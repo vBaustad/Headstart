@@ -7,7 +7,7 @@ if faction == "Horde" or not RXPGuides then return end   -- the scanner and logg
 RXPGuides.RegisterGuide([[
 #forever
 #season 0,1
-#version 8
+#version 9
 << Alliance Dwarf Paladin
 #group YippRoute Launch (A)
 #subgroup Launch day
@@ -20,8 +20,8 @@ step
     .destroy 6948 >> Delete the |T134414:0|t[Hearthstone]
 step
     #completewith MiningPick
-    +Loot everything: 45c for Mining Pack, Pick and Mining
-    .money >0.0045,1
+    +Loot everything until you have 73c (Mining Pack, Pick, Hammer, Mining, Blacksmithing)
+    .money >0.0073,1
 step
     #completewith next
     .goto 1426/0,688.98,-6222.47,30 >> Run to |cRXP_FRIENDLY_Talin Keeneye|r
@@ -200,9 +200,10 @@ step
     .goto 1426/0,-664.55,-5499.710
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Loslor Rudge|r
     .vendor >> Vendor trash
-    >>|cRXP_BUY_Buy a|r |T134708:0|t[Mining Pick] |cRXP_BUY_and an|r |T133635:0|t[Apprentice's Mining Pack]
+    >>|cRXP_BUY_Buy a|r |T134708:0|t[Mining Pick]|cRXP_BUY_, a|r |T133635:0|t[Apprentice's Mining Pack] |cRXP_BUY_and a|r |T133057:0|t[Blacksmith Hammer]
     .collect 2901,1 --Mining Pick (1)
     .collect 277115,1 --Apprentice's Mining Pack (1)
+    .collect 5956,1 --Blacksmith Hammer (1)
     .target Loslor Rudge
 step
     .goto 1426/0,-660.91,-5528.93
@@ -212,4 +213,9 @@ step
 step
     .cast 2580 >> Cast |T136025:0|t[Find Minerals]
     .usespell 2580
+step
+    .goto 1426,45.344,51.936
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
+    .train 2018 >> Train |T136241:0|t[Blacksmithing]
+    .target Tognus Flintfire
 ]])
