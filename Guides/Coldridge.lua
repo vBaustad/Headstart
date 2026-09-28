@@ -7,7 +7,7 @@ if faction == "Horde" or not RXPGuides then return end   -- the scanner and logg
 RXPGuides.RegisterGuide([[
 #forever
 #season 0,1
-#version 7
+#version 8
 << Alliance Dwarf Paladin
 #group YippRoute Launch (A)
 #subgroup Launch day
@@ -18,6 +18,10 @@ step
     #optional
     #completewith Talin1
     .destroy 6948 >> Delete the |T134414:0|t[Hearthstone]
+step
+    #completewith MiningPick
+    +Loot everything: 45c for Mining Pack, Pick and Mining
+    .money >0.0045,1
 step
     #completewith next
     .goto 1426/0,688.98,-6222.47,30 >> Run to |cRXP_FRIENDLY_Talin Keeneye|r
@@ -192,11 +196,13 @@ step
     .subzoneskip 800,1
     .isOnQuest 2160
 step
+    #label MiningPick
     .goto 1426/0,-664.55,-5499.710
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Loslor Rudge|r
     .vendor >> Vendor trash
-    >>|cRXP_BUY_Buy a|r |T134708:0|t[Mining Pick]
+    >>|cRXP_BUY_Buy a|r |T134708:0|t[Mining Pick] |cRXP_BUY_and an|r |T133635:0|t[Apprentice's Mining Pack]
     .collect 2901,1 --Mining Pick (1)
+    .collect 277115,1 --Apprentice's Mining Pack (1)
     .target Loslor Rudge
 step
     .goto 1426/0,-660.91,-5528.93
