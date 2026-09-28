@@ -89,6 +89,9 @@ check(s.finished is not None, "scan finished")
 
 # --- run log ---
 run = g.YippRouteDB.runs["Tester-Realm"]
+# at login a quest finished in an earlier session is already complete: not a completion "now"
+g.LOG = lua.eval("{ { 783, true } }")
+g.Fire("QUEST_LOG_UPDATE")
 g.Fire("QUEST_ACCEPTED", 179)
 g.LOG = lua.eval("{ { 179, false } }")
 g.CLOCK += 300; g.XP = 380
