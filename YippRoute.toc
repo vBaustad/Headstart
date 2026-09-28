@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: YippRoute
+## Notes: Private. Launch route for RestedXP, plus a quest scanner and run logger for the route model.
+## Author: vebjorn
+## Version: 0.2.0
+## OptionalDeps: RXPGuides
+## SavedVariables: YippRouteDB
+
+Data\QuestIDs.lua
+Core.lua
+Scan.lua
+Log.lua
+Guides\Coldridge.lua
