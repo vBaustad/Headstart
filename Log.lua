@@ -26,15 +26,19 @@ local function Npc()
     return ok and name or nil
 end
 
+-- The first pass after login only records what is already complete: those were finished in an
+-- earlier session, and logging them "now" would make the objective look instant.
+local primed = false
 local function ScanCompletions()
     for i = 1, C_QuestLog.GetNumQuestLogEntries() do
         local info = C_QuestLog.GetInfo(i)
         local id = info and not info.isHeader and info.questID
         if id and not complete[id] and C_QuestLog.IsComplete(id) then
             complete[id] = true
-            Add("complete", id)
+            if primed then Add("complete", id) end
         end
     end
+    primed = true
 end
 
 local events = CreateFrame("Frame")
