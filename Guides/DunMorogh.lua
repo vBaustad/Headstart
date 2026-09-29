@@ -78,6 +78,8 @@ step
     .target Eric Brighthammer::265813
     .turnin 96608 >>Turn in The Great Outdoors
     .accept 96629 >>Accept Camping 101: Cooking
+    .accept 96046 >>Accept Camping 101: Mining
+    .accept 96044 >>Accept Camping 101: Blacksmithing
 step
     #label SenirEnd
     .goto 1426/0,-501.400,-5643.900
