@@ -199,4 +199,12 @@ YR.StartSplits(YR)
 check(splits.runs["Player-C"] is None, "a character that is already levelled is not timed")
 YR.ShowSplits(YR, False)
 check(g.YippRouteSplitsFrame.hidden is True and g.YippRouteDB.showSplits is False, "splits can be turned off")
+# Runs from before the splits: rebuilt from the run log, logged-out gaps left out, another character cut off
+lua.execute('''YippRouteDB.splits.imported = nil
+YippRouteDB.runs["Old-Realm"] = { track = { {0,1,0,0,1,0}, {30,1,0,0,2,0}, {5000,1,0,0,2,0}, {5030,1,0,0,3,0},
+    {5032,1,0,0,20,0} } }''')
+YR.StartSplits(YR)
+old = [splits.runs[k] for k in splits.runs.keys() if str(k).startswith("log:Old-Realm")]
+ok = len(old) == 1 and old[0].levels[2] == 30 and old[0].levels[3] == 60 and old[0].levels[20] is None
+check(ok, "old run imported: level 2 at 0:30, 3 at 1:00 (an hour logged out skipped), the level-20 main not part of it")
 sys.exit(1 if bad else 0)
