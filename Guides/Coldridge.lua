@@ -7,7 +7,7 @@ if faction == "Horde" or not RXPGuides then return end   -- the scanner and logg
 RXPGuides.RegisterGuide([[
 #forever
 #season 0,1
-#version 9
+#version 10
 << Alliance Dwarf Paladin
 #group YippRoute Launch (A)
 #subgroup Launch day
@@ -86,6 +86,12 @@ step
     .accept 218 >> Accept The Stolen Journal
     .target Grelin Whitebeard
 step
+    .goto 1426/0,571.82,-6371.20
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Nori Pridedrift|r
+    >>|cRXP_WARN_5 minute timer: kill Grik'nir, then die|r
+    .accept 3364 >> Accept Scalding Mornbrew Delivery
+    .target Nori Pridedrift
+step
     #optional
     #label FrostMCave1
     #completewith Grelin
@@ -96,7 +102,7 @@ step
     #completewith Grelin
     .goto 1426,28.298,79.836,15,0
     .goto 1426,29.252,79.043,15,0
-    .goto 1426,30.489,80.165,50 >> Travel towards |cRXP_ENEMY_Grik'nir the Cold|r
+    .goto 1426,30.489,80.165,50 >> Run past the trolls to |cRXP_ENEMY_Grik'nir the Cold|r
 step
     #label Grelin
     .goto 1426,30.489,80.165,0,0
@@ -105,35 +111,16 @@ step
     .complete 218,1 --Collect Grelin Whitebeard's Journal (x1)
     .mob Grik'nir the Cold
 step
-    #optional
-    #completewith Stolen
-    .goto 1426,29.252,79.043,15,0
-    .goto 1426,28.298,79.836,15,0
-    .goto 1426,27.098,80.707,20 >> Exit the Frostmane Cave
-    .subzoneskip 132
-step
-    #label Stolen
-    .goto 1426/0,567.14,-6363.06
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grelin Whitebeard|r
-    .turnin 218 >> Turn in The Stolen Journal
-    .accept 282 >> Accept Senir's Observations
-    .target Grelin Whitebeard
-step
-    .xp 4 >> Grind to level 4
-    .mob Frostmane Troll Whelp
-
-step
-    .goto 1426/0,571.82,-6371.20
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Nori Pridedrift|r
-    >>|cRXP_WARN_5 minute timer|r
-    .accept 3364 >> Accept Scalding Mornbrew Delivery
-    .target Nori Pridedrift
+    #completewith Durnan
+    .deathskip >> Die in the cave and respawn at the Spirit Healer
+    .target Spirit Healer
 step
     #optional
     #completewith next
     .goto 1426,28.792,68.804,12,0
     .goto 1426,28.939,68.387,12 >> Enter Anvilmar
 step
+    #label Durnan
     .goto 1426/0,385.21,-6056.46
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Durnan Furcutter|r
     .turnin 3364 >> Turn in Scalding Mornbrew Delivery
@@ -149,12 +136,6 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grundel Harkin|r
     .vendor >> Vendor trash
     .target Grundel Harkin
-step
-    .goto 1426/0,382.06,-6120.65
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Bromos Grummner|r
-    .train 19740 >> Train |T135906:0|t[Blessing of Might]
-    .train 20271 >> Train |T135959:0|t[Judgement]
-    .target Bromos Grummner
 step
     #completewith next
     .goto 1426/0,497.300,-6118.500,20,0
@@ -174,10 +155,19 @@ step
     .turnin 97277 >>Turn in Grund and Gozwin
     .target Grund Drokda::2756
 step
-    .goto 1426/0,571.82,-6371.20
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Nori Pridedrift|r
+    .goto 1426/0,567.14,-6363.06
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grelin Whitebeard|r and |cRXP_FRIENDLY_Nori Pridedrift|r
+    .turnin 218 >> Turn in The Stolen Journal
+    .accept 282 >> Accept Senir's Observations
+    .target +Grelin Whitebeard
     .turnin 3365 >> Turn in Bring Back the Mug
-    .target Nori Pridedrift
+    .target +Nori Pridedrift
+step
+    .goto 1426/0,382.06,-6120.65
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Bromos Grummner|r in Anvilmar
+    .train 19740 >> Train |T135906:0|t[Blessing of Might]
+    .train 20271 >> Train |T135959:0|t[Judgement]
+    .target Bromos Grummner
 step
     .goto 1426/0,152.900,-6235.800
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Mountaineer Thalos::1965|r
