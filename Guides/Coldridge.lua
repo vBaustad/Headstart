@@ -7,7 +7,7 @@ if faction == "Horde" or not RXPGuides then return end   -- the scanner and logg
 RXPGuides.RegisterGuide([[
 #forever
 #season 0,1
-#version 13
+#version 14
 << Alliance Dwarf Paladin
 #group YippRoute Launch (A)
 #subgroup Launch day
@@ -242,4 +242,5 @@ step
 step
     .cast 2580 >> Cast |T136025:0|t[Find Minerals]
     .usespell 2580
+    .aura 2580
 ]])
