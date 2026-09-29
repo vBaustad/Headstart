@@ -7,7 +7,7 @@ if faction == "Horde" or not RXPGuides then return end   -- the scanner and logg
 RXPGuides.RegisterGuide([[
 #forever
 #season 0,1
-#version 11
+#version 12
 << Alliance Dwarf Paladin
 #group YippRoute Launch (A)
 #subgroup Launch day
@@ -108,7 +108,7 @@ step
     .mob Grik'nir the Cold
 step
     #completewith Durnan
-    .hs >> Hearth to Anvilmar. If you get interrupted, die instead: the Spirit Healer is at Anvilmar
+    .hs >> Hearth to Anvilmar
     .subzoneskip 77
 step
     #optional
@@ -186,6 +186,35 @@ step
     .subzoneskip 800,1
     .isOnQuest 2160
 step
+    .goto 1426,45.344,51.936
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
+    .train 2018 >> Train |T136241:0|t[Blacksmithing]
+    .target Tognus Flintfire
+step
+    .goto 1426/0,-498.400,-5648.400
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Eric Brighthammer::265813|r at the campfire
+    .turnin 96628 >>Turn in The Adventurer
+    .accept 96608 >>Accept The Great Outdoors
+    .target Eric Brighthammer::265813
+step
+    .goto 1426/0,-498.400,-5648.400
+    >>Type |cRXP_WARN_/sit|r by the campfire and wait one minute
+    .complete 96608,1 -- /sit emote in chat 1/1
+    .complete 96608,2 -- Gain boosted rest buff 1/1
+step
+    .goto 1426/0,-498.400,-5648.400
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Eric Brighthammer::265813|r
+    >>Accept every |cRXP_WARN_Camping 101|r he offers
+    .turnin 96608 >>Turn in The Great Outdoors
+    .accept 96629 >>Accept Camping 101: Cooking
+    .target Eric Brighthammer::265813
+step
+    .goto 1426/0,-501.400,-5643.900
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Senir Whitebeard::1252|r
+    .turnin 420 >>Turn in Senir's Observations
+    .accept 98322 >>Accept Secure the Mountain
+    .target Senir Whitebeard::1252
+step
     #label MiningPick
     .goto 1426/0,-664.55,-5499.710
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Loslor Rudge|r
@@ -203,9 +232,4 @@ step
 step
     .cast 2580 >> Cast |T136025:0|t[Find Minerals]
     .usespell 2580
-step
-    .goto 1426,45.344,51.936
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
-    .train 2018 >> Train |T136241:0|t[Blacksmithing]
-    .target Tognus Flintfire
 ]])
