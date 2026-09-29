@@ -7,7 +7,7 @@ if faction == "Horde" or not RXPGuides then return end   -- the scanner and logg
 RXPGuides.RegisterGuide([[
 #forever
 #season 0,1
-#version 12
+#version 13
 << Alliance Dwarf Paladin
 #group YippRoute Launch (A)
 #subgroup Launch day
@@ -191,6 +191,11 @@ step
     .train 2018 >> Train |T136241:0|t[Blacksmithing]
     .target Tognus Flintfire
 step
+    .goto 1426/0,-464.45,-5573.78
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tharek Blackstone|r
+    .accept 400 >> Accept Tools for Steelgrill
+    .target Tharek Blackstone
+step
     .goto 1426/0,-498.400,-5648.400
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Eric Brighthammer::265813|r at the campfire
     .turnin 96628 >>Turn in The Adventurer
@@ -214,6 +219,11 @@ step
     .turnin 420 >>Turn in Senir's Observations
     .accept 98322 >>Accept Secure the Mountain
     .target Senir Whitebeard::1252
+step
+    .goto 1426/0,-682.23,-5488.94
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Beldin Steelgrill|r
+    .turnin 400 >> Turn in Tools for Steelgrill
+    .target Beldin Steelgrill
 step
     #label MiningPick
     .goto 1426/0,-664.55,-5499.710
