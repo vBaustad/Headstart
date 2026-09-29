@@ -41,9 +41,11 @@ end
 local function Refresh()
     if not (frame and frame:IsShown()) then return end
     if not rec then
+        local pb, top = Best(), 1
+        for lvl in pairs(pb and pb.levels or {}) do if lvl > top then top = lvl end end
         frame.top:SetText("Level splits")
-        frame.mid:SetText("|cff999999start a new character to time a run|r")
-        frame.low:SetText("")
+        frame.mid:SetText(pb and ("best: level %d in %s"):format(top, Clock(pb.levels[top])) or "no runs yet")
+        frame.low:SetText("|cff999999a new character is timed from level 1|r")
         return
     end
     local level = UnitLevel("player")
@@ -106,8 +108,42 @@ function YR:ShowSplits(on)
     end
 end
 
+-- Runs from before the splits existed, rebuilt once from the run log's position samples: play time
+-- is the sum of the gaps between samples, leaving out any gap over a minute (logged out). The log
+-- mixes characters under one name, so a level that drops or jumps by more than one is another
+-- character and ends the run; only runs from level 1 count.
+local LOGGED_OUT = 60
+local function ImportLogs()
+    local db = DB()
+    if db.imported then return end
+    db.imported = true
+    local n = 0
+    for char, r in pairs(YippRouteDB.runs or {}) do
+        local cur, prev
+        for _, p in ipairs(r.track or {}) do
+            local t, level = p[1], p[5]
+            if prev and (level < prev[5] or level > prev[5] + 1) then cur = nil end
+            if not cur and level == 1 then
+                cur = { name = char .. " (log)", elapsed = 0, levels = { [1] = 0 } }
+                n = n + 1
+                db.runs["log:" .. char .. ":" .. n] = cur
+            elseif cur and prev then
+                local dt = t - prev[1]
+                if dt <= LOGGED_OUT then cur.elapsed = cur.elapsed + dt end
+                for lvl = prev[5] + 1, level do cur.levels[lvl] = cur.elapsed end
+            end
+            prev = p
+        end
+    end
+    -- a stretch that never left level 2 is a false start, not a run
+    for k, run in pairs(db.runs) do
+        if k:find("^log:") and not run.levels[3] then db.runs[k] = nil end
+    end
+end
+
 -- A new character at level 1 starts a run; one already timed carries on; anyone else is not timed.
 function YR:StartSplits()
+    ImportLogs()
     local name = UnitFullName("player")
     local ok, guid = pcall(function() return UnitGUID("player") .. "" end)
     if not name or name == UNKNOWNOBJECT or name == "Unknown" or not ok then
