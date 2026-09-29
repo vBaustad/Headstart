@@ -200,10 +200,10 @@ YR.ShowSplits(YR, True)
 g.NOW += 1; g.RunTickers()
 f = g.YippRouteSplitsFrame
 row = lambda i: [f.rows[i][c].text for c in (1, 2, 3, 4)]
-check(row(1)[0].startswith("Lvl 3"), f"live row: {row(1)}")
-check(row(2)[0] == "Lvl 2" and row(2)[1] == "|cff40ff400:50|r" and row(2)[2] == "|cff40ff400:50|r"
+check("Level 3" in row(1)[0], f"live row: {row(1)}")
+check(row(2)[0] == "|cff66ccffLevel 2|r" and row(2)[1] == "|cff40ff400:50|r" and row(2)[2] == "|cff40ff400:50|r"
       and row(2)[3] == "|cff40ff40-0:50|r", f"level 2 row, green: {row(2)}")
-check(f.time.text.startswith("Time "), f"total time: {f.time.text}")
+check(f.time.text.startswith("|cff66ccffTime:|r "), f"total time: {f.time.text}")
 lua.execute('''GUID = "Player-C"; XP = 900; LVL = 12''')
 YR.StartSplits(YR)
 check(splits.runs["Player-C"] is None, "a character that is already levelled is not timed")

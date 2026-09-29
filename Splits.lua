@@ -4,21 +4,32 @@
 -- A run starts on a character that logs in at level 1 with no XP; older characters are not timed and
 -- show the best run instead.
 --
---   Time 58:06                        total play time, coloured against the best run at this level
---   XP/hr 15.5k   Ding 4 min          over the last 10 minutes of play
---           level   total   vs best
---   Lvl 8    9:21   58:06   -1:12      the level in progress, live
---   Lvl 7   17:37   48:45   +0:20      each level reached: its own time, time from level 1, difference
+--   XP/hr: 15.5k                      over the last 10 minutes of play
+--   Ding: 4 min                       at that rate
+--   Time: 58:06                       total play time, green while the next level can still beat the best run
+--               level   total  vs best
+--   Level 8 ..   9:21   58:06   -1:12   the level in progress, live
+--   Level 7     17:37   48:45   +0:20   each level reached: its own time, time from level 1, difference
+-- No background: outlined text straight on the screen.
 local _, YR = ...
 
 local TICK = 0.5
 local RATE_WINDOW = 600          -- XP/hour over the last 10 minutes of play
-local ROW_H = 13
+local ROW_H = 16
+local FONT = "Fonts\\FRIZQT__.TTF"
+local TOP = 58                   -- the three lines above the table
 local key, rec, frame, last, ticker
 local lastXP, lastMax, lastLevel
 local rate = {}                  -- { play seconds, XP since level 1 } every few seconds, for XP/hour
 
-local GREEN, RED, WHITE, GREY = "|cff40ff40", "|cffff5050", "|cffffffff", "|cff999999"
+local GREEN, RED, WHITE, GREY, BLUE = "|cff40ff40", "|cffff5050", "|cffffffff", "|cff999999", "|cff66ccff"
+
+local function Text(size)
+    local fs = frame:CreateFontString(nil, "OVERLAY")
+    fs:SetFont(FONT, size, "OUTLINE")
+    fs:SetShadowOffset(1, -1)
+    return fs
+end
 
 local function Clock(s)
     s = floor(s + 0.5)
@@ -75,9 +86,9 @@ local function Row(i)
     local r = frame.rows[i]
     if r then return r end
     r = {}
-    local y = -48 - (i - 1) * ROW_H
-    for c, spec in ipairs({ { "LEFT", 6, 40 }, { "RIGHT", 96, 50 }, { "RIGHT", 150, 54 }, { "RIGHT", 204, 54 } }) do
-        local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local y = -TOP - (i - 1) * ROW_H
+    for c, spec in ipairs({ { "LEFT", 0, 80 }, { "RIGHT", 128, 48 }, { "RIGHT", 186, 58 }, { "RIGHT", 244, 58 } }) do
+        local fs = Text(i == 0 and 11 or 14)
         fs:SetJustifyH(spec[1])
         fs:SetWidth(spec[3])
         fs:SetPoint("TOPLEFT", spec[1] == "LEFT" and spec[2] or spec[2] - spec[3], y)
@@ -101,20 +112,21 @@ local function Refresh()
         local level = UnitLevel("player")
         local theirsNow = pb and pb.levels[level + 1]
         -- green while you can still reach the next level before the best run did
-        frame.time:SetText("Time " .. Vs(run.elapsed, theirsNow))
+        frame.time:SetText(BLUE .. "Time:|r " .. Vs(run.elapsed, theirsNow))
         local xph = XPRate()
         local left = UnitXPMax("player") - UnitXP("player")
-        frame.rate:SetText(xph and xph > 0 and ("XP/hr %s   Ding %d min"):format(Short(xph), math.ceil(left / xph * 60))
-            or GREY .. "XP/hr -   Ding -|r")
+        frame.xph:SetText(BLUE .. "XP/hr:|r " .. (xph and xph > 0 and Short(xph) or "-"))
+        frame.ding:SetText(BLUE .. "Ding:|r " .. (xph and xph > 0 and ("%d min"):format(math.ceil(left / xph * 60)) or "-"))
         -- the level in progress, live
         local since = run.levels[level] or 0
         local seg = pb and pb.levels[level + 1] and pb.levels[level] and pb.levels[level + 1] - pb.levels[level]
         n = n + 1
-        SetRow(n, ("Lvl %d"):format(level + 1) .. GREY .. " ..|r", Vs(run.elapsed - since, seg),
+        SetRow(n, BLUE .. ("Level %d|r"):format(level + 1) .. GREY .. " ..|r", Vs(run.elapsed - since, seg),
             Vs(run.elapsed, theirsNow), Delta(theirsNow and run.elapsed - theirsNow))
     else
-        frame.time:SetText(pb and ("Best run  " .. WHITE .. Clock(pb.levels[Top(pb)]) .. "|r") or "Level splits")
-        frame.rate:SetText(GREY .. "a new character is timed from level 1|r")
+        frame.xph:SetText(BLUE .. "Best run|r")
+        frame.ding:SetText(GREY .. "new characters are timed from level 1|r")
+        frame.time:SetText(BLUE .. "Time:|r " .. (pb and WHITE .. Clock(pb.levels[Top(pb)]) .. "|r" or "-"))
         run, pb = pb, nil
     end
     -- every level reached, newest first
@@ -125,14 +137,14 @@ local function Refresh()
                 local theirs = pb and pb.levels[lvl]
                 local theirSeg = theirs and pb.levels[lvl - 1] and theirs - pb.levels[lvl - 1]
                 n = n + 1
-                SetRow(n, ("Lvl %d"):format(lvl), Vs(at - before, theirSeg), Vs(at, theirs), Delta(theirs and at - theirs))
+                SetRow(n, BLUE .. ("Level %d|r"):format(lvl), Vs(at - before, theirSeg), Vs(at, theirs), Delta(theirs and at - theirs))
             end
         end
     end
     for i = n + 1, #frame.rows do
         for _, fs in ipairs(frame.rows[i]) do fs:Hide() end
     end
-    frame:SetHeight(52 + n * ROW_H)
+    frame:SetHeight(TOP + n * ROW_H)
 end
 
 local function Tick()
@@ -151,17 +163,16 @@ end
 
 local function Build()
     frame = CreateFrame("Frame", "YippRouteSplitsFrame", UIParent)
-    frame:SetSize(212, 60)
+    frame:SetSize(246, TOP)
     frame.rows = {}
     local p = YippRouteDB.splitsPos
     if p then frame:SetPoint(p[1], UIParent, p[1], p[2], p[3]) else frame:SetPoint("TOP", 0, -120) end
-    local bg = frame:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0, 0, 0, 0.55)
-    frame.time = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    frame.time:SetPoint("TOPLEFT", 6, -5)
-    frame.rate = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    frame.rate:SetPoint("TOPLEFT", frame.time, "BOTTOMLEFT", 0, -3)
+    frame.xph = Text(16)
+    frame.xph:SetPoint("TOPLEFT", 0, 0)
+    frame.ding = Text(16)
+    frame.ding:SetPoint("TOPLEFT", 0, -17)
+    frame.time = Text(16)
+    frame.time:SetPoint("TOPLEFT", 0, -34)
     SetRow(0, "", GREY .. "level|r", GREY .. "total|r", GREY .. "vs best|r")
     frame:EnableMouse(true)
     frame:SetMovable(true)
