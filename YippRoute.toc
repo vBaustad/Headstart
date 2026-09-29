@@ -14,3 +14,4 @@ Rewards.lua
 Splits.lua
 Options.lua
 Guides\Coldridge.lua
+Guides\DunMorogh.lua
