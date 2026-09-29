@@ -22,7 +22,7 @@ end
 
 local function Choose(tries)
     local n = GetNumQuestChoices()
-    if n < 2 or IsShiftKeyDown() or UnitLevel("player") > MAX_LEVEL then return end
+    if n < 2 or IsShiftKeyDown() or UnitLevel("player") > MAX_LEVEL or not YR.Option("pickRewards") then return end
     local best, bestScore, bestValue = nil, 0, -1
     for i = 1, n do
         local _, _, _, _, isUsable, itemID = GetQuestItemInfo("choice", i)

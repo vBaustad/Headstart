@@ -1,8 +1,8 @@
 ## Interface: 16001
 ## Title: YippRoute
-## Notes: Private. Launch route for RestedXP, plus a quest scanner and run logger for the route model, and quest rewards picked for you up to level 10.
+## Notes: Private. Launch route for RestedXP, plus a quest scanner and run logger for the route model, quest rewards picked for you up to level 10, and level splits.
 ## Author: vebjorn
-## Version: 0.3.0
+## Version: 0.4.0
 ## OptionalDeps: RXPGuides
 ## SavedVariables: YippRouteDB
 
@@ -11,4 +11,6 @@ Core.lua
 Scan.lua
 Log.lua
 Rewards.lua
+Splits.lua
+Options.lua
 Guides\Coldridge.lua

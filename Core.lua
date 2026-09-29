@@ -20,6 +20,11 @@ function YR.Position()
     if ok and map then return map, x, y end
 end
 
+-- An option from the options page: on unless turned off.
+function YR.Option(key)
+    return YippRouteDB[key] ~= false
+end
+
 function YR.CharKey()
     local name, realm = UnitFullName("player")
     return (name or "?") .. "-" .. (realm or GetRealmName() or "?")
@@ -32,10 +37,13 @@ SlashCmdList.YIPPROUTE = function(msg)
         if arg == "stop" then YR:StopScan() else YR:StartScan() end
     elseif cmd == "log" then
         YR:SetLogging(arg ~= "off")
+    elseif cmd == "splits" then
+        if arg == "reset" then YR:ResetSplits() else YR:ShowSplits(arg ~= "off") end
     else
         YR:ScanStatus()
         YR:LogStatus()
-        YR.Print("/yroute scan (stop) - ask the server about every known quest; /yroute log on|off")
+        YR.Print("/yroute scan (stop) - ask the server about every known quest; /yroute log on|off;"
+            .. " /yroute splits on|off|reset")
     end
 end
 
@@ -48,4 +56,6 @@ f:SetScript("OnEvent", function(self, _, name)
     YippRouteDB.runs = YippRouteDB.runs or {}
     if YippRouteDB.logging == nil then YippRouteDB.logging = true end   -- on by default: that's the point on the beta
     YR:StartLog()
+    YR:StartSplits()
+    YR:BuildOptions()   -- last: Blizzard's options API is the part most likely to differ on this client
 end)

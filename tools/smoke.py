@@ -11,14 +11,19 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 lua = lua51.LuaRuntime(unpack_returned_tuples=True)
 lua.execute(r'''
 FRAMES, TICKERS, NOW, CLOCK = {}, {}, 0, 1000
+-- frames: any method this fake doesn't define is a no-op that returns another fake (textures, font strings)
 local Frame = {}
-Frame.__index = Frame
+Frame.__index = function(_, k) return rawget(Frame, k) or function() return setmetatable({ ev = {} }, Frame) end end
+function Frame:Show() self.hidden = false end
+function Frame:Hide() self.hidden = true end
+function Frame:IsShown() return not self.hidden end
+function Frame:SetText(t) self.text = t end
 function Frame:SetScript(_, fn) self.fn = fn end
 function Frame:RegisterEvent(e) self.ev[e] = true end
 function Frame:UnregisterEvent(e) self.ev[e] = nil end
 function Frame:UnregisterAllEvents() self.ev = {} end
 function Frame:RegisterUnitEvent(e) self.ev[e] = true end
-function CreateFrame() local f = setmetatable({ ev = {} }, Frame) table.insert(FRAMES, f) return f end
+function CreateFrame(_, name) local f = setmetatable({ ev = {} }, Frame) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 function Fire(event, ...) for _, f in ipairs(FRAMES) do if f.ev[event] and f.fn then f.fn(f, event, ...) end end end
 C_Timer = { NewTicker = function(_, fn) local t = { fn = fn, Cancel = function(self) self.dead = true end } table.insert(TICKERS, t) return t end }
 function RunTickers() for _, t in ipairs(TICKERS) do if not t.dead then t.fn() end end end
@@ -36,6 +41,8 @@ function GetRealmName() return "Realm" end
 function UnitClass() return "Paladin", "PALADIN" end
 function UnitRace() return "Dwarf", "Dwarf" end
 function UnitLevel() return 1 end
+GUID = "Player-A"
+function UnitGUID() return GUID end
 XP = 0
 function UnitXP() return XP end
 function UnitXPMax() return 400 end
@@ -72,7 +79,7 @@ function GetQuestLogRewardMoney(id) return KNOWN[id] and KNOWN[id][4] or 0 end
 function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESULT", id, KNOWN[id] ~= nil) end ASKED = {} end
 ''')
 YR = lua.table()
-for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua"):
+for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Options.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("YippRoute", YR)
 YR.QUEST_IDS = lua.eval("{ route = { 179 }, new = { 96628, 5 }, rest = { 99999 } }")
@@ -165,4 +172,31 @@ lua.execute("SHIFT = true")
 check(g.Pick(1, 2) is None, "Shift held: you choose")
 lua.execute("SHIFT = false; LEVEL = 11")
 check(g.Pick(1, 2) is None, "above level 10: you choose")
+
+# Level splits: character A reaches level 2 after 100 s of play; B, a new character, after 50 s - 50 s ahead.
+lua.execute("LVL = 1; function UnitLevel() return LVL end")
+splits = g.YippRouteDB.splits
+a = splits.runs["Player-A"]
+check(a is not None and a.levels[1] == 0, "a level-1 character with no XP starts a run")
+g.RunTickers(); start = a.elapsed
+for _ in range(10):
+    g.NOW += 10; g.RunTickers()
+lua.execute("LVL = 2"); g.Fire("PLAYER_LEVEL_UP", 2)
+a.levels[2] = a.levels[2] - start   # this test only counts its own 100 s
+check(abs(a.levels[2] - 100) < 1, f"A: level 2 at {a.levels[2]:.0f} s of play")
+lua.execute('''GUID = "Player-B"; XP = 0; LVL = 1''')
+YR.StartSplits(YR)
+g.CLOCK += 3600                                  # logged out for an hour: doesn't count
+for _ in range(5):
+    g.NOW += 10; g.RunTickers()
+lua.execute("LVL = 2"); g.Fire("PLAYER_LEVEL_UP", 2)
+b = splits.runs["Player-B"]
+check(abs(b.levels[2] - 50) < 1, f"B: level 2 at {b.levels[2]:.0f} s of play")
+said = g.PRINTS[len(g.PRINTS)]
+check("|cff40ff40-0:50" in said, f"B is told it is 50 s ahead of A: {said}")
+lua.execute('''GUID = "Player-C"; XP = 900; LVL = 12''')
+YR.StartSplits(YR)
+check(splits.runs["Player-C"] is None, "a character that is already levelled is not timed")
+YR.ShowSplits(YR, False)
+check(g.YippRouteSplitsFrame.hidden is True and g.YippRouteDB.showSplits is False, "splits can be turned off")
 sys.exit(1 if bad else 0)
