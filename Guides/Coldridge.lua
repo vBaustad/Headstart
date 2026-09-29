@@ -7,17 +7,13 @@ if faction == "Horde" or not RXPGuides then return end   -- the scanner and logg
 RXPGuides.RegisterGuide([[
 #forever
 #season 0,1
-#version 10
+#version 11
 << Alliance Dwarf Paladin
 #group YippRoute Launch (A)
 #subgroup Launch day
 #name 1-5 Coldridge Valley (Launch)
 #next RestedXP Forever Guide (A)\5-11 Dun Morogh
 
-step
-    #optional
-    #completewith Talin1
-    .destroy 6948 >> Delete the |T134414:0|t[Hearthstone]
 step
     #completewith MiningPick
     +Loot everything until you have 73c (Mining Pack, Pick, Hammer, Mining, Blacksmithing)
@@ -88,7 +84,7 @@ step
 step
     .goto 1426/0,571.82,-6371.20
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Nori Pridedrift|r
-    >>|cRXP_WARN_5 minute timer: kill Grik'nir, then die|r
+    >>|cRXP_WARN_5 minute timer: kill Grik'nir, then hearth|r
     .accept 3364 >> Accept Scalding Mornbrew Delivery
     .target Nori Pridedrift
 step
@@ -112,8 +108,12 @@ step
     .mob Grik'nir the Cold
 step
     #completewith Durnan
-    .deathskip >> Die in the cave and respawn at the Spirit Healer
-    .target Spirit Healer
+    .hs >> Hearth to Anvilmar. If you get interrupted, die instead: the Spirit Healer is at Anvilmar
+    .subzoneskip 77
+step
+    #optional
+    #completewith Durnan
+    .destroy 6948 >> Delete the |T134414:0|t[Hearthstone]. Binding at an inn gives a new one
 step
     #optional
     #completewith next
