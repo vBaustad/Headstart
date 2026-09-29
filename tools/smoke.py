@@ -62,7 +62,7 @@ function GetQuestLogRewardMoney(id) return KNOWN[id] and KNOWN[id][4] or 0 end
 function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESULT", id, KNOWN[id] ~= nil) end ASKED = {} end
 ''')
 YR = lua.table()
-for f in ("Core.lua", "Scan.lua", "Log.lua"):
+for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("YippRoute", YR)
 YR.QUEST_IDS = lua.eval("{ route = { 179 }, new = { 96628, 5 }, rest = { 99999 } }")
@@ -108,4 +108,34 @@ check(acc[6] == 1426 and acc[7] == 29.93 and acc[8] == 71.2, f"accept: position 
 check(com[1] - acc[1] == 300 and tin[1] - com[1] == 40, "times: 5 min objective, 40 s to turn in")
 check(tin.xp == 80 and tin.money == 35, "turn-in: XP and money received")
 check(len(run.track) >= 1, "position samples recorded")
+
+# Reward choices: a two-handed weapon beats mail, mail beats water, water beats food; Shift or a level
+# above 10 leaves the choice to you; nothing that fits, nothing chosen.
+lua.execute(r'''
+C_Timer.After = function(_, fn) fn() end
+SHIFT, LEVEL = false, 5
+function IsShiftKeyDown() return SHIFT end
+function UnitLevel() return LEVEL end
+-- id = { equipLoc, classID, subclassID, spell, sellPrice }
+ITEMS = { [1] = { "INVTYPE_2HWEAPON", 2, 5, nil, 50 }, [2] = { "INVTYPE_CHEST", 4, 3, nil, 20 },
+          [3] = { "INVTYPE_CHEST", 4, 2, nil, 99 }, [4] = { "", 0, 5, "Drink", 5 }, [5] = { "", 0, 5, "Food", 9 },
+          [6] = { "INVTYPE_LEGS", 4, 3, nil, 40 }, [7] = { "INVTYPE_WEAPON", 2, 4, nil, 70 } }
+C_Item = { GetItemInfoInstant = function(id) local i = ITEMS[id] return id, "", "", i[1], 0, i[2], i[3] end,
+           GetItemSpell = function(id) return ITEMS[id][4] end,
+           GetItemInfo = function(id) return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, ITEMS[id][5] end }
+CHOICES = {}
+function GetNumQuestChoices() return #CHOICES end
+function GetQuestItemInfo(_, i) return "x", 0, 1, 1, true, CHOICES[i] end
+function GetQuestItemLink(_, i) return "item" .. CHOICES[i] end
+function GetQuestReward(i) PICKED = i end
+function Pick(...) CHOICES = { ... } PICKED = nil Fire("QUEST_COMPLETE") return PICKED end
+''')
+check(g.Pick(3, 2, 1) == 3, "two-hander over mail and leather")
+check(g.Pick(3, 2, 6) == 3, "of two mail pieces, the one that sells for more")
+check(g.Pick(5, 4) == 2, "water over food")
+check(g.Pick(3, 5, 7) is None, "nothing that fits: nothing chosen")
+lua.execute("SHIFT = true")
+check(g.Pick(1, 2) is None, "Shift held: you choose")
+lua.execute("SHIFT = false; LEVEL = 11")
+check(g.Pick(1, 2) is None, "above level 10: you choose")
 sys.exit(1 if bad else 0)
