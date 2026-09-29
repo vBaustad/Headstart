@@ -17,7 +17,7 @@ local TICK = 0.5
 local RATE_WINDOW = 600          -- XP/hour over the last 10 minutes of play
 local ROW_H = 16
 local FONT = "Fonts\\FRIZQT__.TTF"
-local TOP = 58                   -- the three lines above the table
+local TOP = 56                   -- the three lines above the table
 local key, rec, frame, last, ticker
 local lastXP, lastMax, lastLevel
 local rate = {}                  -- { play seconds, XP since level 1 } every few seconds, for XP/hour
@@ -86,12 +86,17 @@ local function Row(i)
     local r = frame.rows[i]
     if r then return r end
     r = {}
-    local y = -TOP - (i - 1) * ROW_H
-    for c, spec in ipairs({ { "LEFT", 0, 80 }, { "RIGHT", 128, 48 }, { "RIGHT", 186, 58 }, { "RIGHT", 244, 58 } }) do
+    -- row 0 is the column headings; the level name hangs from its left edge, each time from its
+    -- right edge, so headings and times line up whatever their font size
+    local y = -TOP - i * ROW_H + (i == 0 and 3 or 0)
+    for c, right in ipairs({ 0, 128, 186, 244 }) do
         local fs = Text(i == 0 and 11 or 14)
-        fs:SetJustifyH(spec[1])
-        fs:SetWidth(spec[3])
-        fs:SetPoint("TOPLEFT", spec[1] == "LEFT" and spec[2] or spec[2] - spec[3], y)
+        if c == 1 then
+            fs:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, y)
+        else
+            fs:SetJustifyH("RIGHT")
+            fs:SetPoint("TOPRIGHT", frame, "TOPLEFT", right, y)
+        end
         r[c] = fs
     end
     frame.rows[i] = r
@@ -144,7 +149,7 @@ local function Refresh()
     for i = n + 1, #frame.rows do
         for _, fs in ipairs(frame.rows[i]) do fs:Hide() end
     end
-    frame:SetHeight(TOP + n * ROW_H)
+    frame:SetHeight(TOP + (n + 1) * ROW_H)
 end
 
 local function Tick()
