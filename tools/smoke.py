@@ -42,6 +42,7 @@ function UnitClass() return "Paladin", "PALADIN" end
 function UnitRace() return "Dwarf", "Dwarf" end
 function UnitLevel() return 1 end
 GUID = "Player-A"
+function wipe(t) for k in pairs(t) do t[k] = nil end return t end
 function UnitGUID() return GUID end
 XP = 0
 function UnitXP() return XP end
@@ -194,6 +195,15 @@ b = splits.runs["Player-B"]
 check(abs(b.levels[2] - 50) < 1, f"B: level 2 at {b.levels[2]:.0f} s of play")
 said = g.PRINTS[len(g.PRINTS)]
 check("|cff40ff40-0:50" in said, f"B is told it is 50 s ahead of A: {said}")
+# the table: the live row for level 3 on top, then level 2 - its own time 0:50 and total 0:50, green against A's 1:40
+YR.ShowSplits(YR, True)
+g.NOW += 1; g.RunTickers()
+f = g.YippRouteSplitsFrame
+row = lambda i: [f.rows[i][c].text for c in (1, 2, 3, 4)]
+check(row(1)[0].startswith("Lvl 3"), f"live row: {row(1)}")
+check(row(2)[0] == "Lvl 2" and row(2)[1] == "|cff40ff400:50|r" and row(2)[2] == "|cff40ff400:50|r"
+      and row(2)[3] == "|cff40ff40-0:50|r", f"level 2 row, green: {row(2)}")
+check(f.time.text.startswith("Time "), f"total time: {f.time.text}")
 lua.execute('''GUID = "Player-C"; XP = 900; LVL = 12''')
 YR.StartSplits(YR)
 check(splits.runs["Player-C"] is None, "a character that is already levelled is not timed")
