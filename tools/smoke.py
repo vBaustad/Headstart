@@ -42,6 +42,11 @@ function UnitClass() return "Paladin", "PALADIN" end
 function UnitRace() return "Dwarf", "Dwarf" end
 function UnitLevel() return 1 end
 GUID = "Player-A"
+HOOKS = {}
+function hooksecurefunc(name, fn) HOOKS[name] = fn end
+function GetMerchantItemLink(i) return "|cffffffff|Hitem:2901::::|h[Mining Pick]|h|r" end
+REGISTERED = {}
+RXPGuides = { RegisterGuide = function(text) table.insert(REGISTERED, text) end }
 function wipe(t) for k in pairs(t) do t[k] = nil end return t end
 function UnitGUID() return GUID end
 XP = 0
@@ -80,7 +85,8 @@ function GetQuestLogRewardMoney(id) return KNOWN[id] and KNOWN[id][4] or 0 end
 function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESULT", id, KNOWN[id] ~= nil) end ASKED = {} end
 ''')
 YR = lua.table()
-for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Options.lua"):
+for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Options.lua", "Guides.lua",
+          "Guides/Coldridge.lua", "Guides/DunMorogh.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("YippRoute", YR)
 YR.QUEST_IDS = lua.eval("{ route = { 179 }, new = { 96628, 5 }, rest = { 99999 } }")
@@ -217,4 +223,35 @@ YR.StartSplits(YR)
 old = [splits.runs[k] for k in splits.runs.keys() if str(k).startswith("log:Old-Realm")]
 ok = len(old) == 1 and old[0].levels[2] == 30 and old[0].levels[3] == 60 and old[0].levels[20] is None
 check(ok, "old run imported: level 2 at 0:30, 3 at 1:00 (an hour logged out skipped), the level-20 main not part of it")
+
+# Shipped guides: both handed to RestedXP at login; a guide splits into steps and joins back unchanged;
+# a saved edit replaces the shipped text; reverting brings it back.
+check(len(g.REGISTERED) == 2, f"two guides registered with RestedXP: {len(g.REGISTERED)}")
+for key in ("coldridge", "dunmorogh"):
+    text = YR.GuideText(YR, key)
+    header, steps = YR.SplitSteps(text)
+    joined = YR.JoinSteps(header, steps)
+    squash = lambda t: [l.rstrip() for l in t.strip().splitlines() if l.strip()]
+    check(squash(joined) == squash(text) and len(steps) > 20, f"{key}: {len(steps)} steps, split and joined back unchanged")
+header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
+summaries = [YR.StepSummary(steps[i]) for i in range(1, len(steps) + 1)]
+check(any(s_ == "Accept The Boar Hunter" for s_ in summaries), f"step summary reads like the guide: {summaries[2]!r}")
+first = steps[1]
+table_remove = lua.eval("function(t, i) return table.remove(t, i) end")
+table_remove(steps, 1)
+YR.SaveCustom(YR, "coldridge", header, steps)
+check(YR.IsCustom(YR, "coldridge") and first not in YR.GuideText(YR, "coldridge"), "an edit (first step removed) is what RestedXP gets")
+YR.RevertGuide(YR, "coldridge")
+check(not YR.IsCustom(YR, "coldridge") and first in YR.GuideText(YR, "coldridge"), "revert gives back the shipped guide")
+
+# Purchases and trainer spells are logged; a spell learned away from a trainer (a level-up) is not
+run = g.YippRouteDB.runs["Tester-Realm"]
+lua.execute('''C_Item.GetItemNameByID = function() return "Mining Pick" end
+C_Spell = { GetSpellName = function() return "Mining" end }''')
+g.HOOKS["BuyMerchantItem"](3, 1)
+g.Fire("TRAINER_SHOW"); g.Fire("LEARNED_SPELL_IN_SKILL_LINE", 2575); g.Fire("TRAINER_CLOSED")
+g.Fire("LEARNED_SPELL_IN_SKILL_LINE", 20271)
+tail = [run.ev[i] for i in range(1, len(run.ev) + 1)][-3:]
+check(tail[0][2] == "buy" and tail[0].item == 2901, f"bought item logged: {tail[0][2]} {tail[0].item}")
+check(tail[2][2] == "learn" and tail[2].spell == 2575, "Mining learned at the trainer logged, the level-up spell not")
 sys.exit(1 if bad else 0)

@@ -1,10 +1,9 @@
 -- YippRoute: launch-day Coldridge Valley for a Dwarf Paladin.
 -- Coordinates and step wording come from RestedXP's Forever guide (Guides/Forever/Alliance-1-14_DwarfGnome.lua,
 -- CC BY-NC-SA 4.0); the order is ours. Why each change exists: S:/forever-data/research/leveling/findings.md
-local faction = UnitFactionGroup("player")
-if faction == "Horde" or not RXPGuides then return end   -- the scanner and logger work without RestedXP
+local _, YR = ...
 
-RXPGuides.RegisterGuide([[
+YR:ShipGuide("coldridge", [[
 #forever
 #season 0,1
 #version 16

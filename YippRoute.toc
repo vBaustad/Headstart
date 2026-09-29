@@ -5,6 +5,7 @@
 ## Version: 0.4.0
 ## OptionalDeps: RXPGuides
 ## SavedVariables: YippRouteDB
+## AddonCompartmentFunc: YippRoute_OnAddonCompartmentClick
 
 Data\QuestIDs.lua
 Core.lua
@@ -13,5 +14,6 @@ Log.lua
 Rewards.lua
 Splits.lua
 Options.lua
+Guides.lua
 Guides\Coldridge.lua
 Guides\DunMorogh.lua

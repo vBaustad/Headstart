@@ -4,6 +4,7 @@
 --            level, death, release (to the Spirit Healer as a ghost), alive (back in the body)
 --            kill (XP from anything but a quest), fight / peace (combat starts / ends)
 --            step (RestedXP's current guide and step), hearth, zone, vendor / trainer / flight
+--            buy (item and count, from a vendor), learn (a spell learned from a trainer)
 --   track  a position sample every 2 seconds: { time, map, x, y, level, XP, flags }
 --          flags: 1 in combat, 2 dead or a ghost, 4 casting or channelling (eating, crafting, hearth)
 local _, YR = ...
@@ -14,6 +15,7 @@ local run, ticker
 local complete = {}      -- questID -> true once its objectives were done (to log that moment once)
 local lastXP, lastMax, lastLevel, turnedInAt
 local lastGuide, lastStep
+local trainerOpen = false
 
 local function Add(kind, questID, extra)
     local map, x, y = YR.Position()
@@ -88,7 +90,9 @@ local NPC_WINDOWS = { MERCHANT_SHOW = "vendor", TRAINER_SHOW = "trainer", TAXIMA
 local events = CreateFrame("Frame")
 events:SetScript("OnEvent", function(_, event, a, b, c)
     if event == "QUEST_ACCEPTED" then
-        Add("accept", a, { npc = Npc(), title = C_QuestLog.GetTitleForQuestID(a) })
+        local objectives = C_QuestLog.GetQuestObjectives(a)
+        Add("accept", a, { npc = Npc(), title = C_QuestLog.GetTitleForQuestID(a),
+            obj = type(objectives) == "table" and #objectives or 0 })
     elseif event == "QUEST_TURNED_IN" then
         complete[a] = nil
         turnedInAt = time()
@@ -115,14 +119,33 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
         if c == HEARTHSTONE then Add("hearth") end
     elseif event == "ZONE_CHANGED_NEW_AREA" then
         Add("zone", nil, { zone = GetZoneText() })
+    elseif event == "TRAINER_CLOSED" then
+        trainerOpen = false
+    elseif event == "LEARNED_SPELL_IN_SKILL_LINE" or event == "LEARNED_SPELL_IN_TAB" then
+        -- only what a trainer taught: a level-up also "learns" passives nobody walks anywhere for
+        if trainerOpen then Add("learn", nil, { spell = a, name = C_Spell.GetSpellName(a) }) end
     elseif NPC_WINDOWS[event] then
+        if event == "TRAINER_SHOW" then trainerOpen = true end
         Add(NPC_WINDOWS[event], nil, { npc = Npc() })
+    end
+end)
+
+-- What was bought, and from whom: the buy goes through BuyMerchantItem, which is not protected.
+hooksecurefunc("BuyMerchantItem", function(index, quantity)
+    if not run then return end
+    local link = GetMerchantItemLink(index)
+    local item = link and tonumber(link:match("item:(%d+)"))
+    if item then
+        Add("buy", nil, { item = item, count = quantity or 1, name = C_Item.GetItemNameByID(item), npc = Npc() })
     end
 end)
 
 local EVENTS = { "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "QUEST_LOG_UPDATE", "PLAYER_XP_UPDATE",
     "PLAYER_LEVEL_UP", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST", "PLAYER_REGEN_DISABLED",
-    "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA", "MERCHANT_SHOW", "TRAINER_SHOW", "TAXIMAP_OPENED" }
+    "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA", "MERCHANT_SHOW", "TRAINER_SHOW", "TRAINER_CLOSED",
+    "TAXIMAP_OPENED" }
+-- the "spell learned" event has a different name in the modern and the Classic API: whichever exists
+local LEARNED = { "LEARNED_SPELL_IN_SKILL_LINE", "LEARNED_SPELL_IN_TAB" }
 
 function YR:StartLog()
     if not YippRouteDB.logging then return end
@@ -137,6 +160,7 @@ function YR:StartLog()
     YippRouteDB.runs[key] = YippRouteDB.runs[key] or { started = time(), ev = {}, track = {} }
     run = YippRouteDB.runs[key]
     for _, e in ipairs(EVENTS) do events:RegisterEvent(e) end
+    for _, e in ipairs(LEARNED) do pcall(events.RegisterEvent, events, e) end
     events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     lastXP, lastMax, lastLevel = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
     ticker = ticker or C_Timer.NewTicker(SAMPLE, Sample)
