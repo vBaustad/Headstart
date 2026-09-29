@@ -17,6 +17,7 @@ function Frame:SetScript(_, fn) self.fn = fn end
 function Frame:RegisterEvent(e) self.ev[e] = true end
 function Frame:UnregisterEvent(e) self.ev[e] = nil end
 function Frame:UnregisterAllEvents() self.ev = {} end
+function Frame:RegisterUnitEvent(e) self.ev[e] = true end
 function CreateFrame() local f = setmetatable({ ev = {} }, Frame) table.insert(FRAMES, f) return f end
 function Fire(event, ...) for _, f in ipairs(FRAMES) do if f.ev[event] and f.fn then f.fn(f, event, ...) end end end
 C_Timer = { NewTicker = function(_, fn) local t = { fn = fn, Cancel = function(self) self.dead = true end } table.insert(TICKERS, t) return t end }
@@ -37,6 +38,15 @@ function UnitRace() return "Dwarf", "Dwarf" end
 function UnitLevel() return 1 end
 XP = 0
 function UnitXP() return XP end
+function UnitXPMax() return 400 end
+COMBAT = false
+function UnitAffectingCombat() return COMBAT end
+function UnitIsDeadOrGhost() return false end
+function UnitIsGhost() return false end
+function UnitCastingInfo() return nil end
+function UnitChannelInfo() return nil end
+function GetZoneText() return "Dun Morogh" end
+UNKNOWNOBJECT = "Unknown"
 function GetBuildInfo() return "1.60.1", "70009" end
 function UnitName() return "Sten Stoutarm" end
 UnitFactionGroup = function() return "Alliance" end
@@ -108,6 +118,23 @@ check(acc[6] == 1426 and acc[7] == 29.93 and acc[8] == 71.2, f"accept: position 
 check(com[1] - acc[1] == 300 and tin[1] - com[1] == 40, "times: 5 min objective, 40 s to turn in")
 check(tin.xp == 80 and tin.money == 35, "turn-in: XP and money received")
 check(len(run.track) >= 1, "position samples recorded")
+check(run.track[1][7] == 0, "position sample carries flags (not in combat)")
+
+# XP from the turn-in above is not a kill; XP after it, in a fight, is. RestedXP's step is logged when it changes.
+g.XP = 460; g.Fire("PLAYER_XP_UPDATE")          # the turn-in's 80 XP, same second as QUEST_TURNED_IN
+g.CLOCK += 10; g.COMBAT = True; g.Fire("PLAYER_REGEN_DISABLED")
+g.XP = 470; g.Fire("PLAYER_XP_UPDATE")          # a kill, 10 XP
+g.COMBAT = False; g.Fire("PLAYER_REGEN_ENABLED")
+lua.execute('''RXP = { currentGuide = { name = "1-5 Coldridge Valley (Launch)" } }; RXPCData = { currentStep = 7 }''')
+g.RunTickers(); g.RunTickers()
+lua.execute("RXPCData.currentStep = 8")
+g.RunTickers()
+kinds = [run.ev[i][2] for i in range(4, len(run.ev) + 1)]
+check(kinds == ["fight", "kill", "peace", "step", "step"], f"fight, one kill, peace, two steps: {kinds}")
+kill = [run.ev[i] for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "kill"][0]
+check(kill.xp == 10, f"kill XP 10: {kill.xp}")
+steps = [run.ev[i].step for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "step"]
+check(list(steps) == [7, 8], f"steps 7 then 8: {list(steps)}")
 
 # Reward choices: a two-handed weapon beats mail, mail beats water, water beats food; Shift or a level
 # above 10 leaves the choice to you; nothing that fits, nothing chosen.
