@@ -55,6 +55,7 @@ f:SetScript("OnEvent", function(self, _, name)
     YippRouteDB = YippRouteDB or {}
     YippRouteDB.runs = YippRouteDB.runs or {}
     if YippRouteDB.logging == nil then YippRouteDB.logging = true end   -- on by default: that's the point on the beta
+    YR:RegisterGuides()
     YR:StartLog()
     YR:StartSplits()
     YR:BuildOptions()   -- last: Blizzard's options API is the part most likely to differ on this client
