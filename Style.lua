@@ -184,6 +184,64 @@ function S.Tip(owner, text)
     GameTooltip:Show()
 end
 
+-- A details card in our look, for the (i) on a settings row: the row's name, then its text wrapped.
+-- S.ShowInfo shows it above owner; pin keeps it there after the mouse moves off, until S.Unpin or
+-- another pin. S.HideInfo hides it unless it is pinned, then brings the pinned one back.
+local info, pinned
+local function InfoCard()
+    if info then return info end
+    info = CreateFrame("Frame", nil, UIParent)
+    info:SetFrameStrata("TOOLTIP")
+    info:SetClampedToScreen(true)
+    info:SetWidth(300)
+    local fill = Rounded(info, "BACKGROUND", "round")
+    fill:SetVertexColor(0.13, 0.14, 0.17, 0.98)
+    info.line = Rounded(info, "BORDER", "roundline")
+    info.title = S.Text(info, 13, S.C.text)
+    info.title:SetPoint("TOPLEFT", 12, -10)
+    info.title:SetPoint("RIGHT", -12, 0)
+    info.body = S.Text(info, 12, S.C.sub)
+    info.body:SetPoint("TOPLEFT", info.title, "BOTTOMLEFT", 0, -6)
+    info.body:SetPoint("RIGHT", -12, 0)
+    info.body:SetWordWrap(true)
+    info.body:SetSpacing(2)
+    info.hint = S.Text(info, 11, S.C.muted)
+    info.hint:SetPoint("TOPLEFT", info.body, "BOTTOMLEFT", 0, -8)
+    return info
+end
+
+function S.ShowInfo(owner, title, text, pin)
+    local f = InfoCard()
+    if pin then pinned = { owner = owner, title = title, text = text } end
+    local isPinned = pinned and pinned.owner == owner
+    f.title:SetText(title)
+    f.body:SetText(text)
+    f.hint:SetText(isPinned and "Pinned: click (i) again to close" or "Click (i) to keep this open")
+    f.line:SetVertexColor(unpack(isPinned and S.C.accent or S.C.lineHi))
+    f:SetHeight(10 + f.title:GetStringHeight() + 6 + f.body:GetStringHeight() + 8
+        + f.hint:GetStringHeight() + 12)
+    f:ClearAllPoints()
+    f:SetPoint("BOTTOMLEFT", owner, "TOPLEFT", 0, 4)
+    f:Show()
+end
+
+function S.HideInfo()
+    if not info then return end
+    if pinned and pinned.owner:IsVisible() then
+        S.ShowInfo(pinned.owner, pinned.title, pinned.text)
+    else
+        pinned = nil
+        info:Hide()
+    end
+end
+
+function S.IsPinned(owner) return pinned and pinned.owner == owner end
+
+function S.Unpin()
+    pinned = nil
+    if info then info:Hide() end
+end
+
 -- On/off switch with its label to the right (and an optional grey note under it).
 function S.Toggle(parent, label, get, set, note)
     local b = CreateFrame("Button", nil, parent)

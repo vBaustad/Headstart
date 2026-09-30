@@ -12,7 +12,7 @@ local DYNAMIC_ICON = 134400     -- the question mark; #showtooltip shows the rea
 local MAX_SLOT = 180
 local SCAN_LEVEL = 60           -- Copy saves every spell; the level limit is a setup option
 
--- What Set up carries over. Every part has a switch on the Character setup page.
+-- What Set up carries over. Every part has a switch in Settings, Character tab.
 local OPTION_DEFAULTS = {
     classSpells = true, maxLevel = 10, placeholders = true, racials = true, professions = true,
     mouseover = "Purify",
@@ -107,7 +107,7 @@ function YS:Scan()
     YippSetupDB.profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots,
         ui = YS:ScanUI() }
     Print(("saved %s: %d spells, %d profession spells, %d macros and %d items. What goes onto a new character is"
-        .. " chosen on the Character setup page."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item))
+        .. " chosen in Settings, Character tab."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item))
 end
 
 --------------------------------------------------------------------------------
