@@ -51,7 +51,7 @@ step
     >>|cRXP_WARN_Make sure your subzone is NOT Coldridge Pass|r
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
     .target Spirit Healer
-step
+step << Warrior/Paladin/Rogue
     .goto 1426,45.344,51.936
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
     .train 2018 >> Train |T136241:0|t[Blacksmithing]

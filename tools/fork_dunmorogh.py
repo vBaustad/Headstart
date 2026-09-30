@@ -35,7 +35,7 @@ nxt = re.search(r"#next (.*)\n", guide).group(1)
 sub(f"#next {nxt}\n", "#next " + ";".join(RXP_GROUP + "\\" + n for n in nxt.split(";")) + "\n")
 
 # Blacksmithing and Tools for Steelgrill first, then the campfire: find the step with The Adventurer
-FIRST = """step
+FIRST = """step << Warrior/Paladin/Rogue
     .goto 1426,45.344,51.936
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
     .train 2018 >> Train |T136241:0|t[Blacksmithing]
