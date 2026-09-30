@@ -26,6 +26,13 @@ step << Hunter/Warrior/Paladin/Shaman/Rogue
     .train 54 >> Train Maces << Rogue/Shaman
     .train 44 >> Train Axes << Shaman
 step
+    #role A,B,C
+    .goto 1455,50.83,5.62
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gerrig Bonegrip|r
+    .target Gerrig Bonegrip
+    .turnin 971 >> Turn in Knowledge in the Deeps
+    .isOnQuest 971
+step
     .goto 1437,8.310,58.533
 .target Karl Boran
 >>Talk to |cRXP_FRIENDLY_Karl Boran|r

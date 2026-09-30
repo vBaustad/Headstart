@@ -738,6 +738,18 @@ step << Dwarf Hunter
     .target Ilyenia Moonfire
     .dungeon DM
 step
+    #role A,B,C
+    .goto 1457,55.36,25.03
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Dawnwatcher Shaedlass|r
+    .target Dawnwatcher Shaedlass
+    .accept 1198 >> Accept In Search of Thaelrid
+step
+    #role A,B,C
+    .goto 1457,55.24,23.99
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Argent Guard Manados|r
+    .target Argent Guard Manados
+    .accept 1199 >> Accept Twilight Falls
+step
     #xprate <1.59
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Chief Archaeologist Greywhisker|r
 	.target Chief Archaeologist Greywhisker

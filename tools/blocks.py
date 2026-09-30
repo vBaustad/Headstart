@@ -13,6 +13,8 @@ server scan), the dungeon mobs almost nothing. The quests in these blocks, at Fo
 # The Restless Dead 3550, An Ancient Grudge 3550, The Treaty of Understanding. Givers and the way in:
 # research/leveling/findings.md (Wowhead's Forever quest pages, warcrafttavern.com).
 HALL_OF_THANES = [
+    # Blackfathom Deeps' Ironforge quest, taken now for the group's BFD run at the end of 21-23 Ashenvale
+    "group: accept 971",
     "group: accept 96403",
     "group: accept 96394",
     "group: goto 1455 43.5 52.0 : Enter the Hall of Thanes with your group: from the Great Forge, face Magni's throne, go left into the spiderweb corridor, down the stairs and the crumbling path (mind the lava), over the bridge",
@@ -25,7 +27,49 @@ HALL_OF_THANES = [
     "group: turnin 96393 98423",
 ]
 
+# Blackfathom Deeps (about level 23): In Search of Thaelrid 9000, Twilight Falls 9550, Blackfathom
+# Villainy 12400, Knowledge in the Deeps 10300 at Forever XP, over 40,000 for one run. The Darnassus
+# quests are taken at the start of 21-23 Ashenvale (Hunters already have them from 19-21), the run is
+# at the Zoram Strand where the route already is, the hand-ins on the route's Darnassus visit.
+BFD_PICKUP = [
+    "group: fly Auberdine : Blackfathom Deeps quests in Darnassus first, for the group run at the Zoram Strand | raw .isNotOnQuest 1198",
+    "group: goto 1439 33.2 39.9 | raw .zone Teldrassil >> Take the boat to Teldrassil | raw .isNotOnQuest 1198",
+    "group: goto 1438 58.399 94.016 | raw .fp Rut'theran >> Get the Rut'theran Village flight path | raw .isNotOnQuest 1198",
+    "group: raw .goto 1438/1,968.90,8795.34 | raw .zone Darnassus >> Take the purple portal into Darnassus | raw .isNotOnQuest 1198",
+    "group: accept 1198",
+    "group: accept 1199",
+    "group: raw .goto 1457,31.0,41.5 | raw .zone Teldrassil >> Take the purple portal back to Rut'theran Village | raw .zoneskip Ashenvale",
+    "group: goto 1438 58.399 94.016 | fly Astranaar | raw .zoneskip Ashenvale",
+]
+BFD_RUN = [
+    "group: goto 1414 44.16 34.85 : Enter Blackfathom Deeps with your group: the temple on the Zoram Strand, then dive down to the entrance",
+    "group: do 1199 : Kill the Twilight's Hammer cultists in the dungeon for Twilight Pendants",
+    "group: do 971 : Find the Lorgalis Manuscript underwater in the flooded halls | raw .isOnQuest 971",
+    "group: raw .turnin 1198 >> Turn in In Search of Thaelrid | raw .accept 1200 >> Accept Blackfathom Villainy | raw >>Talk to |cRXP_FRIENDLY_Argent Guard Thaelrid|r, partway through the dungeon",
+    "group: do 1200 : Kill Twilight Lord Kelris at the Moonshrine for his head",
+]
+BFD_TURNIN = [
+    "group: goto 1439 33.2 39.9 | raw .zone Teldrassil >> Take the boat to Teldrassil | raw .zoneskip Darnassus",
+    "group: raw .goto 1438/1,968.90,8795.34 | raw .zone Darnassus >> Take the purple portal into Darnassus",
+    "group: turnin 1199",
+    "group: turnin 1200",
+]
+
 BLOCKS = {
+    # the Hunters' route ends in Darnassus: the BFD quests there
+    "19-21 Darkshore/Ashenvale": [
+        (r"\.turnin 741\b", "before", ["group: accept 1198", "group: accept 1199"]),
+    ],
+    "21-23 Ashenvale": [
+        (r"\.turnin 967\b", "before", BFD_PICKUP),
+        (r"\.turnin 1009\b", "after", BFD_RUN),
+        (r"Exit Darnassus through the purple portal", "before", BFD_TURNIN),
+        (r"Fly back to Auberdine", "after", ["group: goto 1438 58.399 94.016 | fly Auberdine | raw .isNotOnQuest 942"]),
+    ],
+    # everyone passes Ironforge on the way to the Wetlands
+    "23-24 Wetlands": [
+        (r"\.train 197\b", "after", ["group: turnin 971 | raw .isOnQuest 971"]),
+    ],
     # Dwarf/Gnome: the route ends in Ironforge (about level 14) before the tram: the Hall first
     "12-14 Loch Modan (Dwarf/Gnome)": [
         (r"\.zone Stormwind", "before", HALL_OF_THANES),

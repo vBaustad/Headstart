@@ -11,6 +11,48 @@ YR:ShipGuide("21_23_ashenvale", [[
 #groupid RXP-SRGCE-A1
 #next 23-24 Wetlands;24-27 Redridge/Duskwood
 step
+    #role A,B,C
+    >>Blackfathom Deeps quests in Darnassus first, for the group run at the Zoram Strand
+    .fly Auberdine >> Fly to Auberdine
+    .isNotOnQuest 1198
+step
+    #role A,B,C
+    .goto 1439,33.2,39.9
+    .zone Teldrassil >> Take the boat to Teldrassil
+    .isNotOnQuest 1198
+step
+    #role A,B,C
+    .goto 1438,58.399,94.016
+    .fp Rut'theran >> Get the Rut'theran Village flight path
+    .isNotOnQuest 1198
+step
+    #role A,B,C
+    .goto 1438/1,968.90,8795.34
+    .zone Darnassus >> Take the purple portal into Darnassus
+    .isNotOnQuest 1198
+step
+    #role A,B,C
+    .goto 1457,55.36,25.03
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Dawnwatcher Shaedlass|r
+    .target Dawnwatcher Shaedlass
+    .accept 1198 >> Accept In Search of Thaelrid
+step
+    #role A,B,C
+    .goto 1457,55.24,23.99
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Argent Guard Manados|r
+    .target Argent Guard Manados
+    .accept 1199 >> Accept Twilight Falls
+step
+    #role A,B,C
+    .goto 1457,31.0,41.5
+    .zone Teldrassil >> Take the purple portal back to Rut'theran Village
+    .zoneskip Ashenvale
+step
+    #role A,B,C
+    .goto 1438,58.399,94.016
+    .fly Astranaar >> Fly to Astranaar
+    .zoneskip Ashenvale
+step
 #xprate <1.5 << !Druid
     .goto 1440,26.2,38.6
 .target Delgren the Purifier
@@ -193,6 +235,35 @@ step
 .target Talen
 >>Talk to |cRXP_FRIENDLY_Talen|r
     .turnin 1009 >> Turn in Ruuzel
+step
+    #role A,B,C
+    .goto 1414,44.16,34.85
+    >>Enter Blackfathom Deeps with your group: the temple on the Zoram Strand, then dive down to the entrance
+step
+    #role A,B,C
+    >>Kill the Twilight's Hammer cultists in the dungeon for Twilight Pendants
+    .complete 1199,1 --Collect Twilight Pendant (x10)
+    .mob Twilight Acolyte
+    .mob Twilight Reaver
+    .mob Twilight Aquamancer
+    .mob Twilight Loreseeker
+    .mob Twilight Shadowmage
+    .mob Twilight Elementalist
+step
+    #role A,B,C
+    >>Find the Lorgalis Manuscript underwater in the flooded halls
+    .complete 971,1 --Collect Lorgalis Manuscript (x1)
+    .isOnQuest 971
+step
+    #role A,B,C
+    .turnin 1198 >> Turn in In Search of Thaelrid
+    .accept 1200 >> Accept Blackfathom Villainy
+    >>Talk to |cRXP_FRIENDLY_Argent Guard Thaelrid|r, partway through the dungeon
+step
+    #role A,B,C
+    >>Kill Twilight Lord Kelris at the Moonshrine for his head
+    .complete 1200,1 --Collect Head of Kelris (x1)
+    .mob Twilight Lord Kelris
 step << Druid
     #completewith next
     >>Teleport to Moonglade
@@ -305,6 +376,27 @@ step << Mage/Priest/Warlock
     .isOnQuest 942
 	.goto 1438,29.2,56.7
     .train 227 >> Train Staves
+step
+    #role A,B,C
+    .goto 1439,33.2,39.9
+    .zone Teldrassil >> Take the boat to Teldrassil
+    .zoneskip Darnassus
+step
+    #role A,B,C
+    .goto 1438/1,968.90,8795.34
+    .zone Darnassus >> Take the purple portal into Darnassus
+step
+    #role A,B,C
+    .goto 1457,55.24,23.99
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Argent Guard Manados|r
+    .target Argent Guard Manados
+    .turnin 1199 >> Turn in Twilight Falls
+step
+    #role A,B,C
+    .goto 1457,56.16,24.39
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Dawnwatcher Selgorm|r
+    .target Dawnwatcher Selgorm
+    .turnin 1200 >> Turn in Blackfathom Villainy
 step << !Hunter !NightElf !Rogue
     .isOnQuest 942
     .goto 1457,31.0,41.5,30,0
@@ -314,4 +406,9 @@ step << !Hunter !NightElf !Rogue
 step << !Hunter !NightElf !Rogue
     .isOnQuest 942
     .goto 1438,58.399,94.016
-    .fly Auberdine >>Fly back to Auberdine]])
+    .fly Auberdine >>Fly back to Auberdine
+step
+    #role A,B,C
+    .goto 1438,58.399,94.016
+    .fly Auberdine >> Fly to Auberdine
+    .isNotOnQuest 942]])

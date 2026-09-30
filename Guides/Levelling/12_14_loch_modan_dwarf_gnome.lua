@@ -775,6 +775,12 @@ step
     .zoneskip Stormwind City
 step
     #role A,B,C
+    .goto 1455,50.83,5.62
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gerrig Bonegrip|r
+    .target Gerrig Bonegrip
+    .accept 971 >> Accept Knowledge in the Deeps
+step
+    #role A,B,C
     .goto 1455,31.40,45.40
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thom Filch|r
     .target Thom Filch
