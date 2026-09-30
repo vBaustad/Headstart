@@ -816,15 +816,113 @@ local ACTION_ICON = { accept = YR.STEP_ICON.accept, turnin = YR.STEP_ICON.turnin
     buy = YR.STEP_ICON.buy, learn = YR.STEP_ICON.train, hearth = YR.STEP_ICON.hearth, death = YR.STEP_ICON.death,
     level = YR.STEP_ICON.xp }
 
+-- The details of one logged action, for the panel beside the list: for a quest its whole story
+-- (taken, done, handed in: when, where, from whom, what it gave), else what the log knows.
+local DETAIL_W = 330
+local KIND_NAME = { accept = "Took a quest", complete = "Finished a quest's objectives", turnin = "Handed in a quest",
+    level = "Level up", death = "Died", buy = "Bought", learn = "Learned", hearth = "Hearthstone", sell = "Sold",
+    loot = "Looted" }
+
+local function Where(e)
+    local map = e[6]
+    local info = map and map ~= 0 and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(map)
+    if not map or map == 0 then return "-" end
+    return ("%s  %.1f, %.1f"):format(info and info.name or ("map " .. map), e[7] or 0, e[8] or 0)
+end
+
+-- 1234 copper as "12s 34c"
+local function Coins(c)
+    local g, sv, cu = math.floor(c / 10000), math.floor(c / 100) % 100, c % 100
+    return ((g > 0 and g .. "g " or "") .. ((g > 0 or sv > 0) and sv .. "s " or "") .. cu .. "c")
+end
+
+local function Since(r, t)
+    local start = r and r.started
+    if not start then return "" end
+    local d = t - start
+    return ("  (%d:%02d into the run)"):format(math.floor(d / 60), d % 60)
+end
+
+local function Details(a)
+    local e = a.e
+    local r = YippRouteDB.runs and YippRouteDB.runs[YR.CharKey()]
+    local GREY, WHITE, GOLD = "|cff8a8f99", "|cffeef0f5", "|cffffcc4d"
+    local lines = {}
+    local function Line(label, value) lines[#lines + 1] = GREY .. label .. "|r  " .. WHITE .. value .. "|r" end
+    local link, linkWhat
+    local q = e[3]
+    if (e[2] == "accept" or e[2] == "complete" or e[2] == "turnin") and q and q ~= 0 then
+        local acc, done, tin
+        for _, x in ipairs(r and r.ev or {}) do
+            if x[3] == q then
+                if x[2] == "accept" then acc = x elseif x[2] == "complete" then done = done or x
+                elseif x[2] == "turnin" then tin = x end
+            end
+        end
+        local title = (acc and acc.title) or (C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(q)) or "Quest"
+        lines[1] = GOLD .. title .. "|r"
+        Line("Quest ID", tostring(q))
+        if acc then
+            Line("Taken", date("%H:%M:%S", acc[1]) .. Since(r, acc[1]) .. " at level " .. acc[4])
+            if acc.npc then Line("From", acc.npc) end
+            Line("Where", Where(acc))
+            if acc.obj then Line("Objectives", tostring(acc.obj)) end
+        end
+        if done then
+            Line("Done", date("%H:%M:%S", done[1]) .. (acc and ("  (%d:%02d after taking it)"):format(
+                math.floor((done[1] - acc[1]) / 60), (done[1] - acc[1]) % 60) or ""))
+            Line("Where", Where(done))
+        end
+        if tin then
+            Line("Handed in", date("%H:%M:%S", tin[1]) .. Since(r, tin[1]))
+            if tin.npc then Line("To", tin.npc) end
+            Line("Reward", ("%d XP%s"):format(tin.xp or 0, (tin.money or 0) > 0 and ("  " .. Coins(tin.money)) or ""))
+        elseif not done then
+            Line("Status", "not handed in yet")
+        end
+        link, linkWhat = "https://www.wowhead.com/forever/quest=" .. q, "quest"
+    else
+        lines[1] = GOLD .. a.label .. "|r"
+        Line("What", KIND_NAME[e[2]] or e[2])
+        Line("When", date("%H:%M:%S", e[1]) .. Since(r, e[1]))
+        Line("Level", tostring(e[4]))
+        Line("Where", Where(e))
+        if e.npc then Line("NPC", e.npc) end
+        if e.count then Line("Count", tostring(e.count)) end
+        if e.to then Line("New level", tostring(e.to)) end
+        if e.item then link, linkWhat = "https://www.wowhead.com/forever/item=" .. e.item, "item" end
+        if e.spell then link, linkWhat = "https://www.wowhead.com/forever/spell=" .. e.spell, "spell" end
+    end
+    return table.concat(lines, "\n"), link, linkWhat
+end
+
+local function ShowDetails()
+    local a = run.sel and run.actions and run.actions[run.sel]
+    if not a then
+        run.detail:SetText("|cff8a8f99Click an action to see its details.|r")
+        run.link:Hide() run.linkLabel:Hide()
+        return
+    end
+    local text, link, what = Details(a)
+    run.detail:SetText(text)
+    run.link:SetShown(link ~= nil)
+    run.linkLabel:SetShown(link ~= nil)
+    if link then
+        run.linkLabel:SetText("This " .. what .. " on Wowhead (click, then Ctrl+C):")
+        run.link:SetValue(link)
+    end
+end
+
 local function BuildRun(page)
     local title = S.Text(page, 17)
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText("What this character did")
     run.hint = S.Text(page, 12, S.C.muted)
     run.hint:SetPoint("TOPLEFT", 16, -40)
-    run.list = List(page, PW - 32, math.floor((PH - 130) / 26), 26, function(r, i)
+    run.list = List(page, PW - 32 - DETAIL_W - 12, math.floor((PH - 130) / 26), 26, function(r, i)
         local a = run.actions[i]
-        r.action = a
+        r.action, r.index = a, i
+        r:Select(run.sel == i)
         r.icon:SetTexture(ACTION_ICON[a.e[2]])
         r.label:SetText(a.label)
         r.when:SetText(date("%H:%M", a.e[1]))
@@ -843,12 +941,34 @@ local function BuildRun(page)
         add:SetHeight(22)
         add:SetTextColour(S.C.accent)
         add.tip = "Put this in the open route as a step, after the selected step"
+        r:SetScript("OnClick", function(self)
+            run.sel = self.index
+            run.list:Refresh()
+            ShowDetails()
+        end)
     end)
     run.list:SetPoint("TOPLEFT", 16, -66)
     local frame = CreateFrame("Frame", nil, page)
     frame:SetPoint("TOPLEFT", run.list, -1, 1)
     frame:SetPoint("BOTTOMRIGHT", run.list, 1, -1)
     S.Border(frame)
+    -- the details panel
+    local panel = CreateFrame("Frame", nil, page)
+    panel:SetPoint("TOPLEFT", run.list, "TOPRIGHT", 12, 1)
+    panel:SetSize(DETAIL_W, run.list:GetHeight() + 2)
+    S.Fill(panel, S.C.card)
+    S.Border(panel)
+    run.detail = S.Text(panel, 13)
+    run.detail:SetPoint("TOPLEFT", 14, -14)
+    run.detail:SetPoint("RIGHT", -14, 0)
+    run.detail:SetWordWrap(true)
+    run.detail:SetSpacing(4)
+    run.detail:SetJustifyV("TOP")
+    run.linkLabel = S.Text(panel, 11, S.C.muted)
+    run.linkLabel:SetPoint("BOTTOMLEFT", 14, 44)
+    run.link = S.Input(panel, { width = DETAIL_W - 28 })
+    run.link:SetPoint("BOTTOMLEFT", 14, 14)
+    run.link:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
     run.record = S.Toggle(page, "Record this run", function() return YippRouteDB.logging end,
         function(on) YR:SetLogging(on) end)
     run.record:SetPoint("BOTTOMLEFT", 16, 20)
@@ -869,10 +989,15 @@ end
 local function RefreshRun()
     win.subtitle:SetText("")
     run.actions = YR:RunActions()
-    run.hint:SetText(("%d actions. Add to route puts one in %s, after step %s."):format(#run.actions,
+    run.hint:SetText(("%d actions. Click one for its details; Add to route puts it in %s, after step %s."):format(#run.actions,
         edit.key and YR.GuideName(edit.key) or "the open route", edit.sel or "-"))
-    run.list.offset = math.max(0, #run.actions - #run.list.rows)
+    -- follow the newest actions, but don't jump away from where you were reading
+    if run.seen ~= #run.actions then
+        run.seen = #run.actions
+        run.list.offset = math.max(0, #run.actions - #run.list.rows)
+    end
     run.list:Refresh()
+    ShowDetails()
     run.record:Refresh()
     local stopped = YR:RunStopped()
     run.stop:SetLabel(stopped and "Resume this run" or "Stop this run")

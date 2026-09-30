@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- This run: click an action for its details beside the list. A quest shows when and where you took it, finished it and handed it in, from and to whom, and its XP and money. Everything shows where it happened, and a Wowhead link to copy.
 - The window opens on the route you're on (the one RestedXP has loaded, else your race's starting route), not always Coldridge, so This run's "Add to route" goes to the right one.
 - Quest rewards: a choice that isn't gear or food (a profession to learn, a mining pack or herb bag) is never made for you. It used to take the most valuable, which picked Mining. A choice you made by hand on that quest is still repeated.
 - **Keep what the route needs:** items a route quest still needs (like 4 Chunks of Boar Meat for Stocking Jetsteam, from Coldridge on) say so on their tooltip, and selling one to a vendor warns you straight away so you can buy it back. Read from the routes themselves; on/off in Settings.
