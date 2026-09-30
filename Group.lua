@@ -69,7 +69,11 @@ end
 local function WatchStep()
     local guide, step = Current()
     if guide ~= lastGuide or step ~= lastStep then
+        -- RestedXP moved on to a new route: in a group role, take that route's version for the role
+        -- (a route without one hands over to the solo version of the next)
+        local newRoute = guide ~= lastGuide
         lastGuide, lastStep = guide, step
+        if newRoute and YR.LoadRoleGuide and YR:Role() ~= "solo" then YR:LoadRoleGuide(true) end
         Send(("S\t%s\t%s"):format(guide or "", step or 0))
     end
 end
@@ -194,13 +198,15 @@ end
 
 function YR:SetRole(role)
     YippSetupCharDB.role = role
+    YR:RegisterRole(role)
     YR:SayHello()
     YR:LoadRoleGuide()
 end
 
 -- Switch RestedXP to this role's version of the route it has open (or back to the solo one).
 local function Plain(s) return (s:gsub("%f[%d]0+(%d)", "%1")) end
-function YR:LoadRoleGuide()
+-- quiet: when switching by itself on a new route, say nothing if that route has no version for the role
+function YR:LoadRoleGuide(quiet)
     local rxp = RXP
     local cur = type(rxp) == "table" and rxp.currentGuide
     if not (type(cur) == "table" and cur.name and rxp.GetGuideTable and rxp.LoadGuideTable) then return end
@@ -211,7 +217,7 @@ function YR:LoadRoleGuide()
         local set
         for name, s in pairs(YR.GroupRouteNames or {}) do if Plain(name) == Plain(base) then set = s end end
         if not (set and set[role]) then
-            YR.Print(("%s has no %s version: staying on the solo route."):format(base, role))
+            if not quiet then YR.Print(("%s has no %s version: staying on the solo route."):format(base, role)) end
             return
         end
         target = base .. " (" .. role .. ")"

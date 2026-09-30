@@ -75,11 +75,12 @@ function YR:RegisterGuides()
     if UnitFactionGroup("player") == "Horde" or not (RXPGuides and RXPGuides.RegisterGuide) then return end
     YR:ScanGroupRoutes()
     for _, g in ipairs(YR.shipped) do
-        for _, text in ipairs(YR.RoleVersions(YR:GuideText(g.key))) do
+        for _, text in ipairs(YR.RoleVersions(YR:GuideText(g.key), "solo")) do
             local ok, err = pcall(RXPGuides.RegisterGuide, text)
             if not ok then YR.Print(("guide %s did not load: %s"):format(g.key, tostring(err))) end
         end
     end
+    if YR.Role then YR:RegisterRole(YR:Role()) end
 end
 
 -- Group routes. Two marks in a step:
@@ -107,7 +108,10 @@ end
 local function Sizes(text)
     local roles = text:match("\n#roles%s+([%w,]+)")
     if roles then return { select(2, roles:gsub("[^,]+", "")) } end
-    if text:find("\n%s*#share%s+%d") then return { 2, 3 } end
+    -- split pick-ups, group-only steps, or dungeon steps: a group plays it differently
+    if text:find("\n%s*#share%s+%d") or text:find("\n%s*#role%s") or text:find("\n%s*%.dungeon%s") then
+        return { 2, 3 }
+    end
     return {}
 end
 
@@ -115,8 +119,14 @@ local function Variant(text, role, suffix, size)
     local header, steps = YR.SplitSteps(text)
     local kept = {}
     for _, step in ipairs(steps) do
-        if HasRole(step, role, size) then
-            kept[#kept + 1] = (step:gsub("\n%s*#role%s+[%w,]+", ""):gsub("\n%s*#share%s+%d+", ""))
+        -- a group runs the dungeons: RestedXP's dungeon steps (".dungeon DM", shown only when that
+        -- dungeon is ticked in its settings) always show, and their no-dungeon versions (".dungeon !DM")
+        -- go. Alone, RestedXP's own dungeon setting decides as usual.
+        local skipIfGroup = size and step:find("\n%s*%.dungeon%s+!%a")
+        if HasRole(step, role, size) and not skipIfGroup then
+            step = step:gsub("\n%s*#role%s+[%w,]+", ""):gsub("\n%s*#share%s+%d+", "")
+            if size then step = step:gsub("\n%s*%.dungeon%s+%a+[^\n]*", "") end
+            kept[#kept + 1] = step
         end
     end
     header = ("\n" .. header):gsub("\n#roles[^\n]*", "")   -- a leading newline, so line 1 matches like the rest
@@ -137,16 +147,32 @@ local function Variant(text, role, suffix, size)
 end
 
 -- The texts to register for one route: solo first, then one per role.
-function YR.RoleVersions(text)
+-- only: one role ("Duo A"), "solo" for the solo route alone, or nil for every version.
+function YR.RoleVersions(text, only)
     text = text or ""
-    local out = { Variant(text, "solo") }
+    local out = {}
+    if only == nil or only == "solo" then out[1] = Variant(text, "solo") end
     for _, size in ipairs(Sizes("\n" .. text)) do
         local label = size == 2 and "Duo" or "Trio"
         for i = 1, size do
-            out[#out + 1] = Variant(text, LETTERS[i], label .. " " .. LETTERS[i], size)
+            local role = label .. " " .. LETTERS[i]
+            if only == nil or only == role then out[#out + 1] = Variant(text, LETTERS[i], role, size) end
         end
     end
     return out
+end
+
+-- RestedXP parses every route it is given, and the group versions of the long routes are big: it gets
+-- the solo routes and this character's role's versions; picking another role registers that role's.
+local registered = {}
+function YR:RegisterRole(role)
+    if not (RXPGuides and RXPGuides.RegisterGuide) or not role or role == "solo" or registered[role] then return end
+    registered[role] = true
+    for _, g in ipairs(YR.shipped) do
+        for _, text in ipairs(YR.RoleVersions(YR:GuideText(g.key), role)) do
+            pcall(RXPGuides.RegisterGuide, text)
+        end
+    end
 end
 
 -- Which of our routes have group versions, by name: { [name] = { ["Duo A"] = true, ... } }, so a
