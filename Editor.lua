@@ -165,6 +165,15 @@ end
 -- ---------------------------------------------------------------------------
 -- Routes: the step list, and the buttons under it
 -- ---------------------------------------------------------------------------
+local function DeleteStep(i)
+    if not (i and edit.steps[i]) then return end
+    table.remove(edit.steps, i)
+    Reparse()
+    if edit.sel and edit.sel >= i then edit.sel = edit.sel > 1 and edit.sel - 1 or (#edit.steps > 0 and 1 or nil) end
+    edit.dirty, edit.line = true, nil
+    YR:RefreshWindow()
+end
+
 local function QuestMenu(anchor, onPick)
     local list = {}
     for i = 1, C_QuestLog.GetNumQuestLogEntries() do
@@ -207,7 +216,7 @@ local function BuildStepList(page)
         -- the text runs to the edge unless there are classes to show there
         r.label:ClearAllPoints()
         r.label:SetPoint("LEFT", 68, 0)
-        r.label:SetPoint("RIGHT", info.classes and -82 or -8, 0)
+        r.label:SetPoint("RIGHT", info.classes and -104 or -30, 0)
         r:Select(edit.sel == index)
     end, function() visible = Visible() return #visible end, function(r)
         local grip = r:Tool("grip", nil, "Drag to move")
@@ -222,7 +231,9 @@ local function BuildStepList(page)
         r.icon:SetPoint("LEFT", 46, 0)
         r.label = S.Text(r, 13)
         r.cls = S.Text(r, 11, { 0.55, 0.62, 0.72, 1 })
-        r.cls:SetPoint("RIGHT", -6, 0)
+        r.cls:SetPoint("RIGHT", -28, 0)
+        local del = r:Tool("close", function() DeleteStep(r.index) end, "Delete this step (Undo changes brings it back)", S.C.danger)
+        del:SetPoint("RIGHT", -3, 0)
         r.cls:SetWidth(72)
         r.cls:SetJustifyH("RIGHT")
         r:RegisterForDrag("LeftButton")
@@ -283,15 +294,7 @@ local function BuildStepList(page)
                 YR:RefreshWindow()
             end)
         end, "A step for a quest in your log, here: accept it, or turn it in if it's done" },
-        { "Delete step", function()
-            if not edit.sel then return end
-            table.remove(edit.steps, edit.sel)
-            Reparse()
-            edit.sel = math.min(edit.sel, #edit.steps)
-            if edit.sel == 0 then edit.sel = nil end
-            edit.dirty, edit.line = true, nil
-            YR:RefreshWindow()
-        end },
+        { "Delete step", function() DeleteStep(edit.sel) end, "Delete the selected step (Undo changes brings it back)" },
         { "Move up", function() if edit.sel then Move(edit.sel, edit.sel - 1) end end },
         { "Move down", function() if edit.sel then Move(edit.sel, edit.sel + 1) end end },
         { "Merge up", function()
