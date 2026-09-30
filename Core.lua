@@ -1,4 +1,4 @@
--- Headstart (private): the launch route, plus the two tools that measure what the route model needs.
+-- Headstart: launch-day routes for RestedXP, plus the tools that measure what the routes need.
 --   /headstart      the window (also /yroute)
 --   /headstart scan   ask the server about every known quest ID (name, level, XP, money, objectives)
 --   /headstart log    on/off: record quest accepts, completions and turn-ins with XP, time and position

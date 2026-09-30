@@ -1,9 +1,12 @@
 ## Interface: 16001
 ## Title: Headstart
-## Notes: Private. Launch route for RestedXP, plus a quest scanner and run logger for the route model, quest rewards picked for you up to level 10, level splits, and setting up a new character from your main.
-## Author: vebjorn
-## Version: 0.7.0
+## Notes: Launch-day levelling for WoW: Forever: crowd-aware starting-zone routes for RestedXP, a route editor, level splits, quest rewards picked for you, and new characters set up from your main.
+## Author: vBaustad
+## Version: 0.8.0
+## X-License: CC BY-NC-SA 4.0
+## X-Website: https://github.com/vBaustad/Headstart
 ## OptionalDeps: RXPGuides, AutoFeed
+## IconTexture: Interface\Icons\INV_Misc_Map_01
 ## SavedVariables: YippRouteDB, YippSetupDB
 ## SavedVariablesPerCharacter: YippSetupCharDB
 ## AddonCompartmentFunc: Headstart_OnAddonCompartmentClick
