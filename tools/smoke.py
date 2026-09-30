@@ -452,6 +452,28 @@ if btn is not None:
     check(len(steps) == n_before - 1, f"Delete step, then Save: {n_before} -> {len(steps)} steps")
     YR.RevertGuide(YR, "coldridge")
 
+# This run: clicking a quest action shows its details, with its Wowhead link to copy
+YR.ToggleWindow(YR, "run")
+lua.execute('''
+function ClickFirstQuestRow()
+    for _, f in ipairs(FRAMES) do
+        local a = rawget(f, "action")
+        if type(a) == "table" and (a.e[2] == "accept" or a.e[2] == "turnin") and rawget(f, "fn") then
+            f.fn(f)
+            return a.e[3]
+        end
+    end
+end
+function FindText(prefix)
+    for _, f in ipairs(FRAMES) do
+        local t = rawget(f, "text")
+        if type(t) == "string" and t:sub(1, #prefix) == prefix then return t end
+    end
+end''')
+qid = g.ClickFirstQuestRow()
+link = g.FindText("https://www.wowhead.com/forever/quest=")
+check(qid is not None and link == f"https://www.wowhead.com/forever/quest={qid}", f"clicking a quest in This run shows its Wowhead link: {link}")
+
 # Keep what the route needs: 4 Chunks of Boar Meat for Stocking Jetsteam, needed from Coldridge on (before
 # the quest is even accepted) until it is turned in. Skill-up lines (.collect with flags) don't count.
 count, what = YR.RouteNeed(769)
