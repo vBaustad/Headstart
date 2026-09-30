@@ -266,6 +266,16 @@ YR.StartSplits(YR)
 old = [splits.runs[k] for k in splits.runs.keys() if str(k).startswith("log:Old-Realm")]
 ok = len(old) == 1 and old[0].levels[2] == 30 and old[0].levels[3] == 60 and old[0].levels[20] is None
 check(ok, "old run imported: level 2 at 0:30, 3 at 1:00 (an hour logged out skipped), the level-20 main not part of it")
+# The run to beat has a time for every level: a faster one first seen part-way (only a level-8 total)
+# would leave every "vs best" cell empty.
+lua.execute('''SAVED_RUNS = YippRouteDB.splits.runs
+YippRouteDB.splits.runs = {
+  partial = { name = "Late-Realm", levels = { [8] = 3485 }, elapsed = 9000 },
+  full = { name = "Full-Realm", levels = { [1] = 0, [2] = 116, [3] = 506, [4] = 952, [5] = 1428, [6] = 1868, [7] = 2925, [8] = 3486 } },
+  short = { name = "Short-Realm", levels = { [1] = 0, [2] = 100, [3] = 400 } } }''')
+best = YR.SplitsBest()
+check(best is not None and best.name == "Full-Realm", f"best run is the fully timed one, not a faster partial one: {best and best.name}")
+lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 
 # Shipped guides: both handed to RestedXP at login; a guide splits into steps and joins back unchanged;
 # a saved edit replaces the shipped text; reverting brings it back.
