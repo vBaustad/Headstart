@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Quest rewards: a choice that isn't gear or food (a profession to learn, a mining pack or herb bag) is never made for you. It used to take the most valuable, which picked Mining. A choice you made by hand on that quest is still repeated.
 - **Keep what the route needs:** items a route quest still needs (like 4 Chunks of Boar Meat for Stocking Jetsteam, from Coldridge on) say so on their tooltip, and selling one to a vendor warns you straight away so you can buy it back. Read from the routes themselves; on/off in Settings.
 - **Stop this run** (This run page): the splits clock and the run log end there; Resume carries on without counting the pause. **A run to beat** off keeps a run out of "vs best".
 - The run log also records sales and quest-item loot.
