@@ -1,4 +1,4 @@
-"""Draw YippRoute's small UI icons: white shapes on transparent, 64x64 TGA (WoW reads uncompressed
+"""Draw Headstart's small UI icons: white shapes on transparent, 64x64 TGA (WoW reads uncompressed
 32-bit TGA with power-of-two sizes). Drawn at 4x and scaled down, so the edges are smooth.
 
     python tools/make_icons.py     -> art/*.tga

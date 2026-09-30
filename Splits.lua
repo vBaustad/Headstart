@@ -12,7 +12,7 @@
 --   Level 8 ..   9:21   58:06   -1:12   the level in progress, live
 --   Level 7     17:37   48:45   +0:20   each level reached: its own time, time from level 1, difference
 -- Outlined text straight on the screen by default; size, lines shown, background and position are
--- settings (YippRouteDB.splitsStyle, YippRouteDB.splitsPos) changed from the YippRoute window.
+-- settings (YippRouteDB.splitsStyle, YippRouteDB.splitsPos) changed from the Headstart window.
 local _, YR = ...
 
 local TICK = 0.5
@@ -262,7 +262,7 @@ function YR:ApplySplitsStyle()
 end
 
 local function Build()
-    frame = CreateFrame("Frame", "YippRouteSplitsFrame", UIParent)
+    frame = CreateFrame("Frame", "HeadstartSplitsFrame", UIParent)
     frame:SetSize(246, TOP)
     frame.rows = {}
     frame.bg = frame:CreateTexture(nil, "BACKGROUND")

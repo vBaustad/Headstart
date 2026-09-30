@@ -1,4 +1,4 @@
-# YippRoute (private)
+# Headstart (private)
 
 The personal launch route, plus the tools that measure what the route model needs. It is not published anywhere, and the repo has no remote.
 
@@ -7,7 +7,7 @@ The personal launch route, plus the tools that measure what the route model need
   - It records name, quest level, XP, money, objectives and group size.
   - Order: RXP's route first, then quests new in Forever, then the rest.
   - XP is as seen at the scanning character's level, so scan on a low character.
-  - `/reload` writes the results to `WTF\Account\<account>\SavedVariables\YippRoute.lua`.
+  - `/reload` writes the results to `WTF\Account\<account>\SavedVariables\Headstart.lua`.
 - **Run log:** on by default; `/yroute log off` turns it off. Per character it records:
   - every quest accepted (with the NPC), objective completed, and turned in (with the XP and money actually received);
   - level-ups and deaths;

@@ -1,12 +1,12 @@
 ## Interface: 16001
-## Title: YippRoute
+## Title: Headstart
 ## Notes: Private. Launch route for RestedXP, plus a quest scanner and run logger for the route model, quest rewards picked for you up to level 10, level splits, and setting up a new character from your main.
 ## Author: vebjorn
 ## Version: 0.7.0
 ## OptionalDeps: RXPGuides, AutoFeed
 ## SavedVariables: YippRouteDB, YippSetupDB
 ## SavedVariablesPerCharacter: YippSetupCharDB
-## AddonCompartmentFunc: YippRoute_OnAddonCompartmentClick
+## AddonCompartmentFunc: Headstart_OnAddonCompartmentClick
 
 Data\QuestIDs.lua
 Core.lua

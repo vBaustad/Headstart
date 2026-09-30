@@ -1,4 +1,4 @@
--- YippRoute: launch-day Coldridge Valley for Dwarves and Gnomes of every class.
+-- Headstart: launch-day Coldridge Valley for Dwarves and Gnomes of every class.
 -- Coordinates and step wording come from RestedXP's Forever guide (Guides/Forever/Alliance-1-14_DwarfGnome.lua,
 -- CC BY-NC-SA 4.0); the order is ours. Why each change exists: S:/forever-data/research/leveling/findings.md
 local _, YR = ...
@@ -8,10 +8,10 @@ YR:ShipGuide("coldridge", [[
 #season 0,1
 #version 18
 << Alliance
-#group YippRoute Launch (A)
+#group Headstart Launch (A)
 #subgroup Launch day
 #name 1-5 Coldridge Valley (Launch)
-#next YippRoute Launch (A)\5-11 Dun Morogh (Launch)
+#next Headstart Launch (A)\5-11 Dun Morogh (Launch)
 
 step
     #optional

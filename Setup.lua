@@ -36,7 +36,7 @@ end
 local MACRO_NAME_MAX = 16
 
 local function Print(msg)
-    print("|cff66ccffYippRoute|r: " .. msg)
+    print("|cff66ccffHeadstart|r: " .. msg)
 end
 YS.Print = Print
 
@@ -392,7 +392,7 @@ end
 --------------------------------------------------------------------------------
 
 StaticPopupDialogs["YIPPSETUP_OVERWRITE"] = {
-    text = "YippRoute: replace the saved layout from %s with this character's?",
+    text = "Headstart: replace the saved layout from %s with this character's?",
     button1 = "Replace",
     button2 = "Cancel",
     OnAccept = function() YS:Scan() YS:Refresh() YR:RefreshWindow() end,
@@ -413,7 +413,7 @@ end
 
 local window
 
--- The first-time window: two choices, in YippRoute's own look.
+-- The first-time window: two choices, in Headstart's own look.
 local function BuildWindow()
     local w = S.Window("YippSetupFrame", 380, 146, "Set up this character")
     w:ClearAllPoints()

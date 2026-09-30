@@ -105,10 +105,10 @@ for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Optio
           "Style.lua", "Step.lua", "Data/SpellLevels.lua", "Setup.lua", "SetupUI.lua", "Editor.lua",
           "Guides/Coldridge.lua", "Guides/DunMorogh.lua", "Guides/Northshire.lua", "Guides/Shadowglen.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
-    chunk("YippRoute", YR)
+    chunk("Headstart", YR)
 YR.QUEST_IDS = lua.eval("{ route = { 179 }, new = { 96628, 5 }, rest = { 99999 } }")
 g = lua.globals()
-g.Fire("ADDON_LOADED", "YippRoute")
+g.Fire("ADDON_LOADED", "Headstart")
 
 bad = 0
 def check(ok, what):
@@ -117,7 +117,7 @@ def check(ok, what):
     print(("ok  " if ok else "FAIL"), what)
 
 # --- scan ---
-g.SlashCmdList.YIPPROUTE("scan")
+g.SlashCmdList.HEADSTART("scan")
 for _ in range(80):              # 8 seconds of ticks, answering whatever was asked
     g.RunTickers(); g.Answer(); g.NOW += 0.1
 s = g.YippRouteDB.scan
@@ -240,7 +240,7 @@ check("|cff40ff40-0:50" in said, f"B is told it is 50 s ahead of A: {said}")
 # the table: the live row for level 3 on top, then level 2 - its own time 0:50 and total 0:50, green against A's 1:40
 YR.ShowSplits(YR, True)
 g.NOW += 1; g.RunTickers()
-f = g.YippRouteSplitsFrame
+f = g.HeadstartSplitsFrame
 row = lambda i: [f.rows[i][c].text for c in (1, 2, 3, 4)]
 check("Level 3" in row(1)[0], f"live row: {row(1)}")
 check(row(2)[0] == "|cff66ccffLevel 2|r" and row(2)[1] == "|cff40ff400:50|r" and row(2)[2] == "|cff40ff400:50|r"
@@ -257,7 +257,7 @@ for _ in range(3):
 g.Fire("TIME_PLAYED_MSG", 36100, 700)
 check(c.elapsed == 36100, "the server's /played wins over our own count (nothing lost to a crash)")
 YR.ShowSplits(YR, False)
-check(g.YippRouteSplitsFrame.hidden is True and g.YippRouteDB.showSplits is False, "splits can be turned off")
+check(g.HeadstartSplitsFrame.hidden is True and g.YippRouteDB.showSplits is False, "splits can be turned off")
 # Runs from before the splits: rebuilt from the run log, logged-out gaps left out, another character cut off
 lua.execute('''YippRouteDB.splits.imported = nil
 YippRouteDB.runs["Old-Realm"] = { track = { {0,1,0,0,1,0}, {30,1,0,0,2,0}, {5000,1,0,0,2,0}, {5030,1,0,0,3,0},
@@ -309,7 +309,7 @@ check(".accept 179 >>Accept Dwarven Outfitters" in steps_["Took Dwarven Outfitte
 check(".collect 2901,1" in steps_["Bought Mining Pick"] and ".train 2575" in steps_["Learned Mining"], "buy and learn steps")
 # the window builds, and a recorded step can be put into the open route
 YR.ToggleWindow(YR)
-check(g.YippRouteWindow is not None and g.YippRouteWindow.hidden is False, "the window opens")
+check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is False, "the window opens")
 header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
 before = len(steps)
 YR.InsertStep(YR, steps_["Bought Mining Pick"])
@@ -327,9 +327,9 @@ YR.RevertGuide(YR, "coldridge")
 YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
 check(True, "settings page with reward settings opens")
 # the minimap button exists and the settings switch hides it
-check(g.YippRouteMinimapButton is not None and g.YippRouteMinimapButton.hidden is not True, "minimap button shown")
+check(g.HeadstartMinimapButton is not None and g.HeadstartMinimapButton.hidden is not True, "minimap button shown")
 YR.ShowMinimapButton(YR, False)
-check(g.YippRouteMinimapButton.hidden is True and g.YippRouteDB.minimapButton is False, "minimap button can be hidden")
+check(g.HeadstartMinimapButton.hidden is True and g.YippRouteDB.minimapButton is False, "minimap button can be hidden")
 
 # The step model: every step of both shipped routes reads into lines and writes back to the same text
 # (spacing aside); the templates make steps; editing a line's argument changes only that argument.
@@ -380,7 +380,7 @@ YR.ToggleWindow(YR, "routes")
 count_text = None
 btn = g.FindButton("Delete step")
 check(btn is not None, "the Delete step button exists")
-before = g.YippRouteWindow and None
+before = g.HeadstartWindow and None
 lua.execute("DEL_BEFORE = nil")
 header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
 n_before = len(steps)
