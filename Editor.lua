@@ -852,6 +852,18 @@ local function BuildRun(page)
     run.record = S.Toggle(page, "Record this run", function() return YippRouteDB.logging end,
         function(on) YR:SetLogging(on) end)
     run.record:SetPoint("BOTTOMLEFT", 16, 20)
+    -- Stop run: the splits clock and the log end here, so a run finished (or abandoned) is timed to
+    -- that moment. A run with a mistake in it can be kept out of "vs best".
+    run.stop = S.Button(page, "Stop this run", function()
+        if YR:RunStopped() then YR:ResumeRun() else YR:StopRun() end
+        YR:RefreshWindow()
+    end, nil, 130)
+    run.stop:SetPoint("BOTTOMRIGHT", -16, 16)
+    run.counts = S.Toggle(page, "A run to beat", function() return YR:RunCounts() end,
+        function(on) YR:SetRunCounts(on) end)
+    run.counts:SetWidth(150)
+    run.counts:SetPoint("RIGHT", run.stop, "LEFT", -20, -3)
+    run.counts.tip = "Off: other characters' splits don't compare against this run (a missed quest, a test)"
 end
 
 local function RefreshRun()
@@ -862,6 +874,11 @@ local function RefreshRun()
     run.list.offset = math.max(0, #run.actions - #run.list.rows)
     run.list:Refresh()
     run.record:Refresh()
+    local stopped = YR:RunStopped()
+    run.stop:SetLabel(stopped and "Resume this run" or "Stop this run")
+    run.stop.tip = stopped and "Carry on with this run: the time it was stopped doesn't count"
+        or "End this run now: the splits and the log stop here"
+    run.counts:Refresh()
 end
 
 -- ---------------------------------------------------------------------------
@@ -1026,7 +1043,10 @@ local function BuildRouteSettings(page)
     Section("General")
     Row("Minimap button", S.Switch(c, Opt("minimapButton"), SetOpt("minimapButton", function(on) YR:ShowMinimapButton(on) end)))
     Row("Record runs", S.Switch(c, Opt("logging"), SetOpt("logging", function(on) YR:SetLogging(on) end)),
-        "Quests, levels, deaths, purchases and your position every 2 seconds, for This run and the route analysis")
+        "Quests, levels, deaths, purchases, sales, quest loot and your position every 2 seconds, for This run and the route analysis")
+    Row("Keep what the route needs", S.Switch(c, Opt("sellGuard"), SetOpt("sellGuard")),
+        "Items a route quest still needs (like the boar meat for Stocking Jetsteam) say so on their tooltip, and"
+        .. " selling one to a vendor warns you, so you can buy it back from the Buyback tab")
 
     Section("Level splits")
     Row("Show level splits", S.Switch(c, Opt("showSplits"), SetOpt("showSplits", function(on) YR:ShowSplits(on) end)))

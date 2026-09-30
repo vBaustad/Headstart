@@ -128,12 +128,14 @@ function YR.StepSummary(step)
 end
 
 function YR:SaveCustom(key, header, steps)
+    if YR.ForgetNeeds then YR:ForgetNeeds() end
     local old = Custom()[key]
     Custom()[key] = { text = YR.JoinSteps(header, steps), saved = time(),
         base = old and old.base or (byKey[key] and byKey[key].text) }
 end
 
 function YR:RevertGuide(key)
+    if YR.ForgetNeeds then YR:ForgetNeeds() end
     Custom()[key] = nil
 end
 
@@ -246,6 +248,7 @@ end
 
 -- Take the new shipped route into the player's edited one. Returns the number of clashes.
 function YR:MergeUpdate(key)
+    if YR.ForgetNeeds then YR:ForgetNeeds() end
     local c, g = Custom()[key], byKey[key]
     if not (c and g and c.base) then return end
     local bHead, bSteps = YR.SplitSteps(c.base)
@@ -265,6 +268,7 @@ function YR:CanUndoMerge(key)
 end
 
 function YR:UndoMerge(key)
+    if YR.ForgetNeeds then YR:ForgetNeeds() end
     local c = Custom()[key]
     if not (c and c.before) then return end
     Custom()[key] = { text = c.before.text, base = c.before.base, saved = time(), told = c.told }

@@ -62,6 +62,7 @@ f:SetScript("OnEvent", function(self, _, name)
     YR:RegisterGuides()
     YR:RegisterExtras()
     YR:StartLog()
+    YR:HookTooltips()
     YR:StartSplits()
     YR:BuildMinimapButton()
     YR:BuildOptions()   -- last: Blizzard's options API is the part most likely to differ on this client

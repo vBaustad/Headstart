@@ -91,7 +91,7 @@ local function Best()
         local top = Top(r)
         local t = r.levels[top] or r.elapsed
         local full = Complete(r)
-        if k ~= key and top > 1 and (not best or (full and not bestFull)
+        if k ~= key and top > 1 and not r.noBest and (not best or (full and not bestFull)
                 or (full == bestFull and (top > bestTop or (top == bestTop and t < bestTime)))) then
             best, bestTop, bestTime, bestFull = k, top, t, full
         end
@@ -178,6 +178,10 @@ local function Refresh()
         frame.xph:SetText("")
         frame.ding:SetText("")
         frame.time:SetText(BLUE .. "Time:|r " .. GREY .. "asking the server...|r")
+    elseif run and run.stopped then
+        frame.xph:SetText(BLUE .. "Run stopped|r" .. (run.noBest and GREY .. "  (not a run to beat)|r" or ""))
+        frame.ding:SetText(GREY .. "Resume it on the This run page|r")
+        frame.time:SetText(BLUE .. "Time:|r " .. WHITE .. Clock(run.elapsed) .. "|r")
     elseif run then
         local level = UnitLevel("player")
         local theirsNow = pb and pb.levels[level + 1]
@@ -223,7 +227,7 @@ end
 
 local function Tick()
     local now = GetTime()
-    if rec and last then
+    if rec and last and not rec.stopped then
         rec.elapsed = rec.elapsed + (now - last)
         local newest = rate[#rate]
         if not newest or rec.elapsed - newest[1] >= 5 then
@@ -385,6 +389,28 @@ function YR:StartSplits()
     if YippRouteDB.showSplits ~= false then YR:ShowSplits(true) end
 end
 
+-- Stop run: the clock and the levels stop here, and the run log ends (until Resume). A stopped run
+-- still counts as a run to beat unless the player says it shouldn't (noBest: a missed quest, say).
+function YR:StopRun()
+    if rec and not rec.stopped then rec.stopped = time() end
+    if YR.StopLog then YR:StopLog() end
+    Refresh()
+end
+
+function YR:ResumeRun()
+    if rec and rec.stopped then
+        rec.stopped, rec.resuming = nil, true
+        last = GetTime()
+        AskPlayed()
+    end
+    if YR.ResumeLog then YR:ResumeLog() end
+    Refresh()
+end
+
+function YR:RunStopped() return rec and rec.stopped ~= nil or false end
+function YR:RunCounts() return not (rec and rec.noBest) end
+function YR:SetRunCounts(on) if rec then rec.noBest = not on or nil end Refresh() end
+
 function YR:ResetSplits()
     if key then DB().runs[key] = nil end
     rec = nil
@@ -400,13 +426,16 @@ f:SetScript("OnEvent", function(_, event, level, atLevel)
     if event == "TIME_PLAYED_MSG" then
         -- level is the total here, atLevel the time at this level: the server's word replaces our count
         Unmute()
-        if rec and type(level) == "number" then
-            rec.elapsed = level
+        if rec and type(level) == "number" and not rec.stopped then
+            -- after a Resume, the time the run was stopped doesn't count
+            if rec.resuming then rec.paused, rec.resuming = level - rec.elapsed, nil end
+            local total = level - (rec.paused or 0)
+            rec.elapsed = total
             last = GetTime()
             local lvl = UnitLevel("player")
-            if not rec.levels[lvl] and type(atLevel) == "number" then rec.levels[lvl] = level - atLevel end
-            synced = true
+            if not rec.levels[lvl] and type(atLevel) == "number" then rec.levels[lvl] = total - atLevel end
         end
+        synced = true
         Refresh()
         return
     end
@@ -420,7 +449,7 @@ f:SetScript("OnEvent", function(_, event, level, atLevel)
         lastXP, lastMax, lastLevel = xp, UnitXPMax("player"), lvl
         return
     end
-    if rec then
+    if rec and not rec.stopped then
         rec.levels[level] = rec.elapsed
         C_Timer.After(1, AskPlayed)          -- and check our count against the server's
         local pb = Best()

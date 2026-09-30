@@ -74,6 +74,11 @@ step
     .complete 182,1 --Kill Frostmane Troll Whelp (x14)
     .mob Frostmane Troll Whelp
 step
+    .goto 1426,25.861,78.197,45,0
+    .goto 1426,23.716,80.257,45,0
+    .xp 3+1040 >> Kill trolls to 1040+/1400 XP: be level 4 at the turn-in (Nori's quest needs it)
+    .mob Frostmane Troll Whelp
+step
     .goto 1426/0,567.09,-6362.99
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grelin Whitebeard|r
     .turnin 182 >> Turn in The Troll Cave
@@ -128,7 +133,7 @@ step
 step
     .goto 1426,28.792,67.837
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grundel Harkin|r
-    .vendor >> Vendor trash
+    .vendor >> Vendor trash. Keep 4 |T133970:0|t[Chunk of Boar Meat] (Stocking Jetsteam)
     .target Grundel Harkin
 step << Paladin
     .goto 1426/0,382.06,-6120.65
