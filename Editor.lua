@@ -910,6 +910,14 @@ local function BuildSettings(page)
     local st = function() return YR:SplitsStyle() end
     local function Style(field) return function(v) st()[field] = v YR:ApplySplitsStyle() end end
 
+    Section("Character setup")
+    local copy = S.Button(c, "Copy this layout", function() YR.Setup:Copy() YR:RefreshWindow() end, nil, 170)
+    copy.tip = "On your main: save its bars, macros, Edit Mode layout and game settings"
+    Row("Save this character's layout", copy)
+    local apply = S.Button(c, "Set up layout", function() YR.Setup:Apply() YR:RefreshWindow() end, "primary", 170)
+    apply.tip = "On a new character: put the saved layout on this one"
+    Row("Set this character up from it", apply)
+
     Section("General")
     Row("Minimap button", S.Switch(c, Opt("minimapButton"), SetOpt("minimapButton", function(on) YR:ShowMinimapButton(on) end)))
     Row("Record runs", S.Switch(c, Opt("logging"), SetOpt("logging", function(on) YR:SetLogging(on) end)),
