@@ -893,12 +893,13 @@ local function RowPage(page, controls, bottom)
         L.rowIndex = 0
     end
     -- The whole row lights up under the mouse, the control included. A row with details has an (i)
-    -- after its name: pointing anywhere on the row but its control shows them, and a click on the row
-    -- keeps them open.
-    local rows, hot, carded = {}, nil, nil
+    -- after its name: pointing at the (i) shows them, and a click on it keeps them open.
+    local rows, hot = {}, nil
     local function Paint(r)
         r.hl:SetShown(r == hot)
-        if r.infoIcon then r.infoIcon:SetVertexColor(unpack((r == hot or S.IsPinned(r)) and S.C.accent or S.C.muted)) end
+        if r.infoBtn then
+            r.infoBtn.icon:SetVertexColor(unpack((r.infoBtn:IsMouseOver() or S.IsPinned(r)) and S.C.accent or S.C.muted))
+        end
     end
     area:SetScript("OnUpdate", function()
         local now
@@ -913,15 +914,10 @@ local function RowPage(page, controls, bottom)
             if was then Paint(was) end
             if now then Paint(now) end
         end
-        local want = hot and hot.tip and not hot.control:IsMouseOver() and hot or nil
-        if want ~= carded then
-            carded = want
-            if want then S.ShowInfo(want, want.label, want.tip) else S.HideInfo() end
-        end
     end)
     area:SetScript("OnHide", function()
         S.Unpin()
-        hot, carded = nil, nil
+        hot = nil
         for _, r in ipairs(rows) do Paint(r) end
     end)
     function L.Row(label, control, tip)
@@ -934,18 +930,22 @@ local function RowPage(page, controls, bottom)
         local l = S.Text(r, 13)
         l:SetPoint("LEFT", 12, 0)
         l:SetText(label)
-        r.label, r.tip, r.control, r.infoIcon = label, tip, control, false
+        r.control, r.infoBtn = control, false
         if tip then
-            r.infoIcon = r:CreateTexture(nil, "ARTWORK")
-            r.infoIcon:SetSize(14, 14)
-            r.infoIcon:SetPoint("LEFT", l, "RIGHT", 6, 0)
-            S.ArtTexture(r.infoIcon, "info")
-            r:EnableMouse(true)
-            r:SetScript("OnMouseUp", function(self)
-                if S.IsPinned(self) then S.Unpin() carded = nil
-                else S.ShowInfo(self, label, tip, true) carded = self end
+            local b = CreateFrame("Button", nil, r)
+            b:SetSize(20, 20)
+            b:SetPoint("LEFT", l, "RIGHT", 4, 0)
+            b.icon = b:CreateTexture(nil, "ARTWORK")
+            b.icon:SetSize(14, 14)
+            b.icon:SetPoint("CENTER")
+            S.ArtTexture(b.icon, "info")
+            b:SetScript("OnEnter", function() S.ShowInfo(r, label, tip) Paint(r) end)
+            b:SetScript("OnLeave", function() S.HideInfo() Paint(r) end)
+            b:SetScript("OnClick", function()
+                if S.IsPinned(r) then S.Unpin() else S.ShowInfo(r, label, tip, true) end
                 for _, o in ipairs(rows) do Paint(o) end
             end)
+            r.infoBtn = b
         end
         rows[#rows + 1] = r
         Paint(r)
