@@ -75,7 +75,8 @@ function YR.RewardKind(itemID)
     local _, _, _, equipLoc, _, classID, subclassID = C_Item.GetItemInfoInstant(itemID)
     if SLOT[equipLoc] then return SLOT[equipLoc] end
     if classID == ARMOR then return ARMOR_KIND[subclassID] end
-    if classID == CONTAINER then return "bag" end
+    -- a plain bag only: a mining pack or herb bag is a profession choice, not an upgrade
+    if classID == CONTAINER then return subclassID == 0 and "bag" or nil end
     if classID == CONSUMABLE then
         if subclassID == 1 then return "potion" end
         if subclassID == 5 then
@@ -114,6 +115,14 @@ local function Choose(tries)
     local mine = db.remember and db.chosen[GetQuestID()]
     if mine then
         for i = 1, n do if items[i] == mine.item then return Take(i) end end
+    end
+    -- a choice that isn't gear or food (a profession to learn, a profession bag, a pet): yours, unless you chose
+    -- it by hand on this quest before (above)
+    for i = 1, n do
+        if not kinds[i] then
+            YR.Print("this quest's rewards aren't gear: pick the one you want.")
+            return
+        end
     end
     -- 2. your priority list; the more valuable of two of the same kind
     for _, kind in ipairs(db.order) do

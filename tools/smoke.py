@@ -188,7 +188,8 @@ function GetTitleText() return "A Quest" end
 ITEMS = { [1] = { "INVTYPE_2HWEAPON", 2, 5, nil, 50 }, [2] = { "INVTYPE_CHEST", 4, 3, nil, 20 },
           [3] = { "INVTYPE_CHEST", 4, 2, nil, 99 }, [4] = { "", 0, 5, "Drink", 5 }, [5] = { "", 0, 5, "Food", 9 },
           [6] = { "INVTYPE_LEGS", 4, 3, nil, 40 }, [7] = { "INVTYPE_WEAPON", 2, 4, nil, 70 },
-          [8] = { "INVTYPE_FINGER", 4, 0, nil, 30 } }
+          [8] = { "INVTYPE_FINGER", 4, 0, nil, 30 },
+          [9] = { "INVTYPE_BAG", 1, 6, nil, 25 }, [10] = { "INVTYPE_BAG", 1, 2, nil, 10 } }   -- mining pack, herb bag
 C_Item = { GetItemInfoInstant = function(id) local i = ITEMS[id] or { "", 12, 0 } return id, "", "", i[1], 0, i[2], i[3] end,
            GetItemNameByID = function(id) return ({ [769] = "Chunk of Boar Meat", [2886] = "Crag Boar Rib" })[id] end,
            GetItemCount = function() return 3 end,
@@ -222,6 +223,12 @@ lua.execute("LEVEL = 11")
 check(g.Pick(1, 2) is None, "above the level limit: you choose")
 lua.execute("YippRouteDB.rewards.maxLevel = 12")
 check(g.Pick(1, 2) == 1, "the level limit is a setting")
+check(g.Pick(9, 10) is None, "a profession choice (mining pack or herb bag) is never made for you")
+check(g.Pick(2, 9) is None, "... not even next to a piece of gear")
+lua.execute("QUEST = 201; CHOICES = { 9, 10 }")
+g.HOOKS["GetQuestReward"](2)                           # you took the herb bag by hand
+check(g.Pick(9, 10) == 2, "but the one you picked by hand for that quest is taken again")
+lua.execute("QUEST = 200")
 lua.execute("LEVEL = 5")
 
 # Level splits: the time is the server's /played. A reaches level 2 after 100 s of play; B, a new
