@@ -1,4 +1,4 @@
--- The Blizzard options entry (Esc > Options > AddOns > YippRoute) only points at our own window,
+-- The Blizzard options entry (Esc > Options > AddOns > Headstart) only points at our own window,
 -- where the settings live with the rest; and the minimap button that opens that window.
 local _, YR = ...
 
@@ -8,16 +8,16 @@ function YR:BuildOptions()
     local panel = CreateFrame("Frame")
     local title = S.Text(panel, 20)
     title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("YippRoute")
+    title:SetText("Headstart")
     local note = S.Text(panel, 13, S.C.muted)
     note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    note:SetText("Routes, this run, sharing and settings are in YippRoute's own window.")
-    local open = S.Button(panel, "Open YippRoute", function()
+    note:SetText("Routes, this run, sharing and settings are in Headstart's own window.")
+    local open = S.Button(panel, "Open Headstart", function()
         if SettingsPanel then HideUIPanel(SettingsPanel) end
         YR:ToggleWindow("settings")
     end, "primary")
     open:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -14)
-    local category = Settings.RegisterCanvasLayoutCategory(panel, "YippRoute")
+    local category = Settings.RegisterCanvasLayoutCategory(panel, "Headstart")
     Settings.RegisterAddOnCategory(category)
 end
 
@@ -43,7 +43,7 @@ end
 
 function YR:BuildMinimapButton()
     if button or not Minimap then return end
-    button = CreateFrame("Button", "YippRouteMinimapButton", Minimap)
+    button = CreateFrame("Button", "HeadstartMinimapButton", Minimap)
     button:SetSize(31, 31)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
@@ -68,7 +68,7 @@ function YR:BuildMinimapButton()
     button:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("YippRoute")
+        GameTooltip:AddLine("Headstart")
         GameTooltip:AddLine("Click: routes, this run, share", 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Right-click: settings", 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Drag: move round the minimap", 0.8, 0.8, 0.8)

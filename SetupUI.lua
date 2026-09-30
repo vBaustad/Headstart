@@ -15,8 +15,8 @@ local CVARS = {
     "statusTextDisplay", "cameraDistanceMaxZoomFactor", "showTutorials", "enableFloatingCombatText",
 }
 
--- The RestedXP guide a new character starts on: YippRoute's launch opener for its starting zone.
-local GUIDE_GROUP = "YippRoute Launch (A)"
+-- The RestedXP guide a new character starts on: Headstart's launch opener for its starting zone.
+local GUIDE_GROUP = "Headstart Launch (A)"
 local GUIDE_FOR_RACE = {
     Human = "1-6 Northshire (Launch)",
     NightElf = "1-6 Shadowglen (Launch)",
@@ -96,7 +96,7 @@ local function ApplyGuide()
     if not (rxp and rxp.LoadGuideTable and rxp.GetGuideTable) then return "RestedXP not loaded" end
     local _, race = UnitRace("player")
     local guide = GUIDE_FOR_RACE[race]
-    if not guide then return "no YippRoute opener for this race" end
+    if not guide then return "no Headstart opener for this race" end
     local name = rxp.affix and guide:gsub("^(%d)-(%d%d?)", rxp.affix) or guide
     if not rxp.GetGuideTable(GUIDE_GROUP, name) then return "guide '" .. guide .. "' not found" end
     local ok = pcall(rxp.LoadGuideTable, rxp, GUIDE_GROUP, name)
@@ -107,7 +107,7 @@ end
 -- until then, hovering a button in combat trips ADDON_ACTION_BLOCKED. So Set up layout ends with a
 -- Reload button rather than a line in chat that is easy to miss.
 StaticPopupDialogs["YIPPSETUP_RELOAD"] = {
-    text = "YippRoute: reload the UI to finish setting up the layout.",
+    text = "Headstart: reload the UI to finish setting up the layout.",
     button1 = "Reload",
     button2 = "Later",
     OnAccept = function() ReloadUI() end,

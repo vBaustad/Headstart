@@ -1,4 +1,4 @@
--- Our own look, instead of Blizzard's frames. Every YippRoute window is built from these pieces, so
+-- Our own look, instead of Blizzard's frames. Every Headstart window is built from these pieces, so
 -- the look lives in one place: flat layered panels, a thin border, one accent colour, clean narrow
 -- text, and controls that say what they do.
 local _, YR = ...
@@ -146,7 +146,7 @@ end
 
 -- A square button showing an icon texture or a single character.
 -- Our own icons (art/*.tga, white, tinted here). "down" is "up" turned over.
-S.ART = "Interface\\AddOns\\YippRoute\\art\\"
+S.ART = "Interface\\AddOns\\Headstart\\art\\"
 
 function S.ArtTexture(tex, name)
     tex:SetTexture(S.ART .. (name == "down" and "up" or name))

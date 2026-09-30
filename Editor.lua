@@ -1,4 +1,4 @@
--- The YippRoute window. Opened from the minimap button or /yroute.
+-- The Headstart window. Opened from the minimap button or /yroute.
 --
 --   Routes     the steps of a route on the left; the selected step in full on the right, where every
 --              line of it can be changed, added or removed: places (with "Here"), quests, targets,
@@ -16,8 +16,8 @@ local win, pages, current
 local edit = { key = nil, header = nil, steps = nil, parsed = {}, dirty = false, sel = nil, line = nil, filter = "" }
 local ui = {}
 
-StaticPopupDialogs["YIPPROUTE_RELOAD"] = {
-    text = "YippRoute: reload so RestedXP gets the changed route?",
+StaticPopupDialogs["HEADSTART_RELOAD"] = {
+    text = "Headstart: reload so RestedXP gets the changed route?",
     button1 = "Reload",
     button2 = "Later",
     OnAccept = function() ReloadUI() end,
@@ -709,7 +709,7 @@ local function RefreshInspector()
         ed.single = false
         Field(1, "Value", 10, 220, l.val)
     else
-        ed.what:SetText("A line YippRoute doesn't know: use Edit as text.")
+        ed.what:SetText("A line Headstart doesn't know: use Edit as text.")
         ed.text:Hide() ed.textLabel:Hide()
     end
 end
@@ -722,7 +722,7 @@ local function BuildRoutes(page)
         YR:SaveCustom(edit.key, edit.header, edit.steps)
         edit.dirty = false
         YR:RefreshWindow()
-        StaticPopup_Show("YIPPROUTE_RELOAD")
+        StaticPopup_Show("HEADSTART_RELOAD")
     end, "primary", 110)
     save:SetPoint("BOTTOMLEFT", 16, 16)
     save.tip = "Keep this as your version of the route (RestedXP gets it after a reload)"
@@ -733,7 +733,7 @@ local function BuildRoutes(page)
         YR:RevertGuide(edit.key)
         Open(edit.key)
         YR:RefreshWindow()
-        StaticPopup_Show("YIPPROUTE_RELOAD")
+        StaticPopup_Show("HEADSTART_RELOAD")
     end, nil, 190)
     revert:SetPoint("LEFT", undo, "RIGHT", 8, 0)
     ui.state = S.Text(page, 12, S.C.muted)
@@ -852,7 +852,7 @@ local function BuildShare(page)
         share.hint:SetText(done and ("|cff66dd88Imported:|r " .. done .. ". Reload to use it.") or ("|cffff7070Not imported:|r " .. why))
         if done then
             if edit.key then Open(edit.key) end
-            StaticPopup_Show("YIPPROUTE_RELOAD")
+            StaticPopup_Show("HEADSTART_RELOAD")
         end
     end, nil, 100)
     import:SetPoint("LEFT", export, "RIGHT", 8, 0)
@@ -1304,7 +1304,7 @@ local function RouteButton(parent, key, y)
 end
 
 local function Build()
-    win = S.Window("YippRouteWindow", W, H, "YippRoute")
+    win = S.Window("HeadstartWindow", W, H, "Headstart")
     local side = CreateFrame("Frame", nil, win)
     side:SetPoint("TOPLEFT", 1, -HEAD)
     side:SetPoint("BOTTOMLEFT", 1, 1)
@@ -1345,7 +1345,7 @@ local function Build()
     end
     local version = S.Text(side, 11, S.C.muted)
     version:SetPoint("BOTTOMLEFT", 14, 12)
-    local meta = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("YippRoute", "Version")
+    local meta = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("Headstart", "Version")
     version:SetText(meta and ("v" .. meta) or "")
     if YR.shipped[1] then
         Open(YR.shipped[1].key)
@@ -1367,6 +1367,6 @@ function YR:ToggleWindow(page)
     Show(page or current or "routes")
 end
 
-function YippRoute_OnAddonCompartmentClick()
+function Headstart_OnAddonCompartmentClick()
     YR:ToggleWindow()
 end

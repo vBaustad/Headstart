@@ -26,7 +26,7 @@ function Obj.Show(self) rawset(self, "_shown", true) end
 function Obj.Hide(self) rawset(self, "_shown", false) end
 function Obj.IsShown(self) return rawget(self, "_shown") ~= false end
 function Obj.SetScript(self, what, fn) rawset(self, "_" .. what, fn) end
--- the few getters YippRoute's style kit does arithmetic or tests on
+-- the few getters Headstart's style kit does arithmetic or tests on
 for _, k in ipairs({ "GetStringWidth", "GetWidth", "GetHeight", "GetFrameLevel", "GetLeft", "GetTop",
     "GetVerticalScroll", "GetVerticalScrollRange" }) do Obj[k] = function() return 20 end end
 function Obj.HasFocus() return false end
@@ -133,15 +133,15 @@ Settings = { GetValue = function(k) return SETTINGS[k] end, SetValue = function(
 CVARS = { autoLootDefault = "1", showTutorials = "0" }
 C_CVar = { GetCVar = function(k) return CVARS[k] end, SetCVar = function(k, v) CVARS[k] = v end }
 RXP = { affix = function(a, b) return "0" .. a .. "-0" .. b end, loaded = nil }
-function RXP.GetGuideTable(group, name) return group == "YippRoute Launch (A)" and (name == "01-05 Coldridge Valley (Launch)" or name == "01-06 Northshire (Launch)") and {} or nil end
+function RXP.GetGuideTable(group, name) return group == "Headstart Launch (A)" and (name == "01-05 Coldridge Valley (Launch)" or name == "01-06 Northshire (Launch)") and {} or nil end
 function RXP:LoadGuideTable(group, name) self.loaded = group .. "|" .. name end
 ''')
 YS = lua.table()
 for f in ("Style.lua", "Data/SpellLevels.lua", "Setup.lua", "SetupUI.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
         open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
-    chunk("YippRoute", YS)
-YS = YS.Setup          # the setup's own table inside YippRoute
+    chunk("Headstart", YS)
+YS = YS.Setup          # the setup's own table inside Headstart
 
 g = lua.globals()
 lua.execute(r'''
@@ -255,7 +255,7 @@ bad += not ok
 ok = g.CVARS.autoLootDefault == "1" and g.CVARS.showTutorials == "0"
 print(("ok  " if ok else "FAIL"), "game settings: auto loot on, tutorials off")
 bad += not ok
-ok = g.RXP.loaded == "YippRoute Launch (A)|01-05 Coldridge Valley (Launch)"
+ok = g.RXP.loaded == "Headstart Launch (A)|01-05 Coldridge Valley (Launch)"
 print(("ok  " if ok else "FAIL"), f"RestedXP guide loaded: {g.RXP.loaded}")
 bad += not ok
 # a layout the new character doesn't have (a character layout on the main) is imported as an account one
@@ -342,7 +342,7 @@ bad += not ok
 # the guide follows the race
 lua.execute('''LOADED = {}; RACE = "Human"; RXP.loaded = nil''')
 YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
-ok = g.RXP.loaded == "YippRoute Launch (A)|01-06 Northshire (Launch)"
+ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Northshire (Launch)"
 print(("ok  " if ok else "FAIL"), f"a Human starts on the Northshire route: {g.RXP.loaded}")
 bad += not ok
 lua.execute("RACE = 'Dwarf'")

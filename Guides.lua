@@ -1,4 +1,4 @@
--- The routes YippRoute ships, and each player's own edits of them.
+-- The routes Headstart ships, and each player's own edits of them.
 --
 -- A guide file doesn't register itself with RestedXP any more; it hands its text to YR:ShipGuide.
 -- At login, RegisterGuides gives RestedXP either the player's edited version (saved by the route
@@ -34,7 +34,14 @@ function YR:IsCustom(key)
     return Custom()[key] ~= nil
 end
 
+-- Routes edited or imported before the rename still name the old group: move them to the new one.
+local OLD_GROUP = "YippRoute Launch %(A%)"
+local function Renamed(text)
+    return (text:gsub(OLD_GROUP, "Headstart Launch (A)"))
+end
+
 function YR:RegisterGuides()
+    for _, c in pairs(Custom()) do c.text = Renamed(c.text) end
     if UnitFactionGroup("player") == "Horde" or not (RXPGuides and RXPGuides.RegisterGuide) then return end
     for _, g in ipairs(YR.shipped) do
         local ok, err = pcall(RXPGuides.RegisterGuide, YR:GuideText(g.key))
@@ -113,6 +120,8 @@ end
 function YR:RegisterExtras()
     if UnitFactionGroup("player") == "Horde" or not (RXPGuides and RXPGuides.RegisterGuide) then return end
     for name, text in pairs(Extra()) do
+        text = Renamed(text)
+        Extra()[name] = text
         local ok, err = pcall(RXPGuides.RegisterGuide, text)
         if not ok then YR.Print(("imported guide %s did not load: %s"):format(name, tostring(err))) end
     end

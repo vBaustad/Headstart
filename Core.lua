@@ -1,10 +1,11 @@
--- YippRoute (private): the launch route, plus the two tools that measure what the route model needs.
---   /yroute scan   ask the server about every known quest ID (name, level, XP, money, objectives)
---   /yroute log    on/off: record quest accepts, completions and turn-ins with XP, time and position
+-- Headstart (private): the launch route, plus the two tools that measure what the route model needs.
+--   /headstart      the window (also /yroute)
+--   /headstart scan   ask the server about every known quest ID (name, level, XP, money, objectives)
+--   /headstart log    on/off: record quest accepts, completions and turn-ins with XP, time and position
 local ADDON, YR = ...
 
 function YR.Print(msg)
-    print("|cff66ccffYippRoute|r: " .. msg)
+    print("|cff66ccffHeadstart|r: " .. msg)
 end
 
 -- Where the player is, as uiMapID and 0-100 map coordinates, or nil where the game won't say
@@ -30,8 +31,9 @@ function YR.CharKey()
     return (name or "?") .. "-" .. (realm or GetRealmName() or "?")
 end
 
-SLASH_YIPPROUTE1 = "/yroute"
-SlashCmdList.YIPPROUTE = function(msg)
+SLASH_HEADSTART1 = "/headstart"
+SLASH_HEADSTART2 = "/yroute"   -- its name before it was Headstart
+SlashCmdList.HEADSTART = function(msg)
     local cmd, arg = strsplit(" ", strtrim(msg or ""):lower(), 2)
     if cmd == "scan" then
         if arg == "stop" then YR:StopScan() else YR:StartScan() end
