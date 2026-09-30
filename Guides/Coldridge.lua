@@ -6,17 +6,13 @@ local _, YR = ...
 YR:ShipGuide("coldridge", [[
 #forever
 #season 0,1
-#version 17
+#version 18
 << Alliance
 #group YippRoute Launch (A)
 #subgroup Launch day
 #name 1-5 Coldridge Valley (Launch)
 #next YippRoute Launch (A)\5-11 Dun Morogh (Launch)
 
-step << Warrior/Paladin/Rogue
-    #completewith ThroughPass
-    +Loot everything until you have 73c (Mining Pack, Pick, Hammer, Mining, Blacksmithing)
-    .money >0.0073,1
 step
     #optional
     #completewith Talin1
@@ -135,6 +131,46 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grundel Harkin|r
     .vendor >> Vendor trash
     .target Grundel Harkin
+step << Paladin
+    .goto 1426/0,382.06,-6120.65
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Bromos Grummner|r in Anvilmar
+    .trainer >> Train your class spells
+    .target Bromos Grummner
+step << Warrior
+    .goto 1426/0,382.11,-6084.86
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thran Khorman|r in Anvilmar
+    .trainer >> Train your class spells
+    .target Thran Khorman
+step << Hunter
+    .goto 1426/0,365.21,-6091.86
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thorgas Grimson|r
+    .trainer >> Train your class spells
+    .target Thorgas Grimson
+step << Rogue
+    .goto 1426/0,404.91,-6093.76
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Solm Hargrin|r
+    .trainer >> Train your class spells
+    .target Solm Hargrin
+step << Priest
+    .goto 1426/0,393.53,-6056.72
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Branstock Khalder|r upstairs
+    .trainer >> Train your class spells
+    .target Branstock Khalder
+step << Mage
+    .goto 1426/0,388.17,-6056.10
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Marryk Nurribit|r in Anvilmar
+    .trainer >> Train your class spells
+    .target Marryk Nurribit
+step << Warlock
+    .goto 1426/0,391.07,-6048.84
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Alamar Grimm|r upstairs
+    .trainer >> Train your class spells
+    .target Alamar Grimm
+step << Shaman
+    .goto 1426/0,384.000,-6050.200
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Teo Hammerstorm|r in Anvilmar
+    .trainer >> Train your class spells
+    .target Teo Hammerstorm
 step
     #completewith next
     .goto 1426/0,497.300,-6118.500,20,0
@@ -161,49 +197,6 @@ step
     .target +Grelin Whitebeard
     .turnin 3365 >> Turn in Bring Back the Mug
     .target +Nori Pridedrift
-step << Paladin
-    .goto 1426/0,382.06,-6120.65
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Bromos Grummner|r in Anvilmar
-    .train 19740 >> Train |T135906:0|t[Blessing of Might]
-    .train 20271 >> Train |T135959:0|t[Judgement]
-    .target Bromos Grummner
-step << Warrior
-    .goto 1426/0,382.11,-6084.86
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thran Khorman|r in Anvilmar
-    .train 100 >> Train |T132337:0|t[Charge]
-    .train 772 >> Train |T132155:0|t[Rend]
-    .target Thran Khorman
-step << Hunter
-    .goto 1426/0,365.21,-6091.86
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thorgas Grimson|r
-    .train 1978 >> Train |T132204:0|t[Serpent Sting]
-    .target Thorgas Grimson
-step << Rogue
-    .goto 1426/0,404.91,-6093.76
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Solm Hargrin|r
-    .train 1784 >> Train |T132320:0|t[Stealth]
-    .target Solm Hargrin
-step << Priest
-    .goto 1426/0,393.53,-6056.72
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Branstock Khalder|r upstairs
-    .trainer >> Train your class spells
-    .target Branstock Khalder
-step << Mage
-    .goto 1426/0,388.17,-6056.10
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Marryk Nurribit|r in Anvilmar
-    .train 1459 >> Train |T135932:0|t[Arcane Intellect]
-    .train 116 >> Train |T135846:0|t[Frostbolt]
-    .target Marryk Nurribit
-step << Warlock
-    .goto 1426/0,391.07,-6048.84
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Alamar Grimm|r upstairs
-    .train 172 >> Train |T136118:0|t[Corruption]
-    .target Alamar Grimm
-step << Shaman
-    .goto 1426/0,384.000,-6050.200
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Teo Hammerstorm|r in Anvilmar
-    .train 8042 >> Train |T136026:0|t[Earth Shock]
-    .target Teo Hammerstorm
 step
     .goto 1426/0,152.900,-6235.800
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Mountaineer Thalos::1965|r
