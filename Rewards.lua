@@ -6,8 +6,8 @@
 --   3. Nothing in the list on offer: the most valuable reward, or leave it to you (a setting).
 -- Only up to the level limit, and never while Shift is held - that is how you choose yourself, and
 -- a choice made by hand is remembered for that quest.
---   YippRouteDB.rewards = { maxLevel, order = { kind, ... }, off = { [kind] = true }, remember,
---                           fallback = "value" | "ask", chosen = { [questID] = { item, name, title } } }
+--   YippRouteDB.rewardClasses[CLASS] = { on, maxLevel, order = { kind, ... }, off = { [kind] = true },
+--       remember, fallback = "value" | "ask", chosen = { [questID] = { item, name, title } } }
 local _, YR = ...
 
 local WEAPON, ARMOR, CONSUMABLE, CONTAINER = 2, 4, 0, 1
@@ -43,15 +43,42 @@ local DEFAULT_ORDER = {
     WARLOCK = { "cloth", "water", "food" },
 }
 
-function YR:RewardSettings()
-    local db = YippRouteDB.rewards
-    if not db then
-        local _, class = UnitClass("player")
-        local order = {}
-        for _, k in ipairs(DEFAULT_ORDER[class] or DEFAULT_ORDER.WARRIOR) do order[#order + 1] = k end
-        db = { maxLevel = 10, order = order, off = {}, remember = true, fallback = "value", chosen = {} }
-        YippRouteDB.rewards = db
+local function Copy(t)
+    local c = {}
+    for k, v in pairs(t or {}) do c[k] = type(v) == "table" and Copy(v) or v end
+    return c
+end
+
+-- Per class: YippRouteDB.rewardClasses[CLASS] (plus .on: pick at all). From before that, one set for
+-- all in YippRouteDB.rewards: left as it is, and copied into the first class that asks (the player's
+-- own, at the first quest or on opening the settings), which is the class it was made on. Other
+-- classes start from their own priority list and the same limits, and take over the choices you
+-- made that weren't gear (a profession book is the same pick for everyone).
+function YR:RewardSettings(class)
+    if not class then
+        local _, mine = UnitClass("player")
+        class = mine or "WARRIOR"
     end
+    YippRouteDB.rewardClasses = YippRouteDB.rewardClasses or {}
+    local db = YippRouteDB.rewardClasses[class]
+    if not db then
+        local old = YippRouteDB.rewards
+        if old and not YippRouteDB.rewardsTakenBy then
+            db = Copy(old)
+            YippRouteDB.rewardsTakenBy = class
+        else
+            local order = {}
+            for _, k in ipairs(DEFAULT_ORDER[class] or DEFAULT_ORDER.WARRIOR) do order[#order + 1] = k end
+            db = { maxLevel = old and old.maxLevel or 10, order = order, off = {},
+                remember = not old or old.remember ~= false, fallback = old and old.fallback or "value", chosen = {} }
+            for quest, pick in pairs(old and old.chosen or {}) do
+                if pick.item and YR.RewardKind(pick.item) == nil then db.chosen[quest] = Copy(pick) end
+            end
+        end
+        db.on = YippRouteDB.pickRewards ~= false
+        YippRouteDB.rewardClasses[class] = db
+    end
+    if db.on == nil then db.on = true end
     -- every kind is in the list once, so the settings can switch any of them on
     local seen = {}
     for _, k in ipairs(db.order) do seen[k] = true end
@@ -100,7 +127,7 @@ end
 local function Choose(tries)
     local n = GetNumQuestChoices()
     local db = YR:RewardSettings()
-    if n < 2 or IsShiftKeyDown() or UnitLevel("player") > db.maxLevel or not YR.Option("pickRewards") then return end
+    if n < 2 or IsShiftKeyDown() or UnitLevel("player") > db.maxLevel or not db.on then return end
     local items, values, kinds = {}, {}, {}
     for i = 1, n do
         local _, _, _, _, isUsable, itemID = GetQuestItemInfo("choice", i)

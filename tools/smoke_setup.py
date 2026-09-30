@@ -272,22 +272,22 @@ print(("ok  " if ok else "FAIL"), f"RestedXP guide loaded: {g.RXP.loaded}")
 bad += not ok
 # a layout the new character doesn't have (a character layout on the main) is imported as an account one
 lua.execute(r'''EditModeManagerFrame.layoutInfo.layouts[3].layoutName = "Other"
-YippSetupDB.profile.ui.layout = { name = "MyChar", type = 2, export = "EXPORT:MyChar" }''')
-YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
+YippSetupDB.classes.PALADIN.profile.ui.layout = { name = "MyChar", type = 2, export = "EXPORT:MyChar" }''')
+YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
 ok = g.EDIT.made is not None and g.EDIT.made.kind == 1 and g.EDIT.made.name == "MyChar"
 print(("ok  " if ok else "FAIL"), "missing layout imported as an account layout")
 bad += not ok
 
 # A layout copied before bars and settings were saved: Set up layout still picks the guide, and
 # logging in on the main fills the missing part in.
-lua.execute(r'''YippSetupDB.profile.ui = nil; RXP.loaded = nil''')
+lua.execute(r'''YippSetupDB.classes.PALADIN.profile.ui = nil; RXP.loaded = nil''')
 YS.Apply(YS)
 ok = g.RXP.loaded is not None
 print(("ok  " if ok else "FAIL"), "old layout without ui: RestedXP guide still loaded")
 bad += not ok
 lua.execute(r'''ME.name = "Main"; GUID = "Player-1-0000MAIN"''')
 events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
-ok = g.YippSetupDB.profile.ui is not None and g.YippSetupDB.profile.ui.cvars is not None
+ok = g.YippSetupDB.classes.PALADIN.profile.ui is not None and g.YippSetupDB.classes.PALADIN.profile.ui.cvars is not None
 print(("ok  " if ok else "FAIL"), "logging in on the main fills in the missing ui")
 bad += not ok
 
@@ -331,24 +331,24 @@ bad += not ok
 lua.execute('''LOADED = { "Bartender4" }; EDIT.selected = nil; EditModeManagerFrame.layoutInfo.activeLayout = 1
 SETTINGS = { PROXY_SHOW_ACTIONBAR_2 = false, PROXY_SHOW_ACTIONBAR_3 = false, PROXY_SHOW_ACTIONBAR_4 = false }
 StaticPopup_Show = function(w) POPUP = w end; POPUP = nil''')
-YS.ApplyUI(YS, g.YippSetupDB.profile.ui or lua.eval("nil"))
+YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui or lua.eval("nil"))
 ok = g.SETTINGS.PROXY_SHOW_ACTIONBAR_2 is False and g.EDIT.selected == 3
 check_ok = ok
 print(("ok  " if ok else "FAIL"), "Bartender4 loaded: Blizzard bars left alone, Edit Mode still set")
 bad += not ok
 # Without other UI addons: a reload is asked only when Edit Mode or the bars actually changed.
 lua.execute('''LOADED = {}; EditModeManagerFrame.layoutInfo.activeLayout = 1; POPUP = nil''')
-YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
 first = g.POPUP
 lua.execute("POPUP = nil")
-YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
 ok = first == "YIPPSETUP_RELOAD" and g.POPUP is None
 print(("ok  " if ok else "FAIL"), f"reload asked when the layout and bars changed ({first}), not when set up again with nothing to change ({g.POPUP})")
 bad += not ok
 lua.execute('''LOADED = { "ElvUI", "ElvUI_Options" }; EDIT.selected = nil; EditModeManagerFrame.layoutInfo.activeLayout = 1
 SETTINGS = { PROXY_SHOW_ACTIONBAR_2 = false, PROXY_SHOW_ACTIONBAR_3 = false, PROXY_SHOW_ACTIONBAR_4 = false }
 POPUP = nil''')
-YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
 ok = g.EDIT.selected is None and g.SETTINGS.PROXY_SHOW_ACTIONBAR_2 is False and g.POPUP is None
 print(("ok  " if ok else "FAIL"), "ElvUI loaded: Edit Mode and Blizzard bars left alone, no reload asked")
 bad += not ok
@@ -357,13 +357,13 @@ ok = "left to ElvUI" in said
 print(("ok  " if ok else "FAIL"), f"and it says so: {said}")
 bad += not ok
 lua.execute('''LOADED = { "EllesmereUI_ActionBars" }; EDIT.selected = nil; EditModeManagerFrame.layoutInfo.activeLayout = 1''')
-YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
 ok = g.EDIT.selected is None
 print(("ok  " if ok else "FAIL"), "an EllesmereUI module counts as EllesmereUI")
 bad += not ok
 # the guide follows the race
 lua.execute('''LOADED = {}; RACE = "Human"; RXP.loaded = nil''')
-YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
 ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Northshire (Launch)"
 print(("ok  " if ok else "FAIL"), f"a Human starts on the Northshire route: {g.RXP.loaded}")
 bad += not ok
@@ -380,7 +380,7 @@ end
 function Fresh(opts)
     ME.name = "Alt"; GUID = "Player-1-0000ALT"; RACE = "Dwarf"; LOADED = {}
     MACROS = {}; BAR = {}; KNOWN = { [635] = true, [20594] = true, [1152] = true }
-    YippSetupDB.options = nil
+    YippSetupDB.classes[ME.class].options = {}
     local o = YR_SETUP:Options()
     for k, v in pairs(opts or {}) do o[k] = v end
 end
@@ -438,4 +438,28 @@ ok = m is not None and "@mouseover" in m[3]
 print(("ok  " if ok else "FAIL"), f"mouseover list: Holy Light becomes a mouseover macro: {m and m[3]!r}")
 bad += not ok
 lua.execute("Fresh()")
+
+# A friend's setup from before settings were per class: one set of options and one saved layout.
+# Nothing of it is changed or lost: the layout's class gets both, other classes start from the options.
+lua.execute(r'''
+OLD_PROFILE = { from = "Friend-Realm", class = "PALADIN", scanned = 1, slots = {}, ui = { cvars = {}, bars = {} } }
+YippSetupDB = { options = { maxLevel = 14, items = true, clearBars = false }, profile = OLD_PROFILE }
+''')
+o = YS.Options(YS)
+p = YS.Profile(YS)
+ok = o.maxLevel == 14 and o["items"] is True and o.clearBars is False and p is not None and p["from"] == "Friend-Realm"
+print(("ok  " if ok else "FAIL"), "old setup: this paladin keeps the friend's options and saved layout")
+bad += not ok
+o.maxLevel = 20
+ok = g.YippSetupDB.options.maxLevel == 14 and lua.eval("YippSetupDB.profile == OLD_PROFILE and OLD_PROFILE.from == 'Friend-Realm'")
+print(("ok  " if ok else "FAIL"), "and the old settings themselves are never changed (an older Headstart still reads them)")
+bad += not ok
+w = YS.Options(YS, "WARRIOR")
+ok = w.maxLevel == 14 and w["items"] is True and YS.Profile(YS, "WARRIOR") is None
+print(("ok  " if ok else "FAIL"), "a warrior starts from the same choices, with no layout (a paladin's bars aren't a warrior's)")
+bad += not ok
+w["items"] = False
+ok = YS.Options(YS, "PALADIN")["items"] is True
+print(("ok  " if ok else "FAIL"), "and changing the warrior's choices leaves the paladin's alone")
+bad += not ok
 sys.exit(1 if bad else 0)

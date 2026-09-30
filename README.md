@@ -14,9 +14,10 @@ Built for the first hours of a fresh realm, when every starting zone has hundred
   They show up in RestedXP under **Headstart Launch (A)** and hand over to RestedXP's own guides where they end.
 - **Route editor.** Every step can be changed in game: drag steps around, add, merge, duplicate or delete them, edit each action with pickers for your position and target, or edit the raw text. Your changes are saved for you and can be exported and shared; "back to the shipped route" undoes them.
 - **Level splits.** Time per level and in total from the server's /played, against your best run, in green or red. XP per hour and time to ding. Movable, sizeable, lockable.
-- **Quest rewards picked for you** up to a level you choose, from a priority list per class. It remembers what you picked by hand last time. Hold Shift to choose yourself.
-- **Run log.** Position, quests, kills, deaths, vendors and trainers of each run, to see where the time went.
-- **Character setup.** Copy your main's action bars, macros and settings once; set up every new character with one click. Choose exactly what carries over: class spells up to a level, racials, professions, mouseover macros, your own macros, items, game settings, Edit Mode, bar visibility. Works alongside ElvUI, EllesmereUI, Bartender, Dominos and other UI addons: it leaves their layouts alone.
+- **Quest rewards picked for you** up to a level you choose, from a priority list per class. It remembers what you picked by hand last time. Hold Shift to choose yourself. A choice that isn't gear (a profession to learn) is always yours. Each class has its own settings.
+- **Run log.** Position, quests, kills, deaths, vendors, trainers, sales, loot and money of each run, to see where the time went. Click an action for its details. Stop a run when it's done.
+- **Keep what the route needs.** Items a route quest still needs say so on their tooltip, and selling one warns you straight away.
+- **Character setup.** Copy your main's action bars, macros and settings once per class; set up every new character of that class, after seeing exactly what carries over: class spells up to a level, racials, professions, mouseover macros, your own macros, items, game settings, Edit Mode, bar visibility. Works alongside ElvUI, EllesmereUI, Bartender, Dominos and other UI addons: it leaves their layouts alone.
 
 ## Use
 

@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-beta1
 
+- **Settings per class.** Each class keeps its own quest-reward settings (on/off, priority list, level limit, remembered picks) and its own Character setup: the saved bar layout and every choice of what carries over. Pick the class at the top of either tab; it opens on this character's class. Your existing settings carry over untouched: they become the settings of the class they were made on, and other classes start from the same choices (their own reward list, and your non-gear picks such as a profession book).
+- **Set up shows the settings first.** The new-character window's "Set up..." opens Settings, Character tab, so you see everything that will carry over before clicking Set up layout there.
 - Dun Morogh: Mining and Blacksmithing to 20 for the two Camping 101 quests (270 XP each, and the Sharpening Wheel). A reminder to mine every copper vein you pass until Mining 20 (most sit around the Grizzled Den and south of Kharanos). A stop at Tognus's forge and anvil to smelt and craft to Blacksmithing 20. Both hand-ins, shown only once the quest is done.
 - Dun Morogh money: Cooking (270 XP for 1 silver) comes before class training, with a second chance once Stocking Jetsteam has paid. The Mining Pack (25c) only if money is left.
 - Copper Ore, Bars and Rough Stones count as route items while you're on Camping 101: Blacksmithing, so the sell warning covers them.
