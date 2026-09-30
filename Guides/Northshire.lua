@@ -310,6 +310,7 @@ step
     .goto 1429/0,-186.12,-8874.91
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Brother Paxton|r
     .turnin 91743 >> Turn in Rascally Rodents
+    >>|cRXP_WARN_Take|r |T134708:0|t[Mining for Dummies]|cRXP_WARN_: it teaches Mining, no trainer needed|r << Warrior/Paladin/Rogue
     .accept 91745 >>Accept Mining Consultant
     .target Brother Paxton
 step
@@ -608,6 +609,7 @@ step
     .goto 1429/0,-186.12,-8874.91
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Brother Paxton|r
     .turnin 91743 >> Turn in Rascally Rodents
+    >>|cRXP_WARN_Take|r |T134708:0|t[Mining for Dummies]|cRXP_WARN_: it teaches Mining, no trainer needed|r << Warrior/Paladin/Rogue
     .accept 91745 >>Accept Mining Consultant
     .target Brother Paxton
 step

@@ -155,6 +155,13 @@ def northshire():
     g.suball('''    >>Kill |cRXP_ENEMY_Shinyfinder Narf|r. Loot him for the |cRXP_LOOT_Sack of "Picture" Books|r''',
              '''    >>Kill |cRXP_ENEMY_Shinyfinder Narf|r. Loot him for the |cRXP_LOOT_Sack of "Picture" Books|r
     >>|cRXP_WARN_Group up with whoever is waiting|r''', 3, "single rare")
+
+    # Rascally Rodents offers a profession book: Mining for Dummies teaches Mining (no trainer, no
+    # fee), which the melee classes want for Blacksmithing later.
+    g.suball('''    .turnin 91743 >> Turn in Rascally Rodents
+''', '''    .turnin 91743 >> Turn in Rascally Rodents
+    >>|cRXP_WARN_Take|r |T134708:0|t[Mining for Dummies]|cRXP_WARN_: it teaches Mining, no trainer needed|r << Warrior/Paladin/Rogue
+''', 2, "profession book reward")
     return g
 
 
@@ -181,6 +188,12 @@ def shadowglen():
     g.suball('''    >>Kill |cRXP_ENEMY_Githyiss the Vile|r loot it for it's |T134298:0|t[|cRXP_LOOT_Fang|r]''',
              '''    >>Kill |cRXP_ENEMY_Githyiss the Vile|r loot it for it's |T134298:0|t[|cRXP_LOOT_Fang|r]
     >>|cRXP_WARN_Group up with whoever is waiting|r''', 1, "single-spawn boss")
+    # The Woodland Protector offers a profession book: Mining for Dummies teaches Mining (no trainer,
+    # no fee), which the melee classes want for Blacksmithing later.
+    g.suball('''    .turnin 458 >> Turn in The Woodland Protector
+''', '''    .turnin 458 >> Turn in The Woodland Protector
+    >>|cRXP_WARN_Take|r |T134708:0|t[Mining for Dummies]|cRXP_WARN_: it teaches Mining, no trainer needed|r << Warrior/Paladin/Rogue
+''', 2, "profession book reward")
     return g
 
 

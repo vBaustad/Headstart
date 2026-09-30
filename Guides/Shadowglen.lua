@@ -105,6 +105,7 @@ step << Hunter/Warrior
     .goto 1438/1,866.51,10300.67
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tarindrella|r
     .turnin 458 >> Turn in The Woodland Protector
+    >>|cRXP_WARN_Take|r |T134708:0|t[Mining for Dummies]|cRXP_WARN_: it teaches Mining, no trainer needed|r << Warrior/Paladin/Rogue
     .target Tarindrella
     .accept 459 >> Accept The Woodland Protector
     .accept 97977 >>Accept Nature's Call
@@ -156,6 +157,7 @@ step << !Hunter !Warrior
     .goto 1438/1,866.51,10300.67
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tarindrella|r
     .turnin 458 >> Turn in The Woodland Protector
+    >>|cRXP_WARN_Take|r |T134708:0|t[Mining for Dummies]|cRXP_WARN_: it teaches Mining, no trainer needed|r << Warrior/Paladin/Rogue
     .target Tarindrella
     .accept 459 >> Accept The Woodland Protector
     .accept 97977 >>Accept Nature's Call
