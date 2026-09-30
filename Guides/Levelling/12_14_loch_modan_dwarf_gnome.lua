@@ -774,6 +774,61 @@ step
     .subzone 2257 >>Enter the Deeprun Tram
     .zoneskip Stormwind City
 step
+    #role A,B,C
+    .goto 1455,31.40,45.40
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thom Filch|r
+    .target Thom Filch
+    .accept 96403 >> Accept Important Heirlooms
+step
+    #role A,B,C
+    .goto 1455,32.80,48.60
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Afadra Dunwall|r
+    .target Afadra Dunwall
+    .accept 96394 >> Accept The Restless Dead
+step
+    #role A,B,C
+    .goto 1455,43.5,52.0
+    >>Enter the Hall of Thanes with your group: from the Great Forge, face Magni's throne, go left into the spiderweb corridor, down the stairs and the crumbling path (mind the lava), over the bridge
+step
+    #role A,B,C
+    .accept 96395 >> Accept An Ancient Grudge
+    >>Talk to the |cRXP_FRIENDLY_Ghostly Attendant|r in the first room
+step
+    #role A,B,C
+    >>Clear the Hall: loot the Dwarven Heirlooms, kill Enraged Apparitions and Tormented Souls, put Faldrim Anvilmar to rest, take Durgen Dirgehammer's head
+    .complete 96403,1
+    .complete 96394,1 --Kill Enraged Apparition (x15)
+    .complete 96394,2 --Kill Tormented Soul (x10)
+    .complete 96395,1 --Kill Faldrim Anvilmar (x1)
+    .complete 96393,1
+step
+    #role A,B,C
+    .accept 98423 >> Accept The Treaty of Understanding
+    >>Take the tablet in the Reliquary of Kings (the last room)
+step
+    #role A,B,C
+    .turnin 96395 >> Turn in An Ancient Grudge
+    >>Back to the |cRXP_FRIENDLY_Ghostly Attendant|r
+step
+    #role A,B,C
+    .goto 1455,31.40,45.40
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thom Filch|r
+    .target Thom Filch
+    .turnin 96403 >> Turn in Important Heirlooms
+step
+    #role A,B,C
+    .goto 1455,32.80,48.60
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Afadra Dunwall|r
+    .target Afadra Dunwall
+    .turnin 96394 >> Turn in The Restless Dead
+step
+    #role A,B,C
+    .goto 1455,39.40,55.40
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_King Magni Bronzebeard|r
+    .target King Magni Bronzebeard
+    .turnin 96393 >> Turn in Old Ironforge Incursion
+    .turnin 98423 >> Turn in The Treaty of Understanding
+step
     #optional
     #label WestfallTramEnd
     >>|cRXP_WARN_Level your|r |T135966:0|t[First Aid] |cRXP_WARN_while waiting for the Tram to Stormwind City if needed|r << Rogue/Warrior/Paladin
