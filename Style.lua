@@ -445,16 +445,22 @@ function S.Switch(parent, get, set)
     return b
 end
 
--- A slider with its value in a box beside it; either can be used.
+-- A slider with - and + either side of its value box: drag for big moves, - and + for exact ones
+-- (Shift-click moves ten steps), or type the number. Values are rounded to the step.
 function S.Slider(parent, min, max, step, get, set, width)
+    step = step or 1
+    width = width or 220
     local f = CreateFrame("Frame", nil, parent)
-    f:SetSize(width or 170, 24)
+    f:SetSize(width, 24)
+    local function Round(v) return math.floor(v / step + 0.5) * step end
+    local function Clamp(v) return math.max(min, math.min(max, Round(v))) end
+
     local s = CreateFrame("Slider", nil, f)
     s:SetOrientation("HORIZONTAL")
     s:SetPoint("LEFT")
-    s:SetSize((width or 170) - 58, 16)
+    s:SetSize(width - 104, 16)
     s:SetMinMaxValues(min, max)
-    s:SetValueStep(step or 1)
+    s:SetValueStep(step)
     s:SetObeyStepOnDrag(true)
     local track = s:CreateTexture(nil, "BACKGROUND")
     track:SetPoint("LEFT") track:SetPoint("RIGHT") track:SetHeight(4)
@@ -466,26 +472,40 @@ function S.Slider(parent, min, max, step, get, set, width)
     thumb:SetSize(10, 16)
     thumb:SetColorTexture(1, 1, 1, 1)
     s:SetThumbTexture(thumb)
-    local box = S.Input(f, { width = 48, numeric = true, onCommit = function(t)
+
+    local function Nudge(dir)
+        local n = IsShiftKeyDown() and 10 or 1
+        set(Clamp(get() + dir * n * step))
+        f:Refresh()
+    end
+    local plus = S.IconButton(f, "plus", function() Nudge(1) end, "+" .. step .. "  (Shift: +" .. step * 10 .. ")", S.C.sub, 22)
+    plus:SetPoint("RIGHT")
+    local box = S.Input(f, { width = 52, numeric = true, onCommit = function(t)
         local v = tonumber(t)
-        if v then set(math.max(min, math.min(max, v))) end
+        if v then set(Clamp(v)) end
         f:Refresh()
     end })
-    box:SetPoint("RIGHT")
+    box:SetPoint("RIGHT", plus, "LEFT", -2, 0)
     box:SetJustifyH("CENTER")
+    local minus = S.IconButton(f, "minus", function() Nudge(-1) end, "-" .. step .. "  (Shift: -" .. step * 10 .. ")", S.C.sub, 22)
+    minus:SetPoint("RIGHT", box, "LEFT", -2, 0)
+
     local busy = false
-    s:SetScript("OnValueChanged", function(_, v)
-        if busy then return end
-        set(v)
+    local function Show(v)
         box:SetValue(v)
         fill:SetWidth(math.max(1, (v - min) / (max - min) * s:GetWidth()))
+    end
+    s:SetScript("OnValueChanged", function(_, v)
+        if busy then return end
+        v = Clamp(v)
+        set(v)
+        Show(v)
     end)
     function f:Refresh()
         busy = true
-        local v = get()
+        local v = Clamp(get())
         s:SetValue(v)
-        box:SetValue(v)
-        fill:SetWidth(math.max(1, (v - min) / (max - min) * s:GetWidth()))
+        Show(v)
         busy = false
     end
     f:Refresh()

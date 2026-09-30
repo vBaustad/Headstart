@@ -750,6 +750,7 @@ local function RefreshRoutes()
     ui.state:SetText(edit.dirty and "|cffffd24aUnsaved changes|r" or (YR:IsCustom(edit.key) and "Your version" or "As shipped"))
     ui.steps:ShowIndex(edit.sel)
     ui.steps:Refresh()
+    for _, t in ipairs(ui.routeTabs) do t:Mark() end
     RefreshInspector()
 end
 
@@ -927,9 +928,9 @@ local function BuildSettings(page)
     Row("Background", S.Slider(c, 0, 100, 5, function() return st().bg end, Style("bg")),
         "How dark the box behind the splits is, in percent. 0 is none")
     Row("From the left (pixels)", S.Slider(c, 0, 3000, 1, function() return YR:SplitsPosition()[1] end,
-        function(v) YR:SetSplitsPosition(v, nil) end, 210))
+        function(v) YR:SetSplitsPosition(v, nil) end, 280))
     Row("From the top (pixels)", S.Slider(c, 0, 2000, 1, function() return YR:SplitsPosition()[2] end,
-        function(v) YR:SetSplitsPosition(nil, v) end, 210))
+        function(v) YR:SetSplitsPosition(nil, v) end, 280))
 
     Section("Quest rewards")
     Row("Pick quest rewards", S.Switch(c, Opt("pickRewards"), SetOpt("pickRewards")),
@@ -1091,6 +1092,54 @@ local function NavButton(parent, label, icon, y, indent)
     return b
 end
 
+local function RouteButton(parent, key, y)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(SIDE - 16, 30)
+    b:SetPoint("TOPLEFT", 8, y)
+    b.bg = S.Fill(b, { 0, 0, 0, 0 })
+    b.bar = b:CreateTexture(nil, "ARTWORK")
+    b.bar:SetPoint("TOPLEFT") b.bar:SetPoint("BOTTOMLEFT") b.bar:SetWidth(2)
+    S.Set(b.bar, S.C.accent)
+    b.bar:Hide()
+    local name = YR.GuideName(key)
+    local range, zone = name:match("^(%d+%-%d+)%s+(.+)$")
+    zone = (zone or name):gsub("%s*%(Launch%)", "")
+    local badge = CreateFrame("Frame", nil, b)
+    badge:SetSize(40, 18)
+    badge:SetPoint("LEFT", 12, 0)
+    b.badgeBg = S.Fill(badge, S.C.accentD)
+    b.badge = S.Text(badge, 12, S.C.accent)
+    b.badge:SetPoint("CENTER")
+    b.badge:SetText(range or "")
+    b.text = S.Text(b, 13, S.C.sub)
+    b.text:SetPoint("LEFT", badge, "RIGHT", 8, 0)
+    b.text:SetPoint("RIGHT", -16, 0)
+    b.text:SetText(zone)
+    b.dot = b:CreateTexture(nil, "OVERLAY")
+    b.dot:SetSize(10, 10)
+    b.dot:SetPoint("RIGHT", -6, 0)
+    S.ArtTexture(b.dot, "dot")
+    b.dot:SetVertexColor(unpack(S.C.gold))
+    b.key = key
+    function b:Select(on)
+        self.selected = on
+        self.bg:SetColorTexture(unpack(on and S.C.accentD or { 0, 0, 0, 0 }))
+        self.bar:SetShown(on)
+        self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
+    end
+    function b:Mark() self.dot:SetShown(YR:IsCustom(self.key)) end
+    b:SetScript("OnEnter", function(self)
+        if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end
+        S.Tip(self, name .. (YR:IsCustom(self.key) and "\nYour version (edited)" or "\nAs shipped"))
+    end)
+    b:SetScript("OnLeave", function(self)
+        if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end
+        GameTooltip:Hide()
+    end)
+    b:Mark()
+    return b
+end
+
 local function Build()
     win = S.Window("YippRouteWindow", W, H, "YippRoute")
     local side = CreateFrame("Frame", nil, win)
@@ -1109,15 +1158,19 @@ local function Build()
         p.tab:SetScript("OnClick", function() Show(p.key) end)
         y = y - 34
         if p.key == "routes" then
+            local label = S.Text(side, 11, S.C.muted)
+            label:SetPoint("TOPLEFT", 20, y - 2)
+            label:SetText("YOUR ROUTES")
+            y = y - 20
             for _, g in ipairs(YR.shipped) do
-                local sub = NavButton(side, YR.GuideName(g.key), nil, y, true)
+                local sub = RouteButton(side, g.key, y)
                 sub:SetScript("OnClick", function()
                     Open(g.key)
                     for _, t in ipairs(ui.routeTabs) do t:Select(t == sub) end
                     Show("routes")
                 end)
                 ui.routeTabs[#ui.routeTabs + 1] = sub
-                y = y - 24
+                y = y - 32
             end
             y = y - 10
         end

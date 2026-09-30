@@ -48,6 +48,11 @@ line(d, [(128, 72), (128, 184)])
 line(d, [(72, 128), (184, 128)])
 save(img, "plus")
 
+# minus
+img, d = canvas()
+line(d, [(72, 128), (184, 128)])
+save(img, "minus")
+
 # drag handle: two columns of three dots
 img, d = canvas()
 for x in (104, 152):
