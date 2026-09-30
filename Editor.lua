@@ -11,7 +11,7 @@ local S = YR.Style
 
 local W, H, SIDE, HEAD = 1080, 680, 180, 48
 local PW, PH = W - SIDE, H - HEAD          -- the page area
-local LIST_W, ROW = 430, 24
+local LIST_W, ROW = 480, 24
 local win, pages, current
 local edit = { key = nil, header = nil, steps = nil, parsed = {}, dirty = false, sel = nil, line = nil, filter = "" }
 local ui = {}
@@ -115,7 +115,20 @@ local function List(parent, width, count, rowH, fill, total, build)
             self.selected = on
             self.bg:SetColorTexture(unpack(on and S.C.accentD or { 0, 0, 0, 0 }))
             self.bar:SetShown(on)
+            self:Tools(on or self:IsMouseOver())
         end
+        -- buttons made with r:Tool() show only while the row is hovered or selected
+        r.tools = {}
+        function r:Tools(on) for _, t in ipairs(self.tools) do t:SetShown(on) end end
+        function r:Tool(icon, onClick, tip, color)
+            local t = S.IconButton(self, icon, onClick, tip, color, 20)
+            t:HookScript("OnLeave", function() if not self.selected and not self:IsMouseOver() then self:Tools(false) end end)
+            t:Hide()
+            self.tools[#self.tools + 1] = t
+            return t
+        end
+        r:HookScript("OnEnter", function(self) self:Tools(true) end)
+        r:HookScript("OnLeave", function(self) if not self.selected and not self:IsMouseOver() then self:Tools(false) end end)
         build(r)
         l.rows[i] = r
     end
@@ -191,18 +204,23 @@ local function BuildStepList(page)
         r.icon:SetTexture(info.icon)
         r.label:SetText(info.text)
         r.cls:SetText(info.classes or "")
+        -- the text runs to the edge unless there are classes to show there
+        r.label:ClearAllPoints()
+        r.label:SetPoint("LEFT", 68, 0)
+        r.label:SetPoint("RIGHT", info.classes and -82 or -8, 0)
         r:Select(edit.sel == index)
     end, function() visible = Visible() return #visible end, function(r)
+        local grip = r:Tool("grip", nil, "Drag to move")
+        grip:SetPoint("LEFT", 0, 0)
+        grip:EnableMouse(false)
         r.num = S.Text(r, 11, S.C.muted)
-        r.num:SetPoint("LEFT", 4, 0)
-        r.num:SetWidth(26)
+        r.num:SetPoint("LEFT", 16, 0)
+        r.num:SetWidth(24)
         r.num:SetJustifyH("RIGHT")
         r.icon = r:CreateTexture(nil, "ARTWORK")
         r.icon:SetSize(16, 16)
-        r.icon:SetPoint("LEFT", 36, 0)
+        r.icon:SetPoint("LEFT", 46, 0)
         r.label = S.Text(r, 13)
-        r.label:SetPoint("LEFT", 58, 0)
-        r.label:SetPoint("RIGHT", -78, 0)
         r.cls = S.Text(r, 11, { 0.55, 0.62, 0.72, 1 })
         r.cls:SetPoint("RIGHT", -6, 0)
         r.cls:SetWidth(72)
@@ -403,20 +421,20 @@ local function BuildInspector(page)
         ui.chips[#ui.chips + 1] = chip
         cx = cx + 27
     end
-    ui.head = S.Input(body, { width = CW - cx - 22, placeholder = "or type, e.g. << Dwarf Paladin", onCommit = function(t)
+    ui.head = S.Input(body, { width = CW - 28, placeholder = "Or type who sees it, e.g. << Dwarf Paladin  or  << !Warrior", onCommit = function(t)
         if not edit.sel then return end
         local head = t:gsub("^%s*step%s*", "")
         if head ~= "" and not head:find("^<<") then head = "<< " .. head end
         Parsed(edit.sel).head = head
         Commit() YR:RefreshWindow()
     end })
-    ui.head:SetPoint("TOPLEFT", cx + 6, -63)
+    ui.head:SetPoint("TOPLEFT", 14, -94)
 
     -- step switches
     local function TagSwitch(label, tag, x, width)
         local t = S.Toggle(body, label, function() return edit.sel and YR.HasTag(Parsed(edit.sel), tag) ~= nil end,
             function(on) YR.SetTag(Parsed(edit.sel), tag, on, tag == "completewith" and "next" or nil) Commit() YR:RefreshWindow() end)
-        t:SetPoint("TOPLEFT", x, -98)
+        t:SetPoint("TOPLEFT", x, -128)
         t:SetWidth(width)
         return t
     end
@@ -426,9 +444,9 @@ local function BuildInspector(page)
 
     -- the step's lines
     local actions = S.Text(body, 12, S.C.accent)
-    actions:SetPoint("TOPLEFT", 14, -132)
+    actions:SetPoint("TOPLEFT", 14, -162)
     actions:SetText("ACTIONS")
-    ui.lines = List(body, CW - 28, 7, 24, function(r, i)
+    ui.lines = List(body, CW - 28, 6, 24, function(r, i)
         local l = Parsed(edit.sel).lines[i]
         r.i = i
         r.icon:SetTexture(l.k == "cmd" and LINE_ICON[l.cmd] or (l.k == "say" and YR.STEP_ICON.note) or nil)
@@ -440,7 +458,7 @@ local function BuildInspector(page)
         r.icon:SetPoint("LEFT", 8, 0)
         r.label = S.Text(r, 13)
         r.label:SetPoint("LEFT", 28, 0)
-        r.label:SetPoint("RIGHT", -74, 0)
+        r.label:SetPoint("RIGHT", -72, 0)
         r:SetScript("OnClick", function(self) edit.line = self.i YR:RefreshWindow() end)
         local function Swap(d)
             local lines = Parsed(edit.sel).lines
@@ -450,18 +468,18 @@ local function BuildInspector(page)
             edit.line = b
             Commit() YR:RefreshWindow()
         end
-        local up = S.IconButton(r, "^", function() Swap(-1) end, "Move up")
-        up:SetPoint("RIGHT", -48, 0)
-        local down = S.IconButton(r, "v", function() Swap(1) end, "Move down")
-        down:SetPoint("RIGHT", -25, 0)
-        local x = S.IconButton(r, "\195\151", function()
+        local up = r:Tool("up", function() Swap(-1) end, "Move up")
+        up:SetPoint("RIGHT", -46, 0)
+        local down = r:Tool("down", function() Swap(1) end, "Move down")
+        down:SetPoint("RIGHT", -24, 0)
+        local x = r:Tool("close", function()
             table.remove(Parsed(edit.sel).lines, r.i)
             edit.line = nil
             Commit() YR:RefreshWindow()
         end, "Remove this action", S.C.danger)
         x:SetPoint("RIGHT", -2, 0)
     end)
-    ui.lines:SetPoint("TOPLEFT", 14, -150)
+    ui.lines:SetPoint("TOPLEFT", 14, -180)
     local lf = CreateFrame("Frame", nil, body)
     lf:SetPoint("TOPLEFT", ui.lines, -1, 1)
     lf:SetPoint("BOTTOMRIGHT", ui.lines, 1, -1)
@@ -470,7 +488,7 @@ local function BuildInspector(page)
     -- the selected action, field by field
     local ed = CreateFrame("Frame", nil, body)
     ed:SetPoint("TOPLEFT", ui.lines, "BOTTOMLEFT", 0, -12)
-    ed:SetSize(CW - 28, 116)
+    ed:SetSize(CW - 28, 150)
     S.Fill(ed, S.C.field)
     S.Border(ed)
     ui.lineEd = ed
@@ -501,8 +519,8 @@ local function BuildInspector(page)
         ed.fields[i] = { label = label, input = input }
     end
     ed.textLabel = S.Text(ed, 11, S.C.muted)
-    ed.textLabel:SetPoint("BOTTOMLEFT", 10, 38)
-    ed.text = S.Input(ed, { width = CW - 48, placeholder = "What the guide says for this action", onCommit = function(t)
+    ed.textLabel:SetPoint("BOTTOMLEFT", 10, 58)
+    ed.text = S.TextArea(ed, CW - 48, 44, { placeholder = "What the guide says for this action", onCommit = function(t)
         local l = SelLine()
         if not l then return end
         if l.k == "say" then l.text = t elseif l.k == "cmd" then l.text = t ~= "" and t or nil end
@@ -937,9 +955,9 @@ local function BuildSettings(page)
             db.order[i], db.order[b] = db.order[b], db.order[i]
             YR:RefreshWindow()
         end
-        local up = S.IconButton(r, "^", function() Swap(-1) end, "Higher")
+        local up = S.IconButton(r, "up", function() Swap(-1) end, "Higher")
         up:SetPoint("RIGHT", -36, 0)
-        local down = S.IconButton(r, "v", function() Swap(1) end, "Lower")
+        local down = S.IconButton(r, "down", function() Swap(1) end, "Lower")
         down:SetPoint("RIGHT", -10, 0)
         settings.order[i] = r
         y = y - 30
@@ -982,7 +1000,7 @@ local function RefreshSettings()
             S.Fill(r, (i % 2 == 1) and S.C.card or ZEBRA)
             r.label = S.Text(r, 13)
             r.label:SetPoint("LEFT", 12, 0)
-            r.x = S.IconButton(r, "\195\151", function() YR:RewardSettings().chosen[r.quest] = nil YR:RefreshWindow() end,
+            r.x = S.IconButton(r, "close", function() YR:RewardSettings().chosen[r.quest] = nil YR:RefreshWindow() end,
                 "Forget this choice", S.C.danger)
             r.x:SetPoint("RIGHT", -8, 0)
             settings.chosenRows[i] = r

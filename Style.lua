@@ -95,20 +95,35 @@ function S.Button(parent, label, onClick, kind, width)
 end
 
 -- A square button showing an icon texture or a single character.
-function S.IconButton(parent, iconOrChar, onClick, tip, color, size)
+-- Our own icons (art/*.tga, white, tinted here). "down" is "up" turned over.
+S.ART = "Interface\\AddOns\\YippRoute\\art\\"
+
+function S.ArtTexture(tex, name)
+    tex:SetTexture(S.ART .. (name == "down" and "up" or name))
+    if name == "down" then tex:SetTexCoord(0, 1, 1, 0) else tex:SetTexCoord(0, 1, 0, 1) end
+end
+
+-- A small square button with one of our icons (or, for anything else, a texture path).
+function S.IconButton(parent, icon, onClick, tip, color, size)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(size or 22, size or 22)
     local bg = S.Fill(b, { 1, 1, 1, 0 })
-    if type(iconOrChar) == "string" and iconOrChar:find("[\\/]") then
-        b.icon = S.Icon(b, iconOrChar, (size or 22) - 8)
-        b.icon:SetPoint("CENTER")
-    else
-        b.text = S.Text(b, 15, color or S.C.sub)
-        b.text:SetPoint("CENTER", 0, 1)
-        b.text:SetText(iconOrChar)
-    end
-    b:SetScript("OnEnter", function() bg:SetColorTexture(1, 1, 1, 0.09) if tip then S.Tip(b, tip) end end)
-    b:SetScript("OnLeave", function() bg:SetColorTexture(1, 1, 1, 0) GameTooltip:Hide() end)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetSize((size or 22) - 8, (size or 22) - 8)
+    b.icon:SetPoint("CENTER")
+    if icon:find("[\\/]") then b.icon:SetTexture(icon) else S.ArtTexture(b.icon, icon) end
+    local rest = color or S.C.muted
+    b.icon:SetVertexColor(unpack(rest))
+    b:SetScript("OnEnter", function()
+        bg:SetColorTexture(1, 1, 1, 0.08)
+        b.icon:SetVertexColor(unpack(color == S.C.danger and S.C.danger or S.C.text))
+        if tip then S.Tip(b, tip) end
+    end)
+    b:SetScript("OnLeave", function()
+        bg:SetColorTexture(1, 1, 1, 0)
+        b.icon:SetVertexColor(unpack(rest))
+        GameTooltip:Hide()
+    end)
     b:SetScript("OnClick", onClick)
     return b
 end
@@ -175,7 +190,11 @@ function S.Input(parent, opts)
         Hint()
         if user and opts.onChange then opts.onChange(box:GetText()) end
     end)
-    function box:SetValue(v) self:SetText(v == nil and "" or tostring(v)) Hint() end
+    function box:SetValue(v)
+        self:SetText(v == nil and "" or tostring(v))
+        self:SetCursorPosition(0)
+        Hint()
+    end
     Hint()
     return box
 end
@@ -253,9 +272,11 @@ function S.Dropdown(parent, width, options, onPick)
     b.label = S.Text(b, 13)
     b.label:SetPoint("LEFT", 8, 0)
     b.label:SetPoint("RIGHT", -20, 0)
-    local arrow = S.Text(b, 11, S.C.muted)
-    arrow:SetPoint("RIGHT", -8, 0)
-    arrow:SetText("v")
+    local arrow = b:CreateTexture(nil, "ARTWORK")
+    arrow:SetSize(12, 12)
+    arrow:SetPoint("RIGHT", -7, 0)
+    S.ArtTexture(arrow, "down")
+    arrow:SetVertexColor(unpack(S.C.muted))
     b:SetScript("OnEnter", function() border:Color(S.C.lineHi) end)
     b:SetScript("OnLeave", function() border:Color(S.C.line) end)
     b:SetScript("OnClick", function(self)
@@ -305,9 +326,9 @@ function S.Stepper(parent, get, set, min, max, step, width)
         if v then set(math.max(min, math.min(max, v))) end
         input:SetValue(get())
     end
-    local minus = S.IconButton(f, "-", function() Apply(get() - (step or 1)) end, nil, S.C.text, 24)
+    local minus = S.IconButton(f, "down", function() Apply(get() - (step or 1)) end, nil, S.C.text, 24)
     minus:SetPoint("LEFT")
-    local plus = S.IconButton(f, "+", function() Apply(get() + (step or 1)) end, nil, S.C.text, 24)
+    local plus = S.IconButton(f, "up", function() Apply(get() + (step or 1)) end, nil, S.C.text, 24)
     plus:SetPoint("RIGHT")
     input = S.Input(f, { width = (width or 110) - 52, onCommit = Apply })
     input:SetPoint("LEFT", minus, "RIGHT", 2, 0)
@@ -390,8 +411,7 @@ function S.Window(name, w, h, title)
     f.title:SetText(title)
     f.subtitle = S.Text(head, 13, S.C.muted)
     f.subtitle:SetPoint("LEFT", f.title, "RIGHT", 12, -1)
-    local close = S.IconButton(head, "\195\151", function() f:Hide() end, "Close (Esc)", S.C.sub, 28)
-    close.text:SetFont(S.FONT, 20, "")
+    local close = S.IconButton(head, "close", function() f:Hide() end, "Close (Esc)", S.C.sub, 30)
     close:SetPoint("RIGHT", -10, 0)
     f:EnableMouse(true)
     f:SetMovable(true)
@@ -469,5 +489,41 @@ function S.Slider(parent, min, max, step, get, set, width)
         busy = false
     end
     f:Refresh()
+    return f
+end
+
+-- Text that can be longer than a line: it wraps and shows all of itself. Enter or leaving it commits.
+function S.TextArea(parent, width, height, opts)
+    opts = opts or {}
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(width, height)
+    S.Fill(f, S.C.field)
+    local border = S.Border(f)
+    local box = CreateFrame("EditBox", nil, f)
+    box:SetMultiLine(true)
+    box:SetAutoFocus(false)
+    box:SetFont(S.FONT, 13, "")
+    box:SetTextColor(unpack(S.C.text))
+    box:SetPoint("TOPLEFT", 7, -5)
+    box:SetPoint("BOTTOMRIGHT", -7, 5)
+    box:SetWidth(width - 14)
+    local hint = S.Text(f, 12, S.C.muted)
+    hint:SetPoint("TOPLEFT", 8, -6)
+    hint:SetText(opts.placeholder or "")
+    local function Hint() hint:SetShown(box:GetText() == "" and not box:HasFocus()) end
+    box:SetScript("OnEditFocusGained", function() border:Color(S.C.accent) Hint() end)
+    box:SetScript("OnEditFocusLost", function()
+        border:Color(S.C.line) Hint()
+        if opts.onCommit then opts.onCommit((box:GetText():gsub("\n", " "))) end
+    end)
+    box:SetScript("OnEnterPressed", box.ClearFocus)
+    box:SetScript("OnEscapePressed", box.ClearFocus)
+    box:SetScript("OnTextChanged", Hint)
+    f:EnableMouse(true)
+    f:SetScript("OnMouseDown", function() box:SetFocus() end)
+    f.box = box
+    function f:SetValue(v) box:SetText(v == nil and "" or tostring(v)) box:SetCursorPosition(0) Hint() end
+    function f:HasFocus() return box:HasFocus() end
+    Hint()
     return f
 end
