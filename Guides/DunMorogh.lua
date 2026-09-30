@@ -651,12 +651,6 @@ step
     .complete 287,1 --Kill Frostmane Headhunter (x5)
     .mob Frostmane Headhunter
 step
-    #optional
-    .goto 1426,24.975,50.473,20,0
-    .goto 1426,24.682,50.836,20 >> Run up the side of the cave entrance. Jump down into Frostmane Hold
-    .isOnQuest 287
-    .isQuestNotComplete 287
-step
     #label Headhunters
     .goto 1426/0,628.400,-5579.500,20,0
     .goto 1426/0,696.600,-5674.600,20,0
