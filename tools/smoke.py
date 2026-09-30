@@ -366,4 +366,34 @@ pos = g.YippRouteDB.splitsPos
 check(pos[1] == "TOPLEFT" and pos[2] == 300 and pos[3] == -150, f"splits placed in pixels: {list(pos.values())}")
 YR.ToggleWindow(YR, "routes")
 check(True, "the routes page with the step inspector builds and fills")
+
+# Delete step: find the button by its label, click it, and the open route has one step fewer
+lua.execute('''
+function FindButton(label)
+    for _, f in ipairs(FRAMES) do
+        local t = rawget(f, "text")
+        if type(t) == "table" and rawget(t, "text") == label then return f end
+    end
+end
+''')
+YR.ToggleWindow(YR, "routes")
+count_text = None
+btn = g.FindButton("Delete step")
+check(btn is not None, "the Delete step button exists")
+before = g.YippRouteWindow and None
+lua.execute("DEL_BEFORE = nil")
+header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
+n_before = len(steps)
+if btn is not None:
+    undo = g.FindButton("Undo changes")
+    undo.fn(undo)                        # start from the saved route
+    btn.fn(btn)
+    YR.RefreshWindow(YR)
+    lua.execute('''
+    local b = FindButton("Save")
+    b.fn(b)
+    ''')
+    header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
+    check(len(steps) == n_before - 1, f"Delete step, then Save: {n_before} -> {len(steps)} steps")
+    YR.RevertGuide(YR, "coldridge")
 sys.exit(1 if bad else 0)
