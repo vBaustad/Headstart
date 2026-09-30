@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Routes to level 21 for every Alliance race and class.** After the starting zones, Headstart now has its own copies of RestedXP's Forever routes: Elwynn, Teldrassil, Loch Modan, Westfall, Darkshore, Redridge and Darkshore/Ashenvale. They are cleaned the same way, editable in the route editor, and linked so each starting route leads on through them. At 21 they hand over to RestedXP's own guides.
+- The route list in the window scrolls.
+- "Keep what the route needs" only counts the routes your race follows: a Dwarf isn't told to keep meat for a Human quest in Elwynn.
 - **Group play (duo and trio).** In a party, a route quest you take from an NPC is shared straight away (on Forever, from any distance), and one a party member shares is accepted for you. Only route quests; anything else still asks, and holding Shift asks anyway. Headstarts in a party see each other's role and route step in a small list under the splits, and hear about a newer Headstart in the party.
 - **Group roles:** Settings, Route: Solo, Duo A/B or Trio A/B/C per character. Where a quest pick-up lies off the path the others walk, the Duo and Trio versions of a route give it to one member in turn; the others walk on and get the quest shared. Northshire and Shadowglen have such a pick-up so far; more come with the 11-30 routes.
 ## 0.9.0-beta1

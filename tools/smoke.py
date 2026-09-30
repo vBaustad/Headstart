@@ -348,8 +348,11 @@ lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 # a saved edit replaces the shipped text; reverting brings it back.
 names = [str(g.REGISTERED[i]).split("#name ", 1)[1].splitlines()[0] for i in range(1, len(g.REGISTERED) + 1)]
 solo = [n_ for n_ in names if "(Duo" not in n_ and "(Trio" not in n_]
-check(len(solo) == 4 and "1-6 Northshire (Launch) (Duo B)" in names and "1-6 Shadowglen (Launch) (Trio C)" in names,
-      f"four routes registered with RestedXP, plus Duo and Trio versions where a pick-up is worth splitting: {len(names)}")
+check(len(solo) == 16 and "1-6 Northshire (Launch) (Duo B)" in names and "1-6 Shadowglen (Launch) (Trio C)" in names,
+      f"16 routes registered with RestedXP (starting zones and 6-21), plus Duo and Trio versions where a pick-up is worth splitting: {len(solo)} + {len(names) - len(solo)}")
+dwarf = YR.RoutesFor(YR, "Dwarf")
+check(dwarf["coldridge"] and dwarf["dunmorogh"] and dwarf["16_19_darkshore"] and not dwarf["6_11_elwynn_forest"] and not dwarf["northshire"],
+      "a Dwarf's routes: Coldridge on through Darkshore, not Human Elwynn or Northshire")
 for key in ("coldridge", "dunmorogh", "northshire", "shadowglen"):
     text = YR.GuideText(YR, key)
     header, steps = YR.SplitSteps(text)

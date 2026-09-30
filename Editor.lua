@@ -1620,28 +1620,32 @@ local function Build()
     S.Set(rule, S.C.line)
     pages = {}
     ui.routeTabs = {}
+    -- the pages first, then every route in a list that scrolls (there are more routes than room)
     local y = -12
     for _, p in ipairs(PAGES) do
         p.tab = NavButton(side, p.label, p.icon, y)
         p.tab:SetScript("OnClick", function() Show(p.key) end)
         y = y - 34
-        if p.key == "routes" then
-            local label = S.Text(side, 11, S.C.muted)
-            label:SetPoint("TOPLEFT", 20, y - 2)
-            label:SetText("YOUR ROUTES")
-            y = y - 20
-            for _, g in ipairs(YR.shipped) do
-                local sub = RouteButton(side, g.key, y)
-                sub:SetScript("OnClick", function()
-                    Open(g.key)
-                    for _, t in ipairs(ui.routeTabs) do t:Select(t == sub) end
-                    Show("routes")
-                end)
-                ui.routeTabs[#ui.routeTabs + 1] = sub
-                y = y - 32
-            end
-            y = y - 10
-        end
+    end
+    local label = S.Text(side, 11, S.C.muted)
+    label:SetPoint("TOPLEFT", 20, y - 8)
+    label:SetText("YOUR ROUTES")
+    local listTop = y - 26
+    local list = S.ScrollArea(side, SIDE, H - HEAD + listTop - 40)
+    list:SetPoint("TOPLEFT", 0, listTop)
+    local ry = 0
+    for _, g in ipairs(YR.shipped) do
+        local sub = RouteButton(list.content, g.key, ry)
+        sub:SetScript("OnClick", function()
+            Open(g.key)
+            for _, t in ipairs(ui.routeTabs) do t:Select(t == sub) end
+            Show("routes")
+        end)
+        ui.routeTabs[#ui.routeTabs + 1] = sub
+        ry = ry - 32
+    end
+    list.content:SetHeight(-ry + 8)
+    for _, p in ipairs(PAGES) do
         local page = CreateFrame("Frame", nil, win)
         page:SetPoint("TOPLEFT", SIDE, -HEAD)
         page:SetPoint("BOTTOMRIGHT")
