@@ -19,7 +19,7 @@ local OPTION_DEFAULTS = {
     macros = true, autofeed = true, items = false,
     clearBars = true, clearMacros = true,
     settings = true, editMode = true, barVisibility = true, guide = true, noAutoPush = true,
-    swap = true, popup = true,
+    swap = true, popup = true, skipIntro = true,
 }
 
 -- Everything is kept per class: a warrior main's bars and choices don't land on a new paladin.
@@ -479,17 +479,18 @@ local function BuildWindow()
     -- Only a deliberate click marks this character as done. Escape (which also skips the intro
     -- cinematic) just hides the window, so it comes back on the next login.
     local function Done() YippSetupCharDB.seen = CharacterID() or true end
-    -- Set up first shows every choice (Settings, Character tab); the layout goes on from there
-    w.setup = S.Button(w, "Set up...", function()
+    -- Set up is instant (a new character wants to get going); Copy first shows every choice of what
+    -- carries over (Settings, Character tab), and is done from there
+    w.setup = S.Button(w, "Set up layout", function() Done() YS:Apply() YS:Refresh() end, "primary")
+    w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
+    w.setup.tip = "On a new character: put the saved layout on this one, now"
+    w.copy = S.Button(w, "Copy this layout...", function()
         Done()
         w:Hide()
         YR:ShowSettingsTab("character")
-    end, "primary")
-    w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
-    w.setup.tip = "On a new character: see what carries over from your main, then set it up"
-    w.copy = S.Button(w, "Copy this layout", function() Done() YS:Copy() end)
+    end)
     w.copy:SetPoint("RIGHT", w.setup, "LEFT", -8, 0)
-    w.copy.tip = "On your main: save its bars, macros, Edit Mode layout and game settings"
+    w.copy.tip = "On your main: see what a new character will get, then copy this one's bars, macros and settings"
     w.close:HookScript("OnClick", Done)
     return w
 end
@@ -532,6 +533,20 @@ local function FirstTimeHere()
     YS:Toggle()
 end
 
+-- The intro cinematic (or movie) a new character logs in to: cancelled at once while level 1, when the
+-- option is on. It can start before we load, so the first login checks for one running too.
+local function SkipIntro()
+    if UnitLevel("player") > 1 or not (YippSetupDB and YS:Options().skipIntro) then return end
+    if InCinematic and InCinematic() then
+        if CinematicFrame_CancelCinematic then CinematicFrame_CancelCinematic() elseif StopCinematic then StopCinematic() end
+    end
+    if MovieFrame and MovieFrame:IsShown() then
+        MovieFrame:StopMovie()
+        if GameMovieFinished then GameMovieFinished() end
+    end
+end
+YS.SkipIntro = SkipIntro
+
 -- A layout copied before Edit Mode, bars and settings were saved has no ui part. Logging in on the
 -- character it was copied from fills it in, so the bars aren't copied again just for that.
 local function FillInUI()
@@ -570,6 +585,7 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
         YippSetupCharDB = YippSetupCharDB or {}
     elseif event == "PLAYER_ENTERING_WORLD" and (arg1 or arg2) then   -- login or reload only
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        SkipIntro()
         C_Timer.After(2, FirstTimeHere)
         C_Timer.After(3, FillInUI)
         if YippSetupCharDB.applied then NoAutoPush() end
@@ -577,3 +593,9 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
         if YippSetupCharDB then YS:Upgrade() end
     end
 end)
+
+-- the intro starting while we are loaded (see SkipIntro)
+local intro = CreateFrame("Frame")
+intro:RegisterEvent("CINEMATIC_START")
+intro:RegisterEvent("PLAY_MOVIE")
+intro:SetScript("OnEvent", function() C_Timer.After(0, SkipIntro) end)

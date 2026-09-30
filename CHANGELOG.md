@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New-character window: **Set up layout** is instant again. **Copy this layout...** now opens the Character settings first, so you see what a new character will get before copying.
+- **Skip the intro on new characters** (on by default, Settings, Character): the intro cinematic or movie a level-1 character logs in to is cancelled as it starts.
 - **Groups run the Deadmines.** In the Duo and Trio versions, RestedXP's Deadmines steps always show and their no-dungeon alternatives go. Deadmines quests pay three to four times the XP on Forever. Solo, RestedXP's own dungeon setting decides as before.
 - A group role follows you from route to route: when RestedXP moves on, Headstart switches to that route's version for your role.
 - Only the solo routes and your own role's versions are handed to RestedXP, so login stays quick.

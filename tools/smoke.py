@@ -539,10 +539,15 @@ YS = YR.Setup
 lua.execute("YippSetupCharDB = YippSetupCharDB or {}")
 YS.Toggle(YS)
 n_prints = len(g.PRINTS)
-g.YippSetupFrame.setup.fn(g.YippSetupFrame.setup)
+g.YippSetupFrame.copy.fn(g.YippSetupFrame.copy)
 said = [str(g.PRINTS[i]) for i in range(n_prints + 1, len(g.PRINTS) + 1)]
 check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is not True and g.YippSetupFrame.hidden is True
-      and not any("placed" in p_ for p_ in said), "the setup window's Set up opens the Character settings instead of setting up")
+      and not any("saved" in p_ for p_ in said), "the setup window's Copy opens the Character settings first instead of copying")
+lua.execute("function InCombatLockdown() return false end")
+n_prints = len(g.PRINTS)
+g.YippSetupFrame.setup.fn(g.YippSetupFrame.setup)
+said = [str(g.PRINTS[i]) for i in range(n_prints + 1, len(g.PRINTS) + 1)]
+check(any("layout" in p_ for p_ in said), f"and its Set up layout sets up at once: {said[:1]}")
 
 # Group play. A route with "#roles A,B" becomes a solo route plus one per role; steps marked
 # "#role X" are only that role's (or "#role solo": only when alone).

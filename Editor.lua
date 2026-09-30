@@ -1408,6 +1408,7 @@ local function BuildSetup(page)
     Section("While levelling")
     Row("Put spells on the bars as I learn them", Sw("swap"), "A placeholder becomes the real spell, or an empty saved slot gets it")
     Row("Show the setup window on new characters", Sw("popup"))
+    Row("Skip the intro on new characters", Sw("skipIntro"), "The cinematic a level-1 character logs in to is cancelled as it starts")
     L.Break()
     L.c:SetHeight(-L.y + 20)
 end
