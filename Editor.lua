@@ -9,7 +9,7 @@
 local _, YR = ...
 local S = YR.Style
 
-local W, H, SIDE, HEAD = 1080, 680, 180, 48
+local W, H, SIDE, HEAD = 1140, 680, 180, 48
 local PW, PH = W - SIDE, H - HEAD          -- the page area
 local LIST_W, ROW = 480, 24
 local win, pages, current
@@ -413,13 +413,13 @@ local function BuildInspector(page)
             p.head = #list > 0 and ("<< " .. table.concat(list, "/")) or ""
             Commit() YR:RefreshWindow()
         end, CLASS_TEX, coords)
-        chip:SetWidth(24)
+        chip:SetWidth(23)
         chip:SetPoint("TOPLEFT", cx, -64)
         chip:SetScript("OnEnter", function(self) S.Tip(self, CLASS_NAME[class] .. " (click to add or remove)") end)
         chip:SetScript("OnLeave", function() GameTooltip:Hide() end)
         chip.class = class
         ui.chips[#ui.chips + 1] = chip
-        cx = cx + 27
+        cx = cx + 26
     end
     ui.head = S.Input(body, { width = CW - 28, placeholder = "Or type who sees it, e.g. << Dwarf Paladin  or  << !Warrior", onCommit = function(t)
         if not edit.sel then return end
@@ -568,8 +568,11 @@ local function BuildInspector(page)
     ui.add.label:SetTextColor(unpack(S.C.accent))
     ui.add:SetPoint("TOPLEFT", ed, "BOTTOMLEFT", 0, -12)
     local addNote = S.Text(body, 11, S.C.muted)
+    -- kept inside the card: it wraps onto a second line rather than running past the edge
     addNote:SetPoint("LEFT", ui.add, "RIGHT", 10, 0)
-    addNote:SetText("Places are where you stand; kill and talk use your target.")
+    addNote:SetPoint("RIGHT", body, "RIGHT", -14, 0)
+    addNote:SetWordWrap(true)
+    addNote:SetText("New places are where you stand; kill and talk use your target.")
 
     ui.raw = S.Button(body, "Edit as text", function() YR:EditRawStep() end, "ghost", 100)
     ui.raw:SetPoint("BOTTOMRIGHT", -10, 10)
