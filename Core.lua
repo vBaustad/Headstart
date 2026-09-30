@@ -39,11 +39,13 @@ SlashCmdList.YIPPROUTE = function(msg)
         YR:SetLogging(arg ~= "off")
     elseif cmd == "splits" then
         if arg == "reset" then YR:ResetSplits() else YR:ShowSplits(arg ~= "off") end
-    else
+    elseif cmd == "status" then
         YR:ScanStatus()
         YR:LogStatus()
-        YR.Print("/yroute scan (stop) - ask the server about every known quest; /yroute log on|off;"
-            .. " /yroute splits on|off|reset")
+        YR.Print("/yroute - the window; /yroute scan (stop) - ask the server about every known quest;"
+            .. " /yroute log on|off; /yroute splits on|off|reset")
+    else
+        YR:ToggleWindow()
     end
 end
 
@@ -56,6 +58,7 @@ f:SetScript("OnEvent", function(self, _, name)
     YippRouteDB.runs = YippRouteDB.runs or {}
     if YippRouteDB.logging == nil then YippRouteDB.logging = true end   -- on by default: that's the point on the beta
     YR:RegisterGuides()
+    YR:RegisterExtras()
     YR:StartLog()
     YR:StartSplits()
     YR:BuildOptions()   -- last: Blizzard's options API is the part most likely to differ on this client
