@@ -95,6 +95,12 @@ step
 >>Talk to |cRXP_FRIENDLY_Guard Parker|r
     .accept 244 >> Accept Encroaching Gnolls
 step
+    #role A,B,C
+    .goto 1433,21.17,46.58
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Guard Berton|r
+    .target Guard Berton
+    .accept 386 >> Accept What Comes Around...
+step
 	#sticky
 	#label LakeshireFP
 	.goto 1433,30.5,59.4,-1
@@ -194,6 +200,12 @@ step
     .accept 163 >> Accept Raven Hill
     .accept 164 >> Accept Deliveries to Sven
     .accept 165 >> Accept The Hermit
+step
+    #role A,B,C
+    .goto 1431,71.92,47.79
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Councilman Millstipe|r
+    .target Councilman Millstipe
+    .accept 377 >> Accept Crime and Punishment
 step
     .goto 1431,75.4,48.0
 .target Calor
@@ -745,6 +757,74 @@ step
 .target Thomas
 >>Talk to |cRXP_FRIENDLY_Thomas|r
     .accept 1274 >> Accept The Missing Diplomat
+step
+    #role A,B,C
+    .goto 1453,51.49,69.38
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Warden Thelwater|r
+    .target Warden Thelwater
+    .turnin 389 >> Turn in Bazil Thredd
+    .accept 391 >> Accept The Stockade Riots
+    .accept 387 >> Accept Quell the Uprising
+step
+    #role A,B,C
+    .goto 1453,76.42,63.67
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Nikova Raskol|r
+    .target Nikova Raskol
+    .accept 388 >> Accept The Color of Blood
+step
+    #role A,B,C
+    .goto 1453,50.4,66.6
+    >>Enter the Stockade in the Mage Quarter with your group
+step
+    #role A,B,C
+    >>Kill |cRXP_ENEMY_Targorr the Dread|r, |cRXP_ENEMY_Dextren Ward|r, |cRXP_ENEMY_Defias Prisoner|r, |cRXP_ENEMY_Defias Convict|r, |cRXP_ENEMY_Defias Insurgent|r, |cRXP_ENEMY_Defias Captive|r, |cRXP_ENEMY_Defias Inmate|r, |cRXP_ENEMY_Bazil Thredd|r, |cRXP_ENEMY_Bruegal Ironknuckle|r. Loot them for |cRXP_LOOT_Head of Targorr|r, |cRXP_LOOT_Hand of Dextren Ward|r, |cRXP_LOOT_Red Wool Bandana|r, |cRXP_LOOT_Head of Bazil Thredd|r
+    .complete 386,1 --Collect Head of Targorr (x1)
+    .complete 377,1 --Collect Hand of Dextren Ward (x1)
+    .complete 387,1 --Kill Defias Prisoner (x10)
+    .complete 387,2 --Kill Defias Convict (x8)
+    .complete 387,3 --Kill Defias Insurgent (x8)
+    .complete 388,1 --Collect Red Wool Bandana (x10)
+    .complete 391,1 --Collect Head of Bazil Thredd (x1)
+    .mob Targorr the Dread
+    .mob Dextren Ward
+    .mob Defias Prisoner
+    .mob Defias Convict
+    .mob Defias Insurgent
+    .mob Defias Captive
+    .mob Defias Inmate
+    .mob Bazil Thredd
+    .mob Bruegal Ironknuckle
+step
+    #role A,B,C
+    .goto 1453,51.49,69.38
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Warden Thelwater|r
+    .target Warden Thelwater
+    .turnin 387 >> Turn in Quell the Uprising
+    .turnin 391 >> Turn in The Stockade Riots
+step
+    #role A,B,C
+    .goto 1453,76.42,63.67
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Nikova Raskol|r
+    .target Nikova Raskol
+    .turnin 388 >> Turn in The Color of Blood
+step
+    #role A,B,C
+    .fly Lakeshire >> Fly to Lakeshire
+step
+    #role A,B,C
+    .goto 1433,21.17,46.58
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Guard Berton|r
+    .target Guard Berton
+    .turnin 386 >> Turn in What Comes Around...
+step
+    #role A,B,C
+    .fly Darkshire >> Fly to Darkshire
+step
+    #role A,B,C
+    .goto 1431,71.92,47.79
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Councilman Millstipe|r
+    .target Councilman Millstipe
+    .turnin 377 >> Turn in Crime and Punishment
 step << Paladin
 #xprate <1.5
 	.goto 1453,38.6,32.8

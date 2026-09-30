@@ -108,11 +108,28 @@ def build(file, home, name, ours):
         text = text.replace(old, new)
     text = clean(text)
     text = map_ids(text)       # after cleaning: TBC/Wrath lines name maps Forever doesn't have
+    text = insert_blocks(name, text)
     text, dropped = drop_missing(text)
     for d in dropped:
         print(f"    {name}: {d}")
     text, shared = mark(text)
     return text, shared
+
+
+def insert_blocks(name, text):
+    """Our own steps (tools/route_builder.py specs, in blocks.py) put into a route: each block names a
+    step of the route by a pattern and goes before or after the first step that matches it."""
+    from blocks import BLOCKS
+    from route_builder import build
+    for anchor, where, spec in BLOCKS.get(name, []):
+        parts = re.split(r"\n(?=step\b)", text)
+        idx = next((i for i, p in enumerate(parts) if i > 0 and re.search(anchor, p)), None)
+        assert idx, f"{name}: no step matches {anchor!r}"
+        steps = build("", spec).strip("\n")
+        at = idx + 1 if where == "after" else idx
+        parts.insert(at, steps)
+        text = "\n".join(parts)
+    return text
 
 
 _maps = None

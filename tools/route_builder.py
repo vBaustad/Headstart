@@ -196,6 +196,7 @@ def _objectives(q):
         if kind in used:
             used[kind] += 1
         verb = {"item": "Collect", "monster": "Kill", "object": "Use"}.get(kind, "")
+        text = re.sub(r"\s+slain$", "", text)
         label = f"{verb} {text} (x{count})".strip() if text else ""
         out.append(f"    .complete {q},{i}" + (f" --{label}" if label else ""))
     return out

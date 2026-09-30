@@ -40,12 +40,16 @@ UIParent = CreateFrame()
 StaticPopupDialogs, UISpecialFrames, SlashCmdList = {}, {}, {}
 function StaticPopup_Show() end
 C_Timer = { After = function(_, fn) fn() end }
+-- the intro: a cinematic running, and what cancelling it does
+function UnitLevel() return 1 end
+IN_CINEMATIC = false
+function CinematicFrame_CancelCinematic() IN_CINEMATIC = false; CANCELLED = (CANCELLED or 0) + 1 end
 strsplit = function(_, s) local a, b = s:match("^(%S*)%s*(.*)$") return a, b ~= "" and b or nil end
 strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
 tinsert = table.insert
 Constants = { MacroConsts = { MAX_ACCOUNT_MACROS = 120, MAX_CHARACTER_MACROS = 30 } }
 function InCombatLockdown() return COMBAT == true end
-function InCinematic() return false end
+function InCinematic() return IN_CINEMATIC end
 GUID = "Player-1-0000MAIN"
 function UnitGUID() return GUID end
 function date() return ", 30 Sep 21:14" end
@@ -462,4 +466,17 @@ w["items"] = False
 ok = YS.Options(YS, "PALADIN")["items"] is True
 print(("ok  " if ok else "FAIL"), "and changing the warrior's choices leaves the paladin's alone")
 bad += not ok
+
+# The intro cinematic a new character logs in to is cancelled while level 1 (an option, on by default)
+lua.execute("IN_CINEMATIC = true; CANCELLED = 0")
+YS.SkipIntro()
+ok = g.CANCELLED == 1 and not g.IN_CINEMATIC
+print(("ok  " if ok else "FAIL"), "the intro cinematic is cancelled on a level-1 character")
+bad += not ok
+lua.execute("IN_CINEMATIC = true; CANCELLED = 0; YR_SETUP:Options().skipIntro = false")
+YS.SkipIntro()
+ok = g.CANCELLED == 0
+print(("ok  " if ok else "FAIL"), "... unless the option is off")
+bad += not ok
+lua.execute("YR_SETUP:Options().skipIntro = true; IN_CINEMATIC = false")
 sys.exit(1 if bad else 0)
