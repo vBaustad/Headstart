@@ -290,15 +290,25 @@ end
 -- Settings
 -- ---------------------------------------------------------------------------
 local settings = {}
+local rewards = {}
+
+local KIND_LABEL = {}
+for _, k in ipairs(YR.REWARD_KINDS) do KIND_LABEL[k.key] = k.label end
+
+local function Heading(page, text, x, y)
+    local h = S.Text(page, 15)
+    h:SetPoint("TOPLEFT", x, y)
+    h:SetText(text)
+    return h
+end
 
 local function BuildSettings(page)
-    local title = S.Text(page, 15)
-    title:SetPoint("TOPLEFT", 0, 0)
-    title:SetText("Settings")
+    -- left: the general switches, then the rewards you chose yourself
+    Heading(page, "Settings", 0, 0)
     local y = -34
     for _, o in ipairs({
         { "Show level splits", "showSplits", function(on) YR:ShowSplits(on) end },
-        { "Pick quest rewards (up to level 10)", "pickRewards" },
+        { "Pick quest rewards", "pickRewards" },
         { "Record runs", "logging", function(on) YR:SetLogging(on) end },
         { "Minimap button", "minimapButton", function(on) YR:ShowMinimapButton(on) end },
     }) do
@@ -310,6 +320,92 @@ local function BuildSettings(page)
         settings[#settings + 1] = t
         y = y - 30
     end
+
+    Heading(page, "Rewards you chose yourself", 0, y - 12)
+    local hint = S.Text(page, 12, S.C.muted)
+    hint:SetPoint("TOPLEFT", 0, y - 34)
+    hint:SetText("Shift when handing in to choose; taken again next time.")
+    rewards.chosen = List(page, 260, 8, function(r, i)
+        local e = rewards.chosenList[i]
+        r.quest = e.quest
+        r.num:SetText("")
+        r.label:SetPoint("LEFT", 6, 0)
+        r.label:SetText((e.title or ("quest " .. e.quest)) .. ": " .. (e.name or e.item))
+    end, function() return rewards.chosenList and #rewards.chosenList or 0 end)
+    rewards.chosen:SetPoint("TOPLEFT", 0, y - 54)
+    for _, r in ipairs(rewards.chosen.rows) do
+        local x = S.Mini(r, "x", function()
+            YR:RewardSettings().chosen[r.quest] = nil
+            YR:RefreshWindow()
+        end, S.C.danger)
+        x:SetPoint("RIGHT", -4, 0)
+    end
+
+    -- right: how the picker chooses
+    local X = 290
+    Heading(page, "Quest rewards", X, 0)
+    local level = S.Text(page, 13)
+    level:SetPoint("TOPLEFT", X, -38)
+    rewards.level = level
+    local minus = S.Mini(page, "-", function()
+        local db = YR:RewardSettings() db.maxLevel = math.max(1, db.maxLevel - 1) YR:RefreshWindow() end, S.C.text)
+    minus:SetPoint("TOPLEFT", X + 170, -34)
+    local plus = S.Mini(page, "+", function()
+        local db = YR:RewardSettings() db.maxLevel = math.min(60, db.maxLevel + 1) YR:RefreshWindow() end, S.C.text)
+    plus:SetPoint("LEFT", minus, "RIGHT", 4, 0)
+    local remember = S.Toggle(page, "Take the reward I chose before", function() return YR:RewardSettings().remember end,
+        function(on) YR:RewardSettings().remember = on end)
+    remember:SetPoint("TOPLEFT", X, -60)
+    local value = S.Toggle(page, "Nothing below on offer: most valuable",
+        function() return YR:RewardSettings().fallback == "value" end,
+        function(on) YR:RewardSettings().fallback = on and "value" or "ask" end)
+    value:SetPoint("TOPLEFT", X, -86)
+    settings[#settings + 1] = remember
+    settings[#settings + 1] = value
+    local order = S.Text(page, 12, S.C.muted)
+    order:SetPoint("TOPLEFT", X, -114)
+    order:SetText("Take the first of these on offer. Click to turn one off.")
+    rewards.order = List(page, W - SIDE - 40 - X, #YR.REWARD_KINDS, function(r, i)
+        local db = YR:RewardSettings()
+        local kind = db.order[i]
+        r.index = i
+        r.num:SetText(i)
+        r.label:SetText(KIND_LABEL[kind] or kind)
+        r.label:SetTextColor(unpack(db.off[kind] and S.C.muted or S.C.text))
+    end, function() return #YR:RewardSettings().order end)
+    rewards.order:SetPoint("TOPLEFT", X, -132)
+    for _, r in ipairs(rewards.order.rows) do
+        r:SetScript("OnClick", function(self)
+            local db = YR:RewardSettings()
+            local kind = db.order[self.index]
+            db.off[kind] = not db.off[kind] or nil
+            YR:RefreshWindow()
+        end)
+        local function Swap(d)
+            local db = YR:RewardSettings()
+            local a, b = r.index, r.index + d
+            if b < 1 or b > #db.order then return end
+            db.order[a], db.order[b] = db.order[b], db.order[a]
+            YR:RefreshWindow()
+        end
+        local up = S.Mini(r, "^", function() Swap(-1) end)
+        up:SetPoint("RIGHT", -24, 0)
+        local down = S.Mini(r, "v", function() Swap(1) end)
+        down:SetPoint("RIGHT", -4, 0)
+    end
+end
+
+local function RefreshSettings()
+    for _, t in ipairs(settings) do t:Refresh() end
+    local db = YR:RewardSettings()
+    rewards.level:SetText(("Up to level %d"):format(db.maxLevel))
+    rewards.chosenList = {}
+    for quest, e in pairs(db.chosen) do
+        rewards.chosenList[#rewards.chosenList + 1] = { quest = quest, item = e.item, name = e.name, title = e.title }
+    end
+    table.sort(rewards.chosenList, function(a, b) return (a.title or "") < (b.title or "") end)
+    rewards.chosen:Refresh()
+    rewards.order:Refresh()
 end
 
 -- ---------------------------------------------------------------------------
@@ -320,7 +416,7 @@ local PAGES = {
     { key = "run", label = "This run", build = BuildRun, refresh = RefreshRun },
     { key = "share", label = "Share", build = BuildShare, refresh = function() end },
     { key = "settings", label = "Settings", build = BuildSettings,
-      refresh = function() for _, t in ipairs(settings) do t:Refresh() end end },
+      refresh = RefreshSettings },
 }
 
 local function Show(key)

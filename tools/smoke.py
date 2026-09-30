@@ -163,23 +163,27 @@ check(kill.xp == 10, f"kill XP 10: {kill.xp}")
 steps = [run.ev[i].step for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "step"]
 check(list(steps) == [7, 8], f"steps 7 then 8: {list(steps)}")
 
-# Reward choices: a two-handed weapon beats mail, mail beats water, water beats food; Shift or a level
-# above 10 leaves the choice to you; nothing that fits, nothing chosen.
+# Reward choices (a paladin's default order: two-hander, mail, shield, water, food): the first kind on
+# offer; of two the more valuable; nothing listed -> the most valuable (or you, if set so); Shift or
+# above the level limit -> you; a reward you picked by hand is taken again for that quest.
 lua.execute(r'''
 C_Timer.After = function(_, fn) fn() end
-SHIFT, LEVEL = false, 5
+SHIFT, LEVEL, QUEST = false, 5, 100
 function IsShiftKeyDown() return SHIFT end
 function UnitLevel() return LEVEL end
+function GetQuestID() return QUEST end
+function GetTitleText() return "A Quest" end
 -- id = { equipLoc, classID, subclassID, spell, sellPrice }
 ITEMS = { [1] = { "INVTYPE_2HWEAPON", 2, 5, nil, 50 }, [2] = { "INVTYPE_CHEST", 4, 3, nil, 20 },
           [3] = { "INVTYPE_CHEST", 4, 2, nil, 99 }, [4] = { "", 0, 5, "Drink", 5 }, [5] = { "", 0, 5, "Food", 9 },
-          [6] = { "INVTYPE_LEGS", 4, 3, nil, 40 }, [7] = { "INVTYPE_WEAPON", 2, 4, nil, 70 } }
+          [6] = { "INVTYPE_LEGS", 4, 3, nil, 40 }, [7] = { "INVTYPE_WEAPON", 2, 4, nil, 70 },
+          [8] = { "INVTYPE_FINGER", 4, 0, nil, 30 } }
 C_Item = { GetItemInfoInstant = function(id) local i = ITEMS[id] return id, "", "", i[1], 0, i[2], i[3] end,
            GetItemSpell = function(id) return ITEMS[id][4] end,
            GetItemInfo = function(id) return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, ITEMS[id][5] end }
 CHOICES = {}
 function GetNumQuestChoices() return #CHOICES end
-function GetQuestItemInfo(_, i) return "x", 0, 1, 1, true, CHOICES[i] end
+function GetQuestItemInfo(_, i) return "item" .. CHOICES[i], 0, 1, 1, true, CHOICES[i] end
 function GetQuestItemLink(_, i) return "item" .. CHOICES[i] end
 function GetQuestReward(i) PICKED = i end
 function Pick(...) CHOICES = { ... } PICKED = nil Fire("QUEST_COMPLETE") return PICKED end
@@ -187,11 +191,25 @@ function Pick(...) CHOICES = { ... } PICKED = nil Fire("QUEST_COMPLETE") return 
 check(g.Pick(3, 2, 1) == 3, "two-hander over mail and leather")
 check(g.Pick(3, 2, 6) == 3, "of two mail pieces, the one that sells for more")
 check(g.Pick(5, 4) == 2, "water over food")
-check(g.Pick(3, 5, 7) is None, "nothing that fits: nothing chosen")
+check(g.Pick(3, 8, 7) == 1, "nothing from the list on offer: the most valuable (leather, 99)")
+lua.execute("YippRouteDB.rewards.fallback = 'ask'")
+check(g.Pick(3, 8, 7) is None, "... or nothing, if you'd rather choose")
+lua.execute("YippRouteDB.rewards.off.twohand = true")
+check(g.Pick(1, 2) == 2, "two-hander turned off: mail")
+lua.execute("YippRouteDB.rewards.off.twohand = nil")
 lua.execute("SHIFT = true")
 check(g.Pick(1, 2) is None, "Shift held: you choose")
-lua.execute("SHIFT = false; LEVEL = 11")
-check(g.Pick(1, 2) is None, "above level 10: you choose")
+lua.execute("QUEST = 200; CHOICES = { 1, 2, 8 }")
+g.HOOKS["GetQuestReward"](3)                           # you took the ring by hand
+chosen = g.YippRouteDB.rewards.chosen[200]
+check(chosen is not None and chosen.item == 8, "a reward picked by hand is remembered for that quest")
+lua.execute("SHIFT = false")
+check(g.Pick(1, 2, 8) == 3, "... and taken again next time, over the two-hander")
+lua.execute("LEVEL = 11")
+check(g.Pick(1, 2) is None, "above the level limit: you choose")
+lua.execute("YippRouteDB.rewards.maxLevel = 12")
+check(g.Pick(1, 2) == 1, "the level limit is a setting")
+lua.execute("LEVEL = 5")
 
 # Level splits: the time is the server's /played. A reaches level 2 after 100 s of play; B, a new
 # character, after 50 s - 50 s ahead; C, already level 12, is timed from what the server says.
@@ -302,6 +320,8 @@ check(done == "added 1-6 Somewhere Else" and g.YippRouteDB.extra["1-6 Somewhere 
 bad_import = YR.ImportGuide(YR, "hello")
 check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a guide is refused, with the reason")
 YR.RevertGuide(YR, "coldridge")
+YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
+check(True, "settings page with reward settings opens")
 # the minimap button exists and the settings switch hides it
 check(g.YippRouteMinimapButton is not None and g.YippRouteMinimapButton.hidden is not True, "minimap button shown")
 YR.ShowMinimapButton(YR, False)
