@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Set up layout places AutoFeed's macros on a new character: when AutoFeed hasn't made them there yet, it's asked to make them (so it owns and fills them), and they go where they are on your main.
 - Level splits: "vs best" compares against a run with every level timed. A run first timed part-way (for example a character that was already level 8) no longer blanks the column.
 - Set up layout only asks for a reload when it actually changed your Edit Mode layout or which action bars are shown.
 - Updates never overwrite your route edits. When a new version ships a changed route you have edited, you're told once in chat and the route gets a blue dot. **Take the update** gives you the new route with your edits on top (where we changed a step you changed too, yours is kept), **Keep mine** leaves it as it is, and **Undo the update** goes back.

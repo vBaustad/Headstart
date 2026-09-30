@@ -233,6 +233,20 @@ local function AutoFeedOwned()
     return type(char.owned) == "table" and char.owned or {}
 end
 
+-- AutoFeed's own "make this macro" (published through LibForever at login): it makes the macro
+-- configured under that name exactly as its Create button does, owns it and fills it, and returns
+-- the macro index. Nil when AutoFeed isn't loaded or couldn't make it (slots full, in combat,
+-- or somebody else's macro has the name).
+local function AutoFeedMaker()
+    local lib = LibStub and LibStub("LibForever-1.0", true)
+    local maker = lib and lib.GetData and lib.GetData("AutoFeedMacros")
+    return maker and maker.Create
+end
+
+function YS:AutoFeedLoaded()
+    return AutoFeedMaker() ~= nil
+end
+
 
 -- Delete this character's macros, except the ones AutoFeed owns. General (account) macros are left
 -- alone: they are shared with every other character, your main included.
@@ -292,7 +306,7 @@ function YS:Apply(force)
     local autofeed = AutoFeedNames()
     local removed = o.clearMacros and ClearCharacterMacros(AutoFeedOwned()) or 0
     local levels = YS.SPELL_LEVELS[class] or {}
-    local made, placed, full, noAutoFeed = 0, 0, nil, nil
+    local made, placed, full, noAutoFeed, askedAutoFeed = 0, 0, nil, nil, 0
     for slot = 1, MAX_SLOT do
         local e = p.slots[slot]
         if not Wanted(e, levels, autofeed, o) then e = nil end
@@ -308,9 +322,16 @@ function YS:Apply(force)
             ClearCursor()
             placed = placed + 1
         elseif e and e.kind == "macro" and autofeed[e.name] then
-            -- AutoFeed's macros are never made here: only the ones AutoFeed already made on this
-            -- character are placed; the slot stays empty otherwise
+            -- AutoFeed's macros are never copied: a copy is a macro AutoFeed doesn't own, so it would
+            -- never fill it. One AutoFeed already made is placed; otherwise AutoFeed is asked to make it.
             local own = AutoFeedOwned()[e.name] and GetMacroIndexByName(e.name)
+            if not (own and own > 0) then
+                local create = AutoFeedMaker()
+                local ok, res = false, nil
+                if create then ok, res = pcall(create, e.name) end
+                own = ok and res or nil
+                if own then askedAutoFeed = askedAutoFeed + 1 end
+            end
             if own and own > 0 then idx = own else noAutoFeed = e.name end
         -- a layout saved by an older version can still hold items and non-class spells
         elseif e and (e.kind == "macro" or (o.placeholders and e.kind == "spell" and (levels[e.name] or YS.RACIALS[e.name]))) then
@@ -339,8 +360,13 @@ function YS:Apply(force)
     if full then
         Print(("stopped at '%s': your character macro slots are full (%d)."):format(full, Constants.MacroConsts.MAX_CHARACTER_MACROS))
     end
+    if askedAutoFeed > 0 then
+        Print(("AutoFeed made %d of its macros for this character; it keeps them filled."):format(askedAutoFeed))
+    end
     if noAutoFeed then
-        Print(("AutoFeed hasn't made '%s' on this character yet, so that slot is empty. Create it in AutoFeed and Set up layout again."):format(noAutoFeed))
+        Print(AutoFeedMaker()
+            and ("AutoFeed couldn't make '%s' (macro slots full, or another macro has that name), so that slot is empty."):format(noAutoFeed)
+            or ("'%s' is AutoFeed's macro and AutoFeed isn't loaded, so that slot is empty."):format(noAutoFeed))
     end
     if o.noAutoPush and not NoAutoPush() then
         Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
