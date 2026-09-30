@@ -178,6 +178,41 @@ sub("""step
     .isOnQuest 287
 """, "")
 
+# Frosthowl (98326, new in Forever: 775 XP, 3s, needs level 5): Gretta Ganter in Brewnall, a named
+# wendigo at the back of the Grizzled Den. Taken on the first Brewnall visit (the first den visit
+# comes before Brewnall, at level 6), killed on the way back west (the route climbs Shimmer Ridge
+# just above the den), handed in with The Perfect Stout. Wowhead's Forever page, a logged run.
+FROSTHOWL_ACCEPT = """step
+    .goto 1426,31.4,44.6
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gretta Ganter|r
+    .accept 98326 >> Accept Frosthowl
+    .target Gretta Ganter
+"""
+FROSTHOWL_KILL = """step
+    .goto 1426,41.9,49.5,20,0
+    .goto 1426,39.5,48.8
+    >>Into the |cRXP_PICK_Grizzled Den|r: kill |cRXP_ENEMY_Frosthowl|r at the back. Loot him for the |cRXP_LOOT_Sack of Fish|r
+    .complete 98326,1 --Sack of Fish (1)
+    .mob Frosthowl
+    .isOnQuest 98326
+"""
+FROSTHOWL_TURNIN = """step
+    .goto 1426,31.4,44.6
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gretta Ganter|r
+    .turnin 98326 >> Turn in Frosthowl
+    .target Gretta Ganter
+    .isQuestComplete 98326
+"""
+i = guide.index("    #label BrewnallVillage")
+i = guide.index("\nstep", i) + 1
+guide = guide[:i] + FROSTHOWL_ACCEPT + guide[i:]
+i = guide.index("    .goto 1426,42.254,45.301,15 >> Travel up the mountain slope to Shimmer Ridge")
+i = guide.rindex("\nstep", 0, i) + 1
+guide = guide[:i] + FROSTHOWL_KILL + guide[i:]
+i = guide.index("    .turnin 311 >> Turn in Return to Marleth")
+i = guide.index("\nstep", i) + 1
+guide = guide[:i] + FROSTHOWL_TURNIN + guide[i:]
+
 # --- Money ----------------------------------------------------------------------------------------
 # Cooking is 270 XP for 1 silver (Camping 101: Cooking): the best copper spent in Kharanos. A logged
 # run skipped it for lack of money after class training, so it comes first now (same building), and

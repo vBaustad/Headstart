@@ -562,6 +562,11 @@ step
     .goto 1426/0,315.42,-5372.02
     .target +Marleth Barleybrew
 step
+    .goto 1426,31.4,44.6
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gretta Ganter|r
+    .accept 98326 >> Accept Frosthowl
+    .target Gretta Ganter
+step
     #sticky
     #label ForceFavorRibNo
     #loop
@@ -857,6 +862,13 @@ step << Hunter
     .goto 1426/0,-455.83,-5497.90
     .accept 412 >> Accept Operation Recombobulation
 step
+    .goto 1426,41.9,49.5,20,0
+    .goto 1426,39.5,48.8
+    >>Into the |cRXP_PICK_Grizzled Den|r: kill |cRXP_ENEMY_Frosthowl|r at the back. Loot him for the |cRXP_LOOT_Sack of Fish|r
+    .complete 98326,1 --Sack of Fish (1)
+    .mob Frosthowl
+    .isOnQuest 98326
+step
     .isOnQuest 315
     #completewith ShimmerweedCollect
     #optional
@@ -902,6 +914,12 @@ step
     .turnin 311 >> Turn in Return to Marleth
     .goto 1426/0,315.42,-5372.02
     .target +Marleth Barleybrew
+step
+    .goto 1426,31.4,44.6
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gretta Ganter|r
+    .turnin 98326 >> Turn in Frosthowl
+    .target Gretta Ganter
+    .isQuestComplete 98326
 step << Hunter
     #loop
     .goto 1426/0,462.48,-5288.92,60,0

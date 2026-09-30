@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Dun Morogh: **Frosthowl** (new in Forever, 775 XP and 3s). Taken from Gretta Ganter on the first Brewnall visit, Frosthowl killed at the back of the Grizzled Den on the way to Shimmer Ridge (the route passes right above the den), handed in with The Perfect Stout.
 - **Level splits handle long times**: each column is as wide as its longest time, so hours (or days of /played on a main) no longer run into the next column. New settings under Level splits: times past an hour as 1:50:19 or 1h 50m, and the level and total columns can be hidden like vs best.
 - **/hs** opens Settings (again to close it).
 - The route list shows your routes only: the ones your race and class follow, in level order, without "(Dwarf/Gnome)" in their names, in smaller rows. "Show all" lists every route.
