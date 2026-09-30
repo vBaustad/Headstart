@@ -1,8 +1,9 @@
 -- Level splits: this character's playing time from level 1, level by level, against your best run.
--- Only the time you are logged in counts.
---   YippRouteDB.splits.runs[key] = { name, class, elapsed, xp, levels = { [level] = seconds since level 1 } }
--- A run starts on a character that logs in at level 1 with no XP; older characters are not timed and
--- show the best run instead.
+--   YippRouteDB.splits.runs[key] = { name, class, elapsed, xp, levels = { [level] = seconds played } }
+-- The time is the server's own /played: asked for at login and after every level, counted on locally
+-- in between. So every character is timed, the clock never stops while you are logged in, and a crash
+-- or a disconnect can't lose time. The server also says how long you have been at this level, which
+-- gives the level's start even on a character the splits never saw before.
 --
 --   XP/hr: 15.5k                      over the last 10 minutes of play
 --   Ding: 4 min                       at that rate
@@ -19,6 +20,7 @@ local ROW_H = 16
 local FONT = "Fonts\\FRIZQT__.TTF"
 local TOP = 56                   -- the three lines above the table
 local key, rec, frame, last, ticker
+local synced = false             -- the server has told us this character's /played
 local lastXP, lastMax, lastLevel
 local rate = {}                  -- { play seconds, XP since level 1 } every few seconds, for XP/hour
 
@@ -113,7 +115,11 @@ local function Refresh()
     if not (frame and frame:IsShown()) then return end
     local run, pb = rec, Best()
     local n = 0
-    if run then
+    if run and not synced then
+        frame.xph:SetText(BLUE .. "Time:|r " .. GREY .. "asking the server...|r")
+        frame.ding:SetText("")
+        frame.time:SetText("")
+    elseif run then
         local level = UnitLevel("player")
         local theirsNow = pb and pb.levels[level + 1]
         -- green while you can still reach the next level before the best run did
@@ -138,11 +144,13 @@ local function Refresh()
     if run then
         for lvl = Top(run), 2, -1 do
             local at, before = run.levels[lvl], run.levels[lvl - 1]
-            if at and before then
+            if at then
+                -- a level reached before the splits knew this character has a total but no own time
                 local theirs = pb and pb.levels[lvl]
                 local theirSeg = theirs and pb.levels[lvl - 1] and theirs - pb.levels[lvl - 1]
                 n = n + 1
-                SetRow(n, BLUE .. ("Level %d|r"):format(lvl), Vs(at - before, theirSeg), Vs(at, theirs), Delta(theirs and at - theirs))
+                SetRow(n, BLUE .. ("Level %d|r"):format(lvl), before and Vs(at - before, theirSeg) or GREY .. "-|r",
+                    Vs(at, theirs), Delta(theirs and at - theirs))
             end
         end
     end
@@ -234,7 +242,26 @@ local function ImportLogs()
     end
 end
 
--- A new character at level 1 starts a run; one already timed carries on; anyone else is not timed.
+-- /played without the two lines it prints in chat: the chat windows stop listening until the answer
+-- is in, then listen again.
+local muted = {}
+local function AskPlayed()
+    for i = 1, NUM_CHAT_WINDOWS or 10 do
+        local cf = _G["ChatFrame" .. i]
+        if cf and cf:IsEventRegistered("TIME_PLAYED_MSG") then
+            cf:UnregisterEvent("TIME_PLAYED_MSG")
+            muted[#muted + 1] = cf
+        end
+    end
+    RequestTimePlayed()
+end
+
+local function Unmute()
+    for _, cf in ipairs(muted) do cf:RegisterEvent("TIME_PLAYED_MSG") end
+    wipe(muted)
+end
+
+-- Every character is timed: one seen before carries on, any other starts a record now.
 function YR:StartSplits()
     ImportLogs()
     local name = UnitFullName("player")
@@ -245,11 +272,13 @@ function YR:StartSplits()
     end
     key = guid
     rec = DB().runs[key]
-    if not rec and UnitLevel("player") == 1 and UnitXP("player") == 0 then
+    if not rec then
         local _, class = UnitClass("player")
-        rec = { name = YR.CharKey(), class = class, elapsed = 0, xp = 0, levels = { [1] = 0 } }
+        rec = { name = YR.CharKey(), class = class, elapsed = 0, xp = 0, levels = {} }
         DB().runs[key] = rec
     end
+    synced = false
+    AskPlayed()
     wipe(rate)
     lastXP, lastMax, lastLevel = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
     last = GetTime()
@@ -261,13 +290,27 @@ function YR:ResetSplits()
     if key then DB().runs[key] = nil end
     rec = nil
     YR.Print("splits for this character cleared.")
-    Refresh()
+    YR:StartSplits()
 end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_LEVEL_UP")
 f:RegisterEvent("PLAYER_XP_UPDATE")
-f:SetScript("OnEvent", function(_, event, level)
+f:RegisterEvent("TIME_PLAYED_MSG")
+f:SetScript("OnEvent", function(_, event, level, atLevel)
+    if event == "TIME_PLAYED_MSG" then
+        -- level is the total here, atLevel the time at this level: the server's word replaces our count
+        Unmute()
+        if rec and type(level) == "number" then
+            rec.elapsed = level
+            last = GetTime()
+            local lvl = UnitLevel("player")
+            if not rec.levels[lvl] and type(atLevel) == "number" then rec.levels[lvl] = level - atLevel end
+            synced = true
+        end
+        Refresh()
+        return
+    end
     if event == "PLAYER_XP_UPDATE" then
         -- XP since level 1, for XP/hour; a level-up in between adds what was left of the old level
         local xp, lvl = UnitXP("player"), UnitLevel("player")
@@ -280,6 +323,7 @@ f:SetScript("OnEvent", function(_, event, level)
     end
     if rec then
         rec.levels[level] = rec.elapsed
+        C_Timer.After(1, AskPlayed)          -- and check our count against the server's
         local pb = Best()
         local theirs = pb and pb.levels[level]
         YR.Print(("level %d at %s%s"):format(level, Clock(rec.elapsed), theirs and ("  " .. Delta(rec.elapsed - theirs)) or ""))

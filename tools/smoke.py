@@ -49,6 +49,7 @@ function UnitRace() return "Dwarf", "Dwarf" end
 function UnitLevel() return 1 end
 GUID = "Player-A"
 HOOKS = {}
+function RequestTimePlayed() ASKED_PLAYED = (ASKED_PLAYED or 0) + 1 end
 UISpecialFrames, StaticPopupDialogs = {}, {}
 tinsert = table.insert
 function StaticPopup_Show(which) POPUP = which end
@@ -191,20 +192,21 @@ check(g.Pick(1, 2) is None, "Shift held: you choose")
 lua.execute("SHIFT = false; LEVEL = 11")
 check(g.Pick(1, 2) is None, "above level 10: you choose")
 
-# Level splits: character A reaches level 2 after 100 s of play; B, a new character, after 50 s - 50 s ahead.
+# Level splits: the time is the server's /played. A reaches level 2 after 100 s of play; B, a new
+# character, after 50 s - 50 s ahead; C, already level 12, is timed from what the server says.
 lua.execute("LVL = 1; function UnitLevel() return LVL end")
 splits = g.YippRouteDB.splits
 a = splits.runs["Player-A"]
-check(a is not None and a.levels[1] == 0, "a level-1 character with no XP starts a run")
-g.RunTickers(); start = a.elapsed
+check(a is not None and (g.ASKED_PLAYED or 0) >= 1, "login asks the server for /played")
+g.Fire("TIME_PLAYED_MSG", 0, 0)
+check(a.levels[1] == 0 and a.elapsed == 0, "the server's answer sets the clock and the level's start")
 for _ in range(10):
     g.NOW += 10; g.RunTickers()
 lua.execute("LVL = 2"); g.Fire("PLAYER_LEVEL_UP", 2)
-a.levels[2] = a.levels[2] - start   # this test only counts its own 100 s
 check(abs(a.levels[2] - 100) < 1, f"A: level 2 at {a.levels[2]:.0f} s of play")
 lua.execute('''GUID = "Player-B"; XP = 0; LVL = 1''')
 YR.StartSplits(YR)
-g.CLOCK += 3600                                  # logged out for an hour: doesn't count
+g.Fire("TIME_PLAYED_MSG", 0, 0)
 for _ in range(5):
     g.NOW += 10; g.RunTickers()
 lua.execute("LVL = 2"); g.Fire("PLAYER_LEVEL_UP", 2)
@@ -223,7 +225,14 @@ check(row(2)[0] == "|cff66ccffLevel 2|r" and row(2)[1] == "|cff40ff400:50|r" and
 check(f.time.text.startswith("|cff66ccffTime:|r "), f"total time: {f.time.text}")
 lua.execute('''GUID = "Player-C"; XP = 900; LVL = 12''')
 YR.StartSplits(YR)
-check(splits.runs["Player-C"] is None, "a character that is already levelled is not timed")
+g.Fire("TIME_PLAYED_MSG", 36000, 600)
+c = splits.runs["Player-C"]
+check(c is not None and c.elapsed == 36000 and c.levels[12] == 35400,
+      "a levelled character is timed too: 10 h played, level 12 reached 10 min ago")
+for _ in range(3):
+    g.NOW += 10; g.RunTickers()
+g.Fire("TIME_PLAYED_MSG", 36100, 700)
+check(c.elapsed == 36100, "the server's /played wins over our own count (nothing lost to a crash)")
 YR.ShowSplits(YR, False)
 check(g.YippRouteSplitsFrame.hidden is True and g.YippRouteDB.showSplits is False, "splits can be turned off")
 # Runs from before the splits: rebuilt from the run log, logged-out gaps left out, another character cut off
