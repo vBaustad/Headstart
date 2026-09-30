@@ -116,33 +116,36 @@ StaticPopupDialogs["YIPPSETUP_RELOAD"] = {
     hideOnEscape = true,
 }
 
-function YS:ApplyUI(ui)
+function YS:ApplyUI(ui, o)
+    o = o or YS:Options()
     if not ui then
         YS.Print(("RestedXP guide: %s. No Edit Mode layout, bars or settings saved yet: log in on your main once.")
-            :format(ApplyGuide()))
+            :format(o.guide and ApplyGuide() or "off"))
         return
     end
     local set, bars = 0, 0
     local suite = FirstLoaded(UI_SUITES)
     local barAddon = suite or FirstLoaded(BAR_ADDONS)
-    for name, v in pairs(ui.cvars or {}) do
+    for name, v in pairs(o.settings and ui.cvars or {}) do
         if C_CVar.GetCVar(name) ~= nil and C_CVar.GetCVar(name) ~= v and pcall(C_CVar.SetCVar, name, v) then
             set = set + 1
         end
     end
-    if not barAddon then
+    local barsDone = not barAddon and o.barVisibility
+    if barsDone then
         for bar, shown in pairs(ui.bars or {}) do
             local key = "PROXY_SHOW_ACTIONBAR_" .. bar
             local ok, cur = pcall(Settings.GetValue, key)
             if ok and cur ~= shown and pcall(Settings.SetValue, key, shown) then bars = bars + 1 end
         end
     end
-    local layout = suite and ("left to " .. suite) or ApplyLayout(ui.layout)
-    local barText = barAddon and ("left to " .. barAddon) or tostring(bars) .. " changed"
+    local layoutDone = not suite and o.editMode
+    local layout = suite and ("left to " .. suite) or (o.editMode and ApplyLayout(ui.layout) or "off")
+    local barText = barAddon and ("left to " .. barAddon) or (o.barVisibility and (tostring(bars) .. " changed") or "off")
     YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Game settings changed: %d. RestedXP guide: %s.")
-        :format(layout, barText, set, ApplyGuide()))
+        :format(layout, barText, set, o.guide and ApplyGuide() or "off"))
     -- only Edit Mode and the bar settings are Blizzard UI an addon can taint: no reload needed without them
-    if not suite or not barAddon then
+    if layoutDone or barsDone then
         YS.Print("reload to finish: until then the action bars can be blocked in combat.")
         StaticPopup_Show("YIPPSETUP_RELOAD")
     end

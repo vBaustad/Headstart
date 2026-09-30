@@ -10,7 +10,29 @@ local S = YR.Style
 
 local DYNAMIC_ICON = 134400     -- the question mark; #showtooltip shows the real icon once the spell is known
 local MAX_SLOT = 180
-local DEFAULT_MAX_LEVEL = 10
+local SCAN_LEVEL = 60           -- Copy saves every spell; the level limit is a setup option
+
+-- What Set up carries over. Every part has a switch on the Character setup page.
+local OPTION_DEFAULTS = {
+    classSpells = true, maxLevel = 10, placeholders = true, racials = true, professions = true,
+    mouseover = "Purify",
+    macros = true, autofeed = true, items = false,
+    clearBars = true, clearMacros = true,
+    settings = true, editMode = true, barVisibility = true, guide = true, noAutoPush = true,
+    swap = true, popup = true,
+}
+
+-- The saved layout (from Copy this layout), or nil.
+function YS:Profile()
+    return YippSetupDB and YippSetupDB.profile
+end
+
+function YS:Options()
+    YippSetupDB.options = YippSetupDB.options or {}
+    local o = YippSetupDB.options
+    for k, v in pairs(OPTION_DEFAULTS) do if o[k] == nil then o[k] = v end end
+    return o
+end
 local MACRO_NAME_MAX = 16
 
 local function Print(msg)
@@ -47,11 +69,12 @@ end
 -- Class spells up to the level limit, racials (Stoneform: every character has them from level 1),
 -- profession spells (placed on the new character once learned) and your own macros (AutoFeed's
 -- included). Items are left out.
-function YS:Scan(maxLevel)
+function YS:Scan()
+    local maxLevel = SCAN_LEVEL
     local _, class = UnitClass("player")
     local levels = YS.SPELL_LEVELS[class] or {}
     local slots = {}
-    local n = { spell = 0, macro = 0, later = 0, other = 0, prof = 0 }
+    local n = { spell = 0, macro = 0, later = 0, other = 0, prof = 0, item = 0 }
     for slot = 1, MAX_SLOT do
         if HasAction(slot) then
             local kind, id = GetActionInfo(slot)
@@ -60,7 +83,7 @@ function YS:Scan(maxLevel)
                 local name = C_Spell.GetSpellName(id)
                 lvl = name and (levels[name] or (YS.RACIALS[name] and 1))
                 if lvl and lvl <= maxLevel then
-                    entry = { kind = "spell", name = name }
+                    entry = { kind = "spell", name = name, level = lvl, racial = YS.RACIALS[name] or nil }
                 elseif lvl then
                     n.later = n.later + 1
                 elseif name and YS.PROFESSIONS[name] then
@@ -69,6 +92,8 @@ function YS:Scan(maxLevel)
                 end
             elseif kind == "macro" then
                 entry = ReadMacroSlot(slot, id)
+            elseif kind == "item" and id then
+                entry = { kind = "item", id = id, name = C_Item.GetItemNameByID(id) }
             end
             if entry then
                 slots[slot] = entry
@@ -81,8 +106,8 @@ function YS:Scan(maxLevel)
     end
     YippSetupDB.profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots,
         ui = YS:ScanUI() }
-    Print(("saved %s: %d spells (up to level %d), %d profession spells and %d macros. Left out %d higher-level spells and %d other buttons (items).")
-        :format(PlayerKey(), n.spell, maxLevel, n.prof, n.macro, n.later, n.other))
+    Print(("saved %s: %d spells, %d profession spells, %d macros and %d items. What goes onto a new character is"
+        .. " chosen on the Character setup page."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item))
 end
 
 --------------------------------------------------------------------------------
@@ -91,7 +116,18 @@ end
 
 -- Your choices for the new character.
 local REPLACE = {}   -- e.g. ["Seal of Fury"] = "Seal of Righteousness": that spell goes in this one's slot
-local MOUSEOVER = { ["Purify"] = true }                          -- cast on your mouseover target, else yourself/target
+-- Spells cast on your mouseover target (else yourself or your target): a list in the options.
+local mouseoverText, mouseoverSet
+local function MOUSEOVER_SET()
+    local text = YS:Options().mouseover or ""
+    if text ~= mouseoverText then
+        mouseoverText, mouseoverSet = text, {}
+        for name in (text .. ","):gmatch("%s*([^,]-)%s*,") do
+            if name ~= "" then mouseoverSet[name] = true end
+        end
+    end
+    return mouseoverSet
+end
 -- Macro names are the last part of the spell ("Crusader", "Might"); these would clash, so they get their own.
 local SHORT = { ["Divine Protection"] = "Divine" }
 
@@ -103,7 +139,7 @@ end
 local function MacroFor(e)
     if e.kind == "spell" then
         local spell = REPLACE[e.name] or e.name
-        local cast = MOUSEOVER[spell] and ("/cast [@mouseover,help,nodead][] " .. spell) or ("/cast " .. spell)
+        local cast = MOUSEOVER_SET()[spell] and ("/cast [@mouseover,help,nodead][] " .. spell) or ("/cast " .. spell)
         return ShortName(spell), DYNAMIC_ICON, "#showtooltip " .. spell .. "\n" .. cast
     end
     -- your own macros: no "(Rank 3)", so a spell always casts its highest known rank
@@ -147,7 +183,25 @@ local function RealSpell(e)
     if e.kind ~= "spell" then return nil end
     if e.prof then return ProfessionSpellID(e) end
     local spell = REPLACE[e.name] or e.name
-    return not MOUSEOVER[spell] and KnownSpellID(spell) or nil
+    return not MOUSEOVER_SET()[spell] and KnownSpellID(spell) or nil
+end
+
+-- Whether the options carry this saved button over. levels: this class's spell levels; autofeed:
+-- AutoFeed's macro names.
+local function Wanted(e, levels, autofeed, o)
+    if not e then return false end
+    if e.kind == "spell" then
+        if e.prof then return o.professions end
+        if e.racial or YS.RACIALS[e.name] then return o.racials end
+        local lvl = e.level or levels[e.name]
+        return lvl ~= nil and o.classSpells and lvl <= o.maxLevel
+    elseif e.kind == "macro" then
+        if autofeed[e.name] then return o.autofeed end
+        return o.macros
+    elseif e.kind == "item" then
+        return o.items
+    end
+    return false
 end
 
 -- Everything off every bar, so the new character starts from exactly the saved layout.
@@ -233,17 +287,25 @@ function YS:Apply(force)
         Print(("the saved bars are from a %s. Type /ysetup apply force to use them anyway."):format(p.class))
         return
     end
-    ClearBars()
+    local o = YS:Options()
+    if o.clearBars then ClearBars() end
     local autofeed = AutoFeedNames()
-    local removed = ClearCharacterMacros(AutoFeedOwned())
+    local removed = o.clearMacros and ClearCharacterMacros(AutoFeedOwned()) or 0
     local levels = YS.SPELL_LEVELS[class] or {}
     local made, placed, full, noAutoFeed = 0, 0, nil, nil
     for slot = 1, MAX_SLOT do
         local e = p.slots[slot]
+        if not Wanted(e, levels, autofeed, o) then e = nil end
         local idx
         local spellID = e and (levels[e.name] or YS.RACIALS[e.name] or e.prof) and RealSpell(e)
         if spellID then
             PlaceSpell(slot, spellID)
+            placed = placed + 1
+        elseif e and e.kind == "item" then
+            local pickup = (C_Item and C_Item.PickupItem) or PickupItem
+            pickup(e.id)
+            PlaceAction(slot)
+            ClearCursor()
             placed = placed + 1
         elseif e and e.kind == "macro" and autofeed[e.name] then
             -- AutoFeed's macros are never made here: only the ones AutoFeed already made on this
@@ -251,7 +313,7 @@ function YS:Apply(force)
             local own = AutoFeedOwned()[e.name] and GetMacroIndexByName(e.name)
             if own and own > 0 then idx = own else noAutoFeed = e.name end
         -- a layout saved by an older version can still hold items and non-class spells
-        elseif e and (e.kind == "macro" or (e.kind == "spell" and (levels[e.name] or YS.RACIALS[e.name]))) then
+        elseif e and (e.kind == "macro" or (o.placeholders and e.kind == "spell" and (levels[e.name] or YS.RACIALS[e.name]))) then
             local name, icon, body = MacroFor(e)
             idx = FindMacro(body)
             if not idx then
@@ -280,10 +342,10 @@ function YS:Apply(force)
     if noAutoFeed then
         Print(("AutoFeed hasn't made '%s' on this character yet, so that slot is empty. Create it in AutoFeed and Set up layout again."):format(noAutoFeed))
     end
-    if not NoAutoPush() then
+    if o.noAutoPush and not NoAutoPush() then
         Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
     end
-    YS:ApplyUI(p.ui)
+    YS:ApplyUI(p.ui, o)
 end
 
 -- A spell just learned: its placeholder macro is swapped for the spell itself and then deleted; a
@@ -292,17 +354,20 @@ end
 local waiting = false
 function YS:Upgrade()
     local p = YippSetupDB.profile
-    if not (p and YippSetupCharDB.applied) then return end
+    local o = YS:Options()
+    if not (p and YippSetupCharDB.applied and o.swap) then return end
     if InCombatLockdown() then
         waiting = true
         return
     end
     waiting = false
     local swapped = {}
+    local _, class = UnitClass("player")
+    local levels, autofeed = YS.SPELL_LEVELS[class] or {}, AutoFeedNames()
     for slot, e in pairs(p.slots) do
-        local id = RealSpell(e)
-        if id and e.prof and not HasAction(slot) then
-            PlaceSpell(slot, id)      -- a profession spell just learned: into its empty slot
+        local id = Wanted(e, levels, autofeed, o) and RealSpell(e)
+        if id and (e.prof or not o.placeholders) and not HasAction(slot) then
+            PlaceSpell(slot, id)      -- just learned, and no placeholder holds its slot: straight in
         elseif id and HasAction(slot) then
             local kind, actionID = GetActionInfo(slot)
             local m = kind == "macro" and ReadMacroSlot(slot, actionID)
@@ -327,22 +392,21 @@ end
 --------------------------------------------------------------------------------
 
 StaticPopupDialogs["YIPPSETUP_OVERWRITE"] = {
-    text = "YippSetup: replace the saved layout from %s with this character's?",
+    text = "YippRoute: replace the saved layout from %s with this character's?",
     button1 = "Replace",
     button2 = "Cancel",
-    OnAccept = function(_, maxLevel) YS:Scan(maxLevel) YS:Refresh() end,
+    OnAccept = function() YS:Scan() YS:Refresh() YR:RefreshWindow() end,
     timeout = 0,
     whileDead = true,
     hideOnEscape = true,
 }
 
-function YS:Copy(maxLevel)
-    maxLevel = maxLevel or DEFAULT_MAX_LEVEL
+function YS:Copy()
     local p = YippSetupDB.profile
     if p and p.from ~= PlayerKey() then
-        StaticPopup_Show("YIPPSETUP_OVERWRITE", p.from, nil, maxLevel)
+        StaticPopup_Show("YIPPSETUP_OVERWRITE", p.from)
     else
-        self:Scan(maxLevel)
+        self:Scan()
         self:Refresh()
     end
 end
@@ -381,12 +445,19 @@ function YS:Refresh()
     if not p then
         window.info:SetText("No layout saved yet. On your main, click Copy this layout.")
     else
-        window.info:SetText(("Saved layout: |cffffffff%s|r, a %s, spells up to level %d.%s"):format(p.from,
-            p.class:lower(), p.maxLevel,
+        window.info:SetText(("Saved layout: |cffffffff%s|r, a %s.%s"):format(YS:Describe(p) or p.from,
+            p.class:lower(),
             p.ui and "" or "\n|cffff8040No bars or settings saved: log in on " .. p.from .. " once.|r"))
         can = p.class == class and p.from ~= PlayerKey()
     end
     window.setup:SetEnabled(can)
+end
+
+-- "Duplo-Bonk, 30 Sep 21:14": who the saved layout is from and when it was copied.
+function YS:Describe(p)
+    p = p or YippSetupDB.profile
+    if not p then return nil end
+    return p.from .. (p.scanned and date(", %d %b %H:%M", p.scanned) or "")
 end
 
 function YS:Toggle()
@@ -399,7 +470,7 @@ end
 -- character with the same name would otherwise inherit it.
 local function FirstTimeHere()
     local id = CharacterID()
-    if not id or YippSetupCharDB.seen == id or (window and window:IsShown()) then return end
+    if not id or YippSetupCharDB.seen == id or (window and window:IsShown()) or not YS:Options().popup then return end
     if InCinematic() or not UIParent:IsShown() then
         C_Timer.After(2, FirstTimeHere)
         return
@@ -426,7 +497,7 @@ SLASH_YIPPSETUP1 = "/ysetup"
 SlashCmdList.YIPPSETUP = function(msg)
     local cmd, arg = strsplit(" ", strtrim(msg or ""):lower(), 2)
     if cmd == "scan" then
-        YS:Copy(tonumber(arg))
+        YS:Copy()
     elseif cmd == "apply" then
         YS:Apply(arg == "force")
     else
