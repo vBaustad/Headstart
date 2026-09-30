@@ -351,24 +351,24 @@ local window
 
 -- The first-time window: two choices, in YippRoute's own look.
 local function BuildWindow()
-    local w = S.Window("YippSetupFrame", 440, 200, "Set up this character")
+    local w = S.Window("YippSetupFrame", 380, 146, "Set up this character")
     w:ClearAllPoints()
     w:SetPoint("CENTER", 0, 120)
     w.info = S.Text(w, 13, S.C.sub)
-    w.info:SetPoint("TOPLEFT", 20, -66)
-    w.info:SetWidth(400)
+    w.info:SetPoint("TOPLEFT", 20, -62)
+    w.info:SetWidth(340)
     w.info:SetWordWrap(true)
     w.info:SetSpacing(3)
 
     -- Only a deliberate click marks this character as done. Escape (which also skips the intro
     -- cinematic) just hides the window, so it comes back on the next login.
     local function Done() YippSetupCharDB.seen = CharacterID() or true end
-    w.copy = S.Button(w, "Copy this layout", function() Done() YS:Copy() end, nil, 190)
-    w.copy:SetPoint("BOTTOMLEFT", 20, 20)
-    w.copy.tip = "On your main: save its bars, macros, Edit Mode layout and game settings"
-    w.setup = S.Button(w, "Set up layout", function() Done() YS:Apply() YS:Refresh() end, "primary", 190)
-    w.setup:SetPoint("BOTTOMRIGHT", -20, 20)
+    w.setup = S.Button(w, "Set up layout", function() Done() YS:Apply() YS:Refresh() end, "primary")
+    w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
     w.setup.tip = "On a new character: put the saved layout on this one"
+    w.copy = S.Button(w, "Copy this layout", function() Done() YS:Copy() end)
+    w.copy:SetPoint("RIGHT", w.setup, "LEFT", -8, 0)
+    w.copy.tip = "On your main: save its bars, macros, Edit Mode layout and game settings"
     w.close:HookScript("OnClick", Done)
     return w
 end
@@ -387,7 +387,6 @@ function YS:Refresh()
         can = p.class == class and p.from ~= PlayerKey()
     end
     window.setup:SetEnabled(can)
-    window.setup:SetAlpha(can and 1 or 0.35)
 end
 
 function YS:Toggle()
