@@ -892,19 +892,63 @@ local function RowPage(page, controls, bottom)
         L.y = L.y - 20
         L.rowIndex = 0
     end
+    -- The whole row lights up under the mouse, the control included. A row with details has an (i)
+    -- after its name: pointing anywhere on the row but its control shows them, and a click on the row
+    -- keeps them open.
+    local rows, hot, carded = {}, nil, nil
+    local function Paint(r)
+        r.hl:SetShown(r == hot)
+        if r.infoIcon then r.infoIcon:SetVertexColor(unpack((r == hot or S.IsPinned(r)) and S.C.accent or S.C.muted)) end
+    end
+    area:SetScript("OnUpdate", function()
+        local now
+        if area:IsMouseOver() then
+            for _, r in ipairs(rows) do
+                if r:IsMouseOver() then now = r break end
+            end
+        end
+        if now ~= hot then
+            local was = hot
+            hot = now
+            if was then Paint(was) end
+            if now then Paint(now) end
+        end
+        local want = hot and hot.tip and not hot.control:IsMouseOver() and hot or nil
+        if want ~= carded then
+            carded = want
+            if want then S.ShowInfo(want, want.label, want.tip) else S.HideInfo() end
+        end
+    end)
+    area:SetScript("OnHide", function()
+        S.Unpin()
+        hot, carded = nil, nil
+        for _, r in ipairs(rows) do Paint(r) end
+    end)
     function L.Row(label, control, tip)
         local r = CreateFrame("Frame", nil, c)
         r:SetSize(L.colW, 34)
         r:SetPoint("TOPLEFT", L.col * (L.colW + 12), L.y)
         S.Fill(r, (math.floor(L.rowIndex / 2) % 2 == 0) and S.C.card or ZEBRA)
+        r.hl = S.Fill(r, S.C.hover, "BACKGROUND", 1)
+        r.hl:Hide()
         local l = S.Text(r, 13)
         l:SetPoint("LEFT", 12, 0)
         l:SetText(label)
+        r.label, r.tip, r.control, r.infoIcon = label, tip, control, false
         if tip then
+            r.infoIcon = r:CreateTexture(nil, "ARTWORK")
+            r.infoIcon:SetSize(14, 14)
+            r.infoIcon:SetPoint("LEFT", l, "RIGHT", 6, 0)
+            S.ArtTexture(r.infoIcon, "info")
             r:EnableMouse(true)
-            r:SetScript("OnEnter", function(self) S.Tip(self, tip) end)
-            r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            r:SetScript("OnMouseUp", function(self)
+                if S.IsPinned(self) then S.Unpin() carded = nil
+                else S.ShowInfo(self, label, tip, true) carded = self end
+                for _, o in ipairs(rows) do Paint(o) end
+            end)
         end
+        rows[#rows + 1] = r
+        Paint(r)
         control:SetParent(r)
         control:ClearAllPoints()
         control:SetPoint("RIGHT", -12, 0)

@@ -81,6 +81,13 @@ img, d = canvas()
 d.ellipse((88, 88, 168, 168), fill=(255, 255, 255, 255))
 save(img, "dot")
 
+# info: a ring with an "i" in it
+img, d = canvas()
+d.ellipse((40, 40, 216, 216), outline=(255, 255, 255, 255), width=18)
+d.ellipse((115, 70, 141, 96), fill=(255, 255, 255, 255))
+d.rounded_rectangle((116, 112, 140, 186), radius=12, fill=(255, 255, 255, 255))
+save(img, "info")
+
 # rounded shapes for 9-slice buttons: 32x32, corner radius 6, drawn at 8x. The addon stretches the
 # middle and keeps the corners (Texture:SetTextureSliceMargins), so one image fits any button size.
 R = 8
