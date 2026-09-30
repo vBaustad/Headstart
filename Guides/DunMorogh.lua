@@ -997,11 +997,6 @@ step
     .target Spirit Healer
     .subzoneskip 2102
 step
-    .goto 1426/0,-501.400,-5643.900
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Senir Whitebeard::1252|r
-    .target Senir Whitebeard::1252
-    .accept 291 >>Accept The Reports
-step
     .goto 1426/0,-632.15,-5466.540
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Pilot Bellowfiz|r
     .turnin 320 >> Turn in Return to Bellowfiz

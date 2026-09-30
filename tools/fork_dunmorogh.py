@@ -92,11 +92,19 @@ i = guide.rindex("\nstep\n", 0, i) + 1
 guide = guide[:i] + SENIR + guide[i:]
 
 # The Reports comes from Senir the moment Frostmane Hold is handed in: take it there, not on a
-# second visit later (that step now skips itself).
+# second visit later. That later step has to go, not just skip itself: it followed the death skip
+# after Brewnall ("#completewith next"), so being done already took the death skip with it and
+# the route said to walk back (a logged run, 2026-10-01).
 sub("""    .turnin 287 >>Turn in Frostmane Hold
 """, """    .turnin 287 >>Turn in Frostmane Hold
     .accept 291 >>Accept The Reports
 """)
+sub("""step
+    .goto 1426/0,-501.400,-5643.900
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Senir Whitebeard::1252|r
+    .target Senir Whitebeard::1252
+    .accept 291 >>Accept The Reports
+""", "")
 
 # --- Mining and Blacksmithing to 20 for Camping 101 (270 XP each, and the Sharpening Wheel) ---------
 # Only the classes that train them here take the two quests (the others would carry dead quests).
