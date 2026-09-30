@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stormwind and Redridge arrows point to the right place: Forever draws those two maps differently from Classic, and the routes' map positions there (RestedXP's included) were for the Classic maps, 100-200 yards off. They're converted now.
+- Groups: the Stockade in the 24-27 route, with every quest picked up on the way (Lakeshire, Darkshire, Stormwind) and handed in after, about 38,000 XP on Forever.
 - New-character window: **Set up layout** is instant again. **Copy this layout...** now opens the Character settings first, so you see what a new character will get before copying.
 - **Skip the intro on new characters** (on by default, Settings, Character): the intro cinematic or movie a level-1 character logs in to is cancelled as it starts.
 - **Groups run the Deadmines.** In the Duo and Trio versions, RestedXP's Deadmines steps always show and their no-dungeon alternatives go. Deadmines quests pay three to four times the XP on Forever. Solo, RestedXP's own dungeon setting decides as before.
