@@ -11,7 +11,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKIP_DIRS = {"tools", ".git", "__pycache__", "dist"}
-SKIP_FILES = {".gitignore", "CHANGELOG.md"}
+SKIP_FILES = {".gitignore", "CHANGELOG.md", "files.txt"}
 
 version = re.search(r"## Version: (\S+)", open(os.path.join(ROOT, "Headstart.toc"), encoding="utf-8").read()).group(1)
 out_dir = os.path.join(ROOT, "dist")
