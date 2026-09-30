@@ -20,3 +20,5 @@ Step.lua
 Editor.lua
 Guides\Coldridge.lua
 Guides\DunMorogh.lua
+Guides\Northshire.lua
+Guides\Shadowglen.lua

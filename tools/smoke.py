@@ -103,7 +103,7 @@ function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESU
 YR = lua.table()
 for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Options.lua", "Guides.lua",
           "Style.lua", "Step.lua", "Editor.lua",
-          "Guides/Coldridge.lua", "Guides/DunMorogh.lua"):
+          "Guides/Coldridge.lua", "Guides/DunMorogh.lua", "Guides/Northshire.lua", "Guides/Shadowglen.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("YippRoute", YR)
 YR.QUEST_IDS = lua.eval("{ route = { 179 }, new = { 96628, 5 }, rest = { 99999 } }")
@@ -269,8 +269,8 @@ check(ok, "old run imported: level 2 at 0:30, 3 at 1:00 (an hour logged out skip
 
 # Shipped guides: both handed to RestedXP at login; a guide splits into steps and joins back unchanged;
 # a saved edit replaces the shipped text; reverting brings it back.
-check(len(g.REGISTERED) == 2, f"two guides registered with RestedXP: {len(g.REGISTERED)}")
-for key in ("coldridge", "dunmorogh"):
+check(len(g.REGISTERED) == 4, f"four guides registered with RestedXP: {len(g.REGISTERED)}")
+for key in ("coldridge", "dunmorogh", "northshire", "shadowglen"):
     text = YR.GuideText(YR, key)
     header, steps = YR.SplitSteps(text)
     joined = YR.JoinSteps(header, steps)
@@ -333,7 +333,7 @@ check(g.YippRouteMinimapButton.hidden is True and g.YippRouteDB.minimapButton is
 
 # The step model: every step of both shipped routes reads into lines and writes back to the same text
 # (spacing aside); the templates make steps; editing a line's argument changes only that argument.
-for key in ("coldridge", "dunmorogh"):
+for key in ("coldridge", "dunmorogh", "northshire", "shadowglen"):
     header, steps = YR.SplitSteps(YR.GuideText(YR, key))
     changed = []
     for i in range(1, len(steps) + 1):
