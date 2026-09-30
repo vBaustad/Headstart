@@ -5,12 +5,10 @@ local _, YR = ...
 
 YR:ShipGuide("dunmorogh", [[
 #forever
-#season 0,1
 #version 1
 << Alliance
 #group Headstart Launch (A)
 #subgroup Launch day
---#groupid RXP-SRGCE-A1
 #name 5-11 Dun Morogh (Launch)
 #next RestedXP Forever Guide (A)\11-12 Elwynn (Dwarf/Gnome);RestedXP Forever Guide (A)\11-12 Voidwalker Quest;RestedXP Forever Guide (A)\12-14 Loch Modan (Dwarf/Gnome);RestedXP Forever Guide (A)\11-13 Loch Modan (Hunter)
 
@@ -35,18 +33,7 @@ step
     .xp 5+1325 >> Travel to Kharanos. Grind to 1325+/2800xp killing |cRXP_ENEMY_Crag Boars|r en-route << Priest
     .xp 5+1595 >> Travel to Kharanos. Grind to 1595+/2800xp killing |cRXP_ENEMY_Crag Boars|r en-route << !Priest
     .subzoneskip 131
---XX 270 from priest quest
---XX 340 from quest, 45 from explore
---xx 410 the adventurer
---xx 410 the great outdoors
 step
-    #hardcore
-    #completewith next
-    .goto 1426/0,-499.17,-5644.37
-    .subzone 131 >> Travel to Kharanos
-    .mob Crag Boar
-step
-    #softcore
     #completewith next
     >>|cRXP_WARN_Make sure your subzone is NOT Coldridge Pass|r
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
@@ -623,11 +610,9 @@ step
 step
     #optional
     #requires ForceFavorRibNo
---XXREQ Placeholder invis step until multiple requires per step
 step
     #optional
     #requires ForceFavorRibYes
---XXREQ Placeholder invis step until multiple requires per step
 step
     .goto 1426/0,315.28,-5378.39
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rejold Barleybrew|r
@@ -671,14 +656,6 @@ step
     .mob Frostmane Headhunter
 
 step
-    #hardcore
-    #completewith Distracting
-    .goto 1426/0,-531.23,-5601.59
-    .subzone 131 >> Return to Kharanos
---XX if they don't somehow meet xp gate by Kharanos then wcyd
-
-step
-    #softcore
     #completewith next
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
     .target Spirit Healer
@@ -754,7 +731,6 @@ step
     .turnin 384 >> Turn in Beer Basted Boar Ribs
     .target Ragnar Thunderbrew
 
---Alternative path now for Hunters to hit 10 fast for pet quest
 step << Hunter
     .goto 1426/0,-1041.000,-5350.600
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin::1253|r
@@ -770,8 +746,6 @@ step << Hunter
     #completewith next
     #requires Dirt
     +|cRXP_WARN_Kite |cRXP_ENEMY_Vagash|r down to|r |cRXP_FRIENDLY_Rudra|r
-    .link https://youtu.be/70PX093soq4?si=-cIoU8WWdbC0IdHZ&t=3193 >>|cRXP_WARN_CLICK HERE If you're struggling|r << Mage
-    .link https://www.youtube.com/watch?v=ZJX6sCkm5JY >> |cRXP_WARN_Click here for video reference|r << !Mage
     .mob Vagash
 step << Hunter
     #label Rudra
@@ -785,9 +759,6 @@ step << Hunter
     .goto 1426,62.538,46.195
     >>Kill |cRXP_ENEMY_Vagash|r. Loot him for his |cRXP_LOOT_Fang|r
     >>|cRXP_WARN_Kite him to the guard south of the ranch. Make sure you do 51%+ damage to him|r
-    >>|cRXP_WARN_Watch the video below before you attempt to kill |cRXP_ENEMY_Vagash|r. It can be soloed on any class|r
-    .link https://youtu.be/70PX093soq4?si=-cIoU8WWdbC0IdHZ&t=3193 >> |cRXP_WARN_Click here for video reference|r << Mage
-    .link https://www.youtube.com/watch?v=ZJX6sCkm5JY >> |cRXP_WARN_Click here for video reference|r << !Mage
     .complete 314,1 --Collect Fang of Vagash (1)
     .mob Vagash
 step << Hunter
@@ -875,7 +846,6 @@ step << !Mage !Warlock
     .goto 1426/0,-94.88,-5647.69
     >>Open |cRXP_PICK_MacGrann's Meat Locker|r. Loot it for |cRXP_LOOT_MacGrann's Dried Meats|r
     >>|cRXP_WARN_Wait until |cRXP_ENEMY_Old Icebeard|r patrols out of the Cave. Once he patrols out of the Cave you can enter and loot|r |cRXP_PICK_MacGrann's Meat Locker|r
-    .link https://www.youtube.com/watch?v=o55Y3LjgKoE >> |cRXP_WARN_Click here for video reference|r
     .complete 312,1 --MacGrann's Dried Meats (1)
 step << Mage/Warlock
     .goto 1426/0,-94.88,-5647.69
@@ -1110,7 +1080,6 @@ step
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Elder Crag Boar
---  .skill cooking,<10,1
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step << !Hunter
     .goto 1426/0,-1041.000,-5350.600
@@ -1127,8 +1096,6 @@ step << !Hunter
     #completewith next
     #requires Dirt
     +|cRXP_WARN_Kite |cRXP_ENEMY_Vagash|r down to|r |cRXP_FRIENDLY_Rudra|r
-    .link https://youtu.be/70PX093soq4?si=-cIoU8WWdbC0IdHZ&t=3193 >>|cRXP_WARN_CLICK HERE If you're struggling|r << Mage
-    .link https://www.youtube.com/watch?v=ZJX6sCkm5JY >> |cRXP_WARN_Click here for video reference|r << !Mage
     .mob Vagash
 step << !Hunter
     #label Rudra
@@ -1142,9 +1109,6 @@ step << !Hunter
     .goto 1426,62.538,46.195
     >>Kill |cRXP_ENEMY_Vagash|r. Loot him for his |cRXP_LOOT_Fang|r
     >>|cRXP_WARN_Kite him to the guard south of the ranch. Make sure you do 51%+ damage to him|r
-    >>|cRXP_WARN_Watch the video below before you attempt to kill |cRXP_ENEMY_Vagash|r. It can be soloed on any class|r
-    .link https://youtu.be/70PX093soq4?si=-cIoU8WWdbC0IdHZ&t=3193 >> |cRXP_WARN_Click here for video reference|r << Mage
-    .link https://www.youtube.com/watch?v=ZJX6sCkm5JY >> |cRXP_WARN_Click here for video reference|r << !Mage
     .complete 314,1 --Collect Fang of Vagash (1)
     .mob Vagash
 step << !Hunter
@@ -1171,7 +1135,6 @@ step
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Large Crag Boar
---  .skill cooking,<10,1
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
     .subzoneskip 134 --Gol'Bolar Quarry
 step
@@ -1189,13 +1152,6 @@ step
 step
     .isOnQuest 96392
     .aura -1293681 >> |cRXP_WARN_Press ESCAPE to cancel the Farsight|r
-step << skip
-    .goto 1426/0,-1394.24,-5797.83
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Earthseer Farsen|r
-    >>|cRXP_WARN_You can cancel the Farsight once the objective completes|r
-    .complete 96392,1 -- Use Farsen's Farsight
-    .skipgossip
-    .target Earthseer Farsen
 step
     .goto 1426/0,-1394.24,-5797.83
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Earthseer Farsen|r
@@ -1228,7 +1184,6 @@ step << !Hunter
     .vendor 1237 >> |cRXP_BUY_Buy up to 5|r |T133968:0|t[Freshly Baked Bread] |cRXP_BUY_and|r |T132815:0|t[Ice Cold Milk] |cRXP_BUY_from him if needed|r << !Warrior !Rogue !Shaman
     .vendor 1237 >> |cRXP_BUY_Buy up to 10|r |T133968:0|t[Freshly Baked Bread] |cRXP_BUY_and|r |T132815:0|t[Ice Cold Milk] |cRXP_BUY_from him if needed|r << Shaman
     .target Kazan Mogosh
---XX Mud slappers instead
 step
     #label QuarryStart
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Senator Mehr Stonehallow|r and |cRXP_FRIENDLY_Foreman Stonebrow|r
@@ -1282,7 +1237,6 @@ step
     #optional
     #label RockjawEnd
     #requires Skullthumpers
---XXREQ Placeholder invis step until multiple requires per step
 step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Foreman Stonebrow|r and |cRXP_FRIENDLY_Senator Mehr Stonehallow|r
     .turnin 432 >> Turn in Those Blasted Troggs!
@@ -1321,7 +1275,6 @@ step
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Scarred Crag Boar
     .mob Elder Crag Boar
---  .skill cooking,<10,1
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step
     #completewith OII
@@ -1445,7 +1398,6 @@ step
     .accept 418 >> Accept Thelsamar Blood Sausages
     .target Vidra Hearthstove
     .xp >14,1
---XX Skip if 14+
 step << !Hunter
     .goto 1432/0,-2952.46,-5381.87
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Yanni Stoutheart|r
@@ -1527,7 +1479,6 @@ step
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Mountain Boar
---  .skill cooking,<10,1
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
     .subzoneskip 925 --Algaz Station
 step
@@ -1739,7 +1690,6 @@ step << Hunter
     .trainer >> Train your class spells
     .target Regnus Thundergranite
 step << Priest/Mage/Warlock
-    #ah
     #label OilWandFood
     #completewith AHCheck
     .goto 1455/0,-917.57,-4967.58,-1--c:Ironforge,25.800,75.500
@@ -1755,7 +1705,6 @@ step << Priest/Mage/Warlock
     .target Auctioneer Redmuse
     .target Auctioneer Buckler
 step
-    #ah
     .goto 1455/0,-917.57,-4967.58,-1--c:Ironforge,25.800,75.500
     .goto 1455/0,-904.92,-4962.83,-1--c:Ironforge,24.200,74.600
     .goto 1455/0,-901.76,-4948.06,-1--c:Ironforge,23.800,71.800
@@ -1784,7 +1733,6 @@ step
     .skill cooking,50,1 --XX Shows if cooking skill is <50
 step
     #label AHCheck
-    #ah
     #optional
     .goto 1455/0,-917.57,-4967.58,-1--c:Ironforge,25.800,75.500
     .goto 1455/0,-904.92,-4962.83,-1--c:Ironforge,24.200,74.600
@@ -1845,88 +1793,6 @@ step << !Hunter
     .timer 11,Deeprun Rat Roundup RP
     .accept 6662 >> Accept Me Brother, Nipsy
     .target Monty
-step << !Hunter skip
-    #optional
-    #label TramCook1
-    #completewith TramEnd
-    >>|cRXP_WARN_On the Tram when it arrives:|r
-    .cast 818 >>|cRXP_WARN_Create a|r |T135805:0|t[Basic Campfire] |cRXP_WARN_(under the General Tab of your Spellbook)|r
-    .usespell 818
-    .zoneskip Stormwind City
-    .itemcount 769,1 --Chunk of Boar Meat (1+)
-    .itemcount 2672,1 --Stringy Wolf Meat (1+)
-    .itemcount 4470,1 --Simple Wood (1+)
-    .itemcount 4471,1 --Flint and Tinder (1)
-    .skill cooking,50,1 --XX Shows if cooking skill is <50
-step << !Hunter skip
-    #optional
-    #requires TramCook1
-    #label TramCook2
-    #completewith TramEnd
-    >>|cRXP_WARN_On the Tram when it arrives:|r
-    .cast 818 >>|cRXP_WARN_Create a|r |T135805:0|t[Basic Campfire] |cRXP_WARN_(under the General Tab of your Spellbook)|r
-    .usespell 818
-    .zoneskip Stormwind City
-    .itemcount 769,<1 --Chunk of Boar Meat (<1)
-    .itemcount 2672,1 --Stringy Wolf Meat (1+)
-    .itemcount 4470,1 --Simple Wood (1+)
-    .itemcount 4471,1 --Flint and Tinder (1)
-    .skill cooking,50,1 --XX Shows if cooking skill is <50
-step << !Hunter skip
-    #optional
-    #requires TramCook2
-    #label TramCook3
-    #completewith TramEnd
-    >>|cRXP_WARN_On the Tram when it arrives:|r
-    .cast 818 >>|cRXP_WARN_Create a|r |T135805:0|t[Basic Campfire] |cRXP_WARN_(under the General Tab of your Spellbook)|r
-    .usespell 818
-    .zoneskip Stormwind City
-    .itemcount 769,1 --Chunk of Boar Meat (1+)
-    .itemcount 2672,<1 --Stringy Wolf Meat (<1)
-    .itemcount 4470,1 --Simple Wood (1+)
-    .itemcount 4471,1 --Flint and Tinder (1)
-    .skill cooking,50,1 --XX Shows if cooking skill is <50
-step << !Hunter skip
-    #optional
-    #requires TramCook3
-    #label TramCook4
-    #completewith TramEnd
-    >>|cRXP_WARN_You need 50|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Duskwood later|r
-    >>|T133971:0|t[Cook] |cRXP_WARN_the following items:|r
-    >>|T133971:0|t[Cook] |cRXP_WARN_the|r |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r |cRXP_WARN_into|r |T133974:0|t[Roasted Boar Meat]
-    >>|T133971:0|t[Cook] |cRXP_WARN_the|r |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r |cRXP_WARN_into|r |T133974:0|t[Charred Wolf Meat]
-    .usespell 2550
-    .zoneskip Stormwind City
-    .itemcount 769,1 --Chunk of Boar Meat (1+)
-    .itemcount 2672,1 --Stringy Wolf Meat (1+)
-    .itemcount 4471,1 --Flint and Tinder (1)
-    .skill cooking,50,1
-step << !Hunter skip
-    #optional
-    #requires TramCook4
-    #label TramCook5
-    #completewith TramEnd
-    >>|cRXP_WARN_You need 50|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Duskwood later|r
-    >>|T133971:0|t[Cook] |cRXP_WARN_the|r |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r |cRXP_WARN_into|r |T133974:0|t[Charred Wolf Meat]
-    .usespell 2550
-    .zoneskip Stormwind City
-    .itemcount 769,<1 --Chunk of Boar Meat (<1)
-    .itemcount 2672,1 --Stringy Wolf Meat (1)
-    .itemcount 4471,1 --Flint and Tinder (1)
-    .skill cooking,50,1
-step << !Hunter skip
-    #optional
-    #requires TramCook5
-    #label TramCook6
-    #completewith TramEnd
-    >>|cRXP_WARN_You need 50|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Duskwood later|r
-    >>|T133971:0|t[Cook] |cRXP_WARN_the|r |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r |cRXP_WARN_into|r |T133974:0|t[Roasted Boar Meat]
-    .usespell 2550
-    .zoneskip Stormwind City
-    .itemcount 769,1 --Chunk of Boar Meat (1)
-    .itemcount 2672,<1 --Stringy Wolf Meat (<1)
-    .itemcount 4471,1 --Flint and Tinder (1)
-    .skill cooking,50,1
 step << !Hunter
     #label TramEnd
     >>|cRXP_WARN_Take the Deeprun Tram to the Stormwind side|r
@@ -2036,19 +1902,7 @@ step << !Hunter
     .trainer >>Train 2h Swords << Warrior/Paladin
     .target Woo Ping
 step << Rogue
-    #ssf
     #optional
-    .goto 1453/0,607.38,-8790.45
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gunther Weller|r
-    >>|cRXP_BUY_Buy a|r |T135346:0|t[Cutlass] |cRXP_BUY_from him|r
-    >>|cRXP_WARN_Make sure you save 10s for training later|r
-    .collect 851,1 -- Cutlass (1)
-    .target Gunther Weller
-    .money <0.1922
-    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<6.8
-step << Rogue
-    #optional
-    #ah
     .goto 1453/0,607.38,-8790.45
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gunther Weller|r
     >>|cRXP_BUY_Buy a|r |T135346:0|t[Cutlass] |cRXP_BUY_from him|r

@@ -5,14 +5,11 @@ local _, YR = ...
 
 YR:ShipGuide("shadowglen", [[
 #forever
-#season 0,1
 << Alliance
 #name 1-6 Shadowglen (Launch)
-#displayname 1-7 Shadowglen << sod
 #version 1
 #group Headstart Launch (A)
 #subgroup Launch day
---#groupid RXP-SRGCE-A1
 #next RestedXP Forever Guide (A)\6-11 Teldrassil
 step << !NightElf
     #sticky
@@ -48,7 +45,7 @@ step << Druid
 step << Druid
     #completewith next
     +|cRXP_WARN_Make sure that you have at least 96 copper worth of vendor trash|r, you can count your staff that vendors for 9c
-step << !sod/Warrior
+step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Dirania Silvershine|r and |cRXP_FRIENDLY_Melithar Staghelm|r
     #label GoodProtector
     .accept 4495 >> Accept A Good Friend
@@ -83,19 +80,16 @@ step << Hunter
     .complete 457,2 --Kill Thistle Boar (x7)
     .mob +Thistle Boar
 step << Warrior
-    #season 0
     .goto 1438/1,794.92,10436.72
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Keina|r
 	.vendor >> |cRXP_WARN_Vendor trash|r
     .target Keina
 step << Warrior
-    #season 0
 	.goto 1438/1,778.07,10526.62
     .target Alyissia
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Alyissia|r
     .trainer >> Train |T132333:0|t[Battle Shout]
 step << Hunter/Warrior
-    #season 0,1
     .goto 1438/1,769.77,10673.98
     .xp 4-610 >> Grind until you are 610xp away from level 4 (790/1400)
 step << Hunter/Warrior
@@ -140,11 +134,9 @@ step
     .accept 457 >> Accept The Balance of Nature
 	.accept 3116 >> Accept Simple Sigil << Warrior
 	.accept 3117 >> Accept Etched Sigil << Hunter
---	.accept 3118 >> Accept Encrypted Sigil << Rogue
 	.accept 3119 >> Accept Hallowed Sigil << Priest
 	.accept 3120 >> Accept Verdant Sigil << Druid
 step << !Hunter !Druid !Warrior
-    #season 0 << Druid
     .goto 1438/1,769.77,10673.98
     >>Kill |cRXP_ENEMY_Mangy Nightsabers|r and |cRXP_ENEMY_Thistle Boars|r
     .complete 457,1 --Kill Mangy Nightsaber (x7)
@@ -158,14 +150,11 @@ step << !Hunter !Druid !Warrior
     .target Iverron
     .accept 3519 >> Accept A Friend in Need
 step << !Hunter !Druid !Warrior
-    #season 0
     #completewith next
     .hs >> Hearth to Shadowglen
 step << !Hunter !Warrior
-    #season 0 << Druid/Warrior
     .goto 1438/1,866.51,10300.67
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tarindrella|r
-    --@TODO add herbalism note for druid for earthroot
     .turnin 458 >> Turn in The Woodland Protector
     .target Tarindrella
     .accept 459 >> Accept The Woodland Protector
@@ -188,7 +177,6 @@ step << Druid
     .complete 457,2 --Kill Thistle Boar (x7)
     .mob +Thistle Boar
 step << Druid
-    #season 0 << Warrior
     .goto 1438/1,1034.89,10711.58
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Iverron|r
     .turnin 4495 >> Turn in A Good Friend
@@ -201,7 +189,6 @@ step << Druid
     .goto 1438/1,871.60,10300.67
     .target Tarindrella
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tarindrella|r
-    >>TIP: |cRXP_WARN_Take the leggings as the reward and keep them. You will use them to engrave a rune on later on|r << sod Hunter/sod Rogue/sod Warrior/sod Druid
     .turnin 459,1 >> Turn in The Woodland Protector
     .turnin 97977 >>Turn in Nature's Call
 step << !Hunter !Druid !Warrior
@@ -218,7 +205,6 @@ step
 step << Warrior
     .xp 4-40
 step << Hunter/Druid/Warrior
-    #season 0
     #completewith htraining
     .goto 1438/1,794.92,10436.72
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Keina|r
@@ -268,27 +254,12 @@ step
     >>Loot the |cRXP_LOOT_Moonpetal Lilies|r on the ground
     .complete 3521,2 --Collect Moonpetal Lily (x4)
 step
-    #season 0 << Warrior
     #label IchorVenomSac
     .goto 1438/1,922.52,10755.43
     >>Kill |cRXP_ENEMY_Webwood Spiders|r. Loot them for their |cRXP_LOOT_Ichor|r and |cRXP_LOOT_Venom Sacs|r
     .complete 3521,3 --Collect Webwood Ichor (x1)
     .complete 916,1 --Collect Webwood Venom Sac (x10)
     .mob Webwood Spider
-step << skip --logout skip Warrior
-	#hardcore
-	#completewith next
-    #season 2
-	+Logout skip on the ledge behind the eggs. Move your character until it looks like they're floating, then log out, and back in.
-	>>If you fall down, just run out the cave normally to the quest turn in
-	.link https://www.youtube.com/watch?v=TTZZT3jpv1s >> CLICK HERE for reference
-step << skip --logout skip Hunter
-	#hardcore
-    #season 2
-	#completewith next
-	+Logout skip on the ledge behind the eggs. Move your character until it looks like they're floating, then log out, and back in.
-	>>If you fall down, just run out the cave normally to the quest turn in
-	.link https://www.youtube.com/watch?v=TTZZT3jpv1s >> CLICK HERE for reference
 step
     #completewith next
     >>Kill |cRXP_ENEMY_Thistle Boars|r on the way to the Grells
@@ -313,7 +284,6 @@ step
     .goto 1438/1,871.60,10300.67
     .target Tarindrella
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tarindrella|r
-    >>TIP: |cRXP_WARN_Take the leggings as the reward and keep them. You will use them to engrave a rune on later on|r << sod Hunter/sod Rogue/sod Warrior/sod Druid
     .turnin 459 >> Turn in The Woodland Protector
     .turnin 97977 >>Turn in Nature's Call
 step
@@ -328,7 +298,6 @@ step
     .target Dirania Silvershine
     .accept 3522 >> Accept Iverron's Antidote
 step << !Priest
-    #season 0 << Hunter
     .goto 1438/1,794.92,10436.72
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Keina|r
 	.vendor >> |cRXP_WARN_Vendor trash|r << !Hunter
@@ -342,15 +311,12 @@ step << Priest
 	.vendor >> |cRXP_WARN_Vendor trash|r
     .target Janna Brightmoon
 step << Priest
-    #season 0,1,2
 	.goto 1438/1,801.64,10458.75
     .target Shanda
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shanda|r up stairs
-	.turnin 3119 >> Turn in Hallowed Sigil << !sod
-    .turnin 77574 >> Turn in Meditation of Elune << sod
+	.turnin 3119 >> Turn in Hallowed Sigil
 	.trainer >> Train your class spells
 step
-    #season 0 << Warrior
     .goto 1438/1,871.24,10417.65
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gilshalan Windwalker|r
     .turnin 916 >> Turn in Webwood Venom
@@ -363,19 +329,15 @@ step << Hunter/Rogue
     .itemcount 5392,1
     .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<2.05
 step
-    #season 0 << Warrior
     .goto 1438/1,1034.89,10711.58
     .target Iverron
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Iverron|r
-    >>TIP: |cRXP_WARN_Take the pants as reward from him. You will use them to engrave a rune on later|r << Priest sod
     .turnin 3522 >> Turn in Iverron's Antidote
 step
-    #season 0 << Warrior
     #completewith next
     .goto 1438/1,926.08,10773.42,25 >> Enter the Shadowthread Cave
 step
     .goto 1438/1,912.33,10935.30
-    #season 0 << Warrior
     >>Kill |cRXP_ENEMY_Githyiss the Vile|r loot it for it's |T134298:0|t[|cRXP_LOOT_Fang|r]
     >>|cRXP_WARN_Group up with whoever is waiting|r
     >>Loot a |cRXP_LOOT_Webwood Egg|r on the ground at the back of the Cave
@@ -383,18 +345,9 @@ step
     .complete 917,1 --Collect Webwood Egg (x1)
     .mob Githyiss the Vile
 step
-	#softcore
 	#completewith next
-    #season 0 << Warrior
     .deathskip >> Die and respawn at the Spirit Healer
     .target Spirit Healer
-step << skip --logout skip
-	#hardcore
-	#completewith next
-    #season 0 << Warrior
-	+Logout skip on the ledge behind the eggs. Move your character until it looks like they're floating, then log out, and back in.
-	>>If you fall down, just run out the cave normally to the quest turn in
-	.link https://www.youtube.com/watch?v=TTZZT3jpv1s >> CLICK HERE for reference
 step
 #xprate <1.99
 	.goto 1438/1,871.24,10417.65

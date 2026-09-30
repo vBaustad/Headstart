@@ -11,6 +11,8 @@ Written files: Guides/<Zone>.lua, each shipping one guide through YR:ShipGuide.
 import os
 import re
 
+from clean_guide import clean
+
 RXP = "S:/forever-data/external/rxp/Guides/Forever/"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RXP_GROUP = "RestedXP Forever Guide (A)"
@@ -62,6 +64,7 @@ def write(file, key, source, text, notes):
             "-- only the edits listed in that script are ours. Do not edit by hand: change the script, rerun it.\n"
             "local _, YR = ...\n\n"
             f'YR:ShipGuide("{key}", [[')
+    text = clean(text)   # without the SoD, hardcore and self-found steps
     out = os.path.join(ROOT, "Guides", file)
     open(out, "w", encoding="utf-8", newline="\n").write(head + text + "]])\n")
     print(out, text.count("\nstep"), "steps")

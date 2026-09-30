@@ -5,15 +5,12 @@ local _, YR = ...
 
 YR:ShipGuide("northshire", [[
 #forever
-#season 0,1
 << Alliance
 #name 1-6 Northshire (Launch)
 #version 1
 #group Headstart Launch (A)
 #subgroup Launch day
---#groupid RXP-SRGCE-A1
 #next RestedXP Forever Guide (A)\6-11 Elwynn Forest
-
 
 step << !Human
     #completewith next
@@ -21,12 +18,7 @@ step << !Human
 step << Mage
     #completewith next
     +Note that you have selected the single target Mage guide. Single target is a lot safer than AoE Mage, but a LOT slower
-step << !Human Mage
-    #season 2
-    #completewith next
-    +In Season of Discovery, you should NOT start outside of your race's starter zone as a Mage, as you will be unable to get your first rune here (|T135844:0|t[Ice Lance])
 step
-    #softcore << Warlock
     #optional
     #completewith Within
     .destroy 6948 >> Delete the |T134414:0|t[Hearthstone] from your bags, as it's no longer needed
@@ -176,7 +168,6 @@ step << !Priest !Mage !Warlock !Rogue
     .vendor >>Vendor Trash
     .target Godric Rothgar
 step << Rogue
-    #season 0,1
     .goto 1429/0,-104.21,-8909.39--c:Elwynn Forest,47.240,41.900
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Janos Hammerknuckle|r
     .vendor 78 >>|cRXP_BUY_Buy a|r |T135650:0|t[Dirk] |cRXP_BUY_from him if you can afford it|r
@@ -185,7 +176,6 @@ step << Rogue
     .target Janos Hammerknuckle
     .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<1.2
 step << Rogue
-    #season 0,1
     #completewith next
     +|cRXP_WARN_Equip the|r |T135650:0|t[Dirk]
     .use 2139
@@ -219,28 +209,17 @@ step << Warlock
     .train 348 >> Train |T135817:0|t[Immolate]
     .target Drusilla La Salle
 
-
 step << Warlock
-    #hardcore
---   .goto 1429/0,-300.65,-8964.94,60,0
     .goto 1429/0,-432.55,-8958.00
     >>Open the |cRXP_PICK_Stolen Books|r. Loot it for the |cRXP_LOOT_Powers of the Void|r
     .complete 1598,1 --Collect Powers of the Void (x1)
 step << Warlock
-    #softcore
---  .goto 1429/0,-300.65,-8964.94,60,0
-    .goto 1429/0,-432.55,-8958.00
-    >>Open the |cRXP_PICK_Stolen Books|r. Loot it for the |cRXP_LOOT_Powers of the Void|r
-    .complete 1598,1 --Collect Powers of the Void (x1)
-step << Warlock
-    #softcore
     #completewith next
     .goto 1429,49.527,43.491,0
     .deathskip >> Die and respawn at the Spirit Healer
     >>|cRXP_WARN_If there are no |cRXP_ENEMY_Defias|r nearby, run back instead|r
     .target Spirit Healer
 step << Warlock
-    #season 0,1
     .goto 1429/0,-195.59,-8926.73
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Drusilla La Salle|r
     .turnin 1598 >> Turn in The Stolen Tome
@@ -256,7 +235,6 @@ step
     >>Kill |cRXP_ENEMY_Kobolds|r. Loot them for their |cRXP_LOOT_Stolen Books|r
     .complete 91743,1 -- Stolen Book (8)
 step
-    #season 0,1 << Priest/Warrior
     #loop
     .goto 1429,47.468,36.298,0
     .goto 1429,50.224,34.125,0
@@ -279,11 +257,6 @@ step
     >>Kill |cRXP_ENEMY_Kobold Workers|r
     .complete 15,1 --Kill Kobold Worker (x10)
     .mob Kobold Worker
-
-----Start of 1x train section----
-
-
-
 
 step
     #label xp3
@@ -312,7 +285,6 @@ step
     .disablecheckbox
     .mob Kobold Worker
 step << !Hunter
-    #season 0,1 << Warrior
     #completewith next
     .goto 1429/0,-119.86,-8898.21
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Godric Rothgar|r
@@ -359,7 +331,6 @@ step << Mage
     .goto 1429,49.436,39.881,10,0
     .goto 1429/0,-188.23,-8851.58,12 >>Travel toward |cRXP_FRIENDLY_Khelden Bremen|r upstairs
 step << Mage
-    #season 0,1
     .goto 1429/0,-188.23,-8851.58
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Khelden Bremen|r inside upstairs
     .turnin 3104 >> Turn in Glyphic Letter
@@ -382,21 +353,18 @@ step << Warrior/Paladin
     .goto 1429/0,-186.12,-8907.08,15 >> Travel toward |cRXP_FRIENDLY_Llane Beshere|r inside downstairs << Warrior
     .goto 1429/0,-186.12,-8907.08,15 >> Travel toward |cRXP_FRIENDLY_Brother Sammuel|r inside downstairs << Paladin
 step << Warrior
-    #season 0,1
     .goto 1429/0,-208.40,-8918.35
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Llane Beshere|r inside downstairs
     .turnin 3100 >> Turn in Simple Letter
     .trainer >> Train your class spells
     .target Llane Beshere
 step << Paladin
-    #season 0,1
     .goto 1429/0,-215.03,-8914.58
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Brother Sammuel|r
     .turnin 3101 >> Turn in Consecrated Letter
     .trainer >> Train your class spells
     .target Brother Sammuel
 step
-    #season 0,1 << Warrior
     .goto 1429/0,-136.52,-8933.53
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Deputy Willem|r outside
     .accept 18 >> Accept Brotherhood of Thieves
@@ -413,15 +381,7 @@ step << Warlock
     .train 172 >>Train |T136118:0|t[Corruption]
     .target Drusilla La Salle
 
-
-
-----End of 1x train section----
-
-
-
-
 step
-    #season 0,1
     #loop
     .goto 1429/0,-288.51,-9068.87,0
     .goto 1429/0,-388.47,-9001.28,0
@@ -445,7 +405,6 @@ step << Rogue
     .goto 1429/0,-333.97,-9028.59,30,0
     .xp 4 >> Grind to level 4
 step
-    #season 0,1
     .goto 1429/0,-136.48,-8933.47
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Deputy Willem|r
     .turnin 18,1 >> Turn in Brotherhood of Thieves << Rogue/Warlock
@@ -458,14 +417,12 @@ step
     .accept 6 >> Accept Bounty on Garrick Padfoot
     .target Deputy Willem
 step << Paladin
-    #season 0,1
     #completewith RestandR
     .equip 16,5579 >> |cRXP_WARN_Equip the|r |T133052:0|t[Militia Warhammer]
     .use 5579
     .itemcount 5579,1
     .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<2.6
 step << Rogue
-    #season 0,1
     #completewith RestandR
     .equip 16,2224 >> Equip the |T135641:0|t[Militia Dagger]
     .use 2224
@@ -566,7 +523,6 @@ step
     .accept 3904 >> Accept Milly's Harvest << Priest/Mage
     .target Milly Osworth
 step << Rogue
-    #season 0,1
     .goto 1429/0,-210.90,-8863.47
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Jorik Kerridan|r
     .turnin 3102 >> Turn in Encrypted Letter
@@ -591,7 +547,7 @@ step
     .complete 6,1 --Collect Garrick's Head (x1)
     .mob Garrick Padfoot
 step
-    #requires CuttyNote << Rogue --Season 2
+    #requires CuttyNote << Rogue
     #optional
     #loop
     .goto 1429/0,-288.51,-9068.87,0
@@ -603,14 +559,11 @@ step
     .goto 1429/0,-333.97,-9028.59,30,0
     .xp 5 >> Grind to level 5
     .mob Defias Thug
-    --no need for extra grinding. being level 5 and doing the kobold quest chain will get you 6 once you arrive in goldshire
 step
     #optional
-    #softcore
     #completewith next
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
     .target Spirit Healer
--- .subzoneskip 59,1
 step << Priest/Mage
     .goto 1429/0,-224.02,-8850.30
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Milly Osworth|r
@@ -674,7 +627,6 @@ step << Priest/Mage
     .turnin 3905,1 >>Turn in Grape Manifest
     .target Brother Neals
 step << Priest
-    #season 0,1
     .goto 1429/0,-193.34,-8853.59
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Priestess Anetta|r inside
     .accept 5623 >> Accept In Favor of the Light

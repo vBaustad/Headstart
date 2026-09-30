@@ -5,7 +5,6 @@ local _, YR = ...
 
 YR:ShipGuide("coldridge", [[
 #forever
-#season 0,1
 #version 18
 << Alliance
 #group Headstart Launch (A)
