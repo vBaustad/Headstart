@@ -48,6 +48,7 @@ step
     .accept 7 >> Accept Kobold Camp Cleanup
     .target Marshal McBride
 step
+    #share 1
     .goto 1429/0,-136.52,-8933.53
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Deputy Willem|r
     .accept 5261 >> Accept Eagan Peltskinner

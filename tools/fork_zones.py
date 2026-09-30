@@ -12,6 +12,7 @@ import os
 import re
 
 from clean_guide import clean
+from share_split import mark
 
 RXP = "S:/forever-data/external/rxp/Guides/Forever/"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -65,6 +66,9 @@ def write(file, key, source, text, notes):
             "local _, YR = ...\n\n"
             f'YR:ShipGuide("{key}", [[')
     text = clean(text)   # without the SoD, hardcore and self-found steps
+    text, shared = mark(text)   # pick-ups a duo or trio splits (Duo/Trio versions of the route)
+    for line in shared:
+        print("   ", line)
     out = os.path.join(ROOT, "Guides", file)
     open(out, "w", encoding="utf-8", newline="\n").write(head + text + "]])\n")
     print(out, text.count("\nstep"), "steps")

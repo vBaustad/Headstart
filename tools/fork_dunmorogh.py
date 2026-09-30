@@ -15,6 +15,7 @@ import os
 import re
 
 from clean_guide import clean
+from share_split import mark
 
 SRC = "S:/forever-data/external/rxp/Guides/Forever/Alliance-1-14_DwarfGnome.lua"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Guides", "DunMorogh.lua")
@@ -196,5 +197,8 @@ local _, YR = ...
 
 YR:ShipGuide("dunmorogh", [["""
 guide = clean(guide)   # without the SoD, hardcore and self-found steps
+guide, shared = mark(guide)   # pick-ups a duo or trio splits (Duo/Trio versions of the route)
+for line in shared:
+    print("   ", line)
 open(OUT, "w", encoding="utf-8", newline="\n").write(HEAD + guide + "]])\n")
 print(OUT, guide.count("\nstep"), "steps")

@@ -1198,6 +1198,20 @@ local function BuildRouteSettings(page)
         "Items a route quest still needs (like the boar meat for Stocking Jetsteam) say so on their tooltip, and"
         .. " selling one to a vendor warns you, so you can buy it back from the Buyback tab")
 
+    Section("Group play", "a duo or trio sharing quests")
+    local role = S.Dropdown(c, 190, YR.ROLES, function(v) YR:SetRole(v) YR:RefreshWindow() end)
+    function role:Refresh()
+        for _, r in ipairs(YR.ROLES) do if r[1] == YR:Role() then self:SetValue(r[2]) end end
+    end
+    Row("This character plays", role, "Routes with a group version give each role its own steps: one takes the"
+        .. " quests while the others start killing. Agree on roles with your group. Solo: the normal route")
+    Row("Share route quests with my party", S.Switch(c, Opt("groupShare"), SetOpt("groupShare")),
+        "A route quest you take from an NPC is shared with your party at once (on Forever, from any distance)")
+    Row("Accept route quests my party shares", S.Switch(c, Opt("groupAccept"), SetOpt("groupAccept")),
+        "Only quests on the route, and escorts on it; anything else still asks. Hold Shift to be asked anyway")
+    Row("Show my party's steps", S.Switch(c, Opt("groupPanel"), SetOpt("groupPanel", function() YR:RefreshParty() end)),
+        "A small list under the splits: each Headstart in your party, its role and the route step it is on")
+
     Section("Level splits")
     Row("Show level splits", S.Switch(c, Opt("showSplits"), SetOpt("showSplits", function(on) YR:ShowSplits(on) end)))
     Row("Lock in place", S.Switch(c, function() return st().lock end, Style("lock")),

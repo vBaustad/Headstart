@@ -219,6 +219,7 @@ step << Warrior
 	.turnin 3116 >> Turn in Simple Sigil
     .trainer >> Train your class spells
 step
+    #share 1
     .goto 1438/1,871.24,10417.65
     .target Gilshalan Windwalker
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gilshalan Windwalker|r

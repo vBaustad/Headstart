@@ -21,6 +21,7 @@ Rewards.lua
 Splits.lua
 Options.lua
 Guides.lua
+Group.lua
 Style.lua
 Step.lua
 Data\SpellLevels.lua
