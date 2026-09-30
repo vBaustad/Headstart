@@ -44,3 +44,8 @@ Guides\Levelling\16_19_darkshore.lua
 Guides\Levelling\19_20_redridge.lua
 Guides\Levelling\19_21_darkshore_ashenvale.lua
 Guides\Levelling\20_21_darkshore_ashenvale.lua
+Guides\Levelling\21_23_ashenvale.lua
+Guides\Levelling\23_24_wetlands.lua
+Guides\Levelling\24_27_redridge_duskwood.lua
+Guides\Levelling\27_30_wetlands_hillsbrad.lua
+Guides\Levelling\28_30_duskwood.lua

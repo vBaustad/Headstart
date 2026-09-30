@@ -1414,7 +1414,7 @@ step << NightElf
     .accept 399 >> Accept Humble Beginnings
     .target Baros Alexston
 step << NightElf Druid
-    .goto Stormwind City,21.6,51.4
+    .goto 1453,21.6,51.4
     >>Talk to |cRXP_FRIENDLY_Theridran|r
     .trainer >>Train your class spells
 	.target Theridran

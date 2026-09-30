@@ -19,8 +19,12 @@ Anything else it cannot decide raises, so an upstream change can't slip through 
 import itertools
 import re
 
-NEVER = {"sod", "skip"}          # filter words that are never true on Forever
-ALWAYS = {"!sod"}                # and ones that always are
+# Filter words that are never true on Forever: RestedXP matches a game word only against the game it
+# runs on ("FOREVER"), so older guides' TBC and Wrath lines never show here; "sod" is Season of
+# Discovery, "skip" a step switched off upstream.
+NEVER = {"sod", "skip", "tbc", "wotlk", "cata", "retail", "df", "mop",
+         "draenei", "bloodelf"}   # (and no Draenei or Blood Elves on Forever)
+ALWAYS = {"!" + w for w in NEVER}  # and their opposites, always true
 
 
 def _filter(expr):

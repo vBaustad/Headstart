@@ -685,7 +685,7 @@ step
     .turnin 4161 >> Turn in Recipe of the Kaldorei
     .target Zarrin
 step
-    .goto Teldrassil,57.2,61.2
+    .goto 1438,57.2,61.2
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Nyoma|r
     +Buy 5 |T134059:0|t[Mild Spices] from her, use |T133971:0|t[|cRXP_FRIENDLY_Cooking|r] to cook |T132834:0|t[|cRXP_LOOT_Herb Baked Eggs|r] until you run out of |T132832:0|t[|cRXP_LOOT_Small Eggs|r]
     .collect 2678,5 --Mild Spices
@@ -1022,12 +1022,12 @@ step << !Rogue
     .deathskip >> Die and respawn at the Spirit Healer in Darnassus
     .target Spirit Healer
 step << Hunter
-    .goto Darnassus,58.76,44.48
+    .goto 1457,58.76,44.48
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Ariyell Skyshadow|r
     .vendor >>|cRXP_BUY_Sell your vendor trash|r
     .target Ariyell Skyshadow
 step << Hunter
-    .goto Darnassus,57.56,46.73
+    .goto 1457,57.56,46.73
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Ilyenia Moonfire|r
     .skipgossipid 96881
     .train 227 >>Train Staves
@@ -1197,7 +1197,7 @@ step
     .itemcount 3418,3
     .isOnQuest 489
 step << Hunter
-    .goto Teldrassil,56.308,59.488
+    .goto 1438,56.308,59.488
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shalomon|r
     >>|cRXP_BUY_Buy and equip a|r |T135145:0|t[Walking Stick] |cRXP_BUY_if you can afford it (5s 4c), if not skip this step|r
     .collect 2495,1 --Walking Stick (1)

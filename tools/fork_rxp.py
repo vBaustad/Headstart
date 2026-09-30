@@ -9,6 +9,7 @@ Every guide in SOURCES becomes Guides/Levelling/<slug>.lua shipping one route (Y
   * the per-route changes in EDITS (each must match RestedXP's text exactly, or the build fails).
 Also writes Guides/Levelling/files.txt, the list the .toc needs (check_toc below keeps them in step).
 """
+import json
 import os
 import re
 import sys
@@ -32,8 +33,36 @@ SOURCES = [
       "20-21 Darkshore/Ashenvale"]),
 ]
 
+SOURCES += [
+    # 21-30: RestedXP's free route (their paid 20-30 isn't public); older, so cleaned of TBC/Wrath lines
+    ("RestedXP Alliance 11-23.lua", "RestedXP Alliance 20-32", ["21-23 Ashenvale"]),
+    ("RestedXP Alliance 23-30.lua", "RestedXP Alliance 20-32",
+     ["23-24 Wetlands", "24-27 Redridge/Duskwood", "27-30 Wetlands/Hillsbrad", "28-30 Duskwood"]),
+]
+
+# At 30: the paid RestedXP 30-40 guide where it is installed, else the free one
+AT_30 = "RestedXP Survival Guide (A)\\30-32 Duskwood;RestedXP Alliance 20-32\\{free}"
+
 # Our changes per route: name -> [(old, new, why)]
-EDITS = {}
+EDITS = {
+    "20-21 Darkshore/Ashenvale": [
+        ("#next RestedXP Alliance 20-30\\21-23 Stonetalon/Ashenvale;RestedXP Alliance 20-30\\21-22 Ashenvale SoD\n",
+         "#next 21-23 Ashenvale\n", "on to our 21-30"),
+    ],
+    "19-21 Darkshore/Ashenvale": [
+        ("#next RestedXP Alliance 20-30\\21-23 Ashenvale/Stonetalon\n", "#next 21-23 Ashenvale\n", "on to our 21-30"),
+    ],
+    # the free route sent Warlocks another way (its Darkshore/Ashenvale); ours comes from our 20-21
+    "21-23 Ashenvale": [
+        ("<< Alliance !Warlock/Alliance wotlk\n", "<< Alliance\n", "every class goes this way from our 20-21"),
+    ],
+    "27-30 Wetlands/Hillsbrad": [
+        ("#next RestedXP Alliance 20-32\\30-32 Duskwood/STV\n", "#next " + AT_30.format(free="30-32 Duskwood/STV") + "\n", "hand over at 30"),
+    ],
+    "28-30 Duskwood": [
+        ("#next RestedXP Alliance 20-32\\30-32 Hillsbrad\n", "#next " + AT_30.format(free="30-32 Hillsbrad") + "\n", "hand over at 30"),
+    ],
+}
 
 
 def slug(name):
@@ -68,14 +97,79 @@ def build(file, home, name, ours):
     text = re.sub(r"\n#group [^\n]*", "\n#group " + GROUP, text, count=1)
     text = re.sub(r"\n#subgroup [^\n]*", "\n#subgroup Levelling", text, count=1)
     text = re.sub(r"\n#defaultfor [^\n]*", "", text)
+    # the game(s) a guide is for: the older free guides say #tbc / #wotlk, which Forever never is
+    text = re.sub(r"\n#(tbc|wotlk|classic|era|som|cata|mop|retail)[ \t]*(?=\n)", "", text)
+    if "\n#forever" not in text:
+        text = "\n#forever" + text
     text = re.sub(r"\n#next ([^\n]*)", lambda m: "\n#next " + next_line(m.group(1), home, ours), text)
     for old, new, why in EDITS.get(name, []):
         n = text.count(old)
         assert n == 1, f"{name}: expected one match upstream, found {n}: {old[:70]!r} ({why})"
         text = text.replace(old, new)
     text = clean(text)
+    text = map_ids(text)       # after cleaning: TBC/Wrath lines name maps Forever doesn't have
+    text, dropped = drop_missing(text)
+    for d in dropped:
+        print(f"    {name}: {d}")
     text, shared = mark(text)
     return text, shared
+
+
+_maps = None
+
+
+def map_ids(text):
+    """".goto Duskwood,73.5,46.8" -> ".goto 1431,73.5,46.8": the older guides name zones, and RestedXP
+    on Forever doesn't load its Classic name table (DB/classic/db.lua returns unless the game is
+    CLASSIC). The names come from that table, plus TBC's "StormwindClassic"."""
+    global _maps
+    if _maps is None:
+        src = open(RXP + "../DB/classic/db.lua", encoding="utf-8").read()
+        _maps = {n: int(i) for n, i in re.findall(r'\["([^"]+)"\]\s*=\s*(\d{4})\b', src)}
+        _maps["StormwindClassic"] = 1453
+    def repl(m):
+        name = m.group(2).strip()
+        if name not in _maps:
+            raise SystemExit(f"unknown zone name in .{m.group(1)}: {name!r}")
+        return f".{m.group(1)} {_maps[name]},"
+    return re.sub(r"\.(goto|waypoint) ([A-Za-z][A-Za-z' ]*),", repl, text)
+
+
+_known = None
+
+
+def known_quest(q):
+    """Whether Forever has this quest: in Questie's Forever data (every Era quest), our server scan,
+    or Wowhead's Forever zone lists. The older free guides still carry TBC quests, which it hasn't."""
+    global _known
+    if _known is None:
+        d = "S:/forever-data/research/leveling/data/"
+        _known = set(json.load(open(d + "Quest.json", encoding="utf-8")))
+        _known |= set(json.load(open(d + "scan_70009.json", encoding="utf-8"))["quests"])
+        _known |= {str(x[0]) for x in json.load(open(d + "wh_zone_quests.json", encoding="utf-8"))["quests"]}
+    return str(q) in _known
+
+
+def drop_missing(text):
+    """Lines for quests Forever doesn't have go; a step left with nothing to do goes too."""
+    parts = re.split(r"\n(?=step\b)", text)
+    out, dropped = [parts[0]], []
+    for step in parts[1:]:
+        lines = step.split("\n")
+        keep = []
+        for ln in lines:
+            m = re.match(r"\s*\.(accept|turnin|complete)\s+(\d+)", ln)
+            if m and not known_quest(m.group(2)):
+                dropped.append(f"dropped {m.group(1)} {m.group(2)} (not on Forever)")
+                continue
+            keep.append(ln)
+        acts = [l for l in keep[1:] if l.strip().startswith(".") and not l.strip().startswith((".goto", ".target"))]
+        had = [l for l in lines[1:] if l.strip().startswith(".") and not l.strip().startswith((".goto", ".target"))]
+        if had and not acts:
+            dropped.append("dropped a step with only such quests: " + lines[0])
+            continue
+        out.append("\n".join(keep))
+    return "\n".join(out), dropped
 
 
 def main():

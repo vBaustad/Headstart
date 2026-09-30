@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Routes to level 30.** After 21, RestedXP's free 20-30 route: Ashenvale 21-23, Wetlands 23-24, Redridge/Duskwood 24-27, Wetlands/Hillsbrad 27-30 and Duskwood 28-30. Made fit for Forever: TBC-only quests and lines out, zones by map number. At 30 it hands over to RestedXP's paid 30-40 guide where you have it, else their free one.
 - Northshire and Shadowglen: Warriors, Paladins and Rogues are told to take Mining for Dummies from Rascally Rodents / The Woodland Protector. It teaches Mining with no trainer and no fee.
 - **Routes to level 21 for every Alliance race and class.** After the starting zones, Headstart now has its own copies of RestedXP's Forever routes: Elwynn, Teldrassil, Loch Modan, Westfall, Darkshore, Redridge and Darkshore/Ashenvale. They are cleaned the same way, editable in the route editor, and linked so each starting route leads on through them. At 21 they hand over to RestedXP's own guides.
 - The route list in the window scrolls.

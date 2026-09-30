@@ -9,7 +9,7 @@ YR:ShipGuide("19_21_darkshore_ashenvale", [[
 #group Headstart Launch (A)
 #subgroup Levelling
 #name 19-21 Darkshore/Ashenvale
-#next RestedXP Alliance 20-30\21-23 Ashenvale/Stonetalon
+#next 21-23 Ashenvale
 
 step
     #xprate >1.59
