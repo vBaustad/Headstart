@@ -1224,6 +1224,17 @@ local function BuildRouteSettings(page)
         "How many finished levels are listed under the one in progress")
     Row("Show XP per hour", S.Switch(c, function() return st().rate end, Style("rate")))
     Row("Show time to ding", S.Switch(c, function() return st().ding end, Style("ding")))
+    local CLOCKS = { { "full", "1:50:19" }, { "short", "1h 50m" } }
+    local clock
+    clock = S.Dropdown(c, 120, CLOCKS, function(v) Style("clock")(v) clock:Refresh() end)
+    function clock:Refresh()
+        for _, o in ipairs(CLOCKS) do if o[1] == st().clock then self:SetValue(o[2]) end end
+    end
+    Row("Times past an hour", clock, "Under an hour both read 27:57. The short form drops the seconds")
+    Row("Show the level column", S.Switch(c, function() return st().levelCol end, Style("levelCol")),
+        "How long each level took on its own")
+    Row("Show the total column", S.Switch(c, function() return st().totalCol end, Style("totalCol")),
+        "Your play time from level 1 when you reached each level")
     Row("Show the vs best column", S.Switch(c, function() return st().vs end, Style("vs")))
     Row("Background", S.Slider(c, 0, 100, 5, function() return st().bg end, Style("bg")),
         "How dark the box behind the splits is, in percent. 0 is none")
@@ -1559,9 +1570,42 @@ local function NavButton(parent, label, icon, y, indent)
     return b
 end
 
+-- The routes this character follows: reachable from its race's start (Guides.lua) and not for
+-- another class ("<< Alliance Hunter" in the header; "!Hunter" excludes).
+local CLASS_WORDS = { WARRIOR = true, PALADIN = true, HUNTER = true, ROGUE = true, PRIEST = true, SHAMAN = true,
+    MAGE = true, WARLOCK = true, DRUID = true }
+local function ForClass(key, class)
+    local head = ("\n" .. (YR:GuideText(key) or "")):match("\n<<%s*([^\n]+)")
+    if not head then return true end
+    local wanted = false
+    for word in head:gmatch("[!%a]+") do
+        local neg, name = word:match("^(!?)(%a+)$")
+        name = name and name:upper()
+        if name and CLASS_WORDS[name] then
+            if neg == "!" then
+                if name == class then return false end
+            else
+                wanted = wanted or {}
+                wanted[name] = true
+            end
+        end
+    end
+    return not wanted or wanted[class] == true
+end
+
+function YR.MyRoutes()
+    local _, race = UnitRace("player")
+    local _, class = UnitClass("player")
+    local set = {}
+    for key in pairs(YR:RoutesFor(race)) do
+        if ForClass(key, class) then set[key] = true end
+    end
+    return set
+end
+
 local function RouteButton(parent, key, y)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(SIDE - 16, 30)
+    b:SetSize(SIDE - 16, 24)
     b:SetPoint("TOPLEFT", 8, y)
     b.bg = S.Fill(b, { 0, 0, 0, 0 })
     b.bar = b:CreateTexture(nil, "ARTWORK")
@@ -1571,14 +1615,16 @@ local function RouteButton(parent, key, y)
     local name = YR.GuideName(key)
     local range, zone = name:match("^(%d+%-%d+)%s+(.+)$")
     zone = (zone or name):gsub("%s*%(Launch%)", "")
+    b.from = tonumber(range and range:match("^%d+")) or 0
+    b.full, b.short = zone, (zone:gsub("%s*%b()", ""))   -- "Loch Modan (Dwarf/Gnome)" -> "Loch Modan"
     local badge = CreateFrame("Frame", nil, b)
-    badge:SetSize(40, 18)
+    badge:SetSize(38, 16)
     badge:SetPoint("LEFT", 12, 0)
     b.badgeBg = S.Fill(badge, S.C.accentD)
     b.badge = S.Text(badge, 12, S.C.accent)
     b.badge:SetPoint("CENTER")
     b.badge:SetText(range or "")
-    b.text = S.Text(b, 13, S.C.sub)
+    b.text = S.Text(b, 12, S.C.sub)
     b.text:SetPoint("LEFT", badge, "RIGHT", 8, 0)
     b.text:SetPoint("RIGHT", -16, 0)
     b.text:SetText(zone)
@@ -1633,22 +1679,49 @@ local function Build()
     end
     local label = S.Text(side, 11, S.C.muted)
     label:SetPoint("TOPLEFT", 20, y - 8)
-    label:SetText("YOUR ROUTES")
     local listTop = y - 26
     local list = S.ScrollArea(side, SIDE, H - HEAD + listTop - 40)
     list:SetPoint("TOPLEFT", 0, listTop)
-    local ry = 0
     for _, g in ipairs(YR.shipped) do
-        local sub = RouteButton(list.content, g.key, ry)
+        local sub = RouteButton(list.content, g.key, 0)
         sub:SetScript("OnClick", function()
             Open(g.key)
             for _, t in ipairs(ui.routeTabs) do t:Select(t == sub) end
             Show("routes")
         end)
         ui.routeTabs[#ui.routeTabs + 1] = sub
-        ry = ry - 32
     end
-    list.content:SetHeight(-ry + 8)
+    table.sort(ui.routeTabs, function(a, b) return a.from < b.from or (a.from == b.from and a.full < b.full) end)
+    -- "Mine" (default): only the routes this character's race and class follow, without their
+    -- "(Dwarf/Gnome)" qualifiers; "All": every route. The one open in the editor always shows.
+    local toggle = CreateFrame("Button", nil, side)
+    toggle:SetSize(60, 16)
+    toggle:SetPoint("TOPRIGHT", side, "TOPRIGHT", -12, y - 6)
+    toggle.text = S.Text(toggle, 11, S.C.accent)
+    toggle.text:SetPoint("RIGHT")
+    function ui.LayoutRoutes()
+        local mine = YR.MyRoutes()
+        local all = YippRouteDB.allRoutes or not next(mine)
+        label:SetText(all and "ALL ROUTES" or "YOUR ROUTES")
+        toggle.text:SetText(all and "Mine" or "Show all")
+        local ry = 0
+        for _, b in ipairs(ui.routeTabs) do
+            local on = all or mine[b.key] or b.selected
+            b:SetShown(on)
+            if on then
+                b:ClearAllPoints()
+                b:SetPoint("TOPLEFT", 8, ry)
+                b.text:SetText(all and b.full or b.short)
+                ry = ry - 26
+            end
+        end
+        list.content:SetHeight(-ry + 8)
+    end
+    toggle:SetScript("OnClick", function()
+        YippRouteDB.allRoutes = not YippRouteDB.allRoutes or nil
+        ui.LayoutRoutes()
+    end)
+    ui.LayoutRoutes()
     for _, p in ipairs(PAGES) do
         local page = CreateFrame("Frame", nil, win)
         page:SetPoint("TOPLEFT", SIDE, -HEAD)
@@ -1677,6 +1750,7 @@ local function Build()
     if key then
         Open(key)
         for _, t in ipairs(ui.routeTabs) do t:Select(t.key == key) end
+        if ui.LayoutRoutes then ui.LayoutRoutes() end
     end
 end
 
@@ -1685,6 +1759,12 @@ function YR:RefreshWindow()
     for _, p in ipairs(PAGES) do
         if p.key == current then p.refresh() end
     end
+end
+
+-- /hs: Settings, or closes the window when Settings is already open.
+function YR:ToggleSettings()
+    if win and win:IsShown() and current == "settings" then win:Hide() return end
+    YR:ToggleWindow("settings")
 end
 
 function YR:ToggleWindow(page)
