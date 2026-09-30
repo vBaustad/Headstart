@@ -1,0 +1,79 @@
+"""Draw YippRoute's small UI icons: white shapes on transparent, 64x64 TGA (WoW reads uncompressed
+32-bit TGA with power-of-two sizes). Drawn at 4x and scaled down, so the edges are smooth.
+
+    python tools/make_icons.py     -> art/*.tga
+
+The addon tints them (SetVertexColor), so one white icon serves every colour.
+"""
+import os
+
+from PIL import Image, ImageDraw
+
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "art")
+os.makedirs(OUT, exist_ok=True)
+S = 256                     # drawing size; saved at 64
+W = 22                      # stroke width at drawing size
+
+
+def save(img, name):
+    img.resize((64, 64), Image.LANCZOS).save(os.path.join(OUT, name + ".tga"), orientation=1)
+
+
+def canvas():
+    img = Image.new("RGBA", (S, S), (255, 255, 255, 0))
+    return img, ImageDraw.Draw(img)
+
+
+def line(d, pts):
+    d.line(pts, fill=(255, 255, 255, 255), width=W, joint="curve")
+    for x, y in (pts[0], pts[-1]):
+        r = W / 2
+        d.ellipse((x - r, y - r, x + r, y + r), fill=(255, 255, 255, 255))
+
+
+# chevron pointing up (down is the same texture flipped by the addon)
+img, d = canvas()
+line(d, [(72, 158), (128, 102), (184, 158)])
+save(img, "up")
+
+# cross
+img, d = canvas()
+line(d, [(84, 84), (172, 172)])
+line(d, [(172, 84), (84, 172)])
+save(img, "close")
+
+# plus
+img, d = canvas()
+line(d, [(128, 72), (128, 184)])
+line(d, [(72, 128), (184, 128)])
+save(img, "plus")
+
+# drag handle: two columns of three dots
+img, d = canvas()
+for x in (104, 152):
+    for y in (84, 128, 172):
+        d.ellipse((x - 13, y - 13, x + 13, y + 13), fill=(255, 255, 255, 255))
+save(img, "grip")
+
+# pencil: a slanted bar with a point
+img, d = canvas()
+d.polygon([(70, 186), (82, 146), (160, 68), (188, 96), (110, 174)], fill=(255, 255, 255, 255))
+save(img, "edit")
+
+# copy: two offset squares (outlines)
+img, d = canvas()
+d.rounded_rectangle((96, 70, 186, 160), radius=14, outline=(255, 255, 255, 255), width=18)
+d.rounded_rectangle((70, 96, 160, 186), radius=14, outline=(255, 255, 255, 255), width=18, fill=(255, 255, 255, 0))
+save(img, "copy")
+
+# check mark
+img, d = canvas()
+line(d, [(76, 132), (112, 168), (182, 92)])
+save(img, "check")
+
+# small solid circle (a dot for status)
+img, d = canvas()
+d.ellipse((88, 88, 168, 168), fill=(255, 255, 255, 255))
+save(img, "dot")
+
+print("icons in", OUT, sorted(os.listdir(OUT)))
