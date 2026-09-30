@@ -1160,6 +1160,8 @@ step << !Hunter
     .accept 95212 >> Accept Never Saddle on Quality
     .target Rudra Amberstill
 step << !Hunter
+    .xp 10 >> Grind to level 10 before Vagash, a level 11 elite. Stay off his hill north of the ranch while you do
+step << !Hunter
     .goto 1426,62.094,47.154,40,0
     .goto 1426,62.434,48.989,40,0
     .goto 1426,62.538,46.195

@@ -221,6 +221,18 @@ i = guide.index("    .turnin 95214 >> Turn in Stolen Blasting Powder")
 i = guide.index("\nstep", i) + 1
 guide = guide[:i] + RUDRA + guide[i:]
 
+# Vagash is a level 11 elite (about 666 health). A logged level-9 Paladin killed a normal mob in ~10 s:
+# ~40 s of damage for Vagash, too long against an elite two levels up. Level 10 first (a Paladin gets
+# Lay on Hands; every class a new rank or two), then kite him to the guard. Hunters meet him with
+# their own steps and pet, earlier: left as they are.
+LEVEL_10 = """step << !Hunter
+    .xp 10 >> Grind to level 10 before Vagash, a level 11 elite. Stay off his hill north of the ranch while you do
+"""
+i = guide.rindex(".complete 314,1")          # the second one: everyone but Hunters
+i = guide.rindex("\nstep", 0, i) + 1
+assert guide[i:].startswith("step << !Hunter"), guide[i:i + 40]
+guide = guide[:i] + LEVEL_10 + guide[i:]
+
 # Frosthowl (98326, new in Forever: 775 XP, 3s, needs level 5): Gretta Ganter in Brewnall, a named
 # wendigo at the back of the Grizzled Den. Taken on the first Brewnall visit (the first den visit
 # comes before Brewnall, at level 6), killed on the way back west (the route climbs Shimmer Ridge
