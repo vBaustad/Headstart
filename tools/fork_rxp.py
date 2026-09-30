@@ -56,6 +56,16 @@ EDITS = {
     "21-23 Ashenvale": [
         ("<< Alliance !Warlock/Alliance wotlk\n", "<< Alliance\n", "every class goes this way from our 20-21"),
     ],
+    # Warlocks kill Hogger here (Fear), but RestedXP's hand-in step is marked "skip": hand it in to
+    # Marshal Dughan with Deliver Thomas' Report, the route's next visit to him
+    "11-12 Elwynn (Dwarf/Gnome)": [
+        ("    .turnin 39 >> Turn in Deliver Thomas' Report\n    .target Marshal Dughan\n",
+         "    .turnin 39 >> Turn in Deliver Thomas' Report\n    .target Marshal Dughan\n"
+         "step << Warlock\n    .goto 1429/0,74.02,-9465.52\n"
+         "    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Marshal Dughan|r\n"
+         "    .turnin 176,3 >> Turn in Wanted: \"Hogger\"\n    .target Marshal Dughan\n    .isQuestComplete 176\n",
+         "Hogger's hand-in for Warlocks"),
+    ],
     "27-30 Wetlands/Hillsbrad": [
         ("#next RestedXP Alliance 20-32\\30-32 Duskwood/STV\n", "#next " + AT_30.format(free="30-32 Duskwood/STV") + "\n", "hand over at 30"),
     ],
