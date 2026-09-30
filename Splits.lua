@@ -74,18 +74,31 @@ local function Top(run)
     return top
 end
 
--- The best other run: the one that got furthest, and of those the fastest to its top level.
+-- Whether a run has a time for every level up to its highest. A character the splits first saw
+-- part-way (already level 8, say) has only that level's total: nothing to compare levels 2-7 with.
+local function Complete(run)
+    for lvl = 2, Top(run) do
+        if not run.levels[lvl] then return false end
+    end
+    return true
+end
+
+-- The best other run: the one that got furthest, and of those the fastest to its top level. Runs
+-- with every level timed come first; a partial one only when there is nothing else.
 local function Best()
-    local best, bestTop, bestTime
+    local best, bestTop, bestTime, bestFull
     for k, r in pairs(DB().runs) do
         local top = Top(r)
         local t = r.levels[top] or r.elapsed
-        if k ~= key and top > 1 and (not best or top > bestTop or (top == bestTop and t < bestTime)) then
-            best, bestTop, bestTime = k, top, t
+        local full = Complete(r)
+        if k ~= key and top > 1 and (not best or (full and not bestFull)
+                or (full == bestFull and (top > bestTop or (top == bestTop and t < bestTime)))) then
+            best, bestTop, bestTime, bestFull = k, top, t, full
         end
     end
     return best and DB().runs[best]
 end
+YR.SplitsBest = Best   -- for the tests
 
 local function XPRate()
     local a, b = rate[1], rate[#rate]
