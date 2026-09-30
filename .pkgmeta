@@ -1,10 +1,14 @@
 package-as: Headstart
 
+enable-nolib-creation: no
+
 manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown
 
 ignore:
-  - tools
-  - dist
-  - CHANGELOG.md
+  - ".gitignore"
+  - ".pkgmeta"
+  - "CHANGELOG.md"
+  - "tools"
+  - "dist"

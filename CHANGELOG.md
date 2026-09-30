@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1-beta1
+
+First CurseForge build (same addon as 0.8.0).
+
 ## 0.8.0
 
 First public version.
