@@ -1,7 +1,7 @@
 """Build a zip of Headstart to send to someone: the addon as it runs, without the tools or git.
 
-    python tools/package.py        -> dist/Headstart-<version>.zip (inside this private repo, git-ignored;
-                                      never the notes repo's releases folder, which is public)
+    python tools/package.py        -> dist/Headstart-<version>.zip (git-ignored); upload it to CurseForge
+                                      or attach it to a GitHub release
 
 The zip holds a folder named Headstart, so it unpacks straight into Interface/AddOns.
 """
@@ -11,7 +11,7 @@ import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKIP_DIRS = {"tools", ".git", "__pycache__", "dist"}
-SKIP_FILES = {".gitignore"}
+SKIP_FILES = {".gitignore", "CHANGELOG.md"}
 
 version = re.search(r"## Version: (\S+)", open(os.path.join(ROOT, "Headstart.toc"), encoding="utf-8").read()).group(1)
 out_dir = os.path.join(ROOT, "dist")

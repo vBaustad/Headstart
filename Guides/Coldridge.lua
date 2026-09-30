@@ -1,6 +1,6 @@
 -- Headstart: launch-day Coldridge Valley for Dwarves and Gnomes of every class.
 -- Coordinates and step wording come from RestedXP's Forever guide (Guides/Forever/Alliance-1-14_DwarfGnome.lua,
--- CC BY-NC-SA 4.0); the order is ours. Why each change exists: S:/forever-data/research/leveling/findings.md
+-- CC BY-NC-SA 4.0); the order is ours, from our own logged runs.
 local _, YR = ...
 
 YR:ShipGuide("coldridge", [[
