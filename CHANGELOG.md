@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Dun Morogh: Mining and Blacksmithing to 20 for the two Camping 101 quests (270 XP each, and the Sharpening Wheel). A reminder to mine every copper vein you pass until Mining 20 (most sit around the Grizzled Den and south of Kharanos). A stop at Tognus's forge and anvil to smelt and craft to Blacksmithing 20. Both hand-ins, shown only once the quest is done.
+- Dun Morogh money: Cooking (270 XP for 1 silver) comes before class training, with a second chance once Stocking Jetsteam has paid. The Mining Pack (25c) only if money is left.
+- Copper Ore, Bars and Rough Stones count as route items while you're on Camping 101: Blacksmithing, so the sell warning covers them.
+- The run log records your money with every event, so the analysis can show what training and vendors really cost.
 - Dun Morogh route, from a logged run: take Flintfire's Shipment at the same Tognus visit as Blacksmithing, hand in Senir's Observations before sitting at the campfire, and take The Reports when handing in Frostmane Hold (each was a separate trip).
 - This run: click an action for its details beside the list. A quest shows when and where you took it, finished it and handed it in, from and to whom, and its XP and money. Everything shows where it happened, and a Wowhead link to copy.
 - The window opens on the route you're on (the one RestedXP has loaded, else your race's starting route), not always Coldridge, so This run's "Add to route" goes to the right one.

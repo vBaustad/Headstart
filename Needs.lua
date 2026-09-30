@@ -67,6 +67,14 @@ local function Build()
     end
 end
 
+-- Camping 101: Blacksmithing and Mining are skill quests, not item quests: the ore, bars and stones
+-- the route smelts and crafts to skill 20 are kept while you are on them (the route has no .collect).
+local SKILL_UPS = {
+    { item = 2770, quest = 96044, count = 20 },   -- Copper Ore: smelted for Mining, the bars for Blacksmithing
+    { item = 2840, quest = 96044, count = 20 },   -- Copper Bar
+    { item = 2835, quest = 96044, count = 10 },   -- Rough Stone: Rough Weightstones
+}
+
 -- Routes change when the player saves an edit: read them again next time.
 function YR:ForgetNeeds() needs = nil end
 
@@ -74,19 +82,30 @@ local function Done(quest)
     return C_QuestLog.IsQuestFlaggedCompleted and C_QuestLog.IsQuestFlaggedCompleted(quest) or false
 end
 
+local function OnQuest(quest)
+    return C_QuestLog.IsOnQuest and C_QuestLog.IsOnQuest(quest) or false
+end
+
 local function Title(quest)
-    return titles[quest] or (C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(quest)) or ("quest " .. quest)
+    -- "Camping 101: Mining << Warrior/Paladin" in the route: the title is the part before the filter
+    local t = titles[quest]
+    if t then t = t:gsub("%s*<<.*$", "") end
+    return t or (C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(quest)) or ("quest " .. quest)
 end
 
 -- How many of this item the route still needs, and for what ("Stocking Jetsteam"), or nil.
 function YR.RouteNeed(item)
     if not item then return nil end
     if not needs then Build() end
-    local list = needs[item]
-    if not list then return nil end
     local count, what = 0, {}
-    for _, n in ipairs(list) do
+    for _, n in ipairs(needs[item] or {}) do
         if not Done(n.quest) then
+            count = count + n.count
+            what[#what + 1] = Title(n.quest)
+        end
+    end
+    for _, n in ipairs(SKILL_UPS) do
+        if n.item == item and OnQuest(n.quest) and not C_QuestLog.IsComplete(n.quest) then
             count = count + n.count
             what[#what + 1] = Title(n.quest)
         end
