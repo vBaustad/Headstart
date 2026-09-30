@@ -236,14 +236,26 @@ events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
 shown = g.YippSetupFrame.IsShown(g.YippSetupFrame)
 print(("ok  " if shown else "FAIL"), "popup on a new character whose old saved variables say seen")
 bad += not shown
-# A character where AutoFeed hasn't made its macro yet: nothing is created, the slot stays empty, and it says so
+# A character where AutoFeed hasn't made its macro yet: AutoFeed is asked to make it (so it owns and
+# fills it), and it goes in its slot. Nothing is copied from the main.
 lua.execute(r'''MACROS = {}; AutoFeedCharDB = { owned = {} }''')
+YS.Apply(YS)
+made = [k for k in g.MACROS if g.MACROS[k][1] == "AutoFeed"]
+b9 = g.BAR[9]
+ok = len(made) == 1 and bool(g.AutoFeedCharDB.owned.AutoFeed) and b9 is not None and b9.kind == "macro" and b9.id == made[0]
+ok = ok and g.MACROS[made[0]][3] == "#showtooltip"    # AutoFeed's own body, not the main's copy
+print(("ok  " if ok else "FAIL"), f"AutoFeed asked to make its macro on a new character, and it is placed in slot 9: {b9 and (b9.kind, b9.id)}")
+bad += not ok
+
+# Without AutoFeed loaded: nothing is made, the slot stays empty, and it says why.
+lua.execute(r'''MACROS = {}; AutoFeedCharDB = { owned = {} }; SAVED_LIBSTUB = LibStub; LibStub = nil''')
 YS.Apply(YS)
 names = [g.MACROS[k][1] for k in g.MACROS]
 ok = "AutoFeed" not in names and g.BAR[9] is None
-said = any("hasn't made 'AutoFeed'" in str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1))
-print(("ok  " if ok and said else "FAIL"), "no AutoFeed macro made when AutoFeed hasn't made one; slot 9 empty and reported")
+said = any("AutoFeed isn't loaded" in str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1))
+print(("ok  " if ok and said else "FAIL"), "without AutoFeed: no AutoFeed macro made, slot 9 empty and reported")
 bad += not (ok and said)
+lua.execute("LibStub = SAVED_LIBSTUB")
 
 # Edit Mode, bars, settings and the RestedXP guide on the new character
 ok = g.EDIT.selected == 3
