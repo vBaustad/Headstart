@@ -916,8 +916,8 @@ local function RowPage(page, controls, bottom)
     return L
 end
 
-local function BuildSettings(page)
-    local L = RowPage(page, settings.controls)
+local function BuildRouteSettings(page)
+    local L = RowPage(page, settings.controls, 106)
     local c, colW = L.c, L.colW
     local Section, Row = L.Section, L.Row
     local function Opt(key) return function() return YR.Option(key) end end
@@ -1004,14 +1004,9 @@ local function BuildSettings(page)
     settings.chosenY, settings.chosenRows, settings.content, settings.width = y, {}, c, colW * 2 + 12
     c:SetHeight(-y + 28 * 20)
 
-    local reload = S.Button(page, "Reload UI", function() ReloadUI() end, nil, 110)
-    reload:SetPoint("BOTTOMLEFT", 16, 14)
-    local close = S.Button(page, "Close", function() win:Hide() end, nil, 110)
-    close:SetPoint("BOTTOMRIGHT", -16, 14)
 end
 
-local function RefreshSettings()
-    win.subtitle:SetText("")
+local function RefreshRouteSettings()
     for _, ctl in ipairs(settings.controls) do if ctl.Refresh then ctl:Refresh() end end
     local db = YR:RewardSettings()
     for i, r in ipairs(settings.order) do
@@ -1088,7 +1083,7 @@ local function BuildSetup(page)
     local rows = CreateFrame("Frame", nil, page)
     rows:SetPoint("TOPLEFT", 0, -84)
     rows:SetPoint("BOTTOMRIGHT")
-    local L = RowPage(rows, setup.controls, 100)
+    local L = RowPage(rows, setup.controls, 180)
     local Section, Row = L.Section, L.Row
     local function Sw(key) local b = S.Switch(L.c, function() return o()[key] end, function(on) o()[key] = on end) return b end
 
@@ -1128,7 +1123,6 @@ local function BuildSetup(page)
 end
 
 local function RefreshSetup()
-    win.subtitle:SetText("")
     local YS = YR.Setup
     local p = YS:Profile()
     local _, class = UnitClass("player")
@@ -1139,13 +1133,82 @@ local function RefreshSetup()
 end
 
 -- ---------------------------------------------------------------------------
+-- Settings: two tabs, Route and Character, over one footer
+-- ---------------------------------------------------------------------------
+local TABS = {
+    { key = "route", label = "Route", build = BuildRouteSettings, refresh = RefreshRouteSettings },
+    { key = "character", label = "Character", build = BuildSetup, refresh = RefreshSetup },
+}
+
+local function ShowTab(key)
+    settings.tab = key
+    for _, t in ipairs(TABS) do
+        t.frame:SetShown(t.key == key)
+        t.button.text:SetTextColor(unpack(t.key == key and S.C.text or S.C.muted))
+        t.button.line:SetShown(t.key == key)
+    end
+    YR:RefreshWindow()
+end
+
+local function BuildSettings(page)
+    local strip = page:CreateTexture(nil, "BORDER")
+    strip:SetPoint("TOPLEFT", 16, -40)
+    strip:SetPoint("TOPRIGHT", -16, -40)
+    strip:SetHeight(1)
+    S.Set(strip, S.C.line)
+    local x = 16
+    for _, t in ipairs(TABS) do
+        local b = CreateFrame("Button", nil, page)
+        b.text = S.Text(b, 14)
+        b.text:SetPoint("CENTER", 0, 1)
+        b.text:SetText(t.label)
+        b:SetSize(b.text:GetStringWidth() + 28, 30)
+        b:SetPoint("TOPLEFT", x, -10)
+        b.line = b:CreateTexture(nil, "OVERLAY")
+        b.line:SetPoint("BOTTOMLEFT", 6, 0)
+        b.line:SetPoint("BOTTOMRIGHT", -6, 0)
+        b.line:SetHeight(2)
+        S.Set(b.line, S.C.accent)
+        b:SetScript("OnClick", function() ShowTab(t.key) end)
+        b:SetScript("OnEnter", function() if settings.tab ~= t.key then b.text:SetTextColor(unpack(S.C.sub)) end end)
+        b:SetScript("OnLeave", function() if settings.tab ~= t.key then b.text:SetTextColor(unpack(S.C.muted)) end end)
+        t.button = b
+        x = x + b:GetWidth() + 4
+        local f = CreateFrame("Frame", nil, page)
+        f:SetPoint("TOPLEFT", 0, -44)
+        f:SetPoint("BOTTOMRIGHT")
+        t.build(f)
+        t.frame = f
+    end
+    local reload = S.Button(page, "Reload UI", function() ReloadUI() end, nil, 110)
+    reload:SetPoint("BOTTOMLEFT", 16, 14)
+    local close = S.Button(page, "Close", function() win:Hide() end, nil, 110)
+    close:SetPoint("BOTTOMRIGHT", -16, 14)
+    settings.tab = "route"
+end
+
+local function RefreshSettings()
+    win.subtitle:SetText("")
+    for _, t in ipairs(TABS) do
+        t.frame:SetShown(t.key == settings.tab)
+        t.button.text:SetTextColor(unpack(t.key == settings.tab and S.C.text or S.C.muted))
+        t.button.line:SetShown(t.key == settings.tab)
+        if t.key == settings.tab then t.refresh() end
+    end
+end
+
+-- Open Settings on one of its tabs ("route" or "character").
+function YR:ShowSettingsTab(key)
+    YR:ToggleWindow("settings")
+    ShowTab(key)
+end
+
+-- ---------------------------------------------------------------------------
 -- The window
 -- ---------------------------------------------------------------------------
 local PAGES = {
     { key = "routes", label = "Routes", icon = "Interface\\Icons\\INV_Misc_Map_01", build = BuildRoutes, refresh = RefreshRoutes },
     { key = "run", label = "This run", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", build = BuildRun, refresh = RefreshRun },
-    { key = "setup", label = "Character setup", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore", build = BuildSetup,
-      refresh = RefreshSetup },
     { key = "share", label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,
       refresh = function() win.subtitle:SetText("") end },
     { key = "settings", label = "Settings", icon = "Interface\\Icons\\Trade_Engineering", build = BuildSettings,
