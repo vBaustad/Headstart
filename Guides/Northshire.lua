@@ -10,7 +10,7 @@ YR:ShipGuide("northshire", [[
 #version 1
 #group Headstart Launch (A)
 #subgroup Launch day
-#next RestedXP Forever Guide (A)\6-11 Elwynn Forest
+#next 6-11 Elwynn Forest
 
 step << !Human
     #completewith next

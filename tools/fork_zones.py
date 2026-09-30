@@ -49,7 +49,7 @@ class Guide:
         self.text = self.text[:i] + new + self.text[i:]
 
     def header(self, name, nxt):
-        """Our group and name; #next points back into RestedXP's own guides."""
+        """Our group and name; #next points to the route that follows (ours, or RestedXP's with its group)."""
         t = self.text
         t = re.sub(r"\n#group [^\n]*", "\n#group Headstart Launch (A)", t, count=1)
         t = re.sub(r"\n#subgroup [^\n]*", "\n#subgroup Launch day", t, count=1)
@@ -79,7 +79,7 @@ def write(file, key, source, text, notes):
 # ---------------------------------------------------------------------------------------------------
 def northshire():
     g = Guide(guide_block("Alliance-1-13_Human.lua", "1-6 Northshire"))
-    g.header("1-6 Northshire (Launch)", "RestedXP Forever Guide (A)\\6-11 Elwynn Forest")
+    g.header("1-6 Northshire (Launch)", "6-11 Elwynn Forest")   # our copy (tools/fork_rxp.py)
 
     # Wolf meat: every new Human starts on the Young Wolves round the Abbey. Timber Wolves drop the
     # meat too; their packs are on the south and east edges (Questie: 51,44 x6, 50,48 x3, 52,39 x3,
@@ -163,7 +163,7 @@ def northshire():
 # ---------------------------------------------------------------------------------------------------
 def shadowglen():
     g = Guide(guide_block("Alliance-1-10_NightElf.lua", "1-6 Shadowglen"))
-    g.header("1-6 Shadowglen (Launch)", "RestedXP Forever Guide (A)\\6-11 Teldrassil")
+    g.header("1-6 Shadowglen (Launch)", "6-11 Teldrassil")   # our copy (tools/fork_rxp.py)
 
     # The Balance of Nature: every new Night Elf kills the Young Nightsabers and Thistle Boars round
     # Aldrassil. There are smaller groups on the east edge (Questie: 63,43 x6 sabers, 62,41 x3 and

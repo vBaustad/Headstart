@@ -167,6 +167,31 @@ function YR:ScanGroupRoutes()
     end
 end
 
+-- The routes a character of this race can follow: its starting route and every route its #next
+-- lines lead to (ours only), as a set of keys. A Dwarf never plays Human Elwynn's quests.
+local START = { Human = "northshire", NightElf = "shadowglen", Dwarf = "coldridge", Gnome = "coldridge" }
+function YR:RoutesFor(race)
+    local byName = {}
+    for _, g in ipairs(YR.shipped) do
+        local name = (("\n" .. (YR:GuideText(g.key) or "")):match("\n#name ([^\n]+)"))
+        if name then byName[name] = g.key end
+    end
+    local set, todo = {}, { START[race] }
+    while #todo > 0 do
+        local key = table.remove(todo)
+        if key and not set[key] then
+            set[key] = true
+            for line in ("\n" .. (YR:GuideText(key) or "")):gmatch("\n#next ([^\n]+)") do
+                for entry in (line:gsub("%s*<<.*$", "")):gmatch("[^;]+") do
+                    local name = strtrim(entry):gsub("^Headstart Launch %(A%)\\", "")
+                    if byName[name] then todo[#todo + 1] = byName[name] end
+                end
+            end
+        end
+    end
+    return set
+end
+
 -- header, { step texts } - each step text starts with "step" and has no trailing newline
 function YR.SplitSteps(text)
     local first = text:find("\nstep[^\n]*\n") or text:find("\nstep[^\n]*$")

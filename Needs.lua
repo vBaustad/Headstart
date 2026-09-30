@@ -39,8 +39,11 @@ end
 
 local function Build()
     needs, titles = {}, {}
+    -- only the routes this character can follow (from its race's starting route on)
+    local _, race = UnitRace("player")
+    local mine = YR:RoutesFor(race)
     for _, g in ipairs(YR.shipped) do
-        local text = YR:GuideText(g.key) or ""
+        local text = mine[g.key] and YR:GuideText(g.key) or ""
         for q, t in text:gmatch("%.accept (%d+)%s*>>%s*Accept ([^\n|]+)") do titles[tonumber(q)] = titles[tonumber(q)] or t end
         for q, t in text:gmatch("%.turnin (%d+)[^\n]->>%s*Turn in ([^\n|]+)") do titles[tonumber(q)] = titles[tonumber(q)] or t end
         local header, steps = YR.SplitSteps(text)

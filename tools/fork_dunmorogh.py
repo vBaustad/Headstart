@@ -38,7 +38,9 @@ sub("#subgroup Speedrun Guide 1-20\n", "#subgroup Launch day\n")
 sub("#name 5-11 Dun Morogh\n", "#name 5-11 Dun Morogh (Launch)\n")
 sub("#defaultfor Dwarf/Gnome\n", "")
 nxt = re.search(r"#next (.*)\n", guide).group(1)
-sub(f"#next {nxt}\n", "#next " + ";".join(RXP_GROUP + "\\" + n for n in nxt.split(";")) + "\n")
+# the next routes: our copies where tools/fork_rxp.py makes one (same group, no prefix), else RestedXP's
+OURS = {"11-12 Elwynn (Dwarf/Gnome)", "12-14 Loch Modan (Dwarf/Gnome)", "11-13 Loch Modan (Hunter)"}
+sub(f"#next {nxt}\n", "#next " + ";".join(n if n in OURS else RXP_GROUP + "\\" + n for n in nxt.split(";")) + "\n")
 
 # Blacksmithing and Tools for Steelgrill first, then the campfire: find the step with The Adventurer
 # Flintfire's Shipment is taken at the same visit (a logged run took it there anyway; RestedXP had it

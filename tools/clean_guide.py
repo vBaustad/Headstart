@@ -16,6 +16,7 @@ hardcore, auction house on) these never show, so they are removed instead of car
 
 Anything else it cannot decide raises, so an upstream change can't slip through unseen.
 """
+import itertools
 import re
 
 NEVER = {"sod", "skip"}          # filter words that are never true on Forever
@@ -58,6 +59,17 @@ def _line(line):
     return body + " << " + f + comment
 
 
+def _conditional(arg):
+    """A hiding tag for some classes only ("... << Priest/Mage"): "drop" when that condition can never
+    hold on Forever ("<< Rogue sod"), else ("exclude", the classes it hides the step from)."""
+    f = _filter(arg.split("<<", 1)[1].strip())
+    if f is None:
+        return "drop"
+    if f == "":
+        return "kill"
+    return ("exclude", f)
+
+
 def _tag(line):
     """For a tag line: "drop" (the line), "kill" (the step) or None (keep)."""
     s = line.strip()
@@ -65,21 +77,51 @@ def _tag(line):
     if not m:
         return None
     name, arg = m.group(1), m.group(2)
-    cond = " << " in arg
+    cond = "<<" in arg
     if name == "season":
         seasons = re.split(r"[,;\s]+", arg.split("<<")[0].strip())
         if "0" in seasons:
             return "drop"
         if cond:
-            raise ValueError("conditional #season without season 0: " + s)
+            return _conditional(arg)
         return "kill"
     if name in ("hardcore", "ssf"):
         if cond:
-            raise ValueError("conditional #" + name + ": " + s)
+            return _conditional(arg)
         return "kill"
     if name in ("softcore", "ah"):
         return "drop"
     return None
+
+
+def _goto(block):
+    """A step's first .goto line, to tell where it happens."""
+    return next((l.strip() for l in block if l.strip().startswith(".goto ")), None)
+
+
+def _negate(expr):
+    """not (a RestedXP filter), as a filter: "/" is or, a space is and, "!" is not.
+    not (A B / C) = (!A or !B) and !C = "!A !C/!B !C"."""
+    def neg(w):
+        return w[1:] if w.startswith("!") else "!" + w
+    choices = [[neg(w) for w in alt.split()] for alt in expr.split("/") if alt.strip()]
+    alts = [" ".join(pick) for pick in itertools.product(*choices)]
+    if len(alts) > 8:
+        raise ValueError("can't leave out a class filter this complex: " + expr)
+    return alts
+
+
+def _exclude(step_line, expr):
+    """step_line, shown only where expr (a filter like "Priest/Mage" or "NightElf !Druid") doesn't hold."""
+    nots = _negate(expr)
+    head, sep, filt = step_line.partition(" << ")
+    comment = ""
+    if " --" in filt:
+        filt, comment = filt.split(" --", 1)
+        comment = " --" + comment
+    mine = [a.strip() for a in filt.split("/") if a.strip()] if sep else [""]
+    alts = [(m + " " + n).strip() for m in mine for n in nots]
+    return head.rstrip() + " << " + "/".join(alts) + comment
 
 
 def clean(text):
@@ -104,13 +146,21 @@ def clean(text):
 
     gone_labels = []
     last_kept = None
+    pending = None           # a removed step that a "#completewith next" pointed at: its .goto, to check
     for block in steps:
         first = _line(block[0])
         dead = first is None
+        filtered = dead          # a filter RestedXP settles at load (sod, skip): it never loads the step at all
         kept = [first]
         for ln in block[1:]:
             s = ln.strip()
             t = _tag(ln)
+            if isinstance(t, tuple):
+                # a tag for some classes only ("#season 2 << Priest/Mage"): on Forever those classes never
+                # see the step, the rest always do -> the step's own filter leaves those classes out
+                if not dead:
+                    kept[0] = _exclude(kept[0], t[1])
+                continue
             if t == "kill":
                 dead = True
             if dead or t == "drop" or s.startswith("--") or s.startswith(".link ") or "the video below" in s:
@@ -123,19 +173,29 @@ def clean(text):
             gone_labels += re.findall(r"#label (\S+)", "\n".join(block))
             # a step before it that ends "with the next step" would now end with a different one
             # (fine when the removed step itself ended with the next one: the chain just gets shorter)
-            if (last_kept and any(l.strip() == "#completewith next" for l in last_kept)
+            if (not filtered and last_kept and any(l.strip() == "#completewith next" for l in last_kept)
                     and not any(l.strip() == "#completewith next" for l in block)):
-                raise ValueError("removed step follows a #completewith next: " + block[0])
+                # fine when the step after it is its twin at the same place (the self-found and the
+                # auction-house versions of one purchase): the reminder now ends with that one
+                pending = (block[0], _goto(block))
             continue
         def acts(ls):
             return any(l.strip() and not l.strip().startswith(("#", "--")) for l in ls)
         if acts(block[1:]) and not acts(kept[1:]):
             raise ValueError("step left with nothing to do: " + block[0])
+        if pending:
+            if not pending[1] or pending[1] != _goto(kept):
+                raise ValueError("removed step follows a #completewith next: " + pending[0])
+            pending = None
         out.extend(kept)
         last_kept = kept
 
     text = "\n".join(out)
     for label in gone_labels:
+        if re.search(r"#label " + re.escape(label) + r"\b", text):
+            continue        # a kept twin (the softcore version of a hardcore step) carries the same label
+        # a step waiting for one that never shows here (self-found only) just doesn't wait
+        text = re.sub(r"\n[ \t]*#requires " + re.escape(label) + r"[ \t]*(?=\n)", "", text)
         if re.search(r"\b" + re.escape(label) + r"\b", text):
             raise ValueError("removed step's label is still used: " + label)
     text = re.sub(r"\n{3,}", "\n\n", text)
