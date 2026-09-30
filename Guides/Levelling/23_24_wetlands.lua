@@ -13,10 +13,10 @@ YR:ShipGuide("23_24_wetlands", [[
 #xprate <1.5
 
 step << !Human
-    .goto 1453,66.4,62.1
+    .goto 1453,71.053,72.488
     .fp Stormwind >> Learn the Stormwind Flight Path
 step << Rogue
-	.goto 1453,78.3,57.0
+	.goto 1453,80.260,68.541
     .train 1804>>Make sure to train lockpicking
 step << Hunter/Warrior/Paladin/Shaman/Rogue
 	.goto 1455,61.34,89.25

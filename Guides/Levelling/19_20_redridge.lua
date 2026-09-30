@@ -1013,7 +1013,7 @@ step << Rogue
     #completewith next
     .subzone 97 >> Travel to Alther's Mill
 step << Rogue
-    .goto 1433,51.846,45.116
+    .goto 1433,46.760,45.116
     >>|cRXP_WARN_You MUST do this for your|r |T132290:0|t[Poisons] |cRXP_WARN_quest later|r
     >>|cRXP_WARN_Stand on the waypoint location. Position your camera and cursor until you can click 3 |cRXP_PICK_Practice Lockboxes|r at once without having to move anything|r
     .skill lockpicking,80 >>|cRXP_WARN_Open the |cRXP_PICK_Practice Lockboxes|r on the ground in Alther's Mill until your|r |T136058:0|t[Lockpicking] skill is 80|r
@@ -1491,14 +1491,14 @@ step << !Dwarf Rogue
     #optional
     #requires AntiVenomEnd
     #completewith FirstAidEnd
-    .goto 1453,42.938,33.878,20,0
-    .goto 1453,41.544,31.330,20,0
-    .goto 1453,41.688,28.049,20,0
-    .goto 1453,43.070,26.155,15 >> Travel toward |cRXP_FRIENDLY_Shaina Fuller|r
+    .goto 1453,52.901,50.649,20,0
+    .goto 1453,51.822,48.677,20,0
+    .goto 1453,51.934,46.138,20,0
+    .goto 1453,53.003,44.673,15 >> Travel toward |cRXP_FRIENDLY_Shaina Fuller|r
     .aura -9991
 step << !Dwarf Rogue
     #requires AntiVenomEnd
-    .goto 1453,43.070,26.155
+    .goto 1453,53.003,44.673
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shaina Fuller|r
     >>|cRXP_WARN_If you have a|r |T626003:0|t|cFFF48CBAPaladin|r |cRXP_WARN_or|r |T625999:0|t|cFFFF7C0ADruid|r |cRXP_WARN_friend, ask them to remove the|r |T136230:0|t[Touch of Zanzil] |cRXP_WARN_for you instead|r
     .skill firstaid,80 >> |cRXP_WARN_Level your|r |T135966:0|t[First Aid] |cRXP_WARN_to 80|r
@@ -1506,7 +1506,7 @@ step << !Dwarf Rogue
     .itemcount 6452,<1 --Anti-Venom (<1)
 step << !Dwarf Rogue
     #label FirstAidEnd
-    .goto 1453,43.070,26.155
+    .goto 1453,53.003,44.673
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shaina Fuller|r
     >>|cRXP_WARN_If you have a|r |T626003:0|t|cFFF48CBAPaladin|r |cRXP_WARN_or|r |T625999:0|t|cFFFF7C0ADruid|r |cRXP_WARN_friend, ask them to remove the|r |T136230:0|t[Touch of Zanzil] |cRXP_WARN_for you instead|r
     .train 7934 >> |cRXP_WARN_Train|r |T134437:0|t[Anti-Venom]

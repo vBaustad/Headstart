@@ -1366,11 +1366,11 @@ step << Rogue
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,74.799,53.815,15,0
-    .goto 1453,77.290,58.138,12,0
-    .goto 1453,78.466,60.034,12,0
-    .goto 1453,78.560,58.435,6,0
-    .goto 1453,75.754,60.369,12 >> Travel toward |cRXP_FRIENDLY_Renzik "The Shiv"|r and |cRXP_FRIENDLY_Master Mathias Shaw|r inside SI:7 upstairs
+    .goto 1453,77.551,66.077,15,0
+    .goto 1453,79.478,69.422,12,0
+    .goto 1453,80.388,70.889,12,0
+    .goto 1453,80.461,69.652,6,0
+    .goto 1453,78.290,71.148,12 >> Travel toward |cRXP_FRIENDLY_Renzik "The Shiv"|r and |cRXP_FRIENDLY_Master Mathias Shaw|r inside SI:7 upstairs
     .dungeon !DM
 step << Rogue
     #xprate >1.59
@@ -1555,10 +1555,10 @@ step << Rogue
     .mob Redridge Basher
 step << Rogue
     #xprate >1.59
-    .goto 1433,51.846,45.116,100 >> Head toward Alther's Mill
+    .goto 1433,46.760,45.116,100 >> Head toward Alther's Mill
 step << Rogue
     #xprate >1.59
-    .goto 1433,51.846,45.116
+    .goto 1433,46.760,45.116
     >>|cRXP_WARN_You MUST do this for your|r |T132290:0|t[Poisons] |cRXP_WARN_quest later|r
     >>|cRXP_WARN_Stand on the waypoint location. Position your camera and cursor until you can click 3 |cRXP_PICK_Practice Lockboxes|r at once without having to move anything|r
     .skill lockpicking,80 >>|cRXP_WARN_Open the |cRXP_PICK_Practice Lockboxes|r on the ground in Alther's Mill until your|r |T136058:0|t[Lockpicking] skill is 80|r
@@ -1753,16 +1753,16 @@ step << !Dwarf Rogue
     #optional
     #requires AntiVenomEnd
     #completewith FirstAidEnd
-    .goto 1453,42.938,33.878,20,0
-    .goto 1453,41.544,31.330,20,0
-    .goto 1453,41.688,28.049,20,0
-    .goto 1453,43.070,26.155,15 >> Travel toward |cRXP_FRIENDLY_Shaina Fuller|r
+    .goto 1453,52.901,50.649,20,0
+    .goto 1453,51.822,48.677,20,0
+    .goto 1453,51.934,46.138,20,0
+    .goto 1453,53.003,44.673,15 >> Travel toward |cRXP_FRIENDLY_Shaina Fuller|r
     .aura -9991
     .dungeon !DM
 step << !Dwarf Rogue
     #xprate >1.59
     #requires AntiVenomEnd
-    .goto 1453,43.070,26.155
+    .goto 1453,53.003,44.673
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shaina Fuller|r
     >>|cRXP_WARN_If you have a|r |T626003:0|t|cFFF48CBAPaladin|r |cRXP_WARN_or|r |T625999:0|t|cFFFF7C0ADruid|r |cRXP_WARN_friend, ask them to remove the|r |T136230:0|t[Touch of Zanzil] |cRXP_WARN_for you instead|r
     .skill firstaid,80 >> |cRXP_WARN_Level your|r |T135966:0|t[First Aid] |cRXP_WARN_to 80|r
@@ -1772,7 +1772,7 @@ step << !Dwarf Rogue
 step << !Dwarf Rogue
     #xprate >1.59
     #label FirstAidEnd
-    .goto 1453,43.070,26.155
+    .goto 1453,53.003,44.673
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shaina Fuller|r
     >>|cRXP_WARN_If you have a|r |T626003:0|t|cFFF48CBAPaladin|r |cRXP_WARN_or|r |T625999:0|t|cFFFF7C0ADruid|r |cRXP_WARN_friend, ask them to remove the|r |T136230:0|t[Touch of Zanzil] |cRXP_WARN_for you instead|r
     .train 7934 >> |cRXP_WARN_Train|r |T134437:0|t[Anti-Venom]
@@ -1918,16 +1918,16 @@ step << Mage
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,38.589,81.879,20,0
-    .goto 1453,37.278,81.918,12,0
-    .goto 1453,36.715,80.265,12,0
-    .goto 1453,37.267,78.871,12,0
-    .goto 1453,38.051,78.664,12,0
-    .goto 1453,38.562,79.269,12,0
-    .goto 1453,38.324,80.965,12,0
-    .goto 1453,37.550,81.405,8,0
-    .goto 1453,38.035,81.729,6,0
-    .goto 1453,37.550,82.500,10,0
+    .goto 1453,49.536,87.793,20,0
+    .goto 1453,48.522,87.824,12,0
+    .goto 1453,48.086,86.544,12,0
+    .goto 1453,48.513,85.466,12,0
+    .goto 1453,49.120,85.306,12,0
+    .goto 1453,49.515,85.774,12,0
+    .goto 1453,49.331,87.086,12,0
+    .goto 1453,48.732,87.427,8,0
+    .goto 1453,49.107,87.677,6,0
+    .goto 1453,48.732,88.274,10,0
     >>Ascend the Mage Tower. Go through the Green Portal
     .goto 1453/0,847.55,-8991.79,15 >>Travel toward |cRXP_FRIENDLY_Larimaine Purdue|r
     .dungeon !DM
@@ -1959,8 +1959,8 @@ step << NightElf Rogue
     #xprate >1.59
     #optional
     #completewith NEWarRogNoDMIFPP
-    .goto 1453,60.972,11.690,30,0
-    .goto 1453,65.933,5.771
+    .goto 1453,66.853,33.479,30,0
+    .goto 1453,70.691,28.899
     .subzone 2257 >>Enter the Deeprun Tram
     .zoneskip Darkshore
     .zoneskip Teldrassil
@@ -2777,7 +2777,7 @@ step
 step << Hunter
     #sticky
     #label DMPetTrain
-    .goto 1453,61.576,15.998
+    .goto 1453,67.321,36.813
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Karrina Mekenda|r inside
     .trainer 2879 >> Train your pet spells
     .target Karrina Mekenda
@@ -2847,11 +2847,11 @@ step << Rogue
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,74.799,53.815,15,0
-    .goto 1453,77.290,58.138,12,0
-    .goto 1453,78.466,60.034,12,0
-    .goto 1453,78.560,58.435,6,0
-    .goto 1453,75.754,60.369,12 >> Travel toward |cRXP_FRIENDLY_Renzik "The Shiv"|r and |cRXP_FRIENDLY_Master Mathias Shaw|r inside SI:7 upstairs
+    .goto 1453,77.551,66.077,15,0
+    .goto 1453,79.478,69.422,12,0
+    .goto 1453,80.388,70.889,12,0
+    .goto 1453,80.461,69.652,6,0
+    .goto 1453,78.290,71.148,12 >> Travel toward |cRXP_FRIENDLY_Renzik "The Shiv"|r and |cRXP_FRIENDLY_Master Mathias Shaw|r inside SI:7 upstairs
     .dungeon DM
 step << Rogue
     #xprate >1.59
@@ -2867,13 +2867,13 @@ step << Warrior
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,74.592,51.567,15,0
-    .goto 1453,78.011,47.797,15,0
-    .goto 1453,80.030,45.591,12 >> Travel toward |cRXP_FRIENDLY_Wu Shen|r inside the Command Center
+    .goto 1453,77.391,64.337,15,0
+    .goto 1453,80.036,61.420,15,0
+    .goto 1453,81.598,59.713,12 >> Travel toward |cRXP_FRIENDLY_Wu Shen|r inside the Command Center
     .dungeon DM
 step << Warrior
     #xprate >1.59
-    .goto 1453,78.673,45.791
+    .goto 1453,80.548,59.868
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Wu Shen|r inside upstairs
     .trainer >> Train your class spells
     .target Wu Shen
@@ -2919,9 +2919,9 @@ step << Paladin
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,42.917,34.221,15,0
-    .goto 1453,41.385,31.547,15,0
-    .goto 1453,39.810,29.788,15
+    .goto 1453,52.884,50.914,15,0
+    .goto 1453,51.699,48.845,15,0
+    .goto 1453,50.481,47.484,15
     .goto 1453/0,809.52,-8579.22,20 >> Travel to |cRXP_FRIENDLY_Duthorian Rall|r inside the Stormwind Cathedral
     .dungeon DM
 step << Paladin
@@ -3054,16 +3054,16 @@ step << Mage
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,38.589,81.879,20,0
-    .goto 1453,37.278,81.918,12,0
-    .goto 1453,36.715,80.265,12,0
-    .goto 1453,37.267,78.871,12,0
-    .goto 1453,38.051,78.664,12,0
-    .goto 1453,38.562,79.269,12,0
-    .goto 1453,38.324,80.965,12,0
-    .goto 1453,37.550,81.405,8,0
-    .goto 1453,38.035,81.729,6,0
-    .goto 1453,37.550,82.500,10,0
+    .goto 1453,49.536,87.793,20,0
+    .goto 1453,48.522,87.824,12,0
+    .goto 1453,48.086,86.544,12,0
+    .goto 1453,48.513,85.466,12,0
+    .goto 1453,49.120,85.306,12,0
+    .goto 1453,49.515,85.774,12,0
+    .goto 1453,49.331,87.086,12,0
+    .goto 1453,48.732,87.427,8,0
+    .goto 1453,49.107,87.677,6,0
+    .goto 1453,48.732,88.274,10,0
     >>Ascend the Mage Tower. Go through the Green Portal
     .goto 1453/0,847.55,-8991.79,15 >>Travel toward |cRXP_FRIENDLY_Larimaine Purdue|r
     .dungeon DM
@@ -3083,7 +3083,7 @@ step << !Paladin
     .dungeon DM
 step << Druid
     #xprate >1.59
-    .goto 1453,20.883,55.505
+    .goto 1453,35.837,67.385
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Sheldras Moontree|r
     .train 6756 >> Train your class spells
     .target Sheldras Moontree
@@ -3091,10 +3091,10 @@ step << Druid
 step << Hunter
     #optional
     #completewith next
-    .goto 1453,50.929,57.781,10 >>Enter The Empty Quiver inside the middle ring of the Trade District
+    .goto 1453,59.083,69.146,10 >>Enter The Empty Quiver inside the middle ring of the Trade District
     .dungeon DM
 step << Hunter
-    .goto 1453,49.962,57.638
+    .goto 1453,58.335,69.035
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Frederick Stover|r
     >>|cRXP_BUY_Buy a|r |T135489:0|t[Heavy Recurve Bow] |cRXP_BUY_and a|r |T134410:0|t[Medium Quiver] |cRXP_BUY_from him or check the Auction House for something better/cheaper|r
     .collect 3027,1 -- Heavy Recurve Bow (1)
@@ -3223,7 +3223,7 @@ step << Rogue
     .dungeon DM
 step << Rogue
     #xprate >1.59
-    .goto 1433,51.846,45.116
+    .goto 1433,46.760,45.116
     >>|cRXP_WARN_You MUST do this for your|r |T132290:0|t[Poisons] |cRXP_WARN_quest later|r
     >>|cRXP_WARN_Stand on the waypoint location. Position your camera and cursor until you can click 3 |cRXP_PICK_Practice Lockboxes|r at once without having to move anything|r
     .skill lockpicking,80 >>|cRXP_WARN_Open the |cRXP_PICK_Practice Lockboxes|r on the ground in Alther's Mill until your|r |T136058:0|t[Lockpicking] skill is 80|r
@@ -3391,16 +3391,16 @@ step << !Dwarf Rogue
     #optional
     #requires AntiVenomEnd
     #completewith FirstAidEnd
-    .goto 1453,42.938,33.878,20,0
-    .goto 1453,41.544,31.330,20,0
-    .goto 1453,41.688,28.049,20,0
-    .goto 1453,43.070,26.155,15 >> Travel toward |cRXP_FRIENDLY_Shaina Fuller|r
+    .goto 1453,52.901,50.649,20,0
+    .goto 1453,51.822,48.677,20,0
+    .goto 1453,51.934,46.138,20,0
+    .goto 1453,53.003,44.673,15 >> Travel toward |cRXP_FRIENDLY_Shaina Fuller|r
     .aura -9991
     .dungeon DM
 step << !Dwarf Rogue
     #xprate >1.59
     #requires AntiVenomEnd
-    .goto 1453,43.070,26.155
+    .goto 1453,53.003,44.673
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shaina Fuller|r
     >>|cRXP_WARN_If you have a|r |T626003:0|t|cFFF48CBAPaladin|r |cRXP_WARN_or|r |T625999:0|t|cFFFF7C0ADruid|r |cRXP_WARN_friend, ask them to remove the|r |T136230:0|t[Touch of Zanzil] |cRXP_WARN_for you instead|r
     .skill firstaid,80 >> |cRXP_WARN_Level your|r |T135966:0|t[First Aid] |cRXP_WARN_to 80|r
@@ -3410,7 +3410,7 @@ step << !Dwarf Rogue
 step << !Dwarf Rogue
     #xprate >1.59
     #label FirstAidEnd
-    .goto 1453,43.070,26.155
+    .goto 1453,53.003,44.673
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shaina Fuller|r
     >>|cRXP_WARN_If you have a|r |T626003:0|t|cFFF48CBAPaladin|r |cRXP_WARN_or|r |T625999:0|t|cFFFF7C0ADruid|r |cRXP_WARN_friend, ask them to remove the|r |T136230:0|t[Touch of Zanzil] |cRXP_WARN_for you instead|r
     .train 7934 >> |cRXP_WARN_Train|r |T134437:0|t[Anti-Venom]
@@ -3856,7 +3856,7 @@ step << Mage
 step << Mage
     #xprate >1.59
     #optional
-    .goto 1453,36.863,81.132
+    .goto 1453,48.201,87.215
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Elsharin|r
     .train 2138 >> Train your class spells
     .target Elsharin
@@ -3893,9 +3893,9 @@ step << Paladin
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,42.917,34.221,15,0
-    .goto 1453,41.385,31.547,15,0
-    .goto 1453,39.810,29.788,15
+    .goto 1453,52.884,50.914,15,0
+    .goto 1453,51.699,48.845,15,0
+    .goto 1453,50.481,47.484,15
     .goto 1453/0,809.52,-8579.22,20 >> Travel to |cRXP_FRIENDLY_Duthorian Rall|r inside the Stormwind Cathedral
     .xp <22,1
     .dungeon DM
@@ -3949,15 +3949,15 @@ step << Warrior
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,74.592,51.567,15,0
-    .goto 1453,78.011,47.797,15,0
-    .goto 1453,80.030,45.591,12 >> Travel toward |cRXP_FRIENDLY_Wu Shen|r inside the Command Center
+    .goto 1453,77.391,64.337,15,0
+    .goto 1453,80.036,61.420,15,0
+    .goto 1453,81.598,59.713,12 >> Travel toward |cRXP_FRIENDLY_Wu Shen|r inside the Command Center
     .xp <22,1
     .dungeon DM
 step << Warrior
     #xprate >1.59
     #optional
-    .goto 1453,78.673,45.791
+    .goto 1453,80.548,59.868
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Wu Shen|r inside upstairs
     .train 6192 >> Train your class spells
     .target Wu Shen
@@ -3991,9 +3991,9 @@ step << Paladin
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,42.917,34.221,15,0
-    .goto 1453,41.385,31.547,15,0
-    .goto 1453,39.810,29.788,15
+    .goto 1453,52.884,50.914,15,0
+    .goto 1453,51.699,48.845,15,0
+    .goto 1453,50.481,47.484,15
     .goto 1453/0,809.52,-8579.22,20 >> Travel to |cRXP_FRIENDLY_Duthorian Rall|r inside the Stormwind Cathedral
     .dungeon DM
 step << Paladin
@@ -4041,14 +4041,14 @@ step << Warrior
     #xprate >1.59
     #optional
     #completewith next
-    .goto 1453,74.592,51.567,15,0
-    .goto 1453,78.011,47.797,15,0
-    .goto 1453,80.030,45.591,12 >> Travel toward |cRXP_FRIENDLY_Wu Shen|r inside the Command Center
+    .goto 1453,77.391,64.337,15,0
+    .goto 1453,80.036,61.420,15,0
+    .goto 1453,81.598,59.713,12 >> Travel toward |cRXP_FRIENDLY_Wu Shen|r inside the Command Center
     .xp <22,1
     .dungeon DM
 step << Warrior
     #xprate >1.59
-    .goto 1453,78.673,45.791
+    .goto 1453,80.548,59.868
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Wu Shen|r inside upstairs
     .train 6192 >> Train your class spells
     .target Wu Shen
@@ -4063,7 +4063,7 @@ step << Mage
 step << Mage
     #xprate >1.59
     #optional
-    .goto 1453,36.863,81.132
+    .goto 1453,48.201,87.215
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Elsharin|r atop the Tower
     .train 2138 >> Train your class spells
     .target Elsharin
@@ -4089,8 +4089,8 @@ step << NightElf
     #xprate >1.59 << !Hunter
     #optional
     #completewith NEIFFP
-    .goto 1453,60.972,11.690,30,0
-    .goto 1453,65.933,5.771
+    .goto 1453,66.853,33.479,30,0
+    .goto 1453,70.691,28.899
     .subzone 2257 >>Enter the Deeprun Tram
     .zoneskip Ironforge
     .dungeon DM

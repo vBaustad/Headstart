@@ -108,6 +108,7 @@ def build(file, home, name, ours):
         text = text.replace(old, new)
     text = clean(text)
     text = map_ids(text)       # after cleaning: TBC/Wrath lines name maps Forever doesn't have
+    text = forever_maps(text)  # Stormwind and Redridge are drawn differently on Forever
     text = insert_blocks(name, text)
     text, dropped = drop_missing(text)
     for d in dropped:
@@ -130,6 +131,33 @@ def insert_blocks(name, text):
         parts.insert(at, steps)
         text = "\n".join(parts)
     return text
+
+
+# Map bounds (world Y min/max, world X min/max) of the maps Forever draws differently from Classic,
+# from UiMapAssignment in both clients' data (research: db/forever.duckdb, era vs 1.60.1 build 70009).
+# A zone percentage written for the Classic map lands 100-200 yards off on Forever's. World
+# coordinates (".goto 1453/0,y,x") don't depend on the map and are left alone.
+CHANGED_MAPS = {
+    1453: {"classic": (36.70063, 1380.9714, -9175.205, -8278.851), "forever": (-14.584, 1722.92, -9154.17, -7995.83)},
+    1433: {"classic": (-3741.6665, -1570.8333, -10022.916, -8575), "forever": (-3852.084, -1681.25, -10022.916, -8575)},
+}
+
+
+def to_forever(mapid, px, py):
+    """A Classic-map percentage position -> the same spot as a Forever-map percentage."""
+    cy0, cy1, cx0, cx1 = CHANGED_MAPS[mapid]["classic"]
+    fy0, fy1, fx0, fx1 = CHANGED_MAPS[mapid]["forever"]
+    wy = cy1 - px / 100 * (cy1 - cy0)
+    wx = cx1 - py / 100 * (cx1 - cx0)
+    return (fy1 - wy) / (fy1 - fy0) * 100, (fx1 - wx) / (fx1 - fx0) * 100
+
+
+def forever_maps(text):
+    def repl(m):
+        mapid, px, py = int(m.group(2)), float(m.group(3)), float(m.group(4))
+        fx, fy = to_forever(mapid, px, py)
+        return f".{m.group(1)} {mapid},{fx:.3f},{fy:.3f}"
+    return re.sub(r"\.(goto|waypoint) (1453|1433),(-?[\d.]+),(-?[\d.]+)", repl, text)
 
 
 _maps = None

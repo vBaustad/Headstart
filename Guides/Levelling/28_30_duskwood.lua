@@ -18,26 +18,26 @@ step
     .complete 174,1
 	.bronzetube
 step << Paladin
-    .goto 1453,40.0,29.9
+    .goto 1453,50.628,47.571
 >>Talk to |cRXP_FRIENDLY_Duthorian Rall|r
     .turnin 1652 >>Turn in The Tome of Valor
 .target Duthorian Rall
     .accept 1653 >>Accept The Test of Righteousness
 step << Paladin
-	.goto 1453,38.6,32.8
+	.goto 1453,49.544,49.815
 	.trainer >> Train your class spells
 step << Priest
-	.goto 1453,38.5,26.8
+	.goto 1453,49.467,45.172
 	.trainer >> Train your class spells
 step
-    .goto 1453,39.3,28.0
+    .goto 1453,50.086,46.100
 >>Talk to |cRXP_FRIENDLY_Bishop Farthing|r
     .turnin 269 >> Turn in Seeking Wisdom
 .target Bishop Farthing
     .accept 270 >> Accept The Doomed Fleet
 step
     .isOnQuest 322
-    .goto 1453,51.7,12.3
+    .goto 1453,59.680,33.951
 >>Talk to |cRXP_FRIENDLY_Grimand Elmore|r
     .turnin 322 >> Turn in Blessed Arm
 .target Grimand Elmore
@@ -47,20 +47,20 @@ step
 	#label MDiplomats
 	#completewith nomorekid
     .xp <28,1
-    .goto 1453,41.5,31.7
+    .goto 1453,51.788,48.964
 	>>Talk to the patrolling kid
 .target Thomas
 >>Talk to |cRXP_FRIENDLY_Thomas|r
     .accept 1274 >> Accept The Missing Diplomat
 step
-    .goto 1453,39.7,27.6
+    .goto 1453,50.396,45.791
     .turnin -293 >> Turn in Cleansing the Eye
 step
 	#label nomorekid
 	#requires MDiplomats
 	.zone Stormwind City >> Exit the Chapel
 step << Human Paladin
-    .goto 1453,39.8,30.1
+    .goto 1453,50.473,47.725
     >>Speak to Duthorian Rall and click on the Tome of Divinity provided
     .accept 1642 >>Accept The Tome of Divinity
 >>Talk to |cRXP_FRIENDLY_Duthorian Rall|r
@@ -68,11 +68,11 @@ step << Human Paladin
 .target Duthorian Rall
     .accept 1643 >>Accept The Tome of Divinity
 step << Warlock
-    .goto 1453,25.3,78.7
+    .goto 1453,39.255,85.333
 	.trainer >> Train your class spells
 step
    .isOnQuest 337
-	.goto 1453,74.1,7.6
+	.goto 1453,77.010,30.314
     .accept 337 >> Accept An Old History Book
 >>Talk to |cRXP_FRIENDLY_Milton Sheaf|r
     .turnin 337 >> Turn in An Old History Book
@@ -80,13 +80,13 @@ step
     .accept 538 >> Accept Southshore
 step
     .isOnQuest 1274
-    .goto 1453,78.1,25.1
+    .goto 1453,80.105,43.856
 >>Talk to |cRXP_FRIENDLY_Bishop DeLavey|r
     .turnin 1274 >> Turn in The Missing Diplomat
 .target Bishop DeLavey
     .accept 1241 >> Accept The Missing Diplomat
 step << Hunter
-    .goto 1453,72.8,16.1
+    .goto 1453,76.004,36.892
 .target Major Samuelson
 >>Talk to |cRXP_FRIENDLY_Major Samuelson|r
     .turnin 563 >> Turn in Reassignment
@@ -96,54 +96,54 @@ step << Human Paladin
     >>Buy 10 linen cloth at the Auction House if you don't have it already
     .collect 2589,10,1644,1
 step << Human Paladin
-    .goto 1453,56.9,61.9
+    .goto 1453,63.703,72.333
 >>Talk to |cRXP_FRIENDLY_Stephanie Turner|r
     .turnin 1643 >>Turn in The Tome of Divinity
 .target Stephanie Turner
     .accept 1644 >>Accept The Tome of Divinity
 step << Human Paladin
     #label linen
-    .goto 1453,56.9,61.9
+    .goto 1453,63.703,72.333
     .complete 1644,1
 >>Talk to |cRXP_FRIENDLY_Stephanie Turner|r
     .turnin 1644 >>Turn in The Tome of Divinity
 .target Stephanie Turner
     .accept 1780 >>Accept The Tome of Divinity
 step << Warrior
-	.goto 1453,78.6,45.8
+	.goto 1453,80.492,59.875
 	.trainer >> Go upstairs. Train your class spells
 step << Rogue
-	.goto 1453,74.6,52.8
+	.goto 1453,77.397,65.291
 	.trainer >> Train your class spells
 step
     .isOnQuest 1241
-    .goto 1453,73.1,78.3
+    .goto 1453,76.236,85.024
 >>Talk to |cRXP_FRIENDLY_Jorgen|r
     .turnin 1241 >> Turn in The Missing Diplomat
 .target Jorgen
     .accept 1242 >> Accept The Missing Diplomat
 step
     .isOnQuest 1242
-    .goto 1453,60.1,64.4
+    .goto 1453,66.179,74.268
 >>Talk to |cRXP_FRIENDLY_Elling Trias|r
     .turnin 1242 >> Turn in The Missing Diplomat
 .target Elling Trias
     .accept 1243 >> Accept The Missing Diplomat
 step << Human Paladin
-    .goto 1453,40.1,29.9
+    .goto 1453,50.705,47.571
 >>Talk to |cRXP_FRIENDLY_Duthorian Rall|r
     .turnin 1780 >>Turn in The Tome of Divinity
 .target Duthorian Rall
     .accept 1781 >>Accept The Tome of Divinity
 step << Human Paladin
-    .goto 1453,38.7,26.6
+    .goto 1453,49.622,45.017
 >>Talk to |cRXP_FRIENDLY_Gazin Tenorm|r
     .turnin 1781 >>Turn in The Tome of Divinity
 .target Gazin Tenorm
     .accept 1786 >>Accept The Tome of Divinity
 step
 	#label exit
-	.goto 1453,66.2,62.1
+	.goto 1453,70.898,72.488
     .fly Duskwood>> Fly to Duskwood
 step
     #completewith next
@@ -530,14 +530,14 @@ step << !Mage
 	.goto 1431,77.5,44.2
     .fly Stormwind>> Fly to Stormwind
 step << Shaman
-    .goto 1453,61.9,83.9
+    .goto 1453,67.571,89.357
 .target Farseer Umbrua
 >>Talk to |cRXP_FRIENDLY_Farseer Umbrua|r
     .trainer >> Train your class spells
     .xp <30,1
 step << Mage
 	>> Teleport to stormwind
-    .goto 1453,39.6,79.6
+    .goto 1453,50.318,86.030
 	.trainer >> Train your class spells
 step << Dwarf Paladin
     #sticky
@@ -546,27 +546,27 @@ step << Dwarf Paladin
     .complete 1648,1
 step
     .isOnQuest 1245
-    .goto 1453,60.1,64.4
+    .goto 1453,66.179,74.268
 >>Talk to |cRXP_FRIENDLY_Elling Trias|r
     .turnin 1245 >> Turn in The Missing Diplomat
 .target Elling Trias
     .accept 1246 >> Accept The Missing Diplomat
 step << Paladin
-	.goto 1453,38.6,32.8
+	.goto 1453,49.544,49.815
 	.trainer >> Train your class spells
 step << Priest
-	.goto 1453,38.5,26.8
+	.goto 1453,49.467,45.172
 	.trainer >> Train your class spells
 step << Warrior
     #sticky
     #completewith next
-    .goto 1453,64.1,61.2
-    .goto 1453,46.7,79.0
+    .goto 1453,69.273,71.791
+    .goto 1453,55.811,85.566
     >>Check the the AH, the flower shop at the trade district and the alchemy shop at the mage district and buy some Liferoot, you will need 8 for a quest later, skip this step if you already have it
     .collect 3357,8 --Collect Liferoot (x8)
     #xprate <1.5
 step << Warrior
-    .goto 1453,78.8,45.3
+    .goto 1453,80.646,59.488
 .target Darnath Bladesinger
 .target Wu Shen
 .target Kelv Sternhammer
@@ -578,11 +578,11 @@ step << Warrior
 	.trainer >> Train class spells
     .xp <30,1
 step << Rogue
-	.goto 1453,74.6,52.8
+	.goto 1453,77.397,65.291
 	.trainer >> Train your class spells
 step
     .isOnQuest 1246
-    .goto 1453,70.3,44.8
+    .goto 1453,74.070,59.101
     >>Beat Dashel Stonefist
 >>Talk to |cRXP_FRIENDLY_Dashel Stonefist|r
     .turnin 1246 >> Turn in The Missing Diplomat
@@ -592,33 +592,33 @@ step
     .accept 1247 >> Accept The Missing Diplomat
 step
     .isOnQuest 1247
-    .goto 1453,60.1,63.9
+    .goto 1453,66.179,73.881
 >>Talk to |cRXP_FRIENDLY_Elling Trias|r
     .turnin 1247 >> Turn in The Missing Diplomat
 .target Elling Trias
     .accept 1248 >> Accept The Missing Diplomat
 step << NightElf
     #sticky
-    .goto 1453,52.61,65.71
+    .goto 1453,60.384,75.281
     .home >> Set your hearthstone in Stormwind
 step
-    .goto 1453,39.9,81.3
+    .goto 1453,50.550,87.345
 .target Archmage Malin
 >>Talk to |cRXP_FRIENDLY_Archmage Malin|r
     .accept 690 >> Accept Malin's Request
 step
-    .goto 1453,40.6,91.7
+    .goto 1453,51.092,95.393
 .target Connor Rivers
 >>Talk to |cRXP_FRIENDLY_Connor Rivers|r
     .accept 1301 >> Accept James Hyal
 step << Warlock
-    .goto 1453,25.3,78.5
+    .goto 1453,39.255,85.179
 .target Demisette Cloyce
 >>Talk to |cRXP_FRIENDLY_Demisette Cloyce|r
     .accept 4738 >>Accept In Search of Menara Voidrender
     .xp <31,1
 step << Warlock
-    .goto 1453,25.3,78.5
+    .goto 1453,39.255,85.179
 .target Gakin the Darkbinder
 .target Lago Blackwrench
 >>Talk to |cRXP_FRIENDLY_Lago Blackwrench|r
@@ -626,18 +626,18 @@ step << Warlock
 	.trainer >> Train your class spells
 
 step << Human Paladin
-    .goto 1453,38.6,26.7
+    .goto 1453,49.544,45.094
 >>Talk to |cRXP_FRIENDLY_Gazin Tenorm|r
     .turnin 1787 >>Turn in The Tome of Divinity
 .target Gazin Tenorm
     .accept 1788 >>Accept The Tome of Divinity
 step << Human Paladin
-    .goto 1453,39.9,29.8
+    .goto 1453,50.550,47.493
 .target Duthorian Rall
 >>Talk to |cRXP_FRIENDLY_Duthorian Rall|r
     .turnin 1788 >>Turn in The Tome of Divinity
 step
-    .goto 1453,74.1,7.6
+    .goto 1453,77.010,30.314
     >>Click on the Old History Book in your bags, skip this step if you havent found it
     .accept 337 >> Accept An Old History Book
 .target Milton Sheaf
@@ -645,7 +645,7 @@ step
     .turnin 337 >> Turn in An Old History Book
     .use 2794
 step
-    .goto 1453,74.1,7.6
+    .goto 1453,77.010,30.314
 .target Milton Sheaf
 >>Talk to |cRXP_FRIENDLY_Milton Sheaf|r
     .accept 538 >> Accept Southshore

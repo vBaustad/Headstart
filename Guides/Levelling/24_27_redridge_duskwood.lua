@@ -13,19 +13,19 @@ YR:ShipGuide("24_27_redridge_duskwood", [[
 step << Warrior
     #sticky
     #completewith exit
-    .goto 1453,64.1,61.2,0
-    .goto 1453,46.7,79.0,0
+    .goto 1453,69.273,71.791,0
+    .goto 1453,55.811,85.566,0
     >>Check the the AH, the flower shop at the trade district and the alchemy shop at the mage district and buy some Liferoot, you will need 8 for a quest later, skip this step if you already have it
     .collect 3357,8 --Collect Liferoot (x8)
     #xprate <1.5
 step << Paladin
-	.goto 1453,38.6,32.8
+	.goto 1453,49.544,49.815
 	.trainer >> Train your class spells
 step << Priest
-	.goto 1453,38.5,26.8
+	.goto 1453,49.467,45.172
 	.trainer >> Train your class spells
 step << Paladin
-    .goto 1453,40.1,30.0
+    .goto 1453,50.705,47.648
     >>Speak to Duthorian Rall and right click on the Tome of Valor provided
     .accept 1649 >>Accept The Tome of Valor
 >>Talk to |cRXP_FRIENDLY_Duthorian Rall|r
@@ -33,52 +33,52 @@ step << Paladin
 .target Duthorian Rall
     .accept 1650 >>Accept The Tome of Valor
 step << Warlock
-    .goto 1453,25.3,78.7
+    .goto 1453,39.255,85.333
     .trainer >> Train your class spells
 step << Warlock
     .isOnQuest 1738
-    .goto 1453,25.3,78.7
+    .goto 1453,39.255,85.333
 >>Talk to |cRXP_FRIENDLY_Gakin the Darkbinder|r
     .turnin 1738 >>Turn in Heartswood
 .target Gakin the Darkbinder
     .accept 1739 >>Accept The Binding
 step << Warlock
     .isOnQuest 1739
-    .goto 1453,25.2,77.5
+    .goto 1453,39.177,84.405
     >>Go down into the crypt and use the quest item provided at the summoning circle
     .complete 1739,1 --Summoned Succubus (1)
 step << Warlock
     .isQuestComplete 1739
-    .goto 1453,25.4,78.7
+    .goto 1453,39.332,85.333
 .target Gakin the Darkbinder
 >>Talk to |cRXP_FRIENDLY_Gakin the Darkbinder|r
     .turnin 1739 >>Turn in The Binding
 step << Mage
-    .goto 1453,39.6,79.6
+    .goto 1453,50.318,86.030
     .train 3561>>Train Teleport: Stormwind
     .trainer >> Train your class spells
 step << Rogue
     >> Make sure you train lockpicking and pickpocketing
-	.goto 1453,74.6,52.8
+	.goto 1453,77.397,65.291
 	.trainer >> Train your class spells
 step << Warrior
-	.goto 1453,78.6,45.8
+	.goto 1453,80.492,59.875
 	.trainer >> Go upstairs. Train your class spells
 step << Hunter
-	.goto 1453,61.7,15.4
+	.goto 1453,67.416,36.350
 	.train 14323 >> Train your class spells
 step
-    .goto 1453,53.62,59.76,30,0
-    .goto 1453,55.25,7.08
+    .goto 1453,61.165,70.677,30,0
+    .goto 1453,62.426,29.912
     .vendor 5519>> Check Billibub in the Dwarven District for a Bronze Tube. Buy one if it's available
     .collect 4371,1,175,1,1
     .bronzetube
 step << Shaman
-	.goto 1453,61.9,84.0
+	.goto 1453,67.571,89.435
 	.trainer >> Train your class spells
 step << Human Paladin/Human Warlock
-	.goto 1453,62.5,62.3,30,0
-	.goto 1453,66.3,62.1
+	.goto 1453,68.035,72.643,30,0
+	.goto 1453,70.975,72.488
     .fly Redridge >> Fly to Redridge Mountains
     .zoneskip Elwynn Forest
 step << !Human
@@ -89,7 +89,7 @@ step << !Human
     .accept 94 >> Accept A Watchful Eye
 step
     #label exit
-    .goto 1433,17.4,69.6
+    .goto 1433,12.314,69.600
 	>>Talk to Guard Parker in Redridge Mountains
 .target Guard Parker
 >>Talk to |cRXP_FRIENDLY_Guard Parker|r
@@ -103,30 +103,30 @@ step
 step
 	#sticky
 	#label LakeshireFP
-	.goto 1433,30.5,59.4,-1
+	.goto 1433,25.414,59.400,-1
     .fp Redridge >> Get the Redridge Mountains flight path
 step
-    .goto 1433,30.8,60.1,-1
+    .goto 1433,25.714,60.100,-1
 .target Deputy Feldon
 >>Talk to |cRXP_FRIENDLY_Deputy Feldon|r
     .turnin 244 >> Turn in Encroaching Gnolls
 step
 	#requires LakeshireFP
-    .goto 1433,33.4,49.1
+    .goto 1433,28.314,49.100
 .target Marshal Marris
 >>Talk to |cRXP_FRIENDLY_Marshal Marris|r
     .accept 20 >> Accept Blackrock Menace
 step << !Warlock
     >> Head into the town hall
-    .goto 1433,29.6,44.3
+    .goto 1433,24.514,44.300
 .target Bailiff Conacher
 >>Talk to |cRXP_FRIENDLY_Bailiff Conacher|r
     .accept 91 >> Accept Solomon's Law
 step << Hunter
-	.goto 1433,28.8,47.3
+	.goto 1433,23.714,47.300
 	.vendor >> Restock on arrows, note you will get level 25 arrows soon.
 step
-    .goto 1433,27.723,47.381
+    .goto 1433,22.637,47.381
 .target Dockmaster Baren
 >>Talk to |cRXP_FRIENDLY_Dockmaster Baren|r
     .accept 127 >> Accept Selling Fish
@@ -134,41 +134,41 @@ step
 step
     #sticky
     #label orcs1
-    .goto 1433,61.0,43.1
+    .goto 1433,55.914,43.100
     >>Kill Blackrock orcs
     .complete 20,1 --Collect Battleworn Axe (x10)
 step
-    .goto 1433,57.3,52.4
+    .goto 1433,52.214,52.400
 	>> Kill murlocs. Loot them for their Sunfish and Fins
     .complete 127,1 --Collect Spotted Sunfish (x10)
     .collect 1468,8,150,1 --Collect Murloc Fin (x8)
 step
     #requires orcs1
-    .goto 1433,33.6,48.7
+    .goto 1433,28.514,48.700
 .target Marshal Marris
 >>Talk to |cRXP_FRIENDLY_Marshal Marris|r
     .turnin 20 >> Turn in Blackrock Menace
 step
-    .goto 1433,27.8,47.4
+    .goto 1433,22.714,47.400
 .target Dockmaster Baren
 >>Talk to |cRXP_FRIENDLY_Dockmaster Baren|r
     .turnin 127 >> Turn in Selling Fish
     .turnin 150 >> Turn in Murloc Poachers
 step
-    .goto 1433,26.7,46.5
+    .goto 1433,21.614,46.500
 	>>Click on the wanted poster outside the inn
     .accept 180 >> Accept Wanted: Lieutenant Fangore
 step
-    .goto 1433,21.858,46.329
+    .goto 1433,16.772,46.329
 .target Martie Jainrose
 >>Talk to |cRXP_FRIENDLY_Martie Jainrose|r
     .accept 34 >> Accept An Unwelcome Guest
 step
-    .goto 1433,15.7,49.4
+    .goto 1433,10.614,49.400
 	>> Kill Bellygrub and loot her for her tusk
     .complete 34,1 --Collect Bellygrub's Tusk (x1)
 step
-    .goto 1433,21.8,46.4
+    .goto 1433,16.714,46.400
 .target Martie Jainrose
 >>Talk to |cRXP_FRIENDLY_Martie Jainrose|r
     .turnin 34 >> Turn in An Unwelcome Guest
@@ -542,82 +542,82 @@ step
  .fly Redridge >> Fly to Redridge
 step
     #xprate <1.2
-    .goto 1433,31.537,57.852
+    .goto 1433,26.451,57.852
 .target Guard Howe
 >>Talk to |cRXP_FRIENDLY_Guard Howe|r
     .accept 128 >> Accept Blackrock Bounty
     .maxlevel 26 << Paladin/Hunter
 step
-    .goto 1433,33.5,49.2
+    .goto 1433,28.414,49.200
 .target Marshal Marris
 >>Talk to |cRXP_FRIENDLY_Marshal Marris|r
     .accept 19 >> Accept Tharil'zun
     .accept 115 >> Accept Shadow Magic
 step
-    .goto 1433,80.3,37.2
+    .goto 1433,75.214,37.200
 	>> Kill Fangore, and loot him for his Paw. Be careful as lots of gnolls patrol around him, he is shadow immune, and can social aggro all gnolls at any time within 40 yards.
     .complete 180,1 --Collect Fangore's Paw (x1)
 step
     .isOnQuest 94
-    .goto 1433,84.3,46.9
+    .goto 1433,79.214,46.900
     .turnin 94 >> Turn in A Watchful Eye
 step
-    .goto 1433,84.3,46.9
+    .goto 1433,79.214,46.900
     .accept 248 >> Accept Looking Further
     .isQuestTurnedIn 94
 step << !Warlock
-    .goto 1433,74.2,42.1
+    .goto 1433,69.114,42.100
 	>> Kill gnolls in the area
     .complete 91,1 --Collect Shadowhide Pendant (x10)
 step
 	#sticky
 	#label tharilzun
-    .goto 1433,69.2,59.8
+    .goto 1433,64.114,59.800
 	>> Kill Tharil'zun and loot his head.
     .complete 19,1 --Collect Tharil'zun's Head (x1)
 step
-    .goto 1433,66.6,55.4
+    .goto 1433,61.514,55.400
 	>>Kill Blackrock Shadowcasters. Loot them for Midnight Orbs
     .complete 115,1 --Collect Midnight Orb (x3)
 step
     .isOnQuest 248
-    .goto 1433,63.2,49.7
+    .goto 1433,58.114,49.700
 	>>Climb to the top of the tower
     .turnin 248 >> Turn in Looking Further
 step
-    .goto 1433,32.8,6.8
+    .goto 1433,27.714,6.800
     .complete 128,1 --Kill Blackrock Champion (x15)
     .isOnQuest 128
 step
-    .goto 1433,33.504,48.969
+    .goto 1433,28.418,48.969
 .target Marshal Marris
 >>Talk to |cRXP_FRIENDLY_Marshal Marris|r
     .turnin 19 >> Turn in Tharil'zun
 	.isQuestComplete 19
 step
-	.goto 1433,33.504,48.969
+	.goto 1433,28.418,48.969
 .target Marshal Marris
 >>Talk to |cRXP_FRIENDLY_Marshal Marris|r
     .turnin 115 >> Turn in Shadow Magic
 step << !Warlock
-    .goto 1433,29.6,44.3
+    .goto 1433,24.514,44.300
 .target Bailiff Conacher
 >>Talk to |cRXP_FRIENDLY_Bailiff Conacher|r
     .turnin 91 >> Turn in Solomon's Law
 step
-    .goto 1433,29.8,44.5
+    .goto 1433,24.714,44.500
 .target Magistrate Solomon
 >>Talk to |cRXP_FRIENDLY_Magistrate Solomon|r
     .turnin 180 >> Turn in Wanted: Lieutenant Fangore
 step
-    .goto 1433,31.6,58.0
+    .goto 1433,26.514,58.000
 .target Guard Howe
 >>Talk to |cRXP_FRIENDLY_Guard Howe|r
     .turnin 128 >> Turn in Blackrock Bounty
     .isQuestComplete 128
 step
     #completewith fpwfend
-	.goto 1433,30.5,59.3
+	.goto 1433,25.414,59.300
     .fly Westfall>> Fly to Westfall
 step
 	#sticky
@@ -704,47 +704,47 @@ step
 	.goto 1429,44.2,65.9
     .complete 70,1 --Collect An Undelivered Letter (x1)
 step << Shaman
-	.goto 1453,61.9,84.0
+	.goto 1453,67.571,89.435
 	.trainer >> Train your class spells
 step << Warrior
     .goto 1429,41.087,65.768
     .trainer >> Train your class spells
 step << Mage
-    .goto 1453,39.6,79.6
+    .goto 1453,50.318,86.030
 	>> Teleport to stormwind
 	.trainer >> Train your class spells
 step
     #xprate <1.5
-    .goto 1453,26.4,78.4
+    .goto 1453,40.106,85.101
 .target Zardeth of the Black Claw
 >>Talk to |cRXP_FRIENDLY_Zardeth of the Black Claw|r
     .accept 335 >> Accept A Noble Brew
 step << Warlock
-    .goto 1453,26.4,78.4
+    .goto 1453,40.106,85.101
 	.trainer >> Train your class spells
 step
-    .goto 1453,29.8,61.8
+    .goto 1453,42.736,72.256
 >>Talk to |cRXP_FRIENDLY_Caretaker Folsom|r
     .turnin 70 >> Turn in The Legend of Stalvan
 .target Caretaker Folsom
     .accept 72 >> Accept The Legend of Stalvan
 step
-    .goto 1453,29.6,61.7
+    .goto 1453,42.581,72.178
     .turnin 72 >> Turn in The Legend of Stalvan
     .accept 74 >> Accept The Legend of Stalvan
 step <<!Mage
-    .goto 1453,40.8,30.8
+    .goto 1453,51.247,48.267
 .target Brother Sarno
 >>Talk to |cRXP_FRIENDLY_Brother Sarno|r
     .accept 2923 >> Accept Tinkmaster Overspark
 step << Paladin
-    .goto 1453,40.0,29.9
+    .goto 1453,50.628,47.571
 >>Talk to |cRXP_FRIENDLY_Duthorian Rall|r
     .turnin 1652 >>Turn in The Tome of Valor
 .target Duthorian Rall
     .accept 1653 >>Accept The Test of Righteousness
 step
-    .goto 1453,39.3,28.0
+    .goto 1453,50.086,46.100
 >>Talk to |cRXP_FRIENDLY_Bishop Farthing|r
     .turnin 269 >> Turn in Seeking Wisdom
 .target Bishop Farthing
@@ -752,7 +752,7 @@ step
 step
     #xprate >1.3
     .xp <28,1
-    .goto 1453,41.5,31.7
+    .goto 1453,51.788,48.964
 	>>Talk to the patrolling kid
 .target Thomas
 >>Talk to |cRXP_FRIENDLY_Thomas|r
@@ -827,15 +827,15 @@ step
     .turnin 377 >> Turn in Crime and Punishment
 step << Paladin
 #xprate <1.5
-	.goto 1453,38.6,32.8
+	.goto 1453,49.544,49.815
 	.trainer >> Train your class spells
 step << Priest
 #xprate <1.5
-	.goto 1453,38.5,26.8
+	.goto 1453,49.467,45.172
 	.trainer >> Train your class spells
 step << Hunter
 #xprate <1.5
-	.goto 1453,61.7,15.4
+	.goto 1453,67.416,36.350
 	.trainer >> Train your class spells
 
 ]])
