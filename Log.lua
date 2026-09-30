@@ -7,6 +7,7 @@
 --            buy (item and count, from a vendor), learn (a spell learned from a trainer)
 --            sell (item and count, to a vendor), loot (a quest item, or one the route needs)
 --            stop / resume (the player ended the run, or carried on after all)
+--            skill (a profession or Cooking went up: name and new rank; weapon skills are left out)
 --   track  a position sample every 2 seconds: { time, map, x, y, level, XP, flags }
 --          flags: 1 in combat, 2 dead or a ghost, 4 casting or channelling (eating, crafting, hearth)
 local _, YR = ...
@@ -118,6 +119,23 @@ local function Looted(msg)
     end
 end
 
+-- "Your skill in %s has increased to %d." Only professions (the ones a player can unlearn): weapon
+-- and defense skill-ups come every few swings and say nothing about the route.
+local SKILL_UP = type(ERR_SKILL_UP_SI) == "string" and ("^" .. ERR_SKILL_UP_SI:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1")
+    :gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)") .. "$")
+
+local function Profession(name)
+    for i = 1, GetNumSkillLines and GetNumSkillLines() or 0 do
+        local skill, isHeader, _, _, _, _, _, isAbandonable = GetSkillLineInfo(i)
+        if skill == name and not isHeader then return isAbandonable end
+    end
+end
+
+local function SkillUp(msg)
+    local name, rank = msg:match(SKILL_UP)
+    if name and Profession(name) then Add("skill", nil, { name = name, rank = tonumber(rank) }) end
+end
+
 events:SetScript("OnEvent", function(_, event, a, b, c)
     if not run or run.stopped then return end
     if event == "QUEST_ACCEPTED" then
@@ -157,6 +175,8 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
         if trainerOpen then Add("learn", nil, { spell = a, name = C_Spell.GetSpellName(a) }) end
     elseif event == "CHAT_MSG_LOOT" then
         if type(a) == "string" then Looted(a) end
+    elseif event == "CHAT_MSG_SKILL" then
+        if SKILL_UP and type(a) == "string" then SkillUp(a) end
     elseif NPC_WINDOWS[event] then
         if event == "TRAINER_SHOW" then trainerOpen = true end
         Add(NPC_WINDOWS[event], nil, { npc = Npc() })
@@ -176,7 +196,7 @@ end)
 local EVENTS = { "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "QUEST_LOG_UPDATE", "PLAYER_XP_UPDATE",
     "PLAYER_LEVEL_UP", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST", "PLAYER_REGEN_DISABLED",
     "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA", "MERCHANT_SHOW", "TRAINER_SHOW", "TRAINER_CLOSED",
-    "TAXIMAP_OPENED", "CHAT_MSG_LOOT" }
+    "TAXIMAP_OPENED", "CHAT_MSG_LOOT", "CHAT_MSG_SKILL" }
 
 -- What was sold, and whether the route still needed it (Needs.lua warns about that).
 YR:WatchSells(function(item, count)

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh: a second forge stop at Tognus after handing in Frostmane Hold, to smelt and craft to Blacksmithing 20 there. A logged run had only 5 ore at the first stop and 21 by Frostmane Hold, and walked past the forge with both Camping 101 quests still open.
+- The run log records profession skill-ups (Mining, Blacksmithing, Cooking...), not weapon skills.
 - Coldridge ends with a **death skip to Kharanos**: after The Adventurer and Supplies to Tannok, go back to the trolls, grind to the XP Dun Morogh wants, and die in the cave. With The Adventurer taken, the Spirit Healer is Kharanos's (seen in a logged run; before it, you come back at Anvilmar). That saves the walk through Coldridge Pass.
 - Groups: **Blackfathom Deeps** at the Zoram Strand in 21-23 Ashenvale, about 41,000 XP on Forever. The Darnassus quests are taken at the start of the route (Hunters already have them from 19-21) and handed in on the route's Darnassus visit. Knowledge in the Deeps is taken in Ironforge with the Hall of Thanes and handed in on the way to the Wetlands.
 - Groups: the **Hall of Thanes** under Ironforge (new in Forever) in both Loch Modan routes, around level 14.

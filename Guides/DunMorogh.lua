@@ -465,7 +465,7 @@ step << Warrior/Paladin/Rogue
     .goto 1426,45.344,51.936
     >>At the forge and anvil by |cRXP_FRIENDLY_Tognus Flintfire|r: smelt all your |cRXP_LOOT_Copper Ore|r
     >>Then make |cRXP_PICK_Copper Rods|r to Blacksmithing 10, |cRXP_PICK_Rough Weightstones|r to 15, |cRXP_PICK_Copper Bracers|r to 20
-    >>|cRXP_WARN_Out of ore or stones? Skip this step and finish at the next forge|r
+    >>|cRXP_WARN_Out of ore or stones? Skip this step and it comes back after Frostmane Hold|r
     .skill blacksmithing,20
     .isOnQuest 96044
 step << Warrior/Paladin/Rogue
@@ -691,6 +691,19 @@ step
     .turnin 98323 >>Turn in Secure the Mountain
     .turnin 287 >>Turn in Frostmane Hold
     .accept 291 >>Accept The Reports
+step << Warrior/Paladin/Rogue
+    .goto 1426,45.344,51.936
+    >>At the forge and anvil by |cRXP_FRIENDLY_Tognus Flintfire|r: smelt all your |cRXP_LOOT_Copper Ore|r
+    >>Then make |cRXP_PICK_Copper Rods|r to Blacksmithing 10, |cRXP_PICK_Rough Weightstones|r to 15, |cRXP_PICK_Copper Bracers|r to 20
+    >>|cRXP_WARN_Out of ore or stones? Skip this step|r
+    .skill blacksmithing,20
+    .isOnQuest 96044
+step << Warrior/Paladin/Rogue
+    .goto 1426,45.344,51.936
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
+    .turnin 96044 >>Turn in Camping 101: Blacksmithing
+    .target Tognus Flintfire
+    .isQuestComplete 96044
 step
     #optional
     .goto 1426/0,-531.23,-5601.59

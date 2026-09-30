@@ -140,7 +140,12 @@ step << Warrior/Paladin/Rogue
 """
 i = guide.index("    .turnin 98321 >>Turn in Flintfire's Shipment")
 i = guide.index("\nstep", i) + 1
-guide = guide[:i] + CRAFT + guide[i:]
+guide = guide[:i] + CRAFT.replace("finish at the next forge", "it comes back after Frostmane Hold") + guide[i:]
+# A logged run (2026-09-30) had only 5 ore at that first stop and 21 ore and 16 stones when back in
+# Kharanos for Frostmane Hold, next to the same forge: the second chance goes there.
+i = guide.index("    .turnin 287 >>Turn in Frostmane Hold")
+i = guide.index("\nstep", i) + 1
+guide = guide[:i] + CRAFT.replace("Skip this step and finish at the next forge", "Skip this step") + guide[i:]
 
 # Camping 101: Mining goes to Yarr Hammerstone, downstairs at Steelgrill's Depot, next to Bellowfiz.
 sub("""    .turnin 320 >> Turn in Return to Bellowfiz
