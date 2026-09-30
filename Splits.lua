@@ -11,14 +11,14 @@
 --               level   total  vs best
 --   Level 8 ..   9:21   58:06   -1:12   the level in progress, live
 --   Level 7     17:37   48:45   +0:20   each level reached: its own time, time from level 1, difference
--- No background: outlined text straight on the screen.
+-- Outlined text straight on the screen by default; size, lines shown, background and position are
+-- settings (YippRouteDB.splitsStyle, YippRouteDB.splitsPos) changed from the YippRoute window.
 local _, YR = ...
 
 local TICK = 0.5
 local RATE_WINDOW = 600          -- XP/hour over the last 10 minutes of play
-local ROW_H = 16
 local FONT = "Fonts\\FRIZQT__.TTF"
-local TOP = 56                   -- the three lines above the table
+local TOP, ROW_H = 56, 16        -- set by Layout from the text size
 local key, rec, frame, last, ticker
 local synced = false             -- the server has told us this character's /played
 local lastXP, lastMax, lastLevel
@@ -26,10 +26,23 @@ local rate = {}                  -- { play seconds, XP since level 1 } every few
 
 local GREEN, RED, WHITE, GREY, BLUE = "|cff40ff40", "|cffff5050", "|cffffffff", "|cff999999", "|cff66ccff"
 
-local function Text(size)
+local STYLE_DEFAULT = { size = 14, lock = false, rate = true, ding = true, vs = true, rows = 20, bg = 0 }
+
+function YR:SplitsStyle()
+    local st = YippRouteDB.splitsStyle
+    if not st then st = {} YippRouteDB.splitsStyle = st end
+    for k, v in pairs(STYLE_DEFAULT) do if st[k] == nil then st[k] = v end end
+    return st
+end
+
+-- Every text the box draws, with its role, so a new text size reaches all of them.
+local fonts = {}
+local function Text(role)
     local fs = frame:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(FONT, size, "OUTLINE")
     fs:SetShadowOffset(1, -1)
+    fonts[#fonts + 1] = { fs = fs, role = role }
+    local size = YR:SplitsStyle().size
+    fs:SetFont(FONT, role == "top" and size + 2 or role == "head" and math.max(9, size - 3) or size, "OUTLINE")
     return fs
 end
 
@@ -88,27 +101,60 @@ local function Row(i)
     local r = frame.rows[i]
     if r then return r end
     r = {}
-    -- row 0 is the column headings; the level name hangs from its left edge, each time from its
-    -- right edge, so headings and times line up whatever their font size
-    local y = -TOP - i * ROW_H + (i == 0 and 3 or 0)
-    for c, right in ipairs({ 0, 128, 186, 244 }) do
-        local fs = Text(i == 0 and 11 or 14)
-        if c == 1 then
-            fs:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, y)
-        else
-            fs:SetJustifyH("RIGHT")
-            fs:SetPoint("TOPRIGHT", frame, "TOPLEFT", right, y)
-        end
+    for c = 1, 4 do
+        local fs = Text(i == 0 and "head" or "row")
+        if c > 1 then fs:SetJustifyH("RIGHT") end
         r[c] = fs
     end
     frame.rows[i] = r
     return r
 end
 
+-- Where everything goes for the current text size: the level name hangs from its left edge, each
+-- time from its right edge, so headings and times line up. Row 0 is the column headings.
+local function PlaceRow(i)
+    local st = YR:SplitsStyle()
+    local k = st.size / 14
+    local y = -TOP - i * ROW_H + (i == 0 and 3 or 0)
+    local r = Row(i)
+    r[1]:ClearAllPoints()
+    r[1]:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, y)
+    for c, right in ipairs({ 0, 128, 186, 244 }) do
+        if c > 1 then
+            r[c]:ClearAllPoints()
+            r[c]:SetPoint("TOPRIGHT", frame, "TOPLEFT", right * k, y)
+        end
+    end
+end
+
 local function SetRow(i, a, b, c, d)
     local r = Row(i)
+    PlaceRow(i)
     r[1]:SetText(a) r[2]:SetText(b) r[3]:SetText(c) r[4]:SetText(d)
     for _, fs in ipairs(r) do fs:Show() end
+    r[4]:SetShown(YR:SplitsStyle().vs)
+end
+
+local function Layout()
+    local st = YR:SplitsStyle()
+    for _, f in ipairs(fonts) do
+        f.fs:SetFont(FONT, f.role == "top" and st.size + 2 or f.role == "head" and math.max(9, st.size - 3) or st.size, "OUTLINE")
+    end
+    local lineH = st.size + 5
+    local y = 0
+    for _, line in ipairs({ { frame.xph, st.rate }, { frame.ding, st.ding }, { frame.time, true } }) do
+        line[1]:SetShown(line[2])
+        if line[2] then
+            line[1]:ClearAllPoints()
+            line[1]:SetPoint("TOPLEFT", 0, -y)
+            y = y + lineH
+        end
+    end
+    TOP, ROW_H = y + 6, st.size + 2
+    frame:SetWidth((st.vs and 246 or 190) * st.size / 14)
+    frame.bg:SetColorTexture(0, 0, 0, st.bg / 100)
+    frame:EnableMouse(not st.lock)
+    SetRow(0, "", GREY .. "level|r", GREY .. "total|r", GREY .. "vs best|r")
 end
 
 local function Refresh()
@@ -116,9 +162,9 @@ local function Refresh()
     local run, pb = rec, Best()
     local n = 0
     if run and not synced then
-        frame.xph:SetText(BLUE .. "Time:|r " .. GREY .. "asking the server...|r")
+        frame.xph:SetText("")
         frame.ding:SetText("")
-        frame.time:SetText("")
+        frame.time:SetText(BLUE .. "Time:|r " .. GREY .. "asking the server...|r")
     elseif run then
         local level = UnitLevel("player")
         local theirsNow = pb and pb.levels[level + 1]
@@ -140,11 +186,13 @@ local function Refresh()
         frame.time:SetText(BLUE .. "Time:|r " .. (pb and WHITE .. Clock(pb.levels[Top(pb)]) .. "|r" or "-"))
         run, pb = pb, nil
     end
-    -- every level reached, newest first
+    -- every level reached, newest first, as many as the settings say
     if run then
+        local listed, most = 0, YR:SplitsStyle().rows
         for lvl = Top(run), 2, -1 do
             local at, before = run.levels[lvl], run.levels[lvl - 1]
-            if at then
+            if at and listed < most then
+                listed = listed + 1
                 -- a level reached before the splits knew this character has a total but no own time
                 local theirs = pb and pb.levels[lvl]
                 local theirSeg = theirs and pb.levels[lvl - 1] and theirs - pb.levels[lvl - 1]
@@ -174,28 +222,66 @@ local function Tick()
     Refresh()
 end
 
+-- The position is kept as pixels from the screen's top-left corner, which the settings show and set.
+local function Place()
+    local p = YippRouteDB.splitsPos
+    frame:ClearAllPoints()
+    if p and p[1] == "TOPLEFT" then
+        frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", p[2], p[3])
+    elseif p then
+        frame:SetPoint(p[1], UIParent, p[1], p[2], p[3])     -- saved before positions were pixels
+    else
+        frame:SetPoint("TOP", 0, -120)
+    end
+end
+
+local function Remember()
+    local left, top = frame:GetLeft(), frame:GetTop()
+    if left and top then
+        YippRouteDB.splitsPos = { "TOPLEFT", floor(left + 0.5), floor(top - UIParent:GetTop() + 0.5) }
+    end
+end
+
+function YR:SplitsPosition()
+    local p = YippRouteDB.splitsPos
+    if frame and (not p or p[1] ~= "TOPLEFT") then Remember() p = YippRouteDB.splitsPos end
+    if p and p[1] == "TOPLEFT" then return { p[2], -p[3] } end
+    return { 0, 0 }
+end
+
+function YR:SetSplitsPosition(left, top)
+    local cur = YR:SplitsPosition()
+    YippRouteDB.splitsPos = { "TOPLEFT", floor(left or cur[1]), -floor(top or cur[2]) }
+    if frame then Place() end
+end
+
+function YR:ApplySplitsStyle()
+    if not frame then return end
+    Layout()
+    Refresh()
+end
+
 local function Build()
     frame = CreateFrame("Frame", "YippRouteSplitsFrame", UIParent)
     frame:SetSize(246, TOP)
     frame.rows = {}
-    local p = YippRouteDB.splitsPos
-    if p then frame:SetPoint(p[1], UIParent, p[1], p[2], p[3]) else frame:SetPoint("TOP", 0, -120) end
-    frame.xph = Text(16)
-    frame.xph:SetPoint("TOPLEFT", 0, 0)
-    frame.ding = Text(16)
-    frame.ding:SetPoint("TOPLEFT", 0, -17)
-    frame.time = Text(16)
-    frame.time:SetPoint("TOPLEFT", 0, -34)
-    SetRow(0, "", GREY .. "level|r", GREY .. "total|r", GREY .. "vs best|r")
-    frame:EnableMouse(true)
+    frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+    frame.bg:SetPoint("TOPLEFT", -6, 6)
+    frame.bg:SetPoint("BOTTOMRIGHT", 6, -4)
+    Place()
+    frame.xph = Text("top")
+    frame.ding = Text("top")
+    frame.time = Text("top")
     frame:SetMovable(true)
+    frame:SetClampedToScreen(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        local point, _, _, x, y = self:GetPoint()
-        YippRouteDB.splitsPos = { point, x, y }
+        Remember()
+        YR:RefreshWindow()
     end)
+    Layout()
 end
 
 function YR:ShowSplits(on)

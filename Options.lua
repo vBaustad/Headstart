@@ -15,7 +15,7 @@ function YR:BuildOptions()
     local open = S.Button(panel, "Open YippRoute", function()
         if SettingsPanel then HideUIPanel(SettingsPanel) end
         YR:ToggleWindow("settings")
-    end, true)
+    end, "primary")
     open:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -14)
     local category = Settings.RegisterCanvasLayoutCategory(panel, "YippRoute")
     Settings.RegisterAddOnCategory(category)
