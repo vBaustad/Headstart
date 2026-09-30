@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Dun Morogh: **Never Saddle on Quality** (new in Forever, 625 XP). Taken from Rudra Amberstill with Protecting the Herd, the 6 Pristine Leopard Pelts collected while doing the Gol'Bolar Quarry quests (the Elder Snow Leopards live there), handed in after the Stolen Blasting Powder.
 - Dun Morogh: the death skip after Brewnall no longer vanishes. It ended with the step after it, which was taking The Reports from Senir, and Headstart already has you take that when handing in Frostmane Hold: already done, it took the death skip with it and the route said to walk. That step is gone; the death skip now ends at Return to Bellowfiz. A new check keeps every route's death skips from being followed by a step already done.
 - 11-12 Elwynn (Dwarf/Gnome): Warlocks now hand in Wanted: "Hogger" to Marshal Dughan (RestedXP kills him but had the hand-in switched off).
 - Dun Morogh: **Frosthowl** (new in Forever, 775 XP and 3s). Taken from Gretta Ganter on the first Brewnall visit, Frosthowl killed at the back of the Grizzled Den on the way to Shimmer Ridge (the route passes right above the den), handed in with The Perfect Stout.

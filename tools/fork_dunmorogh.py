@@ -186,6 +186,41 @@ sub("""step
     .isOnQuest 287
 """, "")
 
+# Never Saddle on Quality (95212, new in Forever: 625 XP, needs level 7): Rudra Amberstill, 6 Pristine
+# Leopard Pelts from Elder Snow Leopards east of the ranch (70-82, 50-62), where the route already
+# spends a while (Gol'Bolar Quarry, Farsen's spies, the Stolen Blasting Powder). Taken with Protecting
+# the Herd (both the Hunters' early visit and everyone else's), handed in after the last Blasting
+# Powder, a short detour west before Loch Modan. Wowhead's Forever page.
+old = """    .accept 314 >> Accept Protecting the Herd
+    .target Rudra Amberstill
+"""
+assert guide.count(old) == 2, "Rudra's two Protecting the Herd steps"
+guide = guide.replace(old, """    .accept 314 >> Accept Protecting the Herd
+    .accept 95212 >> Accept Never Saddle on Quality
+    .target Rudra Amberstill
+""")
+PELTS = """step
+    #sticky
+    #label LeopardPelts
+    >>Kill |cRXP_ENEMY_Elder Snow Leopards|r around the quarry and east of it. Loot them for |cRXP_LOOT_Pristine Leopard Pelts|r
+    .complete 95212,1 --Pristine Leopard Pelt (6)
+    .mob Elder Snow Leopard
+    .isOnQuest 95212
+"""
+i = guide.index(">>Kill |cRXP_ENEMY_Rockjaw Skullthumpers|r in or outside the mine")
+i = guide.rindex("\nstep", 0, i) + 1
+guide = guide[:i] + PELTS + guide[i:]
+RUDRA = """step
+    .goto 1426/0,-1304.71,-5513.86
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rudra Amberstill|r at the ranch
+    .turnin 95212 >> Turn in Never Saddle on Quality
+    .target Rudra Amberstill
+    .isQuestComplete 95212
+"""
+i = guide.index("    .turnin 95214 >> Turn in Stolen Blasting Powder")
+i = guide.index("\nstep", i) + 1
+guide = guide[:i] + RUDRA + guide[i:]
+
 # Frosthowl (98326, new in Forever: 775 XP, 3s, needs level 5): Gretta Ganter in Brewnall, a named
 # wendigo at the back of the Grizzled Den. Taken on the first Brewnall visit (the first den visit
 # comes before Brewnall, at level 6), killed on the way back west (the route climbs Shimmer Ridge

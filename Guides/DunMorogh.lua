@@ -792,6 +792,7 @@ step << Hunter
     .goto 1426/0,-1304.71,-5513.86
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rudra Amberstill|r
     .accept 314 >> Accept Protecting the Herd
+    .accept 95212 >> Accept Never Saddle on Quality
     .target Rudra Amberstill
 step << Hunter
     .goto 1426,62.094,47.154,40,0
@@ -1156,6 +1157,7 @@ step << !Hunter
     .goto 1426/0,-1304.71,-5513.86
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rudra Amberstill|r
     .accept 314 >> Accept Protecting the Herd
+    .accept 95212 >> Accept Never Saddle on Quality
     .target Rudra Amberstill
 step << !Hunter
     .goto 1426,62.094,47.154,40,0
@@ -1247,6 +1249,13 @@ step
     .accept 432 >> Accept Those Blasted Troggs!
     .goto 1426/0,-1600.30,-5726.590
     .target +Foreman Stonebrow
+step
+    #sticky
+    #label LeopardPelts
+    >>Kill |cRXP_ENEMY_Elder Snow Leopards|r around the quarry and east of it. Loot them for |cRXP_LOOT_Pristine Leopard Pelts|r
+    .complete 95212,1 --Pristine Leopard Pelt (6)
+    .mob Elder Snow Leopard
+    .isOnQuest 95212
 step
     #sticky
     #label Skullthumpers
@@ -1386,6 +1395,12 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Quarrymaster Thesten|r
     .turnin 95214 >> Turn in Stolen Blasting Powder
     .target Quarrymaster Thesten
+step
+    .goto 1426/0,-1304.71,-5513.86
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rudra Amberstill|r at the ranch
+    .turnin 95212 >> Turn in Never Saddle on Quality
+    .target Rudra Amberstill
+    .isQuestComplete 95212
 step
     #completewith next
     .goto 1426/0,-2165.600,-5609.000,70,0
