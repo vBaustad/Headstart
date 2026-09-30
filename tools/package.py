@@ -1,6 +1,7 @@
 """Build a zip of YippRoute to send to someone: the addon as it runs, without the tools or git.
 
-    python tools/package.py        -> releases/YippRoute-<version>.zip (next to this repo)
+    python tools/package.py        -> dist/YippRoute-<version>.zip (inside this private repo, git-ignored;
+                                      never the notes repo's releases folder, which is public)
 
 The zip holds a folder named YippRoute, so it unpacks straight into Interface/AddOns.
 """
@@ -9,11 +10,11 @@ import re
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SKIP_DIRS = {"tools", ".git", "__pycache__"}
+SKIP_DIRS = {"tools", ".git", "__pycache__", "dist"}
 SKIP_FILES = {".gitignore"}
 
 version = re.search(r"## Version: (\S+)", open(os.path.join(ROOT, "YippRoute.toc"), encoding="utf-8").read()).group(1)
-out_dir = os.path.join(os.path.dirname(ROOT), "releases")
+out_dir = os.path.join(ROOT, "dist")
 os.makedirs(out_dir, exist_ok=True)
 out = os.path.join(out_dir, f"YippRoute-{version}.zip")
 n = 0
