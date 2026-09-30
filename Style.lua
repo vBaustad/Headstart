@@ -413,6 +413,7 @@ function S.Window(name, w, h, title)
     f.subtitle:SetPoint("LEFT", f.title, "RIGHT", 12, -1)
     local close = S.IconButton(head, "close", function() f:Hide() end, "Close (Esc)", S.C.sub, 30)
     close:SetPoint("RIGHT", -10, 0)
+    f.close = close
     f:EnableMouse(true)
     f:SetMovable(true)
     head:EnableMouse(true)
