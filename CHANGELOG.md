@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Dun Morogh, Frostmane Hold: the "jump down into Frostmane Hold" step no longer shows once the cave is done (it pointed back up the mountain after a late Evershine hand-in), and the Evershine hand-in says why it comes first: the route dies in the cave to get back to Kharanos.
 - Dun Morogh: a second forge stop at Tognus after handing in Frostmane Hold, to smelt and craft to Blacksmithing 20 there. A logged run had only 5 ore at the first stop and 21 by Frostmane Hold, and walked past the forge with both Camping 101 quests still open.
 - The run log records profession skill-ups (Mining, Blacksmithing, Cooking...), not weapon skills.
 - Coldridge ends with a **death skip to Kharanos**: after The Adventurer and Supplies to Tannok, go back to the trolls, grind to the XP Dun Morogh wants, and die in the cave. With The Adventurer taken, the Spirit Healer is Kharanos's (seen in a logged run; before it, you come back at Anvilmar). That saves the walk through Coldridge Pass.

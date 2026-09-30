@@ -160,6 +160,23 @@ step << Warrior/Paladin/Rogue
     .isQuestComplete 96046
 """)
 
+# Frostmane Hold ends with a death skip from the cave to Kharanos, so A Favor for Evershine has to be
+# handed in at Brewnall first; logged runs went into the cave first and walked back. Say why at the
+# hand-in, and drop the "jump down into Frostmane Hold" step once the cave's objectives are done (it
+# showed after a late Evershine hand-in, pointing back up the mountain).
+sub("""    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rejold Barleybrew|r
+    .turnin 319 >> Turn in A Favor for Evershine
+""", """    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rejold Barleybrew|r
+    >>|cRXP_WARN_Before Frostmane Hold: you die in the cave at the end to get back to Kharanos, so hand this in first|r
+    .turnin 319 >> Turn in A Favor for Evershine
+""")
+sub("""    .goto 1426,24.682,50.836,20 >> Run up the side of the cave entrance. Jump down into Frostmane Hold
+    .isOnQuest 287
+""", """    .goto 1426,24.682,50.836,20 >> Run up the side of the cave entrance. Jump down into Frostmane Hold
+    .isOnQuest 287
+    .isQuestNotComplete 287
+""")
+
 # --- Money ----------------------------------------------------------------------------------------
 # Cooking is 270 XP for 1 silver (Camping 101: Cooking): the best copper spent in Kharanos. A logged
 # run skipped it for lack of money after class training, so it comes first now (same building), and

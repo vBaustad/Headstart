@@ -641,6 +641,7 @@ step
 step
     .goto 1426/0,315.28,-5378.39
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rejold Barleybrew|r
+    >>|cRXP_WARN_Before Frostmane Hold: you die in the cave at the end to get back to Kharanos, so hand this in first|r
     .turnin 319 >> Turn in A Favor for Evershine
     .accept 320 >> Accept Return to Bellowfiz
     .target Rejold Barleybrew
@@ -654,6 +655,7 @@ step
     .goto 1426,24.975,50.473,20,0
     .goto 1426,24.682,50.836,20 >> Run up the side of the cave entrance. Jump down into Frostmane Hold
     .isOnQuest 287
+    .isQuestNotComplete 287
 step
     #label Headhunters
     .goto 1426/0,628.400,-5579.500,20,0
