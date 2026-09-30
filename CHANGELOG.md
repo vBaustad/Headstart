@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Updates never overwrite your route edits. When a new version ships a changed route you have edited, you're told once in chat and the route gets a blue dot. **Take the update** gives you the new route with your edits on top (where we changed a step you changed too, yours is kept), **Keep mine** leaves it as it is, and **Undo the update** goes back.
+- "Back to the shipped route" now asks first, since it throws your edits away.
+
 ## 0.8.1-beta1
 
 First CurseForge build (same addon as 0.8.0).

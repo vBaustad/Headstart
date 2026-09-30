@@ -40,8 +40,38 @@ local function Renamed(text)
     return (text:gsub(OLD_GROUP, "Headstart Launch (A)"))
 end
 
+-- A new Headstart version never overwrites an edited route: RestedXP keeps getting the player's
+-- version. Each edited route remembers the shipped text it started from (base), so when an update
+-- ships a different route, the player is told and can merge: our new route with their edits on top.
+local function Sum(s)
+    local h = #s
+    for i = 1, #s, 7 do h = (h * 31 + s:byte(i)) % 2147483647 end
+    return h
+end
+
+function YR:HasUpdate(key)
+    local c, g = Custom()[key], byKey[key]
+    return c and g and c.base ~= nil and c.base ~= g.text or false
+end
+
+local function TellUpdates()
+    for _, g in ipairs(YR.shipped) do
+        local c = Custom()[g.key]
+        if YR:HasUpdate(g.key) and c.told ~= Sum(g.text) then
+            c.told = Sum(g.text)
+            YR.Print(("this version ships a new %s route. You're still on your own edited one: open /headstart,"
+                .. " Routes, to take the update with your edits kept."):format(YR.GuideName(g.key)))
+        end
+    end
+end
+
 function YR:RegisterGuides()
-    for _, c in pairs(Custom()) do c.text = Renamed(c.text) end
+    for key, c in pairs(Custom()) do
+        c.text = Renamed(c.text)
+        -- edited before routes remembered their base: take today's shipped route as it
+        if c.base == nil and byKey[key] then c.base = byKey[key].text end
+    end
+    TellUpdates()
     if UnitFactionGroup("player") == "Horde" or not (RXPGuides and RXPGuides.RegisterGuide) then return end
     for _, g in ipairs(YR.shipped) do
         local ok, err = pcall(RXPGuides.RegisterGuide, YR:GuideText(g.key))
@@ -98,11 +128,152 @@ function YR.StepSummary(step)
 end
 
 function YR:SaveCustom(key, header, steps)
-    Custom()[key] = { text = YR.JoinSteps(header, steps), saved = time() }
+    local old = Custom()[key]
+    Custom()[key] = { text = YR.JoinSteps(header, steps), saved = time(),
+        base = old and old.base or (byKey[key] and byKey[key].text) }
 end
 
 function YR:RevertGuide(key)
     Custom()[key] = nil
+end
+
+-- Which steps of a stay, in b's order: for each index of a, the index in b it matches (longest
+-- common subsequence of whole step texts), or nil where a's step is gone.
+local function Match(a, b)
+    local n, m = #a, #b
+    local L = {}
+    for i = n + 1, 1, -1 do
+        L[i] = {}
+        for j = m + 1, 1, -1 do
+            if i > n or j > m then L[i][j] = 0
+            elseif a[i] == b[j] then L[i][j] = L[i + 1][j + 1] + 1
+            else L[i][j] = math.max(L[i + 1][j], L[i][j + 1]) end
+        end
+    end
+    local map, i, j = {}, 1, 1
+    while i <= n and j <= m do
+        if a[i] == b[j] then map[i] = j i = i + 1 j = j + 1
+        elseif L[i + 1][j] >= L[i][j + 1] then i = i + 1
+        else j = j + 1 end
+    end
+    return map
+end
+
+-- What one side did to base, as hunks: base steps s .. e-1 replaced by ins (s == e: ins put in
+-- before base step s; ins empty: steps removed). In base order, never overlapping each other.
+local function Hunks(base, side)
+    local map = Match(base, side)
+    local hunks = {}
+    local i0, j0 = 0, 0
+    local function Gap(i1, j1)
+        if i1 - i0 > 1 or j1 - j0 > 1 then
+            local ins = {}
+            for j = j0 + 1, j1 - 1 do ins[#ins + 1] = side[j] end
+            hunks[#hunks + 1] = { s = i0 + 1, e = i1, ins = ins }
+        end
+    end
+    for i = 1, #base do
+        if map[i] then Gap(i, map[i]) i0, j0 = i, map[i] end
+    end
+    Gap(#base + 1, #side + 1)
+    return hunks
+end
+
+-- Whether two hunks touch the same part of base: overlapping removals, two insertions at one spot,
+-- or an insertion inside what the other removes. (Next to each other is fine.)
+local function Touch(a, b)
+    if a.s == a.e and b.s == b.e then return a.s == b.s end
+    if a.s == a.e then return b.s < a.s and a.s < b.e end
+    if b.s == b.e then return a.s < b.s and b.s < a.e end
+    return a.s < b.e and b.s < a.e
+end
+
+-- base steps s .. e-1 with one side's hunks (inside that range) applied
+local function Apply(base, hunks, s, e)
+    local out, p = {}, s
+    for _, h in ipairs(hunks) do
+        for i = p, h.s - 1 do out[#out + 1] = base[i] end
+        for _, x in ipairs(h.ins) do out[#out + 1] = x end
+        p = h.e
+    end
+    for i = p, e - 1 do out[#out + 1] = base[i] end
+    return out
+end
+
+local function Same(a, b)
+    if #a ~= #b then return false end
+    for i = 1, #a do if a[i] ~= b[i] then return false end end
+    return true
+end
+
+-- Three-way merge of step lists (like diff3): theirs (the new shipped route) with mine (the
+-- player's edits of base) applied. Changes to different parts of the route are all kept; where both
+-- changed the same part differently, the player's version of that part wins. Returns the steps and
+-- how many parts that happened in.
+function YR.MergeSteps(base, mine, theirs)
+    local all = {}
+    for _, h in ipairs(Hunks(base, mine)) do h.mine = true all[#all + 1] = h end
+    for _, h in ipairs(Hunks(base, theirs)) do all[#all + 1] = h end
+    table.sort(all, function(a, b) if a.s ~= b.s then return a.s < b.s end return a.e < b.e end)
+    local out, clashes, pos = {}, 0, 1
+    local function Put(list) for _, x in ipairs(list) do out[#out + 1] = x end end
+    local k = 1
+    while k <= #all do
+        -- a group: this hunk and every later one touching the part it has grown to
+        local g = { all[k] }
+        local gs, ge = all[k].s, all[k].e
+        k = k + 1
+        while k <= #all and Touch({ s = gs, e = ge }, all[k]) do
+            g[#g + 1] = all[k]
+            gs, ge = math.min(gs, all[k].s), math.max(ge, all[k].e)
+            k = k + 1
+        end
+        for i = pos, gs - 1 do out[#out + 1] = base[i] end
+        local m, t = {}, {}
+        for _, h in ipairs(g) do if h.mine then m[#m + 1] = h else t[#t + 1] = h end end
+        if #t == 0 then Put(Apply(base, m, gs, ge))
+        elseif #m == 0 then Put(Apply(base, t, gs, ge))
+        else
+            local rm, rt = Apply(base, m, gs, ge), Apply(base, t, gs, ge)
+            if not Same(rm, rt) then clashes = clashes + 1 end
+            Put(rm)
+        end
+        pos = ge
+    end
+    for i = pos, #base do out[#out + 1] = base[i] end
+    return out, clashes
+end
+
+-- Take the new shipped route into the player's edited one. Returns the number of clashes.
+function YR:MergeUpdate(key)
+    local c, g = Custom()[key], byKey[key]
+    if not (c and g and c.base) then return end
+    local bHead, bSteps = YR.SplitSteps(c.base)
+    local mHead, mSteps = YR.SplitSteps(c.text)
+    local tHead, tSteps = YR.SplitSteps(g.text)
+    local steps, clashes = YR.MergeSteps(bSteps, mSteps, tSteps)
+    local head = (mHead == bHead) and tHead or mHead
+    Custom()[key] = { text = YR.JoinSteps(head, steps), saved = time(), base = g.text,
+        told = c.told, before = { text = c.text, base = c.base } }
+    return clashes
+end
+
+-- Right after a merge (until the next save): back to the route as it was before it.
+function YR:CanUndoMerge(key)
+    local c = Custom()[key]
+    return c and c.before ~= nil or false
+end
+
+function YR:UndoMerge(key)
+    local c = Custom()[key]
+    if not (c and c.before) then return end
+    Custom()[key] = { text = c.before.text, base = c.before.base, saved = time(), told = c.told }
+end
+
+-- Keep the edited route as it is and stop offering this update.
+function YR:KeepMine(key)
+    local c, g = Custom()[key], byKey[key]
+    if c and g then c.base = g.text end
 end
 
 -- The guide's name as RestedXP shows it, from its header.

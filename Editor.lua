@@ -26,6 +26,17 @@ StaticPopupDialogs["HEADSTART_RELOAD"] = {
     hideOnEscape = true,
 }
 
+-- Going back to the shipped route throws the player's edits away: ask first.
+StaticPopupDialogs["HEADSTART_REVERT"] = {
+    text = "Headstart: throw away your edits to %s and use the shipped route?",
+    button1 = "Use the shipped route",
+    button2 = "Cancel",
+    OnAccept = function(_, key) YR:RevertRoute(key) end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
 local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 local CLASS_NAME = { WARRIOR = "Warrior", PALADIN = "Paladin", HUNTER = "Hunter", ROGUE = "Rogue", PRIEST = "Priest",
     SHAMAN = "Shaman", MAGE = "Mage", WARLOCK = "Warlock", DRUID = "Druid" }
@@ -714,6 +725,13 @@ local function RefreshInspector()
     end
 end
 
+function YR:RevertRoute(key)
+    YR:RevertGuide(key)
+    if edit.key == key then Open(key) end
+    YR:RefreshWindow()
+    StaticPopup_Show("HEADSTART_RELOAD")
+end
+
 local function BuildRoutes(page)
     BuildStepList(page)
     BuildInspector(page)
@@ -730,14 +748,41 @@ local function BuildRoutes(page)
     undo:SetPoint("LEFT", save, "RIGHT", 8, 0)
     undo.tip = "Back to your last saved version"
     local revert = S.Button(page, "Back to the shipped route", function()
-        YR:RevertGuide(edit.key)
-        Open(edit.key)
-        YR:RefreshWindow()
-        StaticPopup_Show("HEADSTART_RELOAD")
+        if not YR:IsCustom(edit.key) then return end
+        local dialog = StaticPopup_Show("HEADSTART_REVERT", YR.GuideName(edit.key))
+        if dialog then dialog.data = edit.key end
     end, nil, 190)
     revert:SetPoint("LEFT", undo, "RIGHT", 8, 0)
     ui.state = S.Text(page, 12, S.C.muted)
     ui.state:SetPoint("LEFT", revert, "RIGHT", 16, 0)
+
+    -- A newer Headstart shipped a different version of this route than the one the edits started
+    -- from: take it with the edits kept, or keep the route as it is. Right after taking it, undo.
+    local function Merged(clashes)
+        Open(edit.key)
+        YR:RefreshWindow()
+        YR.Print(clashes and clashes > 0
+            and ("update taken. In %d place(s) we changed a step you had changed too: yours was kept."):format(clashes)
+            or "update taken, with all your edits kept.")
+        StaticPopup_Show("HEADSTART_RELOAD")
+    end
+    ui.take = S.Button(page, "Take the update", function() Merged(YR:MergeUpdate(edit.key)) end, "primary", 140)
+    ui.take:SetPoint("LEFT", revert, "RIGHT", 16, 0)
+    ui.take.tip = "This version of Headstart ships a newer route. Take it, with your own edits applied on top"
+    ui.keep = S.Button(page, "Keep mine", function()
+        YR:KeepMine(edit.key)
+        YR:RefreshWindow()
+    end, "ghost", 96)
+    ui.keep:SetPoint("LEFT", ui.take, "RIGHT", 6, 0)
+    ui.keep.tip = "Stay on your route as it is and stop offering this update"
+    ui.undoMerge = S.Button(page, "Undo the update", function()
+        YR:UndoMerge(edit.key)
+        Open(edit.key)
+        YR:RefreshWindow()
+        StaticPopup_Show("HEADSTART_RELOAD")
+    end, nil, 140)
+    ui.undoMerge:SetPoint("LEFT", revert, "RIGHT", 16, 0)
+    ui.undoMerge.tip = "Back to your route as it was before you took the update"
     local export = S.Button(page, "Export", function() YR:ToggleWindow("share") YR:ExportOpen() end, nil, 90)
     export:SetPoint("BOTTOMRIGHT", -16, 16)
     export.tip = "This route as text, to send to someone"
@@ -747,6 +792,15 @@ local function RefreshRoutes()
     if not edit.key then return end
     win.subtitle:SetText(YR.GuideName(edit.key))
     ui.count:SetText(("%d steps"):format(#edit.steps))
+    local update = YR:HasUpdate(edit.key)
+    local undoable = not update and YR:CanUndoMerge(edit.key)
+    ui.take:SetShown(update)
+    ui.keep:SetShown(update)
+    ui.take:SetEnabled(not edit.dirty)
+    ui.take.tip = edit.dirty and "Save or undo your changes first"
+        or "This version of Headstart ships a newer route. Take it, with your own edits applied on top"
+    ui.undoMerge:SetShown(undoable and not edit.dirty)
+    ui.state:SetShown(not update and not (undoable and not edit.dirty))
     ui.state:SetText(edit.dirty and "|cffffd24aUnsaved changes|r" or (YR:IsCustom(edit.key) and "Your version" or "As shipped"))
     ui.steps:ShowIndex(edit.sel)
     ui.steps:Refresh()
@@ -1334,10 +1388,15 @@ local function RouteButton(parent, key, y)
         self.bar:SetShown(on)
         self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
     end
-    function b:Mark() self.dot:SetShown(YR:IsCustom(self.key)) end
+    -- gold: your edited version; blue: edited, and a newer shipped version is waiting
+    function b:Mark()
+        self.dot:SetShown(YR:IsCustom(self.key))
+        self.dot:SetVertexColor(unpack(YR:HasUpdate(self.key) and S.C.accent or S.C.gold))
+    end
     b:SetScript("OnEnter", function(self)
         if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end
-        S.Tip(self, name .. (YR:IsCustom(self.key) and "\nYour version (edited)" or "\nAs shipped"))
+        S.Tip(self, name .. (YR:HasUpdate(self.key) and "\nYour version (edited). A newer shipped version is waiting"
+            or YR:IsCustom(self.key) and "\nYour version (edited)" or "\nAs shipped"))
     end)
     b:SetScript("OnLeave", function(self)
         if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end
