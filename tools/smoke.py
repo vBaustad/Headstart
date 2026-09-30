@@ -189,7 +189,9 @@ ITEMS = { [1] = { "INVTYPE_2HWEAPON", 2, 5, nil, 50 }, [2] = { "INVTYPE_CHEST", 
           [3] = { "INVTYPE_CHEST", 4, 2, nil, 99 }, [4] = { "", 0, 5, "Drink", 5 }, [5] = { "", 0, 5, "Food", 9 },
           [6] = { "INVTYPE_LEGS", 4, 3, nil, 40 }, [7] = { "INVTYPE_WEAPON", 2, 4, nil, 70 },
           [8] = { "INVTYPE_FINGER", 4, 0, nil, 30 },
-          [9] = { "INVTYPE_BAG", 1, 6, nil, 25 }, [10] = { "INVTYPE_BAG", 1, 2, nil, 10 } }   -- mining pack, herb bag
+          [9] = { "INVTYPE_BAG", 1, 6, nil, 25 }, [10] = { "INVTYPE_BAG", 1, 2, nil, 10 },    -- mining pack, herb bag
+          -- Rascally Rodents (Northshire): Mining for Dummies, Wild Harvest, Pelt Collecting for Beginners
+          [247840] = { "", 0, 8, nil, 12 }, [247841] = { "", 0, 8, nil, 10 }, [247846] = { "", 0, 8, nil, 10 } }
 C_Item = { GetItemInfoInstant = function(id) local i = ITEMS[id] or { "", 12, 0 } return id, "", "", i[1], 0, i[2], i[3] end,
            GetItemNameByID = function(id) return ({ [769] = "Chunk of Boar Meat", [2886] = "Crag Boar Rib" })[id] end,
            GetItemCount = function() return 3 end,
@@ -225,6 +227,7 @@ lua.execute("YippRouteDB.rewards.maxLevel = 12")
 check(g.Pick(1, 2) == 1, "the level limit is a setting")
 check(g.Pick(9, 10) is None, "a profession choice (mining pack or herb bag) is never made for you")
 check(g.Pick(2, 9) is None, "... not even next to a piece of gear")
+check(g.Pick(247840, 247841, 247846) is None, "Rascally Rodents' three profession books: you choose (it used to take Mining for Dummies)")
 lua.execute("QUEST = 201; CHOICES = { 9, 10 }")
 g.HOOKS["GetQuestReward"](2)                           # you took the herb bag by hand
 check(g.Pick(9, 10) == 2, "but the one you picked by hand for that quest is taken again")
