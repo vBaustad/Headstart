@@ -287,6 +287,32 @@ check(YR.IsCustom(YR, "coldridge") and first not in YR.GuideText(YR, "coldridge"
 YR.RevertGuide(YR, "coldridge")
 check(not YR.IsCustom(YR, "coldridge") and first in YR.GuideText(YR, "coldridge"), "revert gives back the shipped guide")
 
+# An update never overwrites an edited route: the player is told, and can take the update with
+# their edits kept, keep theirs, or undo having taken it.
+header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
+mine_first = steps[1]
+table_remove(steps, 1)
+YR.SaveCustom(YR, "coldridge", header, steps)
+edited = YR.GuideText(YR, "coldridge")
+shipped = [YR.shipped[i] for i in range(1, len(YR.shipped) + 1) if YR.shipped[i].key == "coldridge"][0]
+original = shipped.text
+check(not YR.HasUpdate(YR, "coldridge"), "no update while the shipped route is the one the edit started from")
+shipped.text = original.rstrip("\n") + "\nstep\n    .goto 1426,1,1 >> A new step we shipped\n"
+YR.RegisterGuides(YR)
+check(YR.HasUpdate(YR, "coldridge") and YR.GuideText(YR, "coldridge") == edited,
+      "after an update the edited route is still the one RestedXP gets, and the update is offered")
+check(g.YippRouteDB.custom.coldridge.told is not None, "the player is told about the update once (in chat, at login)")
+clashes = YR.MergeUpdate(YR, "coldridge")
+merged = YR.GuideText(YR, "coldridge")
+check(clashes == 0 and "A new step we shipped" in merged and mine_first not in merged and not YR.HasUpdate(YR, "coldridge"),
+      "taking the update keeps the player's edit (first step removed) and adds the new shipped step")
+YR.UndoMerge(YR, "coldridge")
+check(YR.GuideText(YR, "coldridge") == edited and YR.HasUpdate(YR, "coldridge"), "undoing the update gives back the route as it was")
+YR.KeepMine(YR, "coldridge")
+check(YR.GuideText(YR, "coldridge") == edited and not YR.HasUpdate(YR, "coldridge"), "keep mine: the route stays, the offer goes")
+shipped.text = original
+YR.RevertGuide(YR, "coldridge")
+
 # Purchases and trainer spells are logged; a spell learned away from a trainer (a level-up) is not
 run = g.YippRouteDB.runs["Tester-Realm"]
 lua.execute('''C_Item.GetItemNameByID = function() return "Mining Pick" end
