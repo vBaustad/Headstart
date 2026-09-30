@@ -96,6 +96,7 @@ function UnitIsPlayer(u) return u == "npc" and NPC_IS_PLAYER end
 ONQUEST = {}
 function GetMoney() return MONEY or 0 end
 LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_SELF = "You receive loot: %sx%d.", "You receive loot: %s."
+ERR_SKILL_UP_SI = "Your skill in %s has increased to %d."
 function GetMerchantItemLink(i) return "|cffffffff|Hitem:2901::::|h[Mining Pick]|h|r" end
 REGISTERED = {}
 RXPGuides = { RegisterGuide = function(text) table.insert(REGISTERED, text) end }
@@ -204,6 +205,18 @@ kill = [run.ev[i] for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "kill"][
 check(kill.xp == 10, f"kill XP 10: {kill.xp}")
 steps = [run.ev[i].step for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "step"]
 check(list(steps) == [7, 8], f"steps 7 then 8: {list(steps)}")
+
+# Profession skill-ups are logged (name and rank); weapon skill-ups are not.
+lua.execute('''
+SKILLS = { {"Professions", true}, {"Blacksmithing", false, 17, true}, {"Weapon Skills", true}, {"Maces", false, 12, false} }
+function GetNumSkillLines() return #SKILLS end
+function GetSkillLineInfo(i) local s = SKILLS[i] return s[1], s[2], true, s[3], 0, 0, 300, s[4] end
+''')
+n = len(run.ev)
+g.Fire("CHAT_MSG_SKILL", "Your skill in Blacksmithing has increased to 17.")
+g.Fire("CHAT_MSG_SKILL", "Your skill in Maces has increased to 12.")
+check(len(run.ev) == n + 1 and run.ev[n + 1][2] == "skill" and run.ev[n + 1].name == "Blacksmithing" and run.ev[n + 1].rank == 17,
+      "a Blacksmithing skill-up is logged with its rank, a weapon skill-up is not")
 
 # Reward choices (a paladin's default order: two-hander, mail, shield, water, food): the first kind on
 # offer; of two the more valuable; nothing listed -> the most valuable (or you, if set so); Shift or
