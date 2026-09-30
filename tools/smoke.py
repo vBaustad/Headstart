@@ -65,6 +65,8 @@ BAGS = {}
 C_Container = { UseContainerItem = function() end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end }
 MerchantFrame = { shown = false, IsShown = function(self) return self.shown end }
 DONE = {}
+ONQUEST = {}
+function GetMoney() return MONEY or 0 end
 LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_SELF = "You receive loot: %sx%d.", "You receive loot: %s."
 function GetMerchantItemLink(i) return "|cffffffff|Hitem:2901::::|h[Mining Pick]|h|r" end
 REGISTERED = {}
@@ -98,6 +100,7 @@ C_QuestLog = {
     GetSuggestedGroupSize = function() return 0 end,
     GetQuestObjectives = function(id) return id == 179 and { { text = "Tough Wolf Meat: 0/8", type = "item", numRequired = 8 } } or {} end,
     IsQuestFlaggedCompleted = function(id) return DONE[id] or false end,
+    IsOnQuest = function(id) return ONQUEST[id] or false end,
     GetNumQuestLogEntries = function() return #LOG end,
     GetInfo = function(i) return { questID = LOG[i][1], isHeader = false } end,
     IsComplete = function(id) for _, q in ipairs(LOG) do if q[1] == id then return q[2] end end return false end,
@@ -498,6 +501,14 @@ check(len(run.ev) == n, "using an item away from a vendor is not a sale")
 g.DONE[317] = True
 check(YR.RouteNeed(769) is None, "once Stocking Jetsteam is turned in, the meat is free to sell")
 g.DONE[317] = None
+check(YR.RouteNeed(2770) is None, "Copper Ore is free to sell when you're not on Camping 101: Blacksmithing")
+g.ONQUEST[96044] = True
+count, what = YR.RouteNeed(2770)
+check(count == 20 and what == "Camping 101: Blacksmithing", f"on Camping 101: Blacksmithing, the ore is kept for the skill-ups: {count} {what}")
+g.ONQUEST[96044] = None
+lua.execute("MONEY = 1234")
+g.Fire("PLAYER_LEVEL_UP", 7)
+check(run.ev[len(run.ev)].money == 1234, "every logged event carries your money, so training costs can be measured")
 # quest-item loot is logged from the chat line
 g.Fire("CHAT_MSG_LOOT", "You receive loot: |cffffffff|Hitem:2886::|h[Crag Boar Rib]|h|rx2.")
 last = run.ev[len(run.ev)]

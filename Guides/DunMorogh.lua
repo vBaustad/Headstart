@@ -73,8 +73,8 @@ step
     .target Eric Brighthammer::265813
     .turnin 96608 >>Turn in The Great Outdoors
     .accept 96629 >>Accept Camping 101: Cooking
-    .accept 96046 >>Accept Camping 101: Mining
-    .accept 96044 >>Accept Camping 101: Blacksmithing
+    .accept 96046 >>Accept Camping 101: Mining << Warrior/Paladin/Rogue
+    .accept 96044 >>Accept Camping 101: Blacksmithing << Warrior/Paladin/Rogue
 step << Warlock
     .goto 1426/0,-528.87,-5640.00
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gimrizz Shadowcog|r
@@ -102,6 +102,14 @@ step
     .turnin 2160,1 >> Turn in Supplies to Tannok << Warrior/Rogue
     .turnin 2160,2 >> Turn in Supplies to Tannok << !Warrior !Rogue
     .target Tannok Frosthammer
+step
+    .goto 1426/0,-545.800,-5594.500
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gremlock Pilsnor::1699|r
+    >>|cRXP_WARN_270 XP for 1 silver: train this before your class spells. Short of 1s? Skip it: it comes back later|r
+    .target Gremlock Pilsnor::1699
+    .train 2550 >> Train |T133971:0|t[Cooking]
+    .turnin 96629 >>Turn in Camping 101: Cooking
+    .money <0.0100
 step
     .goto 1426/0,-529.600,-5590.600
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Maxan Anvol::1226|r 
@@ -134,14 +142,6 @@ step << Shaman
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Ingrid Dunwald|r inside upstairs
     .trainer >> Train your class spells
     .target Ingrid Dunwald
-step
-    .goto 1426/0,-545.800,-5594.500
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gremlock Pilsnor::1699|r
-    >>|cRXP_WARN_Skip this step if you don't have 1 silver, or if you wish to do it later|r
-    .target Gremlock Pilsnor::1699
-    .train 2550 >> Train |T133971:0|t[Cooking]
-    .turnin 96629 >>Turn in Camping 101: Cooking
-    .money <0.0100
 step << Rogue
     .goto 1426/0,-540.39,-5604.38
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Hogral Bakkan|r inside in the backroom
@@ -302,9 +302,8 @@ step
 step << Warrior/Paladin/Rogue
     #optional
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Loslor Rudge|r
-    >>|cRXP_BUY_Buy a|r |T134708:0|t[Mining Pick]|cRXP_BUY_, an|r |T133635:0|t[Apprentice's Mining Pack] |cRXP_BUY_and a|r |T133057:0|t[Blacksmith Hammer]
+    >>|cRXP_BUY_Buy a|r |T134708:0|t[Mining Pick] |cRXP_BUY_(10c) and a|r |T133057:0|t[Blacksmith Hammer] |cRXP_BUY_(18c). The|r |T133635:0|t[Apprentice's Mining Pack] |cRXP_BUY_(25c) only if you have money left|r
     .collect 2901,1 --Mining Pick (1)
-    .collect 277115,1 --Apprentice's Mining Pack (1)
     .collect 5956,1 --Blacksmith Hammer (1)
     .goto 1426/0,-664.55,-5499.710
     .target Loslor Rudge
@@ -341,6 +340,11 @@ step
     .target Mountaineer Gretchen::271546
     .turnin 98322 >>Turn in Secure the Mountain
     .accept 98319 >>Accept Secure the Mountain
+step << Warrior/Paladin/Rogue
+    #sticky
+    #label MineCopper
+    >>Mine every |cRXP_PICK_Copper Vein|r you pass: most are around the Grizzled Den and south of Kharanos. Keep the ore and the Rough Stones
+    .skill mining,20
 step
     #label RumbleshotAmmo
     .goto 1426/0,-371.400,-5746.900
@@ -456,6 +460,25 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire::1241|r
     .target Tognus Flintfire::1241
     .turnin 98321 >>Turn in Flintfire's Shipment
+step << Warrior/Paladin/Rogue
+    .goto 1426,45.344,51.936
+    >>At the forge and anvil by |cRXP_FRIENDLY_Tognus Flintfire|r: smelt all your |cRXP_LOOT_Copper Ore|r
+    >>Then make |cRXP_PICK_Copper Rods|r to Blacksmithing 10, |cRXP_PICK_Rough Weightstones|r to 15, |cRXP_PICK_Copper Bracers|r to 20
+    >>|cRXP_WARN_Out of ore or stones? Skip this step and finish at the next forge|r
+    .skill blacksmithing,20
+    .isOnQuest 96044
+step << Warrior/Paladin/Rogue
+    .goto 1426,45.344,51.936
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
+    .turnin 96044 >>Turn in Camping 101: Blacksmithing
+    .target Tognus Flintfire
+    .isQuestComplete 96044
+step
+    .goto 1426/0,-545.800,-5594.500
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gremlock Pilsnor::1699|r in the Thunderbrew Distillery
+    .train 2550 >> Train |T133971:0|t[Cooking]
+    .turnin 96629 >>Turn in Camping 101: Cooking
+    .target Gremlock Pilsnor::1699
 step
     #optional
     .xp 7 >> Grind to 7
@@ -955,6 +978,12 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Pilot Bellowfiz|r
     .turnin 320 >> Turn in Return to Bellowfiz
     .target Pilot Bellowfiz
+step << Warrior/Paladin/Rogue
+    .goto 1426/0,-660.91,-5528.93
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Yarr Hammerstone|r inside downstairs
+    .turnin 96046 >>Turn in Camping 101: Mining
+    .target Yarr Hammerstone
+    .isQuestComplete 96046
 step << Hunter
     .goto 1426/0,-463.66,-5474.00,8,0
     .goto 1426/0,-455.83,-5497.90

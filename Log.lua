@@ -1,5 +1,5 @@
 -- The run log: what the route model can't know from data. Per character, in YippRouteDB.runs:
---   ev     each with time, level, XP and position:
+--   ev     each with time, level, XP and position, and money (copper) as .money:
 --            accept / complete / turnin (with the XP and money received)    a quest
 --            level, death, release (to the Spirit Healer as a ghost), alive (back in the body)
 --            kill (XP from anything but a quest), fight / peace (combat starts / ends)
@@ -23,6 +23,8 @@ local function Add(kind, questID, extra)
     local map, x, y = YR.Position()
     local e = { time(), kind, questID or 0, UnitLevel("player"), UnitXP("player"), map or 0, x or 0, y or 0 }
     if extra then for k, v in pairs(extra) do e[k] = v end end
+    -- money on every event: what training and vendors really cost is the difference across them
+    e.money = e.money or GetMoney()
     run.ev[#run.ev + 1] = e
 end
 
