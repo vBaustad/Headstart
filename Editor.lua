@@ -1201,9 +1201,7 @@ local function BuildSetup(page)
     Row("Your own macros", Sw("macros"))
     Row("AutoFeed's macros", Sw("autofeed"), "The AutoFeed macros on your main's bars. AutoFeed makes them on this"
         .. " character if it hasn't yet, and keeps them filled with your best food, water and potions."
-        .. (YR.Setup:AutoFeedLoaded() and "" or "
-
-AutoFeed isn't loaded right now, so these slots stay empty."))
+        .. (YR.Setup:AutoFeedLoaded() and "" or "\n\nAutoFeed isn't loaded right now, so these slots stay empty."))
     Row("Items (Hearthstone, food, potions)", Sw("items"), "Items your main has on its bars. Copy this layout again if your saved copy is older than this option")
 
     Section("Before setting up")
