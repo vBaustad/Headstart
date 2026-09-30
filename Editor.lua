@@ -942,7 +942,7 @@ local function RowPage(page, controls, bottom)
             b:SetScript("OnEnter", function() S.ShowInfo(r, label, tip) Paint(r) end)
             b:SetScript("OnLeave", function() S.HideInfo() Paint(r) end)
             b:SetScript("OnClick", function()
-                if S.IsPinned(r) then S.Unpin() else S.ShowInfo(r, label, tip, true) end
+                if S.IsPinned(r) then S.Unpin() S.ShowInfo(r, label, tip) else S.ShowInfo(r, label, tip, true) end
                 for _, o in ipairs(rows) do Paint(o) end
             end)
             r.infoBtn = b
