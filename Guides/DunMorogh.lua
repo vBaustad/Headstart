@@ -38,10 +38,11 @@ step
     >>|cRXP_WARN_Make sure your subzone is NOT Coldridge Pass|r
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
     .target Spirit Healer
-step << Warrior/Paladin/Rogue
+step
     .goto 1426,45.344,51.936
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
-    .train 2018 >> Train |T136241:0|t[Blacksmithing]
+    .train 2018 >> Train |T136241:0|t[Blacksmithing] << Warrior/Paladin/Rogue
+    .accept 98321 >>Accept Flintfire's Shipment
     .target Tognus Flintfire
 step
     .goto 1426/0,-464.45,-5573.78
@@ -55,6 +56,13 @@ step
     .turnin 96628 >>Turn in The Adventurer
     .accept 96608 >>Accept The Great Outdoors
 step
+    #label SenirEnd
+    .goto 1426/0,-501.400,-5643.900
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Senir Whitebeard::1252|r
+    .target Senir Whitebeard::1252
+    .turnin 420 >>Turn in Senir's Observations
+    .accept 98322 >>Accept Secure the Mountain
+step
     .goto 1426/0,-498.400,-5648.400
     >>|cRXP_WARN_Type "/sit" in chat and wait for one minute around the campfire|r
     .complete 96608,1 -- /sit emote in chat 1/1
@@ -67,13 +75,6 @@ step
     .accept 96629 >>Accept Camping 101: Cooking
     .accept 96046 >>Accept Camping 101: Mining
     .accept 96044 >>Accept Camping 101: Blacksmithing
-step
-    #label SenirEnd
-    .goto 1426/0,-501.400,-5643.900
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Senir Whitebeard::1252|r
-    .target Senir Whitebeard::1252
-    .turnin 420 >>Turn in Senir's Observations
-    .accept 98322 >>Accept Secure the Mountain
 step << Warlock
     .goto 1426/0,-528.87,-5640.00
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gimrizz Shadowcog|r
@@ -665,6 +666,7 @@ step
     .target Senir Whitebeard::1252
     .turnin 98323 >>Turn in Secure the Mountain
     .turnin 287 >>Turn in Frostmane Hold
+    .accept 291 >>Accept The Reports
 step
     #optional
     .goto 1426/0,-531.23,-5601.59
