@@ -348,8 +348,13 @@ lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 # a saved edit replaces the shipped text; reverting brings it back.
 names = [str(g.REGISTERED[i]).split("#name ", 1)[1].splitlines()[0] for i in range(1, len(g.REGISTERED) + 1)]
 solo = [n_ for n_ in names if "(Duo" not in n_ and "(Trio" not in n_]
-check(len(solo) == 21 and "1-6 Northshire (Launch) (Duo B)" in names and "1-6 Shadowglen (Launch) (Trio C)" in names,
-      f"21 routes registered with RestedXP (starting zones and 6-30), plus Duo and Trio versions where a pick-up is worth splitting: {len(solo)} + {len(names) - len(solo)}")
+check(len(solo) == 21 and len(names) == 21, f"21 routes registered with RestedXP (starting zones and 6-30), solo only while playing solo: {len(names)}")
+lua.execute("YippSetupCharDB = YippSetupCharDB or {}")
+YR.SetRole(YR, "Duo B")
+names = [str(g.REGISTERED[i]).split("#name ", 1)[1].splitlines()[0] for i in range(1, len(g.REGISTERED) + 1)]
+check("1-6 Northshire (Launch) (Duo B)" in names and "16-19 Darkshore (Duo B)" in names and not any("Trio" in n_ or "Duo A" in n_ for n_ in names),
+      f"picking Duo B registers that role's versions only: {len(names) - 21} of them")
+YR.SetRole(YR, "solo")
 dwarf = YR.RoutesFor(YR, "Dwarf")
 check(dwarf["coldridge"] and dwarf["dunmorogh"] and dwarf["16_19_darkshore"] and not dwarf["6_11_elwynn_forest"] and not dwarf["northshire"],
       "a Dwarf's routes: Coldridge on through Darkshore, not Human Elwynn or Northshire")
@@ -566,6 +571,22 @@ check("Accept Everyone" in solo and "Alone only" in solo and "Runner only" not i
 check("#name 1-5 Test (Launch) (Duo A)" in a_ and "Runner only" in a_ and "Killer only" not in a_ and "Alone only" not in a_
       and "#role" not in a_, "Duo A: its own steps and everyone's, named (Duo A)")
 check("5-11 Next (Launch) (Duo B)" in b_, "Duo B hands over to the next route's Duo B")
+dm = """#name 19-20 Dungeon Test
+step
+    .accept 10 >> Accept Everyone
+step
+    .accept 11 >> Accept Deadmines quest
+    .dungeon DM
+step
+    .accept 12 >> Accept Without the dungeon
+    .dungeon !DM
+"""
+vs = YR.RoleVersions(dm)
+solo, duo = vs[1], vs[2]
+check(len(vs) == 6 and "Deadmines quest" in duo and ".dungeon" not in duo and "Without the dungeon" not in duo,
+      "a route with dungeon steps gets group versions: the dungeon steps always show there, their no-dungeon versions go")
+check("Deadmines quest" in solo and "Without the dungeon" in solo and ".dungeon DM" in solo,
+      "alone, RestedXP's own dungeon setting still decides")
 
 # sharing and accepting
 lua.execute('''C_QuestLog.SetSelectedQuest = function(id) SELECTED_QUEST = id end
