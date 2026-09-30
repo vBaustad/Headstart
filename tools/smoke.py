@@ -33,7 +33,8 @@ function Frame:UnregisterAllEvents() self.ev = {} end
 function Frame:RegisterUnitEvent(e) self.ev[e] = true end
 function CreateFrame(_, name) local f = setmetatable({ ev = {} }, Frame) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 function Fire(event, ...) for _, f in ipairs(FRAMES) do if f.ev[event] and f.fn then f.fn(f, event, ...) end end end
-C_Timer = { NewTicker = function(_, fn) local t = { fn = fn, Cancel = function(self) self.dead = true end } table.insert(TICKERS, t) return t end }
+C_Timer = { NewTicker = function(_, fn) local t = { fn = fn, Cancel = function(self) self.dead = true end } table.insert(TICKERS, t) return t end,
+            After = function() end }   -- until the tests make it run at once (below)
 function RunTickers() for _, t in ipairs(TICKERS) do if not t.dead then t.fn() end end end
 function GetTime() return NOW end
 function time() return CLOCK end
@@ -65,6 +66,33 @@ BAGS = {}
 C_Container = { UseContainerItem = function() end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end }
 MerchantFrame = { shown = false, IsShown = function(self) return self.shown end }
 DONE = {}
+-- the party: SENT collects addon messages; IN_GROUP / PARTY_NAMES say who is in it
+SENT = {}
+IN_GROUP = false
+PARTY_NAMES = {}
+C_ChatInfo = { RegisterAddonMessagePrefix = function() return true end,
+               SendAddonMessage = function(prefix, msg, channel) table.insert(SENT, { prefix, msg, channel }) end }
+function IsInGroup() return IN_GROUP end
+function UnitInParty(n) return PARTY_NAMES[n] or false end
+function UnitInRaid() return false end
+function Ambiguate(n) return n end
+function strsplit(sep, s)
+    local out, i = {}, 1
+    while true do
+        local j = s:find(sep, i, true)
+        if not j then out[#out + 1] = s:sub(i) break end
+        out[#out + 1] = s:sub(i, j - 1)
+        i = j + 1
+    end
+    return unpack(out)
+end
+function strtrim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
+PUSHED = {}
+function QuestLogPushQuest() table.insert(PUSHED, SELECTED_QUEST) end
+ACCEPTED_OFFER = 0
+function AcceptQuest() ACCEPTED_OFFER = ACCEPTED_OFFER + 1 end
+NPC_IS_PLAYER = false
+function UnitIsPlayer(u) return u == "npc" and NPC_IS_PLAYER end
 ONQUEST = {}
 function GetMoney() return MONEY or 0 end
 LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_SELF = "You receive loot: %sx%d.", "You receive loot: %s."
@@ -318,7 +346,10 @@ lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 
 # Shipped guides: both handed to RestedXP at login; a guide splits into steps and joins back unchanged;
 # a saved edit replaces the shipped text; reverting brings it back.
-check(len(g.REGISTERED) == 4, f"four guides registered with RestedXP: {len(g.REGISTERED)}")
+names = [str(g.REGISTERED[i]).split("#name ", 1)[1].splitlines()[0] for i in range(1, len(g.REGISTERED) + 1)]
+solo = [n_ for n_ in names if "(Duo" not in n_ and "(Trio" not in n_]
+check(len(solo) == 4 and "1-6 Northshire (Launch) (Duo B)" in names and "1-6 Shadowglen (Launch) (Trio C)" in names,
+      f"four routes registered with RestedXP, plus Duo and Trio versions where a pick-up is worth splitting: {len(names)}")
 for key in ("coldridge", "dunmorogh", "northshire", "shadowglen"):
     text = YR.GuideText(YR, key)
     header, steps = YR.SplitSteps(text)
@@ -504,6 +535,58 @@ g.YippSetupFrame.setup.fn(g.YippSetupFrame.setup)
 said = [str(g.PRINTS[i]) for i in range(n_prints + 1, len(g.PRINTS) + 1)]
 check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is not True and g.YippSetupFrame.hidden is True
       and not any("placed" in p_ for p_ in said), "the setup window's Set up opens the Character settings instead of setting up")
+
+# Group play. A route with "#roles A,B" becomes a solo route plus one per role; steps marked
+# "#role X" are only that role's (or "#role solo": only when alone).
+text = """#name 1-5 Test (Launch)
+#group Headstart Launch (A)
+#roles A,B
+#next Headstart Launch (A)BS5-11 Next (Launch)
+step
+    .accept 1 >> Accept Everyone
+step
+    #role A
+    .accept 2 >> Accept Runner only
+step
+    #role B
+    .accept 3 >> Accept Killer only
+step
+    #role solo
+    .accept 4 >> Accept Alone only
+""".replace("BS", chr(92))
+g.GROUPTEST = YR
+lua.execute('''GROUPTEST.GroupRouteNames = { ["5-11 Next (Launch)"] = { ["Duo A"] = true, ["Duo B"] = true } }''')
+vs = YR.RoleVersions(text)
+solo, a_, b_ = vs[1], vs[2], vs[3]
+check("Accept Everyone" in solo and "Alone only" in solo and "Runner only" not in solo and "#roles" not in solo,
+      "solo route: everyone's steps and the solo ones, no role steps")
+check("#name 1-5 Test (Launch) (Duo A)" in a_ and "Runner only" in a_ and "Killer only" not in a_ and "Alone only" not in a_
+      and "#role" not in a_, "Duo A: its own steps and everyone's, named (Duo A)")
+check("5-11 Next (Launch) (Duo B)" in b_, "Duo B hands over to the next route's Duo B")
+
+# sharing and accepting
+lua.execute('''C_QuestLog.SetSelectedQuest = function(id) SELECTED_QUEST = id end
+IN_GROUP = true; PUSHED = {}; SENT = {}''')
+g.Fire("GROUP_ROSTER_UPDATE")
+check(len(g.SENT) >= 1 and str(g.SENT[1][2]).startswith("H	"), "in a group, Headstart says hello (version, role, step)")
+g.Fire("QUEST_ACCEPTED", 183)
+check(len(g.PUSHED) == 1 and g.PUSHED[1] == 183, "a route quest taken from an NPC is shared with the party")
+g.Fire("QUEST_ACCEPTED", 99999)
+check(len(g.PUSHED) == 1, "a quest that isn't on the route is not shared")
+lua.execute("NPC_IS_PLAYER = true; QUEST = 182; ACCEPTED_OFFER = 0")
+g.Fire("QUEST_DETAIL")
+check(g.ACCEPTED_OFFER == 1, "a route quest a party member shares is accepted")
+g.Fire("QUEST_ACCEPTED", 182)
+check(len(g.PUSHED) == 1, "and not shared back")
+lua.execute("QUEST = 99999; ACCEPTED_OFFER = 0")
+g.Fire("QUEST_DETAIL")
+check(g.ACCEPTED_OFFER == 0, "a shared quest that isn't on the route still asks")
+lua.execute("NPC_IS_PLAYER = false; QUEST = 200")
+n = len(g.PRINTS)
+g.Fire("CHAT_MSG_ADDON", "Headstart", "H	9.9.9	Duo B		0", "PARTY", "Friend-Realm")
+said = [str(g.PRINTS[i]) for i in range(n + 1, len(g.PRINTS) + 1)]
+check(any("has Headstart 9.9.9" in p_ for p_ in said), "a newer Headstart in the party is mentioned")
+lua.execute("IN_GROUP = false")
 
 # Keep what the route needs: 4 Chunks of Boar Meat for Stocking Jetsteam, needed from Coldridge on (before
 # the quest is even accepted) until it is turned in. Skill-up lines (.collect with flags) don't count.

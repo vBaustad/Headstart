@@ -73,9 +73,97 @@ function YR:RegisterGuides()
     end
     TellUpdates()
     if UnitFactionGroup("player") == "Horde" or not (RXPGuides and RXPGuides.RegisterGuide) then return end
+    YR:ScanGroupRoutes()
     for _, g in ipairs(YR.shipped) do
-        local ok, err = pcall(RXPGuides.RegisterGuide, YR:GuideText(g.key))
-        if not ok then YR.Print(("guide %s did not load: %s"):format(g.key, tostring(err))) end
+        for _, text in ipairs(YR.RoleVersions(YR:GuideText(g.key))) do
+            local ok, err = pcall(RXPGuides.RegisterGuide, text)
+            if not ok then YR.Print(("guide %s did not load: %s"):format(g.key, tostring(err))) end
+        end
+    end
+end
+
+-- Group routes. Two marks in a step:
+--   "#share N"  the Nth pick-up of quests the party can share, off the others' path (marked by
+--               tools/share_split.py): one member takes it and shares it, the others skip the walk.
+--               Pick-ups go round the group: a duo's A takes 1, 3, 5..., B 2, 4, 6...; a trio's A, B, C
+--               take turns.
+--   "#role X"   (or "#role A,B", or "#role solo") only that role does the step, or only a player alone.
+-- Steps without a mark are everyone's. A route with #share marks gets Duo A/B and Trio A/B/C versions;
+-- "#roles A,B" or "#roles A,B,C" in the header limits it to that group size. RestedXP gets one route
+-- per role, "... (Duo A)" and so on, plus the solo route under the route's own name. Their #next points
+-- to the same role's version of the next route where there is one.
+local LETTERS = { "A", "B", "C" }
+
+local function HasRole(step, role, size)
+    local n = tonumber(step:match("\n%s*#share%s+(%d+)"))
+    if n and size then return LETTERS[(n - 1) % size + 1] == role end
+    local roles = step:match("\n%s*#role%s+([%w,]+)")
+    if not roles then return true end
+    for r in roles:gmatch("[^,]+") do if r == role then return true end end
+    return false
+end
+
+-- The group sizes a route has versions for: { 2, 3 }, { 2 }, { 3 } or none.
+local function Sizes(text)
+    local roles = text:match("\n#roles%s+([%w,]+)")
+    if roles then return { select(2, roles:gsub("[^,]+", "")) } end
+    if text:find("\n%s*#share%s+%d") then return { 2, 3 } end
+    return {}
+end
+
+local function Variant(text, role, suffix, size)
+    local header, steps = YR.SplitSteps(text)
+    local kept = {}
+    for _, step in ipairs(steps) do
+        if HasRole(step, role, size) then
+            kept[#kept + 1] = (step:gsub("\n%s*#role%s+[%w,]+", ""):gsub("\n%s*#share%s+%d+", ""))
+        end
+    end
+    header = ("\n" .. header):gsub("\n#roles[^\n]*", "")   -- a leading newline, so line 1 matches like the rest
+    if suffix then
+        header = header:gsub("\n#name ([^\n]+)", function(n) return "\n#name " .. n .. " (" .. suffix .. ")" end, 1)
+        -- the next route, as this role, when it is one of ours with the same roles
+        header = header:gsub("\n#next ([^\n]+)", function(list)
+            local out = {}
+            for entry in list:gmatch("[^;]+") do
+                local group, name = entry:match("^(.-)\\(.+)$")
+                local ours = group == "Headstart Launch (A)" and YR.GroupRouteNames and YR.GroupRouteNames[name]
+                out[#out + 1] = (ours and ours[suffix]) and (entry .. " (" .. suffix .. ")") or entry
+            end
+            return "\n#next " .. table.concat(out, ";")
+        end, 1)
+    end
+    return YR.JoinSteps(header:sub(2), kept)
+end
+
+-- The texts to register for one route: solo first, then one per role.
+function YR.RoleVersions(text)
+    text = text or ""
+    local out = { Variant(text, "solo") }
+    for _, size in ipairs(Sizes("\n" .. text)) do
+        local label = size == 2 and "Duo" or "Trio"
+        for i = 1, size do
+            out[#out + 1] = Variant(text, LETTERS[i], label .. " " .. LETTERS[i], size)
+        end
+    end
+    return out
+end
+
+-- Which of our routes have group versions, by name: { [name] = { ["Duo A"] = true, ... } }, so a
+-- role's route can hand over to the same role's next route.
+function YR:ScanGroupRoutes()
+    YR.GroupRouteNames = {}
+    for _, g in ipairs(YR.shipped) do
+        local text = "\n" .. (YR:GuideText(g.key) or "")
+        local name = text:match("\n#name ([^\n]+)")
+        local sizes = Sizes(text)
+        if name and #sizes > 0 then
+            local set = {}
+            for _, size in ipairs(sizes) do
+                for i = 1, size do set[(size == 2 and "Duo " or "Trio ") .. LETTERS[i]] = true end
+            end
+            YR.GroupRouteNames[name] = set
+        end
     end
 end
 

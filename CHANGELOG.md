@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Group play (duo and trio).** In a party, a route quest you take from an NPC is shared straight away (on Forever, from any distance), and one a party member shares is accepted for you. Only route quests; anything else still asks, and holding Shift asks anyway. Headstarts in a party see each other's role and route step in a small list under the splits, and hear about a newer Headstart in the party.
+- **Group roles:** Settings, Route: Solo, Duo A/B or Trio A/B/C per character. Where a quest pick-up lies off the path the others walk, the Duo and Trio versions of a route give it to one member in turn; the others walk on and get the quest shared. Northshire and Shadowglen have such a pick-up so far; more come with the 11-30 routes.
 ## 0.9.0-beta1
 
 - **Settings per class.** Each class keeps its own quest-reward settings (on/off, priority list, level limit, remembered picks) and its own Character setup: the saved bar layout and every choice of what carries over. Pick the class at the top of either tab; it opens on this character's class. Your existing settings carry over untouched: they become the settings of the class they were made on, and other classes start from the same choices (their own reward list, and your non-gear picks such as a profession book).
