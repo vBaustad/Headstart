@@ -653,6 +653,14 @@ local function RefreshInspector()
         ed.text:Hide() ed.textLabel:Hide()
         return
     end
+    -- the text area takes whatever room is left under the fields, down to the bottom of the box
+    local function TextFrom(top)
+        ed.textLabel:ClearAllPoints()
+        ed.textLabel:SetPoint("TOPLEFT", 10, top)
+        ed.text:ClearAllPoints()
+        ed.text:SetPoint("TOPLEFT", 10, top - 14)
+        ed.text:SetPoint("BOTTOMRIGHT", -10, 10)
+    end
     local function Field(i, name, x, w, value)
         local f = ed.fields[i]
         f.label:Show() f.input:Show()
@@ -682,10 +690,12 @@ local function RefreshInspector()
             extra:ClearAllPoints()
             extra:SetPoint("TOPLEFT", x, -52)
         end
+        TextFrom(#names > 0 and -86 or -38)
         if not ed.text:HasFocus() then ed.text:SetValue(l.text or "") end
     elseif l.k == "say" then
         ed.what:SetText(l.pre == "+" and "Reminder text" or "Instruction text")
         ed.textLabel:SetText("Text")
+        TextFrom(-38)
         if not ed.text:HasFocus() then ed.text:SetValue(l.text) end
     elseif l.k == "tag" then
         ed.what:SetText("Tag  #" .. l.tag)
