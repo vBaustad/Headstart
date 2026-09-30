@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Level splits handle long times**: each column is as wide as its longest time, so hours (or days of /played on a main) no longer run into the next column. New settings under Level splits: times past an hour as 1:50:19 or 1h 50m, and the level and total columns can be hidden like vs best.
+- **/hs** opens Settings (again to close it).
+- The route list shows your routes only: the ones your race and class follow, in level order, without "(Dwarf/Gnome)" in their names, in smaller rows. "Show all" lists every route.
 - **Release at death skips** (on by default, Settings, Route): when the route step you're on says to die and respawn at the Spirit Healer, your spirit is released at once; RestedXP already accepts the Spirit Healer on those steps. Other deaths are left to you.
 - Dun Morogh, Frostmane Hold: no more climbing the side of the entrance to jump down into the Hold (it saved next to nothing, and after a late Evershine hand-in it pointed back up the mountain); walk in through the front. The Evershine hand-in says why it comes first: the route dies in the cave to get back to Kharanos.
 - Dun Morogh: a second forge stop at Tognus after handing in Frostmane Hold, to smelt and craft to Blacksmithing 20 there. A logged run had only 5 ore at the first stop and 21 by Frostmane Hold, and walked past the forge with both Camping 101 quests still open.

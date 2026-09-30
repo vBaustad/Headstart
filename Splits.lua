@@ -26,7 +26,8 @@ local rate = {}                  -- { play seconds, XP since level 1 } every few
 
 local GREEN, RED, WHITE, GREY, BLUE = "|cff40ff40", "|cffff5050", "|cffffffff", "|cff999999", "|cff66ccff"
 
-local STYLE_DEFAULT = { size = 14, lock = false, rate = true, ding = true, vs = true, rows = 20, bg = 0 }
+local STYLE_DEFAULT = { size = 14, lock = false, rate = true, ding = true, vs = true, rows = 20, bg = 0,
+    clock = "full", levelCol = true, totalCol = true }
 
 function YR:SplitsStyle()
     local st = YippRouteDB.splitsStyle
@@ -46,10 +47,14 @@ local function Text(role)
     return fs
 end
 
+-- A time: 1:50:19 ("full"), or past an hour without the seconds, 1h 50m ("short"). Under an hour
+-- both are 27:57. Days stay hours (46:55:53, 46h 55m): /played on a main runs into days.
 local function Clock(s)
     s = floor(s + 0.5)
     local h, m = floor(s / 3600), floor(s % 3600 / 60)
-    return h > 0 and ("%d:%02d:%02d"):format(h, m, s % 60) or ("%d:%02d"):format(m, s % 60)
+    if h == 0 then return ("%d:%02d"):format(m, s % 60) end
+    if YR:SplitsStyle().clock == "short" then return ("%dh %02dm"):format(h, m) end
+    return ("%d:%02d:%02d"):format(h, m, s % 60)
 end
 
 -- A time coloured against the best run's: green when faster, red when slower, white with nothing to beat.
@@ -123,29 +128,47 @@ local function Row(i)
     return r
 end
 
--- Where everything goes for the current text size: the level name hangs from its left edge, each
--- time from its right edge, so headings and times line up. Row 0 is the column headings.
-local function PlaceRow(i)
+-- Which columns show: 1 the level, 2 its own time, 3 the time from level 1, 4 against the best run.
+local function Shown(c)
     local st = YR:SplitsStyle()
-    local k = st.size / 14
-    local y = -TOP - i * ROW_H + (i == 0 and 3 or 0)
-    local r = Row(i)
-    r[1]:ClearAllPoints()
-    r[1]:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, y)
-    for c, right in ipairs({ 0, 128, 186, 244 }) do
-        if c > 1 then
-            r[c]:ClearAllPoints()
-            r[c]:SetPoint("TOPRIGHT", frame, "TOPLEFT", right * k, y)
-        end
-    end
+    return c == 1 or (c == 2 and st.levelCol) or (c == 3 and st.totalCol) or (c == 4 and st.vs)
 end
 
 local function SetRow(i, a, b, c, d)
     local r = Row(i)
-    PlaceRow(i)
     r[1]:SetText(a) r[2]:SetText(b) r[3]:SetText(c) r[4]:SetText(d)
-    for _, fs in ipairs(r) do fs:Show() end
-    r[4]:SetShown(YR:SplitsStyle().vs)
+    for col, fs in ipairs(r) do fs:SetShown(Shown(col)) end
+end
+
+-- Each column as wide as its widest text so far, so long times (hours, days of /played) never run
+-- into the next column. Widths only grow until the style changes: a ticking clock doesn't make the
+-- columns jitter. The level name hangs from the left edge, each time from its column's right edge.
+local widths = {}
+local function Arrange(n)
+    local k = YR:SplitsStyle().size / 14
+    local gap = 12 * k
+    for c = 1, 4 do
+        local w = widths[c] or 0
+        for i = 0, n do
+            local fs = frame.rows[i] and frame.rows[i][c]
+            if fs and Shown(c) then w = math.max(w, fs:GetStringWidth() or 0) end
+        end
+        widths[c] = w
+    end
+    local right = 0
+    for c = 1, 4 do
+        if Shown(c) then right = right + (c > 1 and gap or 0) + widths[c] end
+        for i = 0, n do
+            local fs = frame.rows[i] and frame.rows[i][c]
+            if fs then
+                local y = -TOP - i * ROW_H + (i == 0 and 3 or 0)
+                fs:ClearAllPoints()
+                if c == 1 then fs:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, y)
+                else fs:SetPoint("TOPRIGHT", frame, "TOPLEFT", right, y) end
+            end
+        end
+    end
+    frame:SetWidth(math.max(right, 150 * k))
 end
 
 local function Layout()
@@ -164,7 +187,7 @@ local function Layout()
         end
     end
     TOP, ROW_H = y + 6, st.size + 2
-    frame:SetWidth((st.vs and 246 or 190) * st.size / 14)
+    widths = {}
     frame.bg:SetColorTexture(0, 0, 0, st.bg / 100)
     frame:EnableMouse(not st.lock)
     SetRow(0, "", GREY .. "level|r", GREY .. "total|r", GREY .. "vs best|r")
@@ -222,6 +245,7 @@ local function Refresh()
     for i = n + 1, #frame.rows do
         for _, fs in ipairs(frame.rows[i]) do fs:Hide() end
     end
+    Arrange(n)
     frame:SetHeight(TOP + (n + 1) * ROW_H)
 end
 

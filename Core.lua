@@ -44,12 +44,15 @@ SlashCmdList.HEADSTART = function(msg)
     elseif cmd == "status" then
         YR:ScanStatus()
         YR:LogStatus()
-        YR.Print("/yroute - the window; /yroute scan (stop) - ask the server about every known quest;"
-            .. " /yroute log on|off; /yroute splits on|off|reset")
+        YR.Print("/headstart - the window; /hs - Settings; /headstart scan (stop) - ask the server about every known quest;"
+            .. " /headstart log on|off; /headstart splits on|off|reset")
     else
         YR:ToggleWindow()
     end
 end
+
+SLASH_HEADSTARTSETTINGS1 = "/hs"
+SlashCmdList.HEADSTARTSETTINGS = function() YR:ToggleSettings() end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")

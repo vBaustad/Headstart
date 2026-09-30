@@ -2,6 +2,7 @@
 
     python tools/smoke.py      (exit code 1 on any failure)
 """
+import re
 import os
 import sys
 
@@ -509,6 +510,33 @@ YR.ApplySplitsStyle(YR)
 YR.SetSplitsPosition(YR, 300, 150)
 pos = g.YippRouteDB.splitsPos
 check(pos[1] == "TOPLEFT" and pos[2] == 300 and pos[3] == -150, f"splits placed in pixels: {list(pos.values())}")
+# long times: the short clock drops the seconds past an hour; columns can be hidden
+sf = g.HeadstartSplitsFrame
+run_rec = [r for r in [g.YippRouteDB.splits.runs[k] for k in g.YippRouteDB.splits.runs.keys()] if r.name == "Tester-Realm"][0]
+old_elapsed = run_rec.elapsed
+run_rec.elapsed = 46 * 3600 + 55 * 60 + 53
+YR.ApplySplitsStyle(YR)
+full = sf.rows[1][3].text
+stl.clock = "short"; YR.ApplySplitsStyle(YR)
+short = sf.rows[1][3].text
+check(re.search(r"\d+:\d\d:\d\d", full) and re.search(r"\d+h \d\dm", short) and not re.search(r"h \d\dm:", short),
+      f"past an hour: {full!r} / {short!r}")
+stl.levelCol = False; YR.ApplySplitsStyle(YR)
+check(sf.rows[1][2].hidden is True and sf.rows[1][3].hidden is False, "the level column can be hidden, the total stays")
+stl.clock, stl.levelCol, stl.size, stl.rate = "full", True, 14, True
+run_rec.elapsed = old_elapsed
+YR.ApplySplitsStyle(YR)
+# The sidebar lists this character's routes: a Dwarf Paladin's, not Northshire's or the Hunters'
+mine = YR.MyRoutes()
+check(mine["coldridge"] and mine["dunmorogh"] and mine["12_14_loch_modan_dwarf_gnome"]
+      and not mine["northshire"] and not mine["shadowglen"] and not mine["11_13_loch_modan_hunter"],
+      f"my routes: {sorted(k for k in mine.keys())}")
+# /hs opens Settings, and closes the window when Settings is already showing
+YR.ToggleWindow(YR, "routes")
+g.SlashCmdList.HEADSTARTSETTINGS("")
+check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is False, "/hs opens Settings")
+g.SlashCmdList.HEADSTARTSETTINGS("")
+check(g.HeadstartWindow.hidden is True, "/hs again closes it")
 YR.ToggleWindow(YR, "routes")
 check(True, "the routes page with the step inspector builds and fills")
 
