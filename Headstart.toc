@@ -17,6 +17,7 @@ Core.lua
 Scan.lua
 Needs.lua
 Log.lua
+DeathSkip.lua
 Rewards.lua
 Splits.lua
 Options.lua

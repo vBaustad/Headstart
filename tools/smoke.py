@@ -218,6 +218,24 @@ g.Fire("CHAT_MSG_SKILL", "Your skill in Maces has increased to 12.")
 check(len(run.ev) == n + 1 and run.ev[n + 1][2] == "skill" and run.ev[n + 1].name == "Blacksmithing" and run.ev[n + 1].rank == 17,
       "a Blacksmithing skill-up is logged with its rank, a weapon skill-up is not")
 
+# Death skips: dying on a step that says ".deathskip" releases the spirit; any other death is left alone.
+lua.execute('''
+C_Timer.After = function(_, fn) fn() end
+REPOPS, DEAD = 0, true
+function RepopMe() REPOPS = REPOPS + 1 end
+function UnitIsDead() return DEAD end
+SKIP = { tag = "deathskip" }
+RXP.currentGuide.steps = { { active = false, elements = { { tag = "goto" } } }, { active = true, elements = { { tag = "goto" }, SKIP } } }
+''')
+g.Fire("PLAYER_DEAD")
+check(g.REPOPS == 1, "a death on a death-skip step releases the spirit")
+lua.execute("SKIP.completed = true")
+g.Fire("PLAYER_DEAD")
+lua.execute("SKIP.completed = nil; YippRouteDB.deathSkipRelease = false")
+g.Fire("PLAYER_DEAD")
+check(g.REPOPS == 1, "... not once that step is done, nor with the option off")
+lua.execute("YippRouteDB.deathSkipRelease = nil; DEAD = false; RXP.currentGuide.steps = nil")
+
 # Reward choices (a paladin's default order: two-hander, mail, shield, water, food): the first kind on
 # offer; of two the more valuable; nothing listed -> the most valuable (or you, if set so); Shift or
 # above the level limit -> you; a reward you picked by hand is taken again for that quest.
