@@ -1472,9 +1472,23 @@ local function Build()
     version:SetPoint("BOTTOMLEFT", 14, 12)
     local meta = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("Headstart", "Version")
     version:SetText(meta and ("v" .. meta) or "")
-    if YR.shipped[1] then
-        Open(YR.shipped[1].key)
-        if ui.routeTabs[1] then ui.routeTabs[1]:Select(true) end
+    -- open on the route this character is on: the one RestedXP has loaded if it's ours, else the
+    -- starting route for its race, else the first
+    local key = YR.shipped[1] and YR.shipped[1].key
+    local current = type(RXP) == "table" and type(RXP.currentGuide) == "table" and RXP.currentGuide.name
+    local _, race = UnitRace("player")
+    local byRace = ({ Human = "northshire", NightElf = "shadowglen", Dwarf = "coldridge", Gnome = "coldridge" })[race]
+    for _, g in ipairs(YR.shipped) do
+        if g.key == byRace then key = g.key end
+    end
+    -- RestedXP pads the level range ("01-05 Coldridge Valley"): compare without leading zeros
+    local function Plain(s) return (s:gsub("%f[%d]0+(%d)", "%1")) end
+    for _, g in ipairs(YR.shipped) do
+        if type(current) == "string" and Plain(current) == Plain(YR.GuideName(g.key)) then key = g.key end
+    end
+    if key then
+        Open(key)
+        for _, t in ipairs(ui.routeTabs) do t:Select(t.key == key) end
     end
 end
 
