@@ -49,6 +49,7 @@ function UnitRace() return "Dwarf", "Dwarf" end
 function UnitLevel() return 1 end
 GUID = "Player-A"
 HOOKS = {}
+Minimap = CreateFrame()
 function RequestTimePlayed() ASKED_PLAYED = (ASKED_PLAYED or 0) + 1 end
 UISpecialFrames, StaticPopupDialogs = {}, {}
 tinsert = table.insert
@@ -301,4 +302,8 @@ check(done == "added 1-6 Somewhere Else" and g.YippRouteDB.extra["1-6 Somewhere 
 bad_import = YR.ImportGuide(YR, "hello")
 check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a guide is refused, with the reason")
 YR.RevertGuide(YR, "coldridge")
+# the minimap button exists and the settings switch hides it
+check(g.YippRouteMinimapButton is not None and g.YippRouteMinimapButton.hidden is not True, "minimap button shown")
+YR.ShowMinimapButton(YR, False)
+check(g.YippRouteMinimapButton.hidden is True and g.YippRouteDB.minimapButton is False, "minimap button can be hidden")
 sys.exit(1 if bad else 0)

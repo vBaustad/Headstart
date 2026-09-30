@@ -300,6 +300,7 @@ local function BuildSettings(page)
         { "Show level splits", "showSplits", function(on) YR:ShowSplits(on) end },
         { "Pick quest rewards (up to level 10)", "pickRewards" },
         { "Record runs", "logging", function(on) YR:SetLogging(on) end },
+        { "Minimap button", "minimapButton", function(on) YR:ShowMinimapButton(on) end },
     }) do
         local t = S.Toggle(page, o[1], function() return YR.Option(o[2]) end, function(on)
             YippRouteDB[o[2]] = on
