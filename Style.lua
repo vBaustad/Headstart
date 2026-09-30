@@ -69,28 +69,78 @@ function S.Icon(parent, texture, size)
     return t
 end
 
--- Buttons. kind: "primary" (accent fill), "danger", "ghost" (no fill until hovered), or nil (quiet).
+-- A rounded shape from art/round.tga (or roundline.tga, an outline), stretched in the middle with its
+-- corners kept (9-slice), tinted with SetVertexColor. Without 9-slice support it falls back to flat.
+local function Rounded(frame, layer, name, sublevel)
+    local t = frame:CreateTexture(nil, layer, nil, sublevel)
+    t:SetAllPoints()
+    if t.SetTextureSliceMargins then
+        t:SetTexture(S.ART .. name)
+        t:SetTextureSliceMargins(8, 8, 8, 8)
+        if t.SetTextureSliceMode and Enum and Enum.UITextureSliceMode then
+            t:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched)
+        end
+    else
+        t:SetColorTexture(1, 1, 1, 1)
+    end
+    return t
+end
+S.Rounded = Rounded
+
+-- Colours per kind and state: { fill, outline or false, text }
+local LOOK = {
+    primary = { normal = { { 0.40, 0.66, 1.00, 1 }, false, { 1, 1, 1, 1 } },
+                hover  = { { 0.50, 0.73, 1.00, 1 }, false, { 1, 1, 1, 1 } },
+                down   = { { 0.33, 0.57, 0.92, 1 }, false, { 1, 1, 1, 1 } } },
+    quiet   = { normal = { { 1, 1, 1, 0.06 }, { 1, 1, 1, 0.14 }, S.C.text },
+                hover  = { { 1, 1, 1, 0.10 }, { 1, 1, 1, 0.24 }, S.C.text },
+                down   = { { 1, 1, 1, 0.04 }, { 1, 1, 1, 0.20 }, S.C.text } },
+    danger  = { normal = { { 0.62, 0.20, 0.20, 1 }, false, { 1, 1, 1, 1 } },
+                hover  = { { 0.72, 0.25, 0.25, 1 }, false, { 1, 1, 1, 1 } },
+                down   = { { 0.55, 0.17, 0.17, 1 }, false, { 1, 1, 1, 1 } } },
+    ghost   = { normal = { { 1, 1, 1, 0 }, false },
+                hover  = { { 1, 1, 1, 0.07 }, false },
+                down   = { { 1, 1, 1, 0.04 }, false } },
+}
+local DISABLED = { { 1, 1, 1, 0.04 }, { 1, 1, 1, 0.07 }, S.C.muted }
+
+-- Buttons. kind: "primary" (the one main action), "danger", "ghost" (text only until hovered), or nil.
+-- Rounded, with hover and pressed states; a disabled button goes quiet and grey rather than faded.
 function S.Button(parent, label, onClick, kind, width)
     local b = CreateFrame("Button", nil, parent)
-    b:SetHeight(26)
-    local fill = kind == "primary" and S.C.accent or kind == "danger" and { 0.55, 0.16, 0.16, 1 }
-        or kind == "ghost" and { 1, 1, 1, 0 } or { 1, 1, 1, 0.06 }
-    local bg = S.Fill(b, fill)
-    if kind ~= "primary" and kind ~= "ghost" then S.Border(b, S.C.line) end
-    b.text = S.Text(b, 13, kind == "primary" and { 0.04, 0.07, 0.12, 1 } or S.C.text)
-    b.text:SetPoint("CENTER")
+    b:SetHeight(28)
+    local look = LOOK[kind] or LOOK.quiet
+    local fill = Rounded(b, "BACKGROUND", "round")
+    local line = Rounded(b, "BORDER", "roundline")
+    b.text = S.Text(b, 13, (look.normal[3]) or S.C.text)
+    b.text:SetPoint("CENTER", 0, 0)
     b.text:SetText(label)
-    b:SetWidth(width or math.max(70, b.text:GetStringWidth() + 26))
+    b:SetWidth(width or math.max(80, b.text:GetStringWidth() + 32))
+    local hovering, pressed, textColor = false, false, nil
+    local function Paint()
+        local st = not b:IsEnabled() and DISABLED or look[pressed and "down" or hovering and "hover" or "normal"]
+        fill:SetVertexColor(unpack(st[1]))
+        line:SetShown(st[2] and true or false)
+        if st[2] then line:SetVertexColor(unpack(st[2])) end
+        -- a ghost button keeps the text colour it was given, except when disabled
+        if st[3] then b.text:SetTextColor(unpack(st[3]))
+        elseif textColor then b.text:SetTextColor(unpack(textColor)) end
+    end
+    b.Paint = Paint
     b:SetScript("OnEnter", function()
-        if kind == "ghost" then bg:SetColorTexture(1, 1, 1, 0.06) else bg:SetAlpha(0.8) end
+        hovering = true Paint()
         if b.tip then S.Tip(b, b.tip) end
     end)
-    b:SetScript("OnLeave", function()
-        if kind == "ghost" then bg:SetColorTexture(1, 1, 1, 0) else bg:SetAlpha(1) end
-        GameTooltip:Hide()
-    end)
+    b:SetScript("OnLeave", function() hovering, pressed = false, false Paint() GameTooltip:Hide() end)
+    b:SetScript("OnMouseDown", function() pressed = true Paint() end)
+    b:SetScript("OnMouseUp", function() pressed = false Paint() end)
+    b:SetScript("OnEnable", Paint)
+    b:SetScript("OnDisable", Paint)
     b:SetScript("OnClick", onClick)
     function b:SetLabel(t) self.text:SetText(t) end
+    -- for ghost buttons: the colour of their text
+    function b:SetTextColour(c) textColor = c Paint() end
+    Paint()
     return b
 end
 

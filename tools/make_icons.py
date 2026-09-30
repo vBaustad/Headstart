@@ -81,4 +81,23 @@ img, d = canvas()
 d.ellipse((88, 88, 168, 168), fill=(255, 255, 255, 255))
 save(img, "dot")
 
+# rounded shapes for 9-slice buttons: 32x32, corner radius 6, drawn at 8x. The addon stretches the
+# middle and keeps the corners (Texture:SetTextureSliceMargins), so one image fits any button size.
+R = 8
+
+
+def rounded(name, outline):
+    big = Image.new("RGBA", (32 * R, 32 * R), (255, 255, 255, 0))
+    dr = ImageDraw.Draw(big)
+    if outline:
+        dr.rounded_rectangle((R // 2, R // 2, 32 * R - R // 2, 32 * R - R // 2), radius=6 * R,
+                             outline=(255, 255, 255, 255), width=R)
+    else:
+        dr.rounded_rectangle((0, 0, 32 * R - 1, 32 * R - 1), radius=6 * R, fill=(255, 255, 255, 255))
+    big.resize((32, 32), Image.LANCZOS).save(os.path.join(OUT, name + ".tga"), orientation=1)
+
+
+rounded("round", False)
+rounded("roundline", True)
+
 print("icons in", OUT, sorted(os.listdir(OUT)))

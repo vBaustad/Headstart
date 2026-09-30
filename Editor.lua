@@ -580,7 +580,7 @@ local function BuildInspector(page)
     ui.raw = S.Button(body, "Edit as text", function() YR:EditRawStep() end, "ghost", 100)
     ui.raw:SetPoint("BOTTOMRIGHT", -10, 10)
     ui.raw.tip = "The whole step as RestedXP text, for anything the fields don't cover"
-    ui.raw.text:SetTextColor(unpack(S.C.accent))
+    ui.raw:SetTextColour(S.C.accent)
 end
 
 -- The step as RestedXP text in a box over the inspector; Apply puts it back.
@@ -787,7 +787,7 @@ local function BuildRun(page)
             "ghost", 124)
         add:SetPoint("RIGHT", -6, 0)
         add:SetHeight(22)
-        add.text:SetTextColor(unpack(S.C.accent))
+        add:SetTextColour(S.C.accent)
         add.tip = "Put this in the open route as a step, after the selected step"
     end)
     run.list:SetPoint("TOPLEFT", 16, -66)
