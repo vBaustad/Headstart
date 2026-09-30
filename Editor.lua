@@ -1,19 +1,20 @@
--- The YippRoute window: edit the routes, see what this character did, share a route, settings.
--- Opened from the minimap's addon menu or /yroute.
+-- The YippRoute window. Opened from the minimap button or /yroute.
 --
---   Routes     each shipped guide as a list of steps: drag a row (or use the arrows) to move it, x to
---              remove it, click to select it (new steps go in after the selected one). Save keeps your
---              version; Revert goes back to the shipped one. Either reaches RestedXP on /reload.
---   This run   what this character did (quests, purchases, spells learned, hearths, deaths): + turns
---              one into a step of the route open in Routes.
---   Share      the open route as text to copy, or paste someone's route and import it.
---   Settings   the same switches as the options page.
+--   Routes     the steps of a route on the left; the selected step in full on the right, where every
+--              line of it can be changed, added or removed: places (with "Here"), quests, targets,
+--              levels to farm to, gold to farm, classes that see it. Save hands it to RestedXP.
+--   This run   what this character did; "Add to route" makes any of it a step of the open route.
+--   Share      the open route as text, or paste one in.
+--   Settings   level splits, quest rewards, recording, the minimap button.
 local _, YR = ...
 local S = YR.Style
 
-local W, H, SIDE, ROW, ROWS = 780, 540, 170, 22, 19
+local W, H, SIDE, HEAD = 1080, 680, 180, 48
+local PW, PH = W - SIDE, H - HEAD          -- the page area
+local LIST_W, ROW = 430, 24
 local win, pages, current
-local edit = { key = nil, header = nil, steps = nil, dirty = false, sel = nil, offset = 0 }
+local edit = { key = nil, header = nil, steps = nil, parsed = {}, dirty = false, sel = nil, line = nil, filter = "" }
+local ui = {}
 
 StaticPopupDialogs["YIPPROUTE_RELOAD"] = {
     text = "YippRoute: reload so RestedXP gets the changed route?",
@@ -25,34 +26,102 @@ StaticPopupDialogs["YIPPROUTE_RELOAD"] = {
     hideOnEscape = true,
 }
 
+local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+local CLASS_NAME = { WARRIOR = "Warrior", PALADIN = "Paladin", HUNTER = "Hunter", ROGUE = "Rogue", PRIEST = "Priest",
+    SHAMAN = "Shaman", MAGE = "Mage", WARLOCK = "Warlock", DRUID = "Druid" }
+local CLASS_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
+local ZEBRA = { 0.095, 0.105, 0.125, 1 }
+
 -- ---------------------------------------------------------------------------
--- A scrolling list of rows, drawn by the caller: fill(row, index) sets a row up for item `index`.
+-- The route being edited
 -- ---------------------------------------------------------------------------
-local function List(parent, width, count, fill, total)
+local function Parsed(i)
+    local p = edit.parsed[i]
+    if not p then p = YR.ParseStep(edit.steps[i]) edit.parsed[i] = p end
+    return p
+end
+
+-- The selected step was changed in the inspector: write it back to text.
+local function Commit()
+    if not edit.sel then return end
+    edit.steps[edit.sel] = YR.WriteStep(Parsed(edit.sel))
+    edit.dirty = true
+end
+
+local function Open(key)
+    edit.key = key
+    edit.header, edit.steps = YR.SplitSteps(YR:GuideText(key))
+    edit.parsed, edit.dirty, edit.line = {}, false, nil
+    edit.sel = #edit.steps > 0 and 1 or nil
+end
+
+local function Reparse() edit.parsed = {} end
+
+local function Visible()
+    local out = {}
+    local f = edit.filter:lower()
+    for i = 1, #edit.steps do
+        if f == "" or edit.steps[i]:lower():find(f, 1, true) then out[#out + 1] = i end
+    end
+    return out
+end
+
+local function Insert(at, text)
+    table.insert(edit.steps, at, text)
+    Reparse()
+    edit.sel, edit.line, edit.dirty = at, nil, true
+end
+
+function YR:InsertStep(text)
+    if not edit.steps then return end
+    Insert((edit.sel or #edit.steps) + 1, text)
+    YR:RefreshWindow()
+end
+
+local function Move(from, to)
+    if not (from and to) or from == to or to < 1 or to > #edit.steps then return end
+    local s = table.remove(edit.steps, from)
+    table.insert(edit.steps, to, s)
+    Reparse()
+    edit.sel, edit.dirty = to, true
+    YR:RefreshWindow()
+end
+
+local function Template(kind)
+    for _, t in ipairs(YR.StepTemplates()) do
+        if t[1] == kind then return YR.WriteStep(t[3]) end
+    end
+end
+
+-- ---------------------------------------------------------------------------
+-- A scrolling list of fixed rows. build(row) makes a row's parts once; fill(row, index) fills it.
+-- ---------------------------------------------------------------------------
+local function List(parent, width, count, rowH, fill, total, build)
     local l = CreateFrame("Frame", nil, parent)
-    l:SetSize(width, ROW * count)
+    l:SetSize(width, rowH * count)
     l.rows, l.offset = {}, 0
     for i = 1, count do
         local r = CreateFrame("Button", nil, l)
-        r:SetSize(width - 8, ROW)
-        r:SetPoint("TOPLEFT", 0, -(i - 1) * ROW)
+        r:SetSize(width - 8, rowH)
+        r:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
         r.bg = S.Fill(r, { 0, 0, 0, 0 })
-        r.num = S.Text(r, 12, S.C.muted)
-        r.num:SetPoint("LEFT", 6, 0)
-        r.num:SetWidth(30)
-        r.label = S.Text(r, 13)
-        r.label:SetPoint("LEFT", 40, 0)
-        r.label:SetPoint("RIGHT", -70, 0)
-        r:SetScript("OnEnter", function(self) if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end
-            if self.OnHover then self:OnHover(true) end end)
-        r:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end
-            if self.OnHover then self:OnHover(false) end end)
+        r.bar = r:CreateTexture(nil, "ARTWORK")
+        r.bar:SetPoint("TOPLEFT") r.bar:SetPoint("BOTTOMLEFT") r.bar:SetWidth(2)
+        S.Set(r.bar, S.C.accent)
+        r.bar:Hide()
+        r:SetScript("OnEnter", function(self) if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end end)
+        r:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end end)
+        function r:Select(on)
+            self.selected = on
+            self.bg:SetColorTexture(unpack(on and S.C.accentD or { 0, 0, 0, 0 }))
+            self.bar:SetShown(on)
+        end
+        build(r)
         l.rows[i] = r
     end
-    -- a thin bar on the right that shows where in the list you are
-    l.bar = l:CreateTexture(nil, "OVERLAY")
-    l.bar:SetColorTexture(1, 1, 1, 0.18)
-    l.bar:SetWidth(3)
+    l.scroll = l:CreateTexture(nil, "OVERLAY")
+    l.scroll:SetColorTexture(1, 1, 1, 0.16)
+    l.scroll:SetWidth(3)
     function l:Refresh()
         local n = total()
         self.offset = math.max(0, math.min(self.offset, n - count))
@@ -60,176 +129,648 @@ local function List(parent, width, count, fill, total)
             local index = self.offset + i
             if index <= n then r:Show() fill(r, index) else r:Hide() end
         end
-        local h = ROW * count
+        local h = rowH * count
         if n > count then
-            self.bar:Show()
-            self.bar:SetHeight(math.max(20, h * count / n))
-            self.bar:ClearAllPoints()
-            self.bar:SetPoint("TOPRIGHT", 0, -(h - self.bar:GetHeight()) * self.offset / (n - count))
+            self.scroll:Show()
+            self.scroll:SetHeight(math.max(20, h * count / n))
+            self.scroll:ClearAllPoints()
+            self.scroll:SetPoint("TOPRIGHT", 0, -(h - self.scroll:GetHeight()) * self.offset / (n - count))
         else
-            self.bar:Hide()
+            self.scroll:Hide()
+        end
+    end
+    function l:ShowIndex(index)
+        if index and (index <= self.offset or index > self.offset + count) then
+            self.offset = math.max(0, index - math.floor(count / 2))
         end
     end
     l:EnableMouseWheel(true)
-    l:SetScript("OnMouseWheel", function(self, delta)
-        self.offset = self.offset - delta * 3
-        self:Refresh()
-    end)
+    l:SetScript("OnMouseWheel", function(self, delta) self.offset = self.offset - delta * 3 self:Refresh() end)
     return l
 end
 
-local function Select(r, on)
-    r.selected = on
-    r.bg:SetColorTexture(unpack(on and S.C.select or { 0, 0, 0, 0 }))
-end
-
 -- ---------------------------------------------------------------------------
--- Routes
+-- Routes: the step list, and the buttons under it
 -- ---------------------------------------------------------------------------
-local routes = {}
-
-local function Open(key)
-    edit.key = key
-    edit.header, edit.steps = YR.SplitSteps(YR:GuideText(key))
-    edit.dirty, edit.sel = false, nil
-    if routes.list then routes.list.offset = 0 end
+local function QuestMenu(anchor, onPick)
+    local list = {}
+    for i = 1, C_QuestLog.GetNumQuestLogEntries() do
+        local info = C_QuestLog.GetInfo(i)
+        if info and not info.isHeader and info.questID then
+            local done = C_QuestLog.IsComplete(info.questID)
+            list[#list + 1] = { info.questID, (done and "|cff66dd88Done|r  " or "") .. info.title }
+        end
+    end
+    if #list == 0 then list[1] = { 0, "Your quest log is empty", S.C.muted } end
+    S.OpenMenu(anchor, list, function(q) if q ~= 0 then onPick(q) end end, 280)
 end
 
-local function Move(from, to)
-    if not (from and to) or from == to or to < 1 or to > #edit.steps then return end
-    local step = table.remove(edit.steps, from)
-    table.insert(edit.steps, to, step)
-    edit.sel, edit.dirty = to, true
-    YR:RefreshWindow()
-end
+local function BuildStepList(page)
+    local search = S.Input(page, { width = 260, placeholder = "Search steps", onChange = function(t)
+        edit.filter = t
+        ui.steps.offset = 0
+        YR:RefreshWindow()
+    end })
+    search:SetPoint("TOPLEFT", 16, -14)
+    ui.count = S.Text(page, 12, S.C.muted)
+    ui.count:SetPoint("LEFT", search, "RIGHT", 12, 0)
 
-local function Remove(i)
-    table.remove(edit.steps, i)
-    if edit.sel and edit.sel >= i then edit.sel = edit.sel > 1 and edit.sel - 1 or nil end
-    edit.dirty = true
-    YR:RefreshWindow()
-end
-
--- Put a step in after the selected one (or at the end) and select it.
-function YR:InsertStep(text)
-    if not edit.steps then return end
-    local at = (edit.sel or #edit.steps) + 1
-    table.insert(edit.steps, at, text)
-    edit.sel, edit.dirty = at, true
-    YR:RefreshWindow()
-end
-
-local function BuildRoutes(page)
-    routes.name = S.Text(page, 15)
-    routes.name:SetPoint("TOPLEFT", 0, 0)
-    routes.state = S.Text(page, 12, S.C.muted)
-    routes.state:SetPoint("LEFT", routes.name, "RIGHT", 10, 0)
-    routes.hint = S.Text(page, 12, S.C.muted)
-    routes.hint:SetPoint("TOPLEFT", 0, -22)
-    routes.hint:SetText("Drag a step to move it. Click to select: new steps go in after it.")
-
+    local rows = math.floor((PH - 48 - 106 - 60) / ROW)
+    local visible = {}
     local dragFrom
-    routes.list = List(page, W - SIDE - 40, ROWS, function(r, i)
-        r.index = i
-        r.num:SetText(i)
-        r.label:SetText(YR.StepSummary(edit.steps[i]))
-        Select(r, edit.sel == i)
-    end, function() return edit.steps and #edit.steps or 0 end)
-    routes.list:SetPoint("TOPLEFT", 0, -44)
-    for _, r in ipairs(routes.list.rows) do
+    local marker = page:CreateTexture(nil, "OVERLAY")
+    marker:SetSize(LIST_W - 8, 2)
+    S.Set(marker, S.C.accent)
+    marker:Hide()
+
+    ui.steps = List(page, LIST_W, rows, ROW, function(r, i)
+        local index = visible[i]
+        r.index = index
+        local info = YR.StepInfo(Parsed(index))
+        r.num:SetText(index)
+        r.icon:SetTexture(info.icon)
+        r.label:SetText(info.text)
+        r.cls:SetText(info.classes or "")
+        r:Select(edit.sel == index)
+    end, function() visible = Visible() return #visible end, function(r)
+        r.num = S.Text(r, 11, S.C.muted)
+        r.num:SetPoint("LEFT", 4, 0)
+        r.num:SetWidth(26)
+        r.num:SetJustifyH("RIGHT")
+        r.icon = r:CreateTexture(nil, "ARTWORK")
+        r.icon:SetSize(16, 16)
+        r.icon:SetPoint("LEFT", 36, 0)
+        r.label = S.Text(r, 13)
+        r.label:SetPoint("LEFT", 58, 0)
+        r.label:SetPoint("RIGHT", -78, 0)
+        r.cls = S.Text(r, 11, { 0.55, 0.62, 0.72, 1 })
+        r.cls:SetPoint("RIGHT", -6, 0)
+        r.cls:SetWidth(72)
+        r.cls:SetJustifyH("RIGHT")
         r:RegisterForDrag("LeftButton")
-        r:SetScript("OnClick", function(self) edit.sel = self.index YR:RefreshWindow() end)
-        r:SetScript("OnDragStart", function(self) dragFrom = self.index end)
+        r:SetScript("OnClick", function(self) edit.sel, edit.line = self.index, nil YR:RefreshWindow() end)
+        r:SetScript("OnDragStart", function(self)
+            dragFrom = self.index
+            page:SetScript("OnUpdate", function()
+                for _, o in ipairs(ui.steps.rows) do
+                    if o:IsShown() and o:IsMouseOver() then
+                        marker:ClearAllPoints()
+                        marker:SetPoint("BOTTOMLEFT", o, "TOPLEFT", 0, 0)
+                        marker:Show()
+                        return
+                    end
+                end
+            end)
+        end)
         r:SetScript("OnDragStop", function()
-            for _, other in ipairs(routes.list.rows) do
-                if other:IsShown() and other:IsMouseOver() then Move(dragFrom, other.index) break end
+            page:SetScript("OnUpdate", nil)
+            marker:Hide()
+            for _, o in ipairs(ui.steps.rows) do
+                if o:IsShown() and o:IsMouseOver() then Move(dragFrom, o.index) break end
             end
             dragFrom = nil
         end)
-        function r:OnHover(on)
-            if not on then GameTooltip:Hide() return end
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            local n = 0
-            for line in (edit.steps[self.index] .. "\n"):gmatch("([^\n]*)\n") do
-                n = n + 1
-                if n > 16 then GameTooltip:AddLine("...", 0.6, 0.6, 0.6) break end
-                GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
-            end
-            GameTooltip:Show()
-        end
-        local up = S.Mini(r, "^", function() Move(r.index, r.index - 1) end)
-        up:SetPoint("RIGHT", -44, 0)
-        local down = S.Mini(r, "v", function() Move(r.index, r.index + 1) end)
-        down:SetPoint("RIGHT", -24, 0)
-        local x = S.Mini(r, "x", function() Remove(r.index) end, S.C.danger)
-        x:SetPoint("RIGHT", -4, 0)
-    end
+    end)
+    ui.steps:SetPoint("TOPLEFT", 16, -48)
+    local frame = CreateFrame("Frame", nil, page)
+    frame:SetPoint("TOPLEFT", ui.steps, -1, 1)
+    frame:SetPoint("BOTTOMRIGHT", ui.steps, 1, -1)
+    S.Fill(frame, S.C.field)
+    frame:SetFrameLevel(math.max(0, ui.steps:GetFrameLevel() - 1))
+    S.Border(frame)
 
+    local function AfterSel() return (edit.sel or #edit.steps) + 1 end
+    local buttons = {
+        { "New step", function(self)
+            local list = {}
+            for _, t in ipairs(YR.StepTemplates()) do list[#list + 1] = { t[1], t[2] } end
+            S.OpenMenu(self, list, function(v)
+                Insert(AfterSel(), Template(v))
+                ui.steps:ShowIndex(edit.sel)
+                YR:RefreshWindow()
+            end, 200)
+        end, "A new step after the selected one, filled in with where you stand and what you target" },
+        { "Quick add quest", function(self)
+            QuestMenu(self, function(q)
+                local map, x, y = YR.Position()
+                local done = C_QuestLog.IsComplete(q)
+                local title = C_QuestLog.GetTitleForQuestID(q) or ("quest " .. q)
+                local ok, npc = pcall(UnitName, "target")
+                local step = { head = "", lines = {} }
+                if map then step.lines[1] = { k = "cmd", cmd = "goto", args = ("%d,%.2f,%.2f"):format(map, x, y) } end
+                step.lines[#step.lines + 1] = { k = "cmd", cmd = done and "turnin" or "accept", args = tostring(q),
+                    text = (done and "Turn in " or "Accept ") .. title }
+                if ok and npc then step.lines[#step.lines + 1] = { k = "cmd", cmd = "target", args = npc } end
+                Insert(AfterSel(), YR.WriteStep(step))
+                YR:RefreshWindow()
+            end)
+        end, "A step for a quest in your log, here: accept it, or turn it in if it's done" },
+        { "Delete step", function()
+            if not edit.sel then return end
+            table.remove(edit.steps, edit.sel)
+            Reparse()
+            edit.sel = math.min(edit.sel, #edit.steps)
+            if edit.sel == 0 then edit.sel = nil end
+            edit.dirty, edit.line = true, nil
+            YR:RefreshWindow()
+        end },
+        { "Move up", function() if edit.sel then Move(edit.sel, edit.sel - 1) end end },
+        { "Move down", function() if edit.sel then Move(edit.sel, edit.sel + 1) end end },
+        { "Merge up", function()
+            if not edit.sel or edit.sel < 2 then return end
+            local into, from = Parsed(edit.sel - 1), Parsed(edit.sel)
+            for _, l in ipairs(from.lines) do into.lines[#into.lines + 1] = l end
+            edit.steps[edit.sel - 1] = YR.WriteStep(into)
+            table.remove(edit.steps, edit.sel)
+            Reparse()
+            edit.sel, edit.dirty = edit.sel - 1, true
+            YR:RefreshWindow()
+        end, "Put this step's lines into the step above it" },
+        { "Duplicate", function() if edit.sel then Insert(edit.sel + 1, edit.steps[edit.sel]) YR:RefreshWindow() end end },
+        { "Farm XP here", function() Insert(AfterSel(), Template("xp")) YR:RefreshWindow() end,
+          "A step: grind here until the next level. Change the level on the right" },
+        { "Farm gold here", function() Insert(AfterSel(), Template("gold")) YR:RefreshWindow() end,
+          "A step: farm here until you have an amount of money. Change it on the right" },
+    }
+    local bw = (LIST_W - 12) / 3
+    for i, b in ipairs(buttons) do
+        local btn = S.Button(page, b[1], b[2], nil, bw)
+        btn.tip = b[3]
+        local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
+        btn:SetPoint("TOPLEFT", ui.steps, "BOTTOMLEFT", col * (bw + 6), -10 - row * 32)
+    end
+end
+
+-- ---------------------------------------------------------------------------
+-- Routes: the inspector - the selected step, line by line
+-- ---------------------------------------------------------------------------
+local LINE_ICON = { ["goto"] = YR.STEP_ICON.travel, accept = YR.STEP_ICON.accept, turnin = YR.STEP_ICON.turnin,
+    complete = YR.STEP_ICON.kill, mob = YR.STEP_ICON.kill, xp = YR.STEP_ICON.xp, money = YR.STEP_ICON.gold,
+    train = YR.STEP_ICON.train, collect = YR.STEP_ICON.buy, hs = YR.STEP_ICON.hearth, home = YR.STEP_ICON.hearth,
+    deathskip = YR.STEP_ICON.death }
+local DIM = "|cff8899aa"
+
+local function LineLabel(l)
+    if l.k == "tag" then return DIM .. "#" .. l.tag .. (l.val and (" " .. l.val) or "") .. "|r" end
+    if l.k == "say" then return (l.pre == "+" and DIM .. "Reminder|r  " or DIM .. "Text|r  ") .. YR.Plain(l.text) end
+    if l.k == "raw" then return DIM .. (l.raw or "") .. "|r" end
+    local c = YR.COMMAND_BY_NAME[l.cmd]
+    local what = c and c.label or ("." .. l.cmd)
+    local args = (l.args or "") ~= "" and ("  " .. DIM .. l.args .. "|r") or ""
+    if l.cmd == "goto" then args = "  " .. DIM .. (YR.PlaceText(YR.Args(l)) or l.args) .. "|r" end
+    return what .. args .. (l.text and ("  " .. YR.Plain(l.text)) or "")
+end
+
+local function AddChoices()
+    local list = {}
+    for _, c in ipairs(YR.COMMANDS) do list[#list + 1] = { "cmd:" .. c.cmd, c.label } end
+    list[#list + 1] = { "say:>>", "Instruction text" }
+    list[#list + 1] = { "say:+", "Reminder text" }
+    for _, t in ipairs(YR.TAGS) do list[#list + 1] = { "tag:" .. t.tag, t.label, S.C.sub } end
+    return list
+end
+
+local function NewLine(choice)
+    local kind, what = choice:match("^(%a+):(.*)$")
+    if kind == "say" then return { k = "say", pre = what, text = "" } end
+    if kind == "tag" then return { k = "tag", tag = what, val = (what == "completewith") and "next" or nil } end
+    local l = { k = "cmd", cmd = what, args = "" }
+    local map, x, y = YR.Position()
+    local ok, target = pcall(UnitName, "target")
+    if what == "goto" and map then l.args = ("%d,%.2f,%.2f"):format(map, x, y) end
+    if (what == "target" or what == "mob") and ok and target then l.args = target end
+    if what == "xp" then l.args = tostring(UnitLevel("player") + 1) l.text = "Grind to level " .. l.args end
+    if what == "money" then l.args = ">0.10" l.text = "Farm until you have 10s" end
+    return l
+end
+
+local function SelLine()
+    return edit.sel and edit.line and Parsed(edit.sel).lines[edit.line]
+end
+
+local function BuildInspector(page)
+    local X = 16 + LIST_W + 16
+    local CW = PW - X - 16
+    local card = CreateFrame("Frame", nil, page)
+    card:SetPoint("TOPLEFT", X, -14)
+    card:SetPoint("BOTTOMRIGHT", -16, 58)
+    S.Fill(card, S.C.card)
+    S.Border(card)
+    ui.card = card
+    local body = CreateFrame("Frame", nil, card)
+    body:SetAllPoints()
+    ui.body = body
+
+    ui.stepIcon = body:CreateTexture(nil, "ARTWORK")
+    ui.stepIcon:SetSize(22, 22)
+    ui.stepIcon:SetPoint("TOPLEFT", 14, -12)
+    ui.stepTitle = S.Text(body, 18)
+    ui.stepTitle:SetPoint("LEFT", ui.stepIcon, "RIGHT", 8, 0)
+    ui.where = S.Text(body, 12, S.C.sub)
+    ui.where:SetPoint("TOPLEFT", 14, -40)
+    ui.empty = S.Text(card, 13, S.C.muted)
+    ui.empty:SetPoint("CENTER")
+    ui.empty:SetText("Pick a step on the left, or make one with New step.")
+
+    -- who sees it
+    local shows = S.Text(body, 12, S.C.muted)
+    shows:SetPoint("TOPLEFT", 14, -68)
+    shows:SetText("Shows for")
+    ui.chips = {}
+    local cx = 76
+    ui.everyone = S.Chip(body, "Everyone", function()
+        Parsed(edit.sel).head = ""
+        Commit() YR:RefreshWindow()
+    end)
+    ui.everyone:SetPoint("TOPLEFT", cx, -64)
+    cx = cx + ui.everyone:GetWidth() + 4
+    for _, class in ipairs(CLASSES) do
+        local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
+        local chip = S.Chip(body, "", function()
+            local p = Parsed(edit.sel)
+            local list, found = {}, nil
+            for token in ((p.head:match("<<%s*(.+)$") or "") .. "/"):gmatch("([^/%s]+)[/%s]*") do list[#list + 1] = token end
+            for i, t in ipairs(list) do if t == CLASS_NAME[class] then found = i end end
+            if found then table.remove(list, found) else list[#list + 1] = CLASS_NAME[class] end
+            p.head = #list > 0 and ("<< " .. table.concat(list, "/")) or ""
+            Commit() YR:RefreshWindow()
+        end, CLASS_TEX, coords)
+        chip:SetWidth(24)
+        chip:SetPoint("TOPLEFT", cx, -64)
+        chip:SetScript("OnEnter", function(self) S.Tip(self, CLASS_NAME[class] .. " (click to add or remove)") end)
+        chip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        chip.class = class
+        ui.chips[#ui.chips + 1] = chip
+        cx = cx + 27
+    end
+    ui.head = S.Input(body, { width = CW - cx - 22, placeholder = "or type, e.g. << Dwarf Paladin", onCommit = function(t)
+        if not edit.sel then return end
+        local head = t:gsub("^%s*step%s*", "")
+        if head ~= "" and not head:find("^<<") then head = "<< " .. head end
+        Parsed(edit.sel).head = head
+        Commit() YR:RefreshWindow()
+    end })
+    ui.head:SetPoint("TOPLEFT", cx + 6, -63)
+
+    -- step switches
+    local function TagSwitch(label, tag, x, width)
+        local t = S.Toggle(body, label, function() return edit.sel and YR.HasTag(Parsed(edit.sel), tag) ~= nil end,
+            function(on) YR.SetTag(Parsed(edit.sel), tag, on, tag == "completewith" and "next" or nil) Commit() YR:RefreshWindow() end)
+        t:SetPoint("TOPLEFT", x, -98)
+        t:SetWidth(width)
+        return t
+    end
+    ui.optional = TagSwitch("Optional", "optional", 14, 118)
+    ui.sticky = TagSwitch("Sticky", "sticky", 136, 100)
+    ui.together = TagSwitch("Ends with the next step", "completewith", 240, 220)
+
+    -- the step's lines
+    local actions = S.Text(body, 12, S.C.accent)
+    actions:SetPoint("TOPLEFT", 14, -132)
+    actions:SetText("ACTIONS")
+    ui.lines = List(body, CW - 28, 7, 24, function(r, i)
+        local l = Parsed(edit.sel).lines[i]
+        r.i = i
+        r.icon:SetTexture(l.k == "cmd" and LINE_ICON[l.cmd] or (l.k == "say" and YR.STEP_ICON.note) or nil)
+        r.label:SetText(LineLabel(l))
+        r:Select(edit.line == i)
+    end, function() return edit.sel and #Parsed(edit.sel).lines or 0 end, function(r)
+        r.icon = r:CreateTexture(nil, "ARTWORK")
+        r.icon:SetSize(14, 14)
+        r.icon:SetPoint("LEFT", 8, 0)
+        r.label = S.Text(r, 13)
+        r.label:SetPoint("LEFT", 28, 0)
+        r.label:SetPoint("RIGHT", -74, 0)
+        r:SetScript("OnClick", function(self) edit.line = self.i YR:RefreshWindow() end)
+        local function Swap(d)
+            local lines = Parsed(edit.sel).lines
+            local a, b = r.i, r.i + d
+            if b < 1 or b > #lines then return end
+            lines[a], lines[b] = lines[b], lines[a]
+            edit.line = b
+            Commit() YR:RefreshWindow()
+        end
+        local up = S.IconButton(r, "^", function() Swap(-1) end, "Move up")
+        up:SetPoint("RIGHT", -48, 0)
+        local down = S.IconButton(r, "v", function() Swap(1) end, "Move down")
+        down:SetPoint("RIGHT", -25, 0)
+        local x = S.IconButton(r, "\195\151", function()
+            table.remove(Parsed(edit.sel).lines, r.i)
+            edit.line = nil
+            Commit() YR:RefreshWindow()
+        end, "Remove this action", S.C.danger)
+        x:SetPoint("RIGHT", -2, 0)
+    end)
+    ui.lines:SetPoint("TOPLEFT", 14, -150)
+    local lf = CreateFrame("Frame", nil, body)
+    lf:SetPoint("TOPLEFT", ui.lines, -1, 1)
+    lf:SetPoint("BOTTOMRIGHT", ui.lines, 1, -1)
+    S.Border(lf)
+
+    -- the selected action, field by field
+    local ed = CreateFrame("Frame", nil, body)
+    ed:SetPoint("TOPLEFT", ui.lines, "BOTTOMLEFT", 0, -12)
+    ed:SetSize(CW - 28, 116)
+    S.Fill(ed, S.C.field)
+    S.Border(ed)
+    ui.lineEd = ed
+    ed.what = S.Text(ed, 13, S.C.sub)
+    ed.what:SetPoint("TOPLEFT", 10, -11)
+    ed.cmd = S.Dropdown(ed, 200, function()
+        local list = {}
+        for _, c in ipairs(YR.COMMANDS) do list[#list + 1] = { c.cmd, c.label } end
+        return list
+    end, function(cmd)
+        local l = SelLine()
+        if l and l.k == "cmd" then l.cmd = cmd Commit() YR:RefreshWindow() end
+    end)
+    ed.cmd:SetPoint("TOPRIGHT", -10, -6)
+    ed.fields = {}
+    for i = 1, 4 do
+        local label = S.Text(ed, 11, S.C.muted)
+        local input = S.Input(ed, { width = 90, onCommit = function(t)
+            local l = SelLine()
+            if not l then return end
+            if l.k == "cmd" then
+                if ed.single then l.args = t else YR.SetArg(l, i, t) end
+            elseif l.k == "tag" then
+                l.val = t ~= "" and t or nil
+            end
+            Commit() YR:RefreshWindow()
+        end })
+        ed.fields[i] = { label = label, input = input }
+    end
+    ed.textLabel = S.Text(ed, 11, S.C.muted)
+    ed.textLabel:SetPoint("BOTTOMLEFT", 10, 38)
+    ed.text = S.Input(ed, { width = CW - 48, placeholder = "What the guide says for this action", onCommit = function(t)
+        local l = SelLine()
+        if not l then return end
+        if l.k == "say" then l.text = t elseif l.k == "cmd" then l.text = t ~= "" and t or nil end
+        Commit() YR:RefreshWindow()
+    end })
+    ed.text:SetPoint("BOTTOMLEFT", 10, 10)
+    ed.here = S.Button(ed, "Here", function()
+        local l = SelLine()
+        local map, x, y = YR.Position()
+        if l and map then
+            local rest = YR.Args(l)
+            l.args = ("%d,%.2f,%.2f"):format(map, x, y) .. (rest[4] and ("," .. table.concat(rest, ",", 4)) or "")
+            Commit() YR:RefreshWindow()
+        end
+    end, nil, 60)
+    ed.here.tip = "Put this point exactly where you are standing"
+    ed.target = S.Button(ed, "My target", function()
+        local l = SelLine()
+        local ok, name = pcall(UnitName, "target")
+        if l and ok and name then l.args = name Commit() YR:RefreshWindow() end
+    end, nil, 84)
+    ed.target.tip = "Use the name of what you have targeted"
+    ed.quest = S.Button(ed, "From my log", function(self)
+        QuestMenu(self, function(q)
+            local l = SelLine()
+            if not l then return end
+            YR.SetArg(l, 1, tostring(q))
+            local title = C_QuestLog.GetTitleForQuestID(q)
+            if title and l.cmd ~= "complete" then l.text = (l.cmd == "turnin" and "Turn in " or "Accept ") .. title end
+            Commit() YR:RefreshWindow()
+        end)
+    end, nil, 96)
+    ed.quest.tip = "Pick the quest from your quest log"
+
+    -- add an action
+    ui.add = S.Dropdown(body, 200, AddChoices, function(choice)
+        if not edit.sel then return end
+        local lines = Parsed(edit.sel).lines
+        local at = (edit.line or #lines) + 1
+        table.insert(lines, at, NewLine(choice))
+        edit.line = at
+        Commit() YR:RefreshWindow()
+    end)
+    ui.add:SetValue("+  Add action")
+    ui.add.label:SetTextColor(unpack(S.C.accent))
+    ui.add:SetPoint("TOPLEFT", ed, "BOTTOMLEFT", 0, -12)
+    local addNote = S.Text(body, 11, S.C.muted)
+    addNote:SetPoint("LEFT", ui.add, "RIGHT", 10, 0)
+    addNote:SetText("Places are where you stand; kill and talk use your target.")
+
+    ui.raw = S.Button(body, "Edit as text", function() YR:EditRawStep() end, "ghost", 100)
+    ui.raw:SetPoint("BOTTOMRIGHT", -10, 10)
+    ui.raw.tip = "The whole step as RestedXP text, for anything the fields don't cover"
+    ui.raw.text:SetTextColor(unpack(S.C.accent))
+end
+
+-- The step as RestedXP text in a box over the inspector; Apply puts it back.
+function YR:EditRawStep()
+    if not edit.sel then return end
+    if not ui.rawFrame then
+        local f = CreateFrame("Frame", nil, ui.card)
+        f:SetAllPoints()
+        f:SetFrameLevel(ui.card:GetFrameLevel() + 30)
+        f:EnableMouse(true)
+        S.Fill(f, S.C.card)
+        S.Border(f, S.C.accent)
+        local t = S.Text(f, 15)
+        t:SetPoint("TOPLEFT", 14, -12)
+        t:SetText("Step as RestedXP text")
+        local w, h = ui.card:GetWidth() - 28, ui.card:GetHeight() - 96
+        local area = S.ScrollArea(f, w, h)
+        area:SetPoint("TOPLEFT", 14, -40)
+        S.Fill(area, S.C.field)
+        local box = CreateFrame("EditBox", nil, area)
+        box:SetMultiLine(true)
+        box:SetAutoFocus(false)
+        box:SetFont(S.FONT, 13, "")
+        box:SetTextColor(unpack(S.C.text))
+        box:SetWidth(w - 12)
+        box:SetTextInsets(8, 8, 8, 8)
+        box:SetScript("OnEscapePressed", box.ClearFocus)
+        area:SetScrollChild(box)
+        area:SetScript("OnMouseDown", function() box:SetFocus() end)
+        local apply = S.Button(f, "Apply", function()
+            edit.steps[edit.sel] = (box:GetText():gsub("%s+$", ""))
+            edit.parsed[edit.sel], edit.line, edit.dirty = nil, nil, true
+            f:Hide() YR:RefreshWindow()
+        end, "primary", 90)
+        apply:SetPoint("BOTTOMLEFT", 14, 12)
+        local cancel = S.Button(f, "Cancel", function() f:Hide() end, nil, 90)
+        cancel:SetPoint("LEFT", apply, "RIGHT", 8, 0)
+        ui.rawBox, ui.rawFrame = box, f
+    end
+    ui.rawBox:SetText(edit.steps[edit.sel])
+    ui.rawFrame:Show()
+    ui.rawBox:SetFocus()
+end
+
+local function RefreshInspector()
+    local has = edit.sel ~= nil and edit.steps[edit.sel] ~= nil
+    ui.body:SetShown(has)
+    ui.empty:SetShown(not has)
+    if ui.rawFrame and not has then ui.rawFrame:Hide() end
+    if not has then return end
+    local p = Parsed(edit.sel)
+    local info = YR.StepInfo(p)
+    ui.stepIcon:SetTexture(info.icon)
+    ui.stepTitle:SetText(("Step %d"):format(edit.sel))
+    ui.where:SetText(info.where and ("Location  " .. (YR.PlaceText(info.where) or "?")) or "No location")
+    local head = p.head:match("<<%s*(.+)$") or ""
+    ui.everyone:SetOn(head == "")
+    for _, chip in ipairs(ui.chips) do
+        local on = false
+        for token in (head .. "/"):gmatch("([^/%s]+)[/%s]*") do if token == CLASS_NAME[chip.class] then on = true end end
+        chip:SetOn(on)
+    end
+    if not ui.head:HasFocus() then ui.head:SetValue(p.head) end
+    ui.optional:Refresh() ui.sticky:Refresh() ui.together:Refresh()
+    if edit.line and not p.lines[edit.line] then edit.line = nil end
+    ui.lines:ShowIndex(edit.line)
+    ui.lines:Refresh()
+
+    local ed, l = ui.lineEd, SelLine()
+    for _, f in ipairs(ed.fields) do f.label:Hide() f.input:Hide() end
+    ed.cmd:Hide() ed.here:Hide() ed.target:Hide() ed.quest:Hide()
+    ed.text:Show() ed.textLabel:Show()
+    ed.textLabel:SetText("Guide text")
+    if not l then
+        ed.what:SetText("Click an action above to change it, or add one below.")
+        ed.text:Hide() ed.textLabel:Hide()
+        return
+    end
+    local function Field(i, name, x, w, value)
+        local f = ed.fields[i]
+        f.label:Show() f.input:Show()
+        f.label:SetText(name)
+        f.label:ClearAllPoints() f.label:SetPoint("TOPLEFT", x, -38)
+        f.input:SetWidth(w)
+        f.input:ClearAllPoints() f.input:SetPoint("TOPLEFT", x, -52)
+        if not f.input:HasFocus() then f.input:SetValue(value) end
+    end
+    if l.k == "cmd" then
+        local c = YR.COMMAND_BY_NAME[l.cmd]
+        ed.what:SetText("Action")
+        ed.cmd:Show()
+        ed.cmd:SetValue(c and c.label or ("." .. l.cmd))
+        local names = c and c.fields or { "Arguments" }
+        ed.single = not c
+        local args = YR.Args(l)
+        local x, w = 10, (l.cmd == "goto") and 70 or (#names <= 1 and 200 or 120)
+        for i, name in ipairs(names) do
+            Field(i, name, x, w, ed.single and (l.args or "") or args[i])
+            x = x + w + 8
+        end
+        local extra = l.cmd == "goto" and ed.here or ((l.cmd == "target" or l.cmd == "mob") and ed.target)
+            or ((l.cmd == "accept" or l.cmd == "turnin" or l.cmd == "complete") and ed.quest)
+        if extra then
+            extra:Show()
+            extra:ClearAllPoints()
+            extra:SetPoint("TOPLEFT", x, -52)
+        end
+        if not ed.text:HasFocus() then ed.text:SetValue(l.text or "") end
+    elseif l.k == "say" then
+        ed.what:SetText(l.pre == "+" and "Reminder text" or "Instruction text")
+        ed.textLabel:SetText("Text")
+        if not ed.text:HasFocus() then ed.text:SetValue(l.text) end
+    elseif l.k == "tag" then
+        ed.what:SetText("Tag  #" .. l.tag)
+        ed.text:Hide() ed.textLabel:Hide()
+        ed.single = false
+        Field(1, "Value", 10, 220, l.val)
+    else
+        ed.what:SetText("A line YippRoute doesn't know: use Edit as text.")
+        ed.text:Hide() ed.textLabel:Hide()
+    end
+end
+
+local function BuildRoutes(page)
+    BuildStepList(page)
+    BuildInspector(page)
     local save = S.Button(page, "Save", function()
+        if not edit.key then return end
         YR:SaveCustom(edit.key, edit.header, edit.steps)
         edit.dirty = false
         YR:RefreshWindow()
         StaticPopup_Show("YIPPROUTE_RELOAD")
-    end, true)
-    save:SetPoint("BOTTOMLEFT", 0, 0)
+    end, "primary", 110)
+    save:SetPoint("BOTTOMLEFT", 16, 16)
+    save.tip = "Keep this as your version of the route (RestedXP gets it after a reload)"
+    local undo = S.Button(page, "Undo changes", function() Open(edit.key) YR:RefreshWindow() end, nil, 120)
+    undo:SetPoint("LEFT", save, "RIGHT", 8, 0)
+    undo.tip = "Back to your last saved version"
     local revert = S.Button(page, "Back to the shipped route", function()
         YR:RevertGuide(edit.key)
         Open(edit.key)
         YR:RefreshWindow()
         StaticPopup_Show("YIPPROUTE_RELOAD")
-    end)
-    revert:SetPoint("LEFT", save, "RIGHT", 8, 0)
-    local undo = S.Button(page, "Undo changes", function() Open(edit.key) YR:RefreshWindow() end)
-    undo:SetPoint("LEFT", revert, "RIGHT", 8, 0)
+    end, nil, 190)
+    revert:SetPoint("LEFT", undo, "RIGHT", 8, 0)
+    ui.state = S.Text(page, 12, S.C.muted)
+    ui.state:SetPoint("LEFT", revert, "RIGHT", 16, 0)
+    local export = S.Button(page, "Export", function() YR:ToggleWindow("share") YR:ExportOpen() end, nil, 90)
+    export:SetPoint("BOTTOMRIGHT", -16, 16)
+    export.tip = "This route as text, to send to someone"
 end
 
 local function RefreshRoutes()
     if not edit.key then return end
-    routes.name:SetText(YR.GuideName(edit.key))
-    routes.state:SetText((edit.dirty and "unsaved changes" or (YR:IsCustom(edit.key) and "your version" or "as shipped"))
-        .. "  -  " .. #edit.steps .. " steps")
-    routes.list:Refresh()
+    win.subtitle:SetText(YR.GuideName(edit.key))
+    ui.count:SetText(("%d steps"):format(#edit.steps))
+    ui.state:SetText(edit.dirty and "|cffffd24aUnsaved changes|r" or (YR:IsCustom(edit.key) and "Your version" or "As shipped"))
+    ui.steps:ShowIndex(edit.sel)
+    ui.steps:Refresh()
+    RefreshInspector()
 end
 
 -- ---------------------------------------------------------------------------
 -- This run
 -- ---------------------------------------------------------------------------
 local run = {}
+local ACTION_ICON = { accept = YR.STEP_ICON.accept, turnin = YR.STEP_ICON.turnin, complete = YR.STEP_ICON.kill,
+    buy = YR.STEP_ICON.buy, learn = YR.STEP_ICON.train, hearth = YR.STEP_ICON.hearth, death = YR.STEP_ICON.death,
+    level = YR.STEP_ICON.xp }
 
 local function BuildRun(page)
-    run.title = S.Text(page, 15)
-    run.title:SetPoint("TOPLEFT", 0, 0)
-    run.title:SetText("What this character did")
+    local title = S.Text(page, 17)
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText("What this character did")
     run.hint = S.Text(page, 12, S.C.muted)
-    run.hint:SetPoint("TOPLEFT", 0, -22)
-    run.list = List(page, W - SIDE - 40, ROWS, function(r, i)
+    run.hint:SetPoint("TOPLEFT", 16, -40)
+    run.list = List(page, PW - 32, math.floor((PH - 130) / 26), 26, function(r, i)
         local a = run.actions[i]
         r.action = a
-        r.num:SetText(i)
+        r.icon:SetTexture(ACTION_ICON[a.e[2]])
         r.label:SetText(a.label)
-    end, function() return run.actions and #run.actions or 0 end)
-    run.list:SetPoint("TOPLEFT", 0, -44)
-    for _, r in ipairs(run.list.rows) do
-        local add = S.Mini(r, "+", function() if r.action.step then YR:InsertStep(r.action.step) end end, S.C.accent)
-        add:SetPoint("RIGHT", -4, 0)
-        function r:OnHover(on)
-            if not on then GameTooltip:Hide() return end
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine("+ adds this as a step to the route open in Routes:", 1, 1, 1)
-            for line in ((self.action.step or "") .. "\n"):gmatch("([^\n]*)\n") do GameTooltip:AddLine(line, 0.8, 0.8, 0.8) end
-            GameTooltip:Show()
-        end
-    end
+        r.when:SetText(date("%H:%M", a.e[1]))
+    end, function() return run.actions and #run.actions or 0 end, function(r)
+        r.when = S.Text(r, 11, S.C.muted)
+        r.when:SetPoint("LEFT", 10, 0)
+        r.icon = r:CreateTexture(nil, "ARTWORK")
+        r.icon:SetSize(16, 16)
+        r.icon:SetPoint("LEFT", 52, 0)
+        r.label = S.Text(r, 13)
+        r.label:SetPoint("LEFT", 76, 0)
+        r.label:SetPoint("RIGHT", -150, 0)
+        local add = S.Button(r, "+  Add to route", function() if r.action.step then YR:InsertStep(r.action.step) end end,
+            "ghost", 124)
+        add:SetPoint("RIGHT", -6, 0)
+        add:SetHeight(22)
+        add.text:SetTextColor(unpack(S.C.accent))
+        add.tip = "Put this in the open route as a step, after the selected step"
+    end)
+    run.list:SetPoint("TOPLEFT", 16, -66)
+    local frame = CreateFrame("Frame", nil, page)
+    frame:SetPoint("TOPLEFT", run.list, -1, 1)
+    frame:SetPoint("BOTTOMRIGHT", run.list, 1, -1)
+    S.Border(frame)
     run.record = S.Toggle(page, "Record this run", function() return YippRouteDB.logging end,
         function(on) YR:SetLogging(on) end)
-    run.record:SetPoint("BOTTOMLEFT", 0, 2)
+    run.record:SetPoint("BOTTOMLEFT", 16, 20)
 end
 
 local function RefreshRun()
+    win.subtitle:SetText("")
     run.actions = YR:RunActions()
-    run.hint:SetText(("%d actions. + adds one as a step after the step selected in Routes (%s)."):format(
-        #run.actions, edit.key and YR.GuideName(edit.key) or "open a route first"))
-    run.list.offset = math.max(0, #run.actions - ROWS)      -- newest at the bottom, in view
+    run.hint:SetText(("%d actions. Add to route puts one in %s, after step %s."):format(#run.actions,
+        edit.key and YR.GuideName(edit.key) or "the open route", edit.sel or "-"))
+    run.list.offset = math.max(0, #run.actions - #run.list.rows)
     run.list:Refresh()
     run.record:Refresh()
 end
@@ -239,239 +780,327 @@ end
 -- ---------------------------------------------------------------------------
 local share = {}
 
+function YR:ExportOpen()
+    if not (edit.key and share.box) then return end
+    share.box:SetText(YR.JoinSteps(edit.header, edit.steps))
+    share.box:SetFocus()
+    share.box:HighlightText()
+    share.hint:SetText("Selected: press Ctrl+C to copy.")
+end
+
 local function BuildShare(page)
-    local title = S.Text(page, 15)
-    title:SetPoint("TOPLEFT", 0, 0)
+    local title = S.Text(page, 17)
+    title:SetPoint("TOPLEFT", 16, -16)
     title:SetText("Share a route")
     share.hint = S.Text(page, 12, S.C.muted)
-    share.hint:SetPoint("TOPLEFT", 0, -22)
-    share.hint:SetText("Export puts the open route here: Ctrl+A, Ctrl+C. To import, paste a route and press Import.")
-
-    local box = CreateFrame("ScrollFrame", nil, page)
-    box:SetPoint("TOPLEFT", 0, -46)
-    box:SetSize(W - SIDE - 40, ROW * ROWS - 30)
-    S.Fill(box, { 0, 0, 0, 0.35 })
-    S.Border(box)
-    local text = CreateFrame("EditBox", nil, box)
-    text:SetMultiLine(true)
-    text:SetAutoFocus(false)
-    text:SetFont(S.FONT, 12, "")
-    text:SetTextColor(unpack(S.C.text))
-    text:SetWidth(W - SIDE - 56)
-    text:SetTextInsets(8, 8, 8, 8)
-    text:SetScript("OnEscapePressed", text.ClearFocus)
-    box:SetScrollChild(text)
-    box:EnableMouseWheel(true)
-    box:SetScript("OnMouseWheel", function(self, delta)
-        self:SetVerticalScroll(math.max(0, math.min(self:GetVerticalScrollRange(), self:GetVerticalScroll() - delta * 40)))
-    end)
-    box:SetScript("OnMouseDown", function() text:SetFocus() end)
-    share.text = text
-
-    local export = S.Button(page, "Export open route", function()
-        if not edit.key then return end
-        text:SetText(YR.JoinSteps(edit.header, edit.steps))
-        text:SetFocus()
-        text:HighlightText()
-    end, true)
-    export:SetPoint("BOTTOMLEFT", 0, 0)
+    share.hint:SetPoint("TOPLEFT", 16, -40)
+    share.hint:SetText("Export the open route and copy it, or paste someone's route here and import it.")
+    local area = S.ScrollArea(page, PW - 32, PH - 132)
+    area:SetPoint("TOPLEFT", 16, -64)
+    S.Fill(area, S.C.field)
+    S.Border(area)
+    local box = CreateFrame("EditBox", nil, area)
+    box:SetMultiLine(true)
+    box:SetAutoFocus(false)
+    box:SetFont(S.FONT, 12, "")
+    box:SetTextColor(unpack(S.C.text))
+    box:SetWidth(PW - 48)
+    box:SetTextInsets(10, 10, 10, 10)
+    box:SetScript("OnEscapePressed", box.ClearFocus)
+    area:SetScrollChild(box)
+    area:SetScript("OnMouseDown", function() box:SetFocus() end)
+    share.box = box
+    local export = S.Button(page, "Export open route", function() YR:ExportOpen() end, "primary", 150)
+    export:SetPoint("BOTTOMLEFT", 16, 16)
     local import = S.Button(page, "Import", function()
-        local done, why = YR:ImportGuide(text:GetText())
-        share.hint:SetText(done and ("Imported: " .. done .. ". Reload to use it.") or ("Not imported: " .. why))
+        local done, why = YR:ImportGuide(box:GetText())
+        share.hint:SetText(done and ("|cff66dd88Imported:|r " .. done .. ". Reload to use it.") or ("|cffff7070Not imported:|r " .. why))
         if done then
             if edit.key then Open(edit.key) end
             StaticPopup_Show("YIPPROUTE_RELOAD")
         end
-    end)
+    end, nil, 100)
     import:SetPoint("LEFT", export, "RIGHT", 8, 0)
+    local clear = S.Button(page, "Clear", function() box:SetText("") end, "ghost", 70)
+    clear:SetPoint("LEFT", import, "RIGHT", 8, 0)
 end
 
 -- ---------------------------------------------------------------------------
--- Settings
+-- Settings: sections of two-column rows, the label on the left and its control on the right
 -- ---------------------------------------------------------------------------
-local settings = {}
-local rewards = {}
-
+local settings = { controls = {} }
 local KIND_LABEL = {}
 for _, k in ipairs(YR.REWARD_KINDS) do KIND_LABEL[k.key] = k.label end
 
-local function Heading(page, text, x, y)
-    local h = S.Text(page, 15)
-    h:SetPoint("TOPLEFT", x, y)
-    h:SetText(text)
-    return h
-end
-
 local function BuildSettings(page)
-    -- left: the general switches, then the rewards you chose yourself
-    Heading(page, "Settings", 0, 0)
-    local y = -34
-    for _, o in ipairs({
-        { "Show level splits", "showSplits", function(on) YR:ShowSplits(on) end },
-        { "Pick quest rewards", "pickRewards" },
-        { "Record runs", "logging", function(on) YR:SetLogging(on) end },
-        { "Minimap button", "minimapButton", function(on) YR:ShowMinimapButton(on) end },
-    }) do
-        local t = S.Toggle(page, o[1], function() return YR.Option(o[2]) end, function(on)
-            YippRouteDB[o[2]] = on
-            if o[3] then o[3](on) end
-        end)
-        t:SetPoint("TOPLEFT", 0, y)
-        settings[#settings + 1] = t
+    local area = S.ScrollArea(page, PW - 24, PH - 64)
+    area:SetPoint("TOPLEFT", 16, -10)
+    local c = area.content
+    c:SetWidth(PW - 40)
+    local colW = (PW - 52) / 2
+    local y, col, rowIndex = -6, 0, 0
+
+    local function Section(title)
+        if col == 1 then y = y - 36 col = 0 end
+        y = y - 12
+        local t = S.Text(c, 12, S.C.accent)
+        t:SetPoint("TOPLEFT", 4, y)
+        t:SetText(title:upper())
+        y = y - 20
+        rowIndex = 0
+    end
+    local function Row(label, control, tip)
+        local r = CreateFrame("Frame", nil, c)
+        r:SetSize(colW, 34)
+        r:SetPoint("TOPLEFT", col * (colW + 12), y)
+        S.Fill(r, (math.floor(rowIndex / 2) % 2 == 0) and S.C.card or ZEBRA)
+        local l = S.Text(r, 13)
+        l:SetPoint("LEFT", 12, 0)
+        l:SetText(label)
+        if tip then
+            r:EnableMouse(true)
+            r:SetScript("OnEnter", function(self) S.Tip(self, tip) end)
+            r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+        control:SetParent(r)
+        control:ClearAllPoints()
+        control:SetPoint("RIGHT", -12, 0)
+        settings.controls[#settings.controls + 1] = control
+        rowIndex = rowIndex + 1
+        if col == 0 then col = 1 else col = 0 y = y - 36 end
+        return r
+    end
+    local function Opt(key) return function() return YR.Option(key) end end
+    local function SetOpt(key, after) return function(on) YippRouteDB[key] = on if after then after(on) end end end
+    local st = function() return YR:SplitsStyle() end
+    local function Style(field) return function(v) st()[field] = v YR:ApplySplitsStyle() end end
+
+    Section("General")
+    Row("Minimap button", S.Switch(c, Opt("minimapButton"), SetOpt("minimapButton", function(on) YR:ShowMinimapButton(on) end)))
+    Row("Record runs", S.Switch(c, Opt("logging"), SetOpt("logging", function(on) YR:SetLogging(on) end)),
+        "Quests, levels, deaths, purchases and your position every 2 seconds, for This run and the route analysis")
+
+    Section("Level splits")
+    Row("Show level splits", S.Switch(c, Opt("showSplits"), SetOpt("showSplits", function(on) YR:ShowSplits(on) end)))
+    Row("Lock in place", S.Switch(c, function() return st().lock end, Style("lock")),
+        "Locked, it can't be dragged and clicks go through it")
+    Row("Text size", S.Slider(c, 10, 24, 1, function() return st().size end, Style("size")))
+    Row("Levels listed", S.Slider(c, 1, 60, 1, function() return st().rows end, Style("rows")),
+        "How many finished levels are listed under the one in progress")
+    Row("Show XP per hour", S.Switch(c, function() return st().rate end, Style("rate")))
+    Row("Show time to ding", S.Switch(c, function() return st().ding end, Style("ding")))
+    Row("Show the vs best column", S.Switch(c, function() return st().vs end, Style("vs")))
+    Row("Background", S.Slider(c, 0, 100, 5, function() return st().bg end, Style("bg")),
+        "How dark the box behind the splits is, in percent. 0 is none")
+    Row("From the left (pixels)", S.Slider(c, 0, 3000, 1, function() return YR:SplitsPosition()[1] end,
+        function(v) YR:SetSplitsPosition(v, nil) end, 210))
+    Row("From the top (pixels)", S.Slider(c, 0, 2000, 1, function() return YR:SplitsPosition()[2] end,
+        function(v) YR:SetSplitsPosition(nil, v) end, 210))
+
+    Section("Quest rewards")
+    Row("Pick quest rewards", S.Switch(c, Opt("pickRewards"), SetOpt("pickRewards")),
+        "When a quest offers a choice, take one for you. Hold Shift when handing in to choose yourself")
+    Row("Up to level", S.Slider(c, 1, 60, 1, function() return YR:RewardSettings().maxLevel end,
+        function(v) YR:RewardSettings().maxLevel = v end))
+    Row("Take the reward I chose before", S.Switch(c, function() return YR:RewardSettings().remember end,
+        function(on) YR:RewardSettings().remember = on end), "A reward you picked by hand for a quest is taken again")
+    local fallback = S.Dropdown(c, 170, { { "value", "The most valuable" }, { "ask", "Let me choose" } }, function(v)
+        YR:RewardSettings().fallback = v
+        YR:RefreshWindow()
+    end)
+    function fallback:Refresh() self:SetValue(YR:RewardSettings().fallback == "value" and "The most valuable" or "Let me choose") end
+    Row("Nothing from the list on offer", fallback)
+    if col == 1 then y = y - 36 col = 0 end
+
+    y = y - 10
+    local t = S.Text(c, 12, S.C.muted)
+    t:SetPoint("TOPLEFT", 4, y)
+    t:SetText("Priority: the first kind on offer is taken. Switch off the kinds you never want.")
+    y = y - 20
+    settings.order = {}
+    for i = 1, #YR.REWARD_KINDS do
+        local r = CreateFrame("Frame", nil, c)
+        r:SetSize(colW * 2 + 12, 30)
+        r:SetPoint("TOPLEFT", 0, y)
+        S.Fill(r, (i % 2 == 1) and S.C.card or ZEBRA)
+        r.num = S.Text(r, 12, S.C.muted)
+        r.num:SetPoint("LEFT", 12, 0)
+        r.label = S.Text(r, 13)
+        r.label:SetPoint("LEFT", 40, 0)
+        r.switch = S.Switch(r, function() local db = YR:RewardSettings() return not db.off[db.order[i]] end,
+            function(on) local db = YR:RewardSettings() db.off[db.order[i]] = (not on) or nil YR:RefreshWindow() end)
+        r.switch:SetPoint("RIGHT", -72, 0)
+        local function Swap(d)
+            local db = YR:RewardSettings()
+            local b = i + d
+            if b < 1 or b > #db.order then return end
+            db.order[i], db.order[b] = db.order[b], db.order[i]
+            YR:RefreshWindow()
+        end
+        local up = S.IconButton(r, "^", function() Swap(-1) end, "Higher")
+        up:SetPoint("RIGHT", -36, 0)
+        local down = S.IconButton(r, "v", function() Swap(1) end, "Lower")
+        down:SetPoint("RIGHT", -10, 0)
+        settings.order[i] = r
         y = y - 30
     end
 
-    Heading(page, "Rewards you chose yourself", 0, y - 12)
-    local hint = S.Text(page, 12, S.C.muted)
-    hint:SetPoint("TOPLEFT", 0, y - 34)
-    hint:SetText("Shift when handing in to choose; taken again next time.")
-    rewards.chosen = List(page, 260, 8, function(r, i)
-        local e = rewards.chosenList[i]
-        r.quest = e.quest
-        r.num:SetText("")
-        r.label:SetPoint("LEFT", 6, 0)
-        r.label:SetText((e.title or ("quest " .. e.quest)) .. ": " .. (e.name or e.item))
-    end, function() return rewards.chosenList and #rewards.chosenList or 0 end)
-    rewards.chosen:SetPoint("TOPLEFT", 0, y - 54)
-    for _, r in ipairs(rewards.chosen.rows) do
-        local x = S.Mini(r, "x", function()
-            YR:RewardSettings().chosen[r.quest] = nil
-            YR:RefreshWindow()
-        end, S.C.danger)
-        x:SetPoint("RIGHT", -4, 0)
-    end
+    y = y - 18
+    local h = S.Text(c, 12, S.C.accent)
+    h:SetPoint("TOPLEFT", 4, y)
+    h:SetText("REWARDS YOU CHOSE YOURSELF")
+    y = y - 22
+    settings.chosenY, settings.chosenRows, settings.content, settings.width = y, {}, c, colW * 2 + 12
+    c:SetHeight(-y + 28 * 20)
 
-    -- right: how the picker chooses
-    local X = 290
-    Heading(page, "Quest rewards", X, 0)
-    local level = S.Text(page, 13)
-    level:SetPoint("TOPLEFT", X, -38)
-    rewards.level = level
-    local minus = S.Mini(page, "-", function()
-        local db = YR:RewardSettings() db.maxLevel = math.max(1, db.maxLevel - 1) YR:RefreshWindow() end, S.C.text)
-    minus:SetPoint("TOPLEFT", X + 170, -34)
-    local plus = S.Mini(page, "+", function()
-        local db = YR:RewardSettings() db.maxLevel = math.min(60, db.maxLevel + 1) YR:RefreshWindow() end, S.C.text)
-    plus:SetPoint("LEFT", minus, "RIGHT", 4, 0)
-    local remember = S.Toggle(page, "Take the reward I chose before", function() return YR:RewardSettings().remember end,
-        function(on) YR:RewardSettings().remember = on end)
-    remember:SetPoint("TOPLEFT", X, -60)
-    local value = S.Toggle(page, "Nothing below on offer: most valuable",
-        function() return YR:RewardSettings().fallback == "value" end,
-        function(on) YR:RewardSettings().fallback = on and "value" or "ask" end)
-    value:SetPoint("TOPLEFT", X, -86)
-    settings[#settings + 1] = remember
-    settings[#settings + 1] = value
-    local order = S.Text(page, 12, S.C.muted)
-    order:SetPoint("TOPLEFT", X, -114)
-    order:SetText("Take the first of these on offer. Click to turn one off.")
-    rewards.order = List(page, W - SIDE - 40 - X, #YR.REWARD_KINDS, function(r, i)
-        local db = YR:RewardSettings()
-        local kind = db.order[i]
-        r.index = i
-        r.num:SetText(i)
-        r.label:SetText(KIND_LABEL[kind] or kind)
-        r.label:SetTextColor(unpack(db.off[kind] and S.C.muted or S.C.text))
-    end, function() return #YR:RewardSettings().order end)
-    rewards.order:SetPoint("TOPLEFT", X, -132)
-    for _, r in ipairs(rewards.order.rows) do
-        r:SetScript("OnClick", function(self)
-            local db = YR:RewardSettings()
-            local kind = db.order[self.index]
-            db.off[kind] = not db.off[kind] or nil
-            YR:RefreshWindow()
-        end)
-        local function Swap(d)
-            local db = YR:RewardSettings()
-            local a, b = r.index, r.index + d
-            if b < 1 or b > #db.order then return end
-            db.order[a], db.order[b] = db.order[b], db.order[a]
-            YR:RefreshWindow()
-        end
-        local up = S.Mini(r, "^", function() Swap(-1) end)
-        up:SetPoint("RIGHT", -24, 0)
-        local down = S.Mini(r, "v", function() Swap(1) end)
-        down:SetPoint("RIGHT", -4, 0)
-    end
+    local reload = S.Button(page, "Reload UI", function() ReloadUI() end, nil, 110)
+    reload:SetPoint("BOTTOMLEFT", 16, 14)
+    local close = S.Button(page, "Close", function() win:Hide() end, nil, 110)
+    close:SetPoint("BOTTOMRIGHT", -16, 14)
 end
 
 local function RefreshSettings()
-    for _, t in ipairs(settings) do t:Refresh() end
+    win.subtitle:SetText("")
+    for _, ctl in ipairs(settings.controls) do if ctl.Refresh then ctl:Refresh() end end
     local db = YR:RewardSettings()
-    rewards.level:SetText(("Up to level %d"):format(db.maxLevel))
-    rewards.chosenList = {}
-    for quest, e in pairs(db.chosen) do
-        rewards.chosenList[#rewards.chosenList + 1] = { quest = quest, item = e.item, name = e.name, title = e.title }
+    for i, r in ipairs(settings.order) do
+        local kind = db.order[i]
+        r.num:SetText(i)
+        r.label:SetText(KIND_LABEL[kind] or kind)
+        r.label:SetTextColor(unpack(db.off[kind] and S.C.muted or S.C.text))
+        r.switch:Refresh()
     end
-    table.sort(rewards.chosenList, function(a, b) return (a.title or "") < (b.title or "") end)
-    rewards.chosen:Refresh()
-    rewards.order:Refresh()
+    local list = {}
+    for quest, e in pairs(db.chosen) do list[#list + 1] = { quest = quest, e = e } end
+    table.sort(list, function(a, b) return (a.e.title or "") < (b.e.title or "") end)
+    for i = 1, math.max(#list, #settings.chosenRows) do
+        local r = settings.chosenRows[i]
+        if not r and list[i] then
+            r = CreateFrame("Frame", nil, settings.content)
+            r:SetSize(settings.width, 28)
+            r:SetPoint("TOPLEFT", 0, settings.chosenY - (i - 1) * 28)
+            S.Fill(r, (i % 2 == 1) and S.C.card or ZEBRA)
+            r.label = S.Text(r, 13)
+            r.label:SetPoint("LEFT", 12, 0)
+            r.x = S.IconButton(r, "\195\151", function() YR:RewardSettings().chosen[r.quest] = nil YR:RefreshWindow() end,
+                "Forget this choice", S.C.danger)
+            r.x:SetPoint("RIGHT", -8, 0)
+            settings.chosenRows[i] = r
+        end
+        if r then
+            if list[i] then
+                r:Show()
+                r.quest = list[i].quest
+                r.label:SetText((list[i].e.title or ("Quest " .. list[i].quest)) .. "   |cffffd24a" .. (list[i].e.name or "") .. "|r")
+            else
+                r:Hide()
+            end
+        end
+    end
+    if not settings.none then
+        settings.none = S.Text(settings.content, 12, S.C.muted)
+        settings.none:SetPoint("TOPLEFT", 12, settings.chosenY - 6)
+        settings.none:SetText("None yet. Hold Shift when handing in a quest and pick a reward: it's remembered here.")
+    end
+    settings.none:SetShown(#list == 0)
 end
 
 -- ---------------------------------------------------------------------------
 -- The window
 -- ---------------------------------------------------------------------------
 local PAGES = {
-    { key = "routes", label = "Routes", build = BuildRoutes, refresh = RefreshRoutes },
-    { key = "run", label = "This run", build = BuildRun, refresh = RefreshRun },
-    { key = "share", label = "Share", build = BuildShare, refresh = function() end },
-    { key = "settings", label = "Settings", build = BuildSettings,
+    { key = "routes", label = "Routes", icon = "Interface\\Icons\\INV_Misc_Map_01", build = BuildRoutes, refresh = RefreshRoutes },
+    { key = "run", label = "This run", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", build = BuildRun, refresh = RefreshRun },
+    { key = "share", label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,
+      refresh = function() win.subtitle:SetText("") end },
+    { key = "settings", label = "Settings", icon = "Interface\\Icons\\Trade_Engineering", build = BuildSettings,
       refresh = RefreshSettings },
 }
 
 local function Show(key)
     current = key
+    S.CloseMenu()
     for _, p in ipairs(PAGES) do
         pages[p.key]:SetShown(p.key == key)
-        p.tab.bg:SetColorTexture(unpack(p.key == key and S.C.select or { 0, 0, 0, 0 }))
+        p.tab:Select(p.key == key)
     end
     YR:RefreshWindow()
+end
+
+local function NavButton(parent, label, icon, y, indent)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(SIDE - 16, indent and 22 or 30)
+    b:SetPoint("TOPLEFT", 8, y)
+    b.bg = S.Fill(b, { 0, 0, 0, 0 })
+    b.bar = b:CreateTexture(nil, "ARTWORK")
+    b.bar:SetPoint("TOPLEFT") b.bar:SetPoint("BOTTOMLEFT") b.bar:SetWidth(2)
+    S.Set(b.bar, S.C.accent)
+    b.bar:Hide()
+    local x = indent and 36 or 10
+    if icon then
+        local i = S.Icon(b, icon, 18)
+        i:SetPoint("LEFT", 10, 0)
+        x = 36
+    end
+    b.text = S.Text(b, indent and 12 or 14, indent and S.C.sub or S.C.text)
+    b.text:SetPoint("LEFT", x, 0)
+    b.text:SetPoint("RIGHT", -6, 0)
+    b.text:SetText(label)
+    function b:Select(on)
+        self.selected = on
+        self.bg:SetColorTexture(unpack(on and (indent and S.C.hover or S.C.accentD) or { 0, 0, 0, 0 }))
+        self.bar:SetShown(on and not indent)
+        if indent then self.text:SetTextColor(unpack(on and S.C.accent or S.C.sub)) end
+    end
+    b:SetScript("OnEnter", function(self) if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end end)
+    b:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end end)
+    return b
 end
 
 local function Build()
     win = S.Window("YippRouteWindow", W, H, "YippRoute")
     local side = CreateFrame("Frame", nil, win)
-    side:SetPoint("TOPLEFT", 1, -44)
+    side:SetPoint("TOPLEFT", 1, -HEAD)
     side:SetPoint("BOTTOMLEFT", 1, 1)
     side:SetWidth(SIDE)
     S.Fill(side, S.C.side)
+    local rule = side:CreateTexture(nil, "BORDER")
+    rule:SetPoint("TOPRIGHT") rule:SetPoint("BOTTOMRIGHT") rule:SetWidth(1)
+    S.Set(rule, S.C.line)
     pages = {}
-    local y = -10
+    ui.routeTabs = {}
+    local y = -12
     for _, p in ipairs(PAGES) do
-        local tab = CreateFrame("Button", nil, side)
-        tab:SetSize(SIDE - 16, 26)
-        tab:SetPoint("TOPLEFT", 8, y)
-        tab.bg = S.Fill(tab, { 0, 0, 0, 0 })
-        local t = S.Text(tab, 14)
-        t:SetPoint("LEFT", 10, 0)
-        t:SetText(p.label)
-        tab:SetScript("OnClick", function() Show(p.key) end)
-        p.tab = tab
-        y = y - 30
-        -- under Routes: one entry per route we ship
+        p.tab = NavButton(side, p.label, p.icon, y)
+        p.tab:SetScript("OnClick", function() Show(p.key) end)
+        y = y - 34
         if p.key == "routes" then
             for _, g in ipairs(YR.shipped) do
-                local sub = CreateFrame("Button", nil, side)
-                sub:SetSize(SIDE - 24, 20)
-                sub:SetPoint("TOPLEFT", 16, y)
-                local st = S.Text(sub, 12, S.C.muted)
-                st:SetPoint("LEFT", 10, 0)
-                st:SetPoint("RIGHT", 0, 0)
-                st:SetText(YR.GuideName(g.key))
-                sub:SetScript("OnClick", function() Open(g.key) Show("routes") end)
-                sub:SetScript("OnEnter", function() st:SetTextColor(unpack(S.C.text)) end)
-                sub:SetScript("OnLeave", function() st:SetTextColor(unpack(S.C.muted)) end)
-                y = y - 22
+                local sub = NavButton(side, YR.GuideName(g.key), nil, y, true)
+                sub:SetScript("OnClick", function()
+                    Open(g.key)
+                    for _, t in ipairs(ui.routeTabs) do t:Select(t == sub) end
+                    Show("routes")
+                end)
+                ui.routeTabs[#ui.routeTabs + 1] = sub
+                y = y - 24
             end
-            y = y - 6
+            y = y - 10
         end
         local page = CreateFrame("Frame", nil, win)
-        page:SetPoint("TOPLEFT", SIDE + 20, -52)
-        page:SetPoint("BOTTOMRIGHT", -20, 16)
+        page:SetPoint("TOPLEFT", SIDE, -HEAD)
+        page:SetPoint("BOTTOMRIGHT")
         p.build(page)
         pages[p.key] = page
     end
-    if YR.shipped[1] then Open(YR.shipped[1].key) end
+    local version = S.Text(side, 11, S.C.muted)
+    version:SetPoint("BOTTOMLEFT", 14, 12)
+    local meta = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("YippRoute", "Version")
+    version:SetText(meta and ("v" .. meta) or "")
+    if YR.shipped[1] then
+        Open(YR.shipped[1].key)
+        if ui.routeTabs[1] then ui.routeTabs[1]:Select(true) end
+    end
 end
 
 function YR:RefreshWindow()

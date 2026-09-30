@@ -19,10 +19,12 @@ function Frame:Hide() self.hidden = true end
 function Frame:IsShown() return not self.hidden end
 function Frame:SetText(t) self.text = t end
 function Frame:GetText() return self.text or "" end
-for _, k in ipairs({ "GetStringWidth", "GetHeight", "GetWidth", "GetVerticalScroll", "GetVerticalScrollRange" }) do
+for _, k in ipairs({ "GetStringWidth", "GetHeight", "GetWidth", "GetVerticalScroll", "GetVerticalScrollRange",
+    "GetFrameLevel", "GetLeft", "GetTop" }) do
     Frame[k] = function() return 20 end
 end
 function Frame:IsMouseOver() return false end
+function Frame:HasFocus() return false end
 function Frame:SetShown(on) self.hidden = not on end
 function Frame:SetScript(_, fn) self.fn = fn end
 function Frame:RegisterEvent(e) self.ev[e] = true end
@@ -50,6 +52,8 @@ function UnitLevel() return 1 end
 GUID = "Player-A"
 HOOKS = {}
 Minimap = CreateFrame()
+UIParent = CreateFrame()
+function ReloadUI() RELOADED = true end
 function RequestTimePlayed() ASKED_PLAYED = (ASKED_PLAYED or 0) + 1 end
 UISpecialFrames, StaticPopupDialogs = {}, {}
 tinsert = table.insert
@@ -98,7 +102,7 @@ function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESU
 ''')
 YR = lua.table()
 for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Options.lua", "Guides.lua",
-          "Style.lua", "Editor.lua",
+          "Style.lua", "Step.lua", "Editor.lua",
           "Guides/Coldridge.lua", "Guides/DunMorogh.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("YippRoute", YR)
@@ -326,4 +330,40 @@ check(True, "settings page with reward settings opens")
 check(g.YippRouteMinimapButton is not None and g.YippRouteMinimapButton.hidden is not True, "minimap button shown")
 YR.ShowMinimapButton(YR, False)
 check(g.YippRouteMinimapButton.hidden is True and g.YippRouteDB.minimapButton is False, "minimap button can be hidden")
+
+# The step model: every step of both shipped routes reads into lines and writes back to the same text
+# (spacing aside); the templates make steps; editing a line's argument changes only that argument.
+for key in ("coldridge", "dunmorogh"):
+    header, steps = YR.SplitSteps(YR.GuideText(YR, key))
+    changed = []
+    for i in range(1, len(steps) + 1):
+        again = YR.WriteStep(YR.ParseStep(steps[i]))
+        norm = lambda t: [l.strip() for l in t.splitlines() if l.strip()]
+        if norm(again) != norm(steps[i]):
+            changed.append(i)
+    check(not changed, f"{key}: every step reads and writes back unchanged (differs: {changed[:5]})")
+st = YR.ParseStep("step << Paladin\n    #optional\n    .goto 1426,22.3,72.5,45\n    >>Kill boars\n    .complete 183,1 --x12")
+check(st.head == "<< Paladin" and st.lines[1].tag == "optional" and st.lines[2].cmd == "goto"
+      and st.lines[3].text == "Kill boars" and st.lines[4].note.strip() == "--x12", "a step's parts: head, tag, command, text, note")
+YR.SetArg(st.lines[2], 2, "30.5")
+check(st.lines[2].args == "1426,30.5,72.5,45", f"changing X keeps the rest: {st.lines[2].args}")
+info = YR.StepInfo(YR.ParseStep("step\n    .goto 1426,22.3,72.5\n    .accept 183 >>Accept The Boar Hunter"))
+check(info.kind == "accept" and "The Boar Hunter" in info.text, f"step info: {info.kind} {info.text}")
+temps = YR.StepTemplates()
+kinds = [temps[i][1] for i in range(1, len(temps) + 1)]
+check("xp" in kinds and "gold" in kinds and "quest" in kinds, f"templates: {kinds}")
+xp_step = [YR.WriteStep(temps[i][3]) for i in range(1, len(temps) + 1) if temps[i][1] == "xp"][0]
+lvl = g.UnitLevel() + 1
+check(f".xp {lvl} >>Grind to level {lvl}" in xp_step and ".goto 1426,29.93,71.20" in xp_step, f"farm XP step here: {xp_step!r}")
+# the split settings: size, lines and position
+YR.ShowSplits(YR, True)
+lua.execute("YR_ST = nil")
+stl = YR.SplitsStyle(YR)
+stl.size = 18; stl.rate = False
+YR.ApplySplitsStyle(YR)
+YR.SetSplitsPosition(YR, 300, 150)
+pos = g.YippRouteDB.splitsPos
+check(pos[1] == "TOPLEFT" and pos[2] == 300 and pos[3] == -150, f"splits placed in pixels: {list(pos.values())}")
+YR.ToggleWindow(YR, "routes")
+check(True, "the routes page with the step inspector builds and fills")
 sys.exit(1 if bad else 0)
