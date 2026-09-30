@@ -18,6 +18,12 @@ function Frame:Show() self.hidden = false end
 function Frame:Hide() self.hidden = true end
 function Frame:IsShown() return not self.hidden end
 function Frame:SetText(t) self.text = t end
+function Frame:GetText() return self.text or "" end
+for _, k in ipairs({ "GetStringWidth", "GetHeight", "GetWidth", "GetVerticalScroll", "GetVerticalScrollRange" }) do
+    Frame[k] = function() return 20 end
+end
+function Frame:IsMouseOver() return false end
+function Frame:SetShown(on) self.hidden = not on end
 function Frame:SetScript(_, fn) self.fn = fn end
 function Frame:RegisterEvent(e) self.ev[e] = true end
 function Frame:UnregisterEvent(e) self.ev[e] = nil end
@@ -43,6 +49,10 @@ function UnitRace() return "Dwarf", "Dwarf" end
 function UnitLevel() return 1 end
 GUID = "Player-A"
 HOOKS = {}
+UISpecialFrames, StaticPopupDialogs = {}, {}
+tinsert = table.insert
+function StaticPopup_Show(which) POPUP = which end
+GameTooltip = setmetatable({}, { __index = function() return function() end end })
 function hooksecurefunc(name, fn) HOOKS[name] = fn end
 function GetMerchantItemLink(i) return "|cffffffff|Hitem:2901::::|h[Mining Pick]|h|r" end
 REGISTERED = {}
@@ -86,6 +96,7 @@ function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESU
 ''')
 YR = lua.table()
 for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Options.lua", "Guides.lua",
+          "Style.lua", "Editor.lua",
           "Guides/Coldridge.lua", "Guides/DunMorogh.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("YippRoute", YR)
@@ -254,4 +265,31 @@ g.Fire("LEARNED_SPELL_IN_SKILL_LINE", 20271)
 tail = [run.ev[i] for i in range(1, len(run.ev) + 1)][-3:]
 check(tail[0][2] == "buy" and tail[0].item == 2901, f"bought item logged: {tail[0][2]} {tail[0].item}")
 check(tail[2][2] == "learn" and tail[2].spell == 2575, "Mining learned at the trainer logged, the level-up spell not")
+
+# The route editor: recorded actions become guide steps (the delivery quest's instant "complete" is no step)
+acts = YR.RunActions(YR)
+labels = [acts[i].label for i in range(1, len(acts) + 1)]
+check("Took Dwarven Outfitters" in labels and "Bought Mining Pick" in labels and "Learned Mining" in labels,
+      f"this run's actions: {labels}")
+steps_ = {acts[i].label: acts[i].step for i in range(1, len(acts) + 1)}
+check(".accept 179 >>Accept Dwarven Outfitters" in steps_["Took Dwarven Outfitters"]
+      and ".goto 1426,29.93,71.20" in steps_["Took Dwarven Outfitters"], "taking a quest becomes an accept step with its place")
+check(".collect 2901,1" in steps_["Bought Mining Pick"] and ".train 2575" in steps_["Learned Mining"], "buy and learn steps")
+# the window builds, and a recorded step can be put into the open route
+YR.ToggleWindow(YR)
+check(g.YippRouteWindow is not None and g.YippRouteWindow.hidden is False, "the window opens")
+header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
+before = len(steps)
+YR.InsertStep(YR, steps_["Bought Mining Pick"])
+YR.ToggleWindow(YR, "share")
+# import: a route with our Coldridge name replaces the player's; any other name is kept as an extra
+own = YR.GuideText(YR, "coldridge").replace("Talin Keeneye", "Talin Keeneye (edited)")
+done = YR.ImportGuide(YR, own)
+check(done == "replaced your 1-5 Coldridge Valley (Launch)" and "(edited)" in YR.GuideText(YR, "coldridge"), f"import replaces: {done}")
+other = "#name 1-6 Somewhere Else\n#group Friends\nstep\n    .accept 1 >>Accept Something\n"
+done = YR.ImportGuide(YR, other)
+check(done == "added 1-6 Somewhere Else" and g.YippRouteDB.extra["1-6 Somewhere Else"] is not None, f"import adds: {done}")
+bad_import = YR.ImportGuide(YR, "hello")
+check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a guide is refused, with the reason")
+YR.RevertGuide(YR, "coldridge")
 sys.exit(1 if bad else 0)
