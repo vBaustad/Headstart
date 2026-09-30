@@ -5,7 +5,7 @@ local _, YR = ...
 
 YR:ShipGuide("coldridge", [[
 #forever
-#version 18
+#version 19
 << Alliance
 #group Headstart Launch (A)
 #subgroup Launch day
@@ -214,9 +214,23 @@ step
     .accept 2160 >>Accept Supplies to Tannok
     .target Hands Springsprocket::6782
 step
-    #label ThroughPass
-    .goto 1426/0,111.82,-6206.61,15,0
-    .goto 1426/0,46.32,-6037.19,15 >> Travel through Coldridge Pass
-    .subzoneskip 800,1
-    .isOnQuest 2160
+    #completewith next
+    .goto 1426,27.8,75.4,40 >> Go back to the Frostmane trolls by the cave, not through the pass
+    .subzoneskip 131
+step
+    .goto 1426,25.861,78.197,45,0
+    .goto 1426,23.716,80.257,45,0
+    .goto 1426,26.382,78.409,45,0
+    .goto 1426,27.098,80.707,45,0
+    .xp 5+1595 >> Kill trolls to 1595+/2800 XP << !Priest
+    .xp 5+1325 >> Kill trolls to 1325+/2800 XP << Priest
+    .mob Frostmane Troll Whelp
+    .subzoneskip 131
+step
+    #label DeathSkip
+    .goto 1426,27.098,80.707,20
+    >>|cRXP_WARN_Pull a pack of trolls in the cave and let them kill you. With The Adventurer taken, you come back at the Spirit Healer in Kharanos, saving the walk through Coldridge Pass|r
+    .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r in Kharanos
+    .isOnQuest 96628
+    .subzoneskip 131
 ]])
