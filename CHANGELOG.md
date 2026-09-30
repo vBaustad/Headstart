@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Northshire and Shadowglen: Warriors, Paladins and Rogues are told to take Mining for Dummies from Rascally Rodents / The Woodland Protector. It teaches Mining with no trainer and no fee.
 - **Routes to level 21 for every Alliance race and class.** After the starting zones, Headstart now has its own copies of RestedXP's Forever routes: Elwynn, Teldrassil, Loch Modan, Westfall, Darkshore, Redridge and Darkshore/Ashenvale. They are cleaned the same way, editable in the route editor, and linked so each starting route leads on through them. At 21 they hand over to RestedXP's own guides.
 - The route list in the window scrolls.
 - "Keep what the route needs" only counts the routes your race follows: a Dwarf isn't told to keep meat for a Human quest in Elwynn.
