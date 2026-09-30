@@ -59,7 +59,13 @@ UISpecialFrames, StaticPopupDialogs = {}, {}
 tinsert = table.insert
 function StaticPopup_Show(which) POPUP = which end
 GameTooltip = setmetatable({}, { __index = function() return function() end end })
-function hooksecurefunc(name, fn) HOOKS[name] = fn end
+function hooksecurefunc(a, b, c) if c then HOOKS[b] = c else HOOKS[a] = b end end
+-- bags (BAGS[bag * 100 + slot] = { itemID, stackCount }) and a vendor window
+BAGS = {}
+C_Container = { UseContainerItem = function() end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end }
+MerchantFrame = { shown = false, IsShown = function(self) return self.shown end }
+DONE = {}
+LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_SELF = "You receive loot: %sx%d.", "You receive loot: %s."
 function GetMerchantItemLink(i) return "|cffffffff|Hitem:2901::::|h[Mining Pick]|h|r" end
 REGISTERED = {}
 RXPGuides = { RegisterGuide = function(text) table.insert(REGISTERED, text) end }
@@ -91,7 +97,7 @@ C_QuestLog = {
     GetQuestTagInfo = function() return nil end,
     GetSuggestedGroupSize = function() return 0 end,
     GetQuestObjectives = function(id) return id == 179 and { { text = "Tough Wolf Meat: 0/8", type = "item", numRequired = 8 } } or {} end,
-    IsQuestFlaggedCompleted = function() return false end,
+    IsQuestFlaggedCompleted = function(id) return DONE[id] or false end,
     GetNumQuestLogEntries = function() return #LOG end,
     GetInfo = function(i) return { questID = LOG[i][1], isHeader = false } end,
     IsComplete = function(id) for _, q in ipairs(LOG) do if q[1] == id then return q[2] end end return false end,
@@ -101,9 +107,10 @@ function GetQuestLogRewardMoney(id) return KNOWN[id] and KNOWN[id][4] or 0 end
 function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESULT", id, KNOWN[id] ~= nil) end ASKED = {} end
 ''')
 YR = lua.table()
-for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Options.lua", "Guides.lua",
-          "Style.lua", "Step.lua", "Data/SpellLevels.lua", "Setup.lua", "SetupUI.lua", "Editor.lua",
-          "Guides/Coldridge.lua", "Guides/DunMorogh.lua", "Guides/Northshire.lua", "Guides/Shadowglen.lua"):
+# every file the .toc loads, in its order
+TOC = [l.strip().replace(chr(92), "/") for l in open(os.path.join(ROOT, "Headstart.toc"), encoding="utf-8")
+       if l.strip().endswith(".lua") and not l.startswith("#")]
+for f in TOC:
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("Headstart", YR)
 YR.QUEST_IDS = lua.eval("{ route = { 179 }, new = { 96628, 5 }, rest = { 99999 } }")
@@ -182,7 +189,9 @@ ITEMS = { [1] = { "INVTYPE_2HWEAPON", 2, 5, nil, 50 }, [2] = { "INVTYPE_CHEST", 
           [3] = { "INVTYPE_CHEST", 4, 2, nil, 99 }, [4] = { "", 0, 5, "Drink", 5 }, [5] = { "", 0, 5, "Food", 9 },
           [6] = { "INVTYPE_LEGS", 4, 3, nil, 40 }, [7] = { "INVTYPE_WEAPON", 2, 4, nil, 70 },
           [8] = { "INVTYPE_FINGER", 4, 0, nil, 30 } }
-C_Item = { GetItemInfoInstant = function(id) local i = ITEMS[id] return id, "", "", i[1], 0, i[2], i[3] end,
+C_Item = { GetItemInfoInstant = function(id) local i = ITEMS[id] or { "", 12, 0 } return id, "", "", i[1], 0, i[2], i[3] end,
+           GetItemNameByID = function(id) return ({ [769] = "Chunk of Boar Meat", [2886] = "Crag Boar Rib" })[id] end,
+           GetItemCount = function() return 3 end,
            GetItemSpell = function(id) return ITEMS[id][4] end,
            GetItemInfo = function(id) return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, ITEMS[id][5] end }
 CHOICES = {}
@@ -432,4 +441,49 @@ if btn is not None:
     header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
     check(len(steps) == n_before - 1, f"Delete step, then Save: {n_before} -> {len(steps)} steps")
     YR.RevertGuide(YR, "coldridge")
+
+# Keep what the route needs: 4 Chunks of Boar Meat for Stocking Jetsteam, needed from Coldridge on (before
+# the quest is even accepted) until it is turned in. Skill-up lines (.collect with flags) don't count.
+count, what = YR.RouteNeed(769)
+check(count == 4 and what == "Stocking Jetsteam", f"the route needs 4 Chunks of Boar Meat for Stocking Jetsteam: {count} {what}")
+count, what = YR.RouteNeed(2886)
+check(count == 6 and what == "Beer Basted Boar Ribs", f"and 6 Crag Boar Ribs for Beer Basted Boar Ribs: {count} {what}")
+check(YR.RouteNeed(4470) is None, "Simple Wood (a cooking skill-up line, not a quest) isn't kept")
+# selling one at a vendor warns, and is logged; away from a vendor (using it) nothing happens
+run = g.YippRouteDB.runs["Tester-Realm"]
+g.BAGS[1 * 100 + 3] = lua.eval("{ itemID = 769, stackCount = 7 }")
+n_ev, n_print = len(run.ev), len(g.PRINTS) if g.PRINTS else 0
+g.MerchantFrame.shown = True
+g.HOOKS["UseContainerItem"](1, 3)
+last = run.ev[len(run.ev)]
+check(last[2] == "sell" and last.item == 769 and last.count == 7 and last.need == 4, f"the sale is logged: {last[2]} {last.item} x{last.count}")
+said = [str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1)] if g.PRINTS else []
+check(any("still needs 4 for Stocking Jetsteam" in p_ for p_ in said), "and it warns: the route still needs 4 for Stocking Jetsteam")
+g.MerchantFrame.shown = False
+n = len(run.ev)
+g.HOOKS["UseContainerItem"](1, 3)
+check(len(run.ev) == n, "using an item away from a vendor is not a sale")
+g.DONE[317] = True
+check(YR.RouteNeed(769) is None, "once Stocking Jetsteam is turned in, the meat is free to sell")
+g.DONE[317] = None
+# quest-item loot is logged from the chat line
+g.Fire("CHAT_MSG_LOOT", "You receive loot: |cffffffff|Hitem:2886::|h[Crag Boar Rib]|h|rx2.")
+last = run.ev[len(run.ev)]
+check(last[2] == "loot" and last.item == 2886 and last.count == 2, f"looting 2 Crag Boar Ribs (a route item) is logged: {last[2]} {last.item}")
+n = len(run.ev)
+g.Fire("CHAT_MSG_LOOT", "Someone receives loot: |cffffffff|Hitem:2886::|h[Crag Boar Rib]|h|r.")
+check(len(run.ev) == n, "somebody else's loot is not")
+
+# Stop run: the splits clock and the log stop; Resume carries on without counting the pause
+splits_rec = [r for r in [g.YippRouteDB.splits.runs[k] for k in g.YippRouteDB.splits.runs.keys()] if r.name == "Tester-Realm"]
+YR.StopRun(YR)
+check(YR.RunStopped(YR) and run.ev[len(run.ev)][2] == "stop" and run.stopped, "Stop this run: the log ends with a stop")
+n = len(run.ev)
+g.Fire("PLAYER_LEVEL_UP", 9)
+check(len(run.ev) == n, "nothing is logged after the stop")
+YR.ResumeRun(YR)
+check(not YR.RunStopped(YR) and run.ev[len(run.ev)][2] == "resume", "Resume: logging carries on")
+YR.SetRunCounts(YR, False)
+check(not YR.RunCounts(YR), "a run can be kept out of vs best")
+YR.SetRunCounts(YR, True)
 sys.exit(1 if bad else 0)

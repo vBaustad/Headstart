@@ -5,6 +5,8 @@
 --            kill (XP from anything but a quest), fight / peace (combat starts / ends)
 --            step (RestedXP's current guide and step), hearth, zone, vendor / trainer / flight
 --            buy (item and count, from a vendor), learn (a spell learned from a trainer)
+--            sell (item and count, to a vendor), loot (a quest item, or one the route needs)
+--            stop / resume (the player ended the run, or carried on after all)
 --   track  a position sample every 2 seconds: { time, map, x, y, level, XP, flags }
 --          flags: 1 in combat, 2 dead or a ghost, 4 casting or channelling (eating, crafting, hearth)
 local _, YR = ...
@@ -46,6 +48,7 @@ local function Flags()
 end
 
 local function Sample()
+    if run.stopped then return end
     local map, x, y = YR.Position()
     if map then
         run.track[#run.track + 1] = { time(), map, x, y, UnitLevel("player"), UnitXP("player"), Flags() }
@@ -88,7 +91,33 @@ end
 local NPC_WINDOWS = { MERCHANT_SHOW = "vendor", TRAINER_SHOW = "trainer", TAXIMAP_OPENED = "flight" }
 
 local events = CreateFrame("Frame")
+-- Your own loot, from the chat line the game prints ("You receive loot: [item]x2."): the patterns
+-- come from the game's own strings, so they work in any language.
+local LOOT_PATTERNS = {}
+for _, s in ipairs({ LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_SELF, LOOT_ITEM_PUSHED_SELF_MULTIPLE, LOOT_ITEM_PUSHED_SELF }) do
+    if type(s) == "string" then
+        LOOT_PATTERNS[#LOOT_PATTERNS + 1] = "^" .. s:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1")
+            :gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)") .. "$"
+    end
+end
+local QUEST_ITEM = Enum and Enum.ItemClass and Enum.ItemClass.Questitem or 12
+
+local function Looted(msg)
+    for _, pat in ipairs(LOOT_PATTERNS) do
+        local link, count = msg:match(pat)
+        local item = link and tonumber(link:match("item:(%d+)"))
+        if item then
+            local _, _, _, _, _, classID = C_Item.GetItemInfoInstant(item)
+            if classID == QUEST_ITEM or YR.RouteNeed(item) then
+                Add("loot", nil, { item = item, count = tonumber(count) or 1, name = C_Item.GetItemNameByID(item) })
+            end
+            return
+        end
+    end
+end
+
 events:SetScript("OnEvent", function(_, event, a, b, c)
+    if not run or run.stopped then return end
     if event == "QUEST_ACCEPTED" then
         local objectives = C_QuestLog.GetQuestObjectives(a)
         Add("accept", a, { npc = Npc(), title = C_QuestLog.GetTitleForQuestID(a),
@@ -124,6 +153,8 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
     elseif event == "LEARNED_SPELL_IN_SKILL_LINE" or event == "LEARNED_SPELL_IN_TAB" then
         -- only what a trainer taught: a level-up also "learns" passives nobody walks anywhere for
         if trainerOpen then Add("learn", nil, { spell = a, name = C_Spell.GetSpellName(a) }) end
+    elseif event == "CHAT_MSG_LOOT" then
+        if type(a) == "string" then Looted(a) end
     elseif NPC_WINDOWS[event] then
         if event == "TRAINER_SHOW" then trainerOpen = true end
         Add(NPC_WINDOWS[event], nil, { npc = Npc() })
@@ -132,7 +163,7 @@ end)
 
 -- What was bought, and from whom: the buy goes through BuyMerchantItem, which is not protected.
 hooksecurefunc("BuyMerchantItem", function(index, quantity)
-    if not run then return end
+    if not run or run.stopped then return end
     local link = GetMerchantItemLink(index)
     local item = link and tonumber(link:match("item:(%d+)"))
     if item then
@@ -143,7 +174,29 @@ end)
 local EVENTS = { "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "QUEST_LOG_UPDATE", "PLAYER_XP_UPDATE",
     "PLAYER_LEVEL_UP", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST", "PLAYER_REGEN_DISABLED",
     "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA", "MERCHANT_SHOW", "TRAINER_SHOW", "TRAINER_CLOSED",
-    "TAXIMAP_OPENED" }
+    "TAXIMAP_OPENED", "CHAT_MSG_LOOT" }
+
+-- What was sold, and whether the route still needed it (Needs.lua warns about that).
+YR:WatchSells(function(item, count)
+    if run and not run.stopped then
+        Add("sell", nil, { item = item, count = count, name = C_Item.GetItemNameByID(item), need = YR.RouteNeed(item) })
+    end
+end)
+
+-- Stop run: this character's log ends here (the analysis cuts the run at it), until Resume.
+function YR:StopLog()
+    if run and not run.stopped then
+        Add("stop")
+        run.stopped = time()
+    end
+end
+
+function YR:ResumeLog()
+    if run and run.stopped then
+        run.stopped = nil
+        Add("resume")
+    end
+end
 -- the "spell learned" event has a different name in the modern and the Classic API: whichever exists
 local LEARNED = { "LEARNED_SPELL_IN_SKILL_LINE", "LEARNED_SPELL_IN_TAB" }
 
