@@ -1060,6 +1060,31 @@ end
 -- Settings: sections of two-column rows, the label on the left and its control on the right
 -- ---------------------------------------------------------------------------
 local settings = { controls = {} }
+
+-- The class whose settings the Route and Character tabs show: this character's, unless picked.
+local function ViewClass()
+    local _, class = UnitClass("player")
+    return settings.viewClass or class or "WARRIOR"
+end
+
+-- "Settings for: Paladin" - every class keeps its own quest-reward and setup choices.
+local function ClassPicker(parent)
+    local options = {}
+    for _, class in ipairs(CLASSES) do
+        local _, mine = UnitClass("player")
+        options[#options + 1] = { class, CLASS_NAME[class] .. (class == mine and "  (this character)" or "") }
+    end
+    local d = S.Dropdown(parent, 190, options, function(class)
+        settings.viewClass = class
+        YR:RefreshWindow()
+    end)
+    function d:Refresh()
+        local _, mine = UnitClass("player")
+        local class = ViewClass()
+        self:SetValue(CLASS_NAME[class] .. (class == mine and "  (this character)" or ""))
+    end
+    return d
+end
 local KIND_LABEL = {}
 for _, k in ipairs(YR.REWARD_KINDS) do KIND_LABEL[k.key] = k.label end
 
@@ -1190,18 +1215,20 @@ local function BuildRouteSettings(page)
     Row("From the top (pixels)", S.Slider(c, 0, 2000, 1, function() return YR:SplitsPosition()[2] end,
         function(v) YR:SetSplitsPosition(nil, v) end, 280))
 
-    Section("Quest rewards")
-    Row("Pick quest rewards", S.Switch(c, Opt("pickRewards"), SetOpt("pickRewards")),
+    Section("Quest rewards", "each class has its own")
+    Row("Settings for", ClassPicker(c), "Every class keeps its own reward choices: a warrior's list isn't a mage's")
+    Row("Pick quest rewards", S.Switch(c, function() return YR:RewardSettings(ViewClass()).on end,
+        function(on) YR:RewardSettings(ViewClass()).on = on end),
         "When a quest offers a choice, take one for you. Hold Shift when handing in to choose yourself")
-    Row("Up to level", S.Slider(c, 1, 60, 1, function() return YR:RewardSettings().maxLevel end,
-        function(v) YR:RewardSettings().maxLevel = v end))
-    Row("Take the reward I chose before", S.Switch(c, function() return YR:RewardSettings().remember end,
-        function(on) YR:RewardSettings().remember = on end), "A reward you picked by hand for a quest is taken again")
+    Row("Up to level", S.Slider(c, 1, 60, 1, function() return YR:RewardSettings(ViewClass()).maxLevel end,
+        function(v) YR:RewardSettings(ViewClass()).maxLevel = v end))
+    Row("Take the reward I chose before", S.Switch(c, function() return YR:RewardSettings(ViewClass()).remember end,
+        function(on) YR:RewardSettings(ViewClass()).remember = on end), "A reward you picked by hand for a quest is taken again")
     local fallback = S.Dropdown(c, 170, { { "value", "The most valuable" }, { "ask", "Let me choose" } }, function(v)
-        YR:RewardSettings().fallback = v
+        YR:RewardSettings(ViewClass()).fallback = v
         YR:RefreshWindow()
     end)
-    function fallback:Refresh() self:SetValue(YR:RewardSettings().fallback == "value" and "The most valuable" or "Let me choose") end
+    function fallback:Refresh() self:SetValue(YR:RewardSettings(ViewClass()).fallback == "value" and "The most valuable" or "Let me choose") end
     Row("Nothing from the list on offer", fallback)
     L.Break()
     local y = L.y
@@ -1221,11 +1248,11 @@ local function BuildRouteSettings(page)
         r.num:SetPoint("LEFT", 12, 0)
         r.label = S.Text(r, 13)
         r.label:SetPoint("LEFT", 40, 0)
-        r.switch = S.Switch(r, function() local db = YR:RewardSettings() return not db.off[db.order[i]] end,
-            function(on) local db = YR:RewardSettings() db.off[db.order[i]] = (not on) or nil YR:RefreshWindow() end)
+        r.switch = S.Switch(r, function() local db = YR:RewardSettings(ViewClass()) return not db.off[db.order[i]] end,
+            function(on) local db = YR:RewardSettings(ViewClass()) db.off[db.order[i]] = (not on) or nil YR:RefreshWindow() end)
         r.switch:SetPoint("RIGHT", -72, 0)
         local function Swap(d)
-            local db = YR:RewardSettings()
+            local db = YR:RewardSettings(ViewClass())
             local b = i + d
             if b < 1 or b > #db.order then return end
             db.order[i], db.order[b] = db.order[b], db.order[i]
@@ -1251,7 +1278,7 @@ end
 
 local function RefreshRouteSettings()
     for _, ctl in ipairs(settings.controls) do if ctl.Refresh then ctl:Refresh() end end
-    local db = YR:RewardSettings()
+    local db = YR:RewardSettings(ViewClass())
     for i, r in ipairs(settings.order) do
         local kind = db.order[i]
         r.num:SetText(i)
@@ -1271,7 +1298,7 @@ local function RefreshRouteSettings()
             S.Fill(r, (i % 2 == 1) and S.C.card or ZEBRA)
             r.label = S.Text(r, 13)
             r.label:SetPoint("LEFT", 12, 0)
-            r.x = S.IconButton(r, "close", function() YR:RewardSettings().chosen[r.quest] = nil YR:RefreshWindow() end,
+            r.x = S.IconButton(r, "close", function() YR:RewardSettings(ViewClass()).chosen[r.quest] = nil YR:RefreshWindow() end,
                 "Forget this choice", S.C.danger)
             r.x:SetPoint("RIGHT", -8, 0)
             settings.chosenRows[i] = r
@@ -1301,7 +1328,7 @@ local setup = { controls = {} }
 
 local function BuildSetup(page)
     local YS = YR.Setup
-    local o = function() return YS:Options() end
+    local o = function() return YS:Options(ViewClass()) end
 
     -- the saved layout and the two actions, above the options
     local card = CreateFrame("Frame", nil, page)
@@ -1314,14 +1341,14 @@ local function BuildSetup(page)
     setup.saved:SetPoint("TOPLEFT", 14, -14)
     setup.note = S.Text(card, 12, S.C.muted)
     setup.note:SetPoint("TOPLEFT", 14, -36)
-    setup.note:SetText("Copy on your main; Set up on a new character of the same class. Everything below is what Set up carries over.")
+    setup.note:SetText("Copy on your main; Set up on a new character of the same class. Check what carries over below, then Set up.")
     local apply = S.Button(card, "Set up layout", function() YS:Apply() YR:RefreshWindow() end, "primary")
     apply:SetPoint("RIGHT", -12, 0)
     apply.tip = "Put the saved layout on this character, with the choices below"
     local copy = S.Button(card, "Copy this layout", function() YS:Copy() YR:RefreshWindow() end)
     copy:SetPoint("RIGHT", apply, "LEFT", -8, 0)
     copy.tip = "Save this character's bars, macros, items, Edit Mode layout and game settings"
-    setup.apply = apply
+    setup.apply, setup.copy = apply, copy
 
     local rows = CreateFrame("Frame", nil, page)
     rows:SetPoint("TOPLEFT", 0, -84)
@@ -1329,6 +1356,10 @@ local function BuildSetup(page)
     local L = RowPage(rows, setup.controls, 180)
     local Section, Row = L.Section, L.Row
     local function Sw(key) local b = S.Switch(L.c, function() return o()[key] end, function(on) o()[key] = on end) return b end
+
+    Section("Class", "each class has its own layout and choices")
+    Row("Settings for", ClassPicker(L.c), "Every class keeps its own saved layout and its own choices below")
+    L.Break()
 
     Section("Spells")
     Row("Class spells", Sw("classSpells"))
@@ -1369,11 +1400,20 @@ end
 
 local function RefreshSetup()
     local YS = YR.Setup
-    local p = YS:Profile()
+    local view = ViewClass()
+    local p = YS:Profile(view)
     local _, class = UnitClass("player")
-    setup.saved:SetText(p and ("Saved layout  |cffffffff" .. YS:Describe(p) .. "|r  |cff8899aa" .. p.class:lower() .. "|r")
-        or "No layout saved yet")
-    setup.apply:SetEnabled(p ~= nil and p.class == class)
+    local name = CLASS_NAME[view] or view
+    setup.saved:SetText(p and ("Saved " .. name .. " layout  |cffffffff" .. YS:Describe(p) .. "|r")
+        or ("No " .. name .. " layout saved yet"))
+    -- Copy and Set up act on this character, so only while its own class is shown
+    setup.apply:SetEnabled(p ~= nil and view == class)
+    setup.copy:SetEnabled(view == class)
+    setup.apply.tip = view ~= class and ("This character isn't a " .. name .. ": pick its own class above")
+        or "Put the saved layout on this character, with the choices below"
+    setup.copy.tip = view ~= class and ("This character isn't a " .. name .. ": pick its own class above")
+        or "Save this character's bars, macros, items, Edit Mode layout and game settings"
+
     for _, ctl in ipairs(setup.controls) do if ctl.Refresh then ctl:Refresh() end end
 end
 
@@ -1444,6 +1484,7 @@ end
 
 -- Open Settings on one of its tabs ("route" or "character").
 function YR:ShowSettingsTab(key)
+    settings.viewClass = nil          -- this character's class
     YR:ToggleWindow("settings")
     ShowTab(key)
 end

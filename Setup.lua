@@ -22,14 +22,42 @@ local OPTION_DEFAULTS = {
     swap = true, popup = true,
 }
 
--- The saved layout (from Copy this layout), or nil.
-function YS:Profile()
-    return YippSetupDB and YippSetupDB.profile
+-- Everything is kept per class: a warrior main's bars and choices don't land on a new paladin.
+--   YippSetupDB.classes[CLASS] = { options = { ... }, profile = { ... saved layout ... } }
+-- From before that, one set for all: YippSetupDB.options and YippSetupDB.profile. They are never
+-- changed or removed (an older Headstart still reads them): a class's options start as a copy of
+-- them, and the old layout becomes the layout of the class it was copied from.
+local function PlayerClass()
+    local _, class = UnitClass("player")
+    return class or "WARRIOR"
+end
+YS.PlayerClass = PlayerClass
+
+local function Copy(t)
+    local c = {}
+    for k, v in pairs(t or {}) do c[k] = type(v) == "table" and Copy(v) or v end
+    return c
 end
 
-function YS:Options()
-    YippSetupDB.options = YippSetupDB.options or {}
-    local o = YippSetupDB.options
+local function ClassData(class)
+    YippSetupDB.classes = YippSetupDB.classes or {}
+    local c = YippSetupDB.classes[class]
+    if not c then
+        c = { options = Copy(YippSetupDB.options) }
+        local old = YippSetupDB.profile
+        if old and old.class == class then c.profile = Copy(old) end
+        YippSetupDB.classes[class] = c
+    end
+    return c
+end
+
+-- The saved layout for a class (this character's if none is given), or nil.
+function YS:Profile(class)
+    return YippSetupDB and ClassData(class or PlayerClass()).profile
+end
+
+function YS:Options(class)
+    local o = ClassData(class or PlayerClass()).options
     for k, v in pairs(OPTION_DEFAULTS) do if o[k] == nil then o[k] = v end end
     return o
 end
@@ -104,7 +132,7 @@ function YS:Scan()
             end
         end
     end
-    YippSetupDB.profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots,
+    ClassData(class).profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots,
         ui = YS:ScanUI() }
     Print(("saved %s: %d spells, %d profession spells, %d macros and %d items. What goes onto a new character is"
         .. " chosen in Settings, Character tab."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item))
@@ -291,14 +319,12 @@ function YS:Apply(force)
         Print("can't change action bars in combat.")
         return
     end
-    local p = YippSetupDB.profile
-    if not p then
-        Print("nothing saved yet. Log on to your main and type /ysetup scan")
-        return
-    end
     local _, class = UnitClass("player")
-    if p.class ~= class and not force then
-        Print(("the saved bars are from a %s. Type /ysetup apply force to use them anyway."):format(p.class))
+    -- force: another class's layout (the last one saved before layouts were per class)
+    local p = YS:Profile() or (force and YippSetupDB.profile)
+    if not p then
+        Print(("no layout saved for %s yet. On your %s main, click Copy this layout (Settings, Character tab)."
+            .. " /ysetup apply force uses another class's."):format(class:lower(), class:lower()))
         return
     end
     local o = YS:Options()
@@ -379,7 +405,7 @@ end
 -- Only on a character that was set up, and never in combat (it waits for combat to end).
 local waiting = false
 function YS:Upgrade()
-    local p = YippSetupDB.profile
+    local p = YS:Profile()
     local o = YS:Options()
     if not (p and YippSetupCharDB.applied and o.swap) then return end
     if InCombatLockdown() then
@@ -428,7 +454,7 @@ StaticPopupDialogs["YIPPSETUP_OVERWRITE"] = {
 }
 
 function YS:Copy()
-    local p = YippSetupDB.profile
+    local p = YS:Profile()
     if p and p.from ~= PlayerKey() then
         StaticPopup_Show("YIPPSETUP_OVERWRITE", p.from)
     else
@@ -453,9 +479,14 @@ local function BuildWindow()
     -- Only a deliberate click marks this character as done. Escape (which also skips the intro
     -- cinematic) just hides the window, so it comes back on the next login.
     local function Done() YippSetupCharDB.seen = CharacterID() or true end
-    w.setup = S.Button(w, "Set up layout", function() Done() YS:Apply() YS:Refresh() end, "primary")
+    -- Set up first shows every choice (Settings, Character tab); the layout goes on from there
+    w.setup = S.Button(w, "Set up...", function()
+        Done()
+        w:Hide()
+        YR:ShowSettingsTab("character")
+    end, "primary")
     w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
-    w.setup.tip = "On a new character: put the saved layout on this one"
+    w.setup.tip = "On a new character: see what carries over from your main, then set it up"
     w.copy = S.Button(w, "Copy this layout", function() Done() YS:Copy() end)
     w.copy:SetPoint("RIGHT", w.setup, "LEFT", -8, 0)
     w.copy.tip = "On your main: save its bars, macros, Edit Mode layout and game settings"
@@ -465,23 +496,20 @@ end
 
 function YS:Refresh()
     if not window then return end
-    local p = YippSetupDB.profile
-    local _, class = UnitClass("player")
-    local can = false
+    local p = YS:Profile()
+    local class = PlayerClass():lower()
     if not p then
-        window.info:SetText("No layout saved yet. On your main, click Copy this layout.")
+        window.info:SetText(("No %s layout saved yet. On your %s main, click Copy this layout."):format(class, class))
     else
-        window.info:SetText(("Saved layout: |cffffffff%s|r, a %s.%s"):format(YS:Describe(p) or p.from,
-            p.class:lower(),
+        window.info:SetText(("Saved %s layout: |cffffffff%s|r.%s"):format(class, YS:Describe(p) or p.from,
             p.ui and "" or "\n|cffff8040No bars or settings saved: log in on " .. p.from .. " once.|r"))
-        can = p.class == class and p.from ~= PlayerKey()
     end
-    window.setup:SetEnabled(can)
+    window.setup:SetEnabled(p ~= nil and p.from ~= PlayerKey())
 end
 
 -- "Duplo-Bonk, 30 Sep 21:14": who the saved layout is from and when it was copied.
 function YS:Describe(p)
-    p = p or YippSetupDB.profile
+    p = p or YS:Profile()
     if not p then return nil end
     return p.from .. (p.scanned and date(", %d %b %H:%M", p.scanned) or "")
 end
@@ -507,7 +535,7 @@ end
 -- A layout copied before Edit Mode, bars and settings were saved has no ui part. Logging in on the
 -- character it was copied from fills it in, so the bars aren't copied again just for that.
 local function FillInUI()
-    local p = YippSetupDB.profile
+    local p = YS:Profile()
     if p and not p.ui and p.from == PlayerKey() then
         p.ui = YS:ScanUI()
         YS:Refresh()

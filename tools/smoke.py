@@ -211,22 +211,22 @@ check(g.Pick(3, 2, 1) == 3, "two-hander over mail and leather")
 check(g.Pick(3, 2, 6) == 3, "of two mail pieces, the one that sells for more")
 check(g.Pick(5, 4) == 2, "water over food")
 check(g.Pick(3, 8, 7) == 1, "nothing from the list on offer: the most valuable (leather, 99)")
-lua.execute("YippRouteDB.rewards.fallback = 'ask'")
+lua.execute("YippRouteDB.rewardClasses.PALADIN.fallback = 'ask'")
 check(g.Pick(3, 8, 7) is None, "... or nothing, if you'd rather choose")
-lua.execute("YippRouteDB.rewards.off.twohand = true")
+lua.execute("YippRouteDB.rewardClasses.PALADIN.off.twohand = true")
 check(g.Pick(1, 2) == 2, "two-hander turned off: mail")
-lua.execute("YippRouteDB.rewards.off.twohand = nil")
+lua.execute("YippRouteDB.rewardClasses.PALADIN.off.twohand = nil")
 lua.execute("SHIFT = true")
 check(g.Pick(1, 2) is None, "Shift held: you choose")
 lua.execute("QUEST = 200; CHOICES = { 1, 2, 8 }")
 g.HOOKS["GetQuestReward"](3)                           # you took the ring by hand
-chosen = g.YippRouteDB.rewards.chosen[200]
+chosen = g.YippRouteDB.rewardClasses.PALADIN.chosen[200]
 check(chosen is not None and chosen.item == 8, "a reward picked by hand is remembered for that quest")
 lua.execute("SHIFT = false")
 check(g.Pick(1, 2, 8) == 3, "... and taken again next time, over the two-hander")
 lua.execute("LEVEL = 11")
 check(g.Pick(1, 2) is None, "above the level limit: you choose")
-lua.execute("YippRouteDB.rewards.maxLevel = 12")
+lua.execute("YippRouteDB.rewardClasses.PALADIN.maxLevel = 12")
 check(g.Pick(1, 2) == 1, "the level limit is a setting")
 check(g.Pick(9, 10) is None, "a profession choice (mining pack or herb bag) is never made for you")
 check(g.Pick(2, 9) is None, "... not even next to a piece of gear")
@@ -236,6 +236,23 @@ g.HOOKS["GetQuestReward"](2)                           # you took the herb bag b
 check(g.Pick(9, 10) == 2, "but the one you picked by hand for that quest is taken again")
 lua.execute("QUEST = 200")
 lua.execute("LEVEL = 5")
+
+# Reward settings per class. A friend's from before (one set for all) become the settings of the
+# first class that asks - the one they were made on - untouched; other classes start from their own
+# list, with the same limits and the profession choices (not gear) they made.
+lua.execute('''SAVED_REWARDS = YippRouteDB.rewardClasses; YippRouteDB.rewardClasses = nil; YippRouteDB.rewardsTakenBy = nil
+OLD_REWARDS = { maxLevel = 7, order = { "cloth", "water" }, off = {}, remember = true, fallback = "ask",
+    chosen = { [300] = { item = 247840, name = "Mining for Dummies" }, [301] = { item = 1, name = "Axe" } } }
+YippRouteDB.rewards = OLD_REWARDS''')
+pal = YR.RewardSettings(YR, "PALADIN")
+check(pal.maxLevel == 7 and pal.order[1] == "cloth" and pal.fallback == "ask" and pal.chosen[301] is not None,
+      "old reward settings: the first class keeps them all")
+war = YR.RewardSettings(YR, "WARRIOR")
+check(war.order[1] == "twohand" and war.maxLevel == 7 and war.chosen[300] is not None and war.chosen[301] is None,
+      "a warrior gets its own list, the same limit, and the profession book pick but not the axe")
+war.maxLevel = 3
+check(g.OLD_REWARDS.maxLevel == 7 and YR.RewardSettings(YR, "PALADIN").maxLevel == 7, "the old settings and the paladin's stay as they were")
+lua.execute("YippRouteDB.rewardClasses = SAVED_REWARDS; YippRouteDB.rewards = nil")
 
 # Level splits: the time is the server's /played. A reaches level 2 after 100 s of play; B, a new
 # character, after 50 s - 50 s ahead; C, already level 12, is timed from what the server says.
@@ -476,6 +493,17 @@ end''')
 qid = g.ClickFirstQuestRow()
 link = g.FindText("https://www.wowhead.com/forever/quest=")
 check(qid is not None and link == f"https://www.wowhead.com/forever/quest={qid}", f"clicking a quest in This run shows its Wowhead link: {link}")
+
+# The first-time setup window's Set up doesn't set anything up yet: it opens the Character settings,
+# for this character's class, so every choice is seen first.
+YS = YR.Setup
+lua.execute("YippSetupCharDB = YippSetupCharDB or {}")
+YS.Toggle(YS)
+n_prints = len(g.PRINTS)
+g.YippSetupFrame.setup.fn(g.YippSetupFrame.setup)
+said = [str(g.PRINTS[i]) for i in range(n_prints + 1, len(g.PRINTS) + 1)]
+check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is not True and g.YippSetupFrame.hidden is True
+      and not any("placed" in p_ for p_ in said), "the setup window's Set up opens the Character settings instead of setting up")
 
 # Keep what the route needs: 4 Chunks of Boar Meat for Stocking Jetsteam, needed from Coldridge on (before
 # the quest is even accepted) until it is turned in. Skill-up lines (.collect with flags) don't count.
