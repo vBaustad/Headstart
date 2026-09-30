@@ -79,16 +79,16 @@ local function ApplyLayout(layout)
     if not (layout and layouts) then return "no layout saved" end
     for index, info in ipairs(layouts) do
         if info.layoutName == layout.name and info.layoutType ~= Enum.EditModeLayoutType.Character then
-            if em:IsLayoutSelected(index) then return "'" .. layout.name .. "' (already active)" end
+            if em:IsLayoutSelected(index) then return "'" .. layout.name .. "' (already active)", false end
             em:SelectLayout(index)
-            return "'" .. layout.name .. "'"
+            return "'" .. layout.name .. "'", true
         end
     end
     if layout.type == Enum.EditModeLayoutType.Preset then return "preset '" .. tostring(layout.name) .. "' not found" end
     local info = layout.export and C_EditMode.ConvertStringToLayoutInfo(layout.export)
     if not info then return "couldn't import '" .. tostring(layout.name) .. "'" end
     em:MakeNewLayout(info, Enum.EditModeLayoutType.Account, layout.name, true)
-    return "'" .. layout.name .. "' (imported as an account layout)"
+    return "'" .. layout.name .. "' (imported as an account layout)", true
 end
 
 local function ApplyGuide()
@@ -139,13 +139,15 @@ function YS:ApplyUI(ui, o)
             if ok and cur ~= shown and pcall(Settings.SetValue, key, shown) then bars = bars + 1 end
         end
     end
-    local layoutDone = not suite and o.editMode
-    local layout = suite and ("left to " .. suite) or (o.editMode and ApplyLayout(ui.layout) or "off")
+    local layout, layoutChanged = "off", false
+    if suite then layout = "left to " .. suite
+    elseif o.editMode then layout, layoutChanged = ApplyLayout(ui.layout) end
     local barText = barAddon and ("left to " .. barAddon) or (o.barVisibility and (tostring(bars) .. " changed") or "off")
     YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Game settings changed: %d. RestedXP guide: %s.")
         :format(layout, barText, set, o.guide and ApplyGuide() or "off"))
-    -- only Edit Mode and the bar settings are Blizzard UI an addon can taint: no reload needed without them
-    if layoutDone or barsDone then
+    -- only Edit Mode and the bar settings are Blizzard UI an addon can taint, and only when they
+    -- actually changed something: otherwise there is nothing to reload for
+    if layoutChanged or bars > 0 then
         YS.Print("reload to finish: until then the action bars can be blocked in combat.")
         StaticPopup_Show("YIPPSETUP_RELOAD")
     end

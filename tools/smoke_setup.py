@@ -324,7 +324,17 @@ ok = g.SETTINGS.PROXY_SHOW_ACTIONBAR_2 is False and g.EDIT.selected == 3
 check_ok = ok
 print(("ok  " if ok else "FAIL"), "Bartender4 loaded: Blizzard bars left alone, Edit Mode still set")
 bad += not ok
+# Without other UI addons: a reload is asked only when Edit Mode or the bars actually changed.
+lua.execute('''LOADED = {}; EditModeManagerFrame.layoutInfo.activeLayout = 1; POPUP = nil''')
+YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
+first = g.POPUP
+lua.execute("POPUP = nil")
+YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
+ok = first == "YIPPSETUP_RELOAD" and g.POPUP is None
+print(("ok  " if ok else "FAIL"), f"reload asked when the layout and bars changed ({first}), not when set up again with nothing to change ({g.POPUP})")
+bad += not ok
 lua.execute('''LOADED = { "ElvUI", "ElvUI_Options" }; EDIT.selected = nil; EditModeManagerFrame.layoutInfo.activeLayout = 1
+SETTINGS = { PROXY_SHOW_ACTIONBAR_2 = false, PROXY_SHOW_ACTIONBAR_3 = false, PROXY_SHOW_ACTIONBAR_4 = false }
 POPUP = nil''')
 YS.ApplyUI(YS, g.YippSetupDB.profile.ui)
 ok = g.EDIT.selected is None and g.SETTINGS.PROXY_SHOW_ACTIONBAR_2 is False and g.POPUP is None
