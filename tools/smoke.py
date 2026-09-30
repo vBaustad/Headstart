@@ -102,7 +102,7 @@ function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESU
 ''')
 YR = lua.table()
 for f in ("Core.lua", "Scan.lua", "Log.lua", "Rewards.lua", "Splits.lua", "Options.lua", "Guides.lua",
-          "Style.lua", "Step.lua", "Editor.lua",
+          "Style.lua", "Step.lua", "Data/SpellLevels.lua", "Setup.lua", "SetupUI.lua", "Editor.lua",
           "Guides/Coldridge.lua", "Guides/DunMorogh.lua", "Guides/Northshire.lua", "Guides/Shadowglen.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("YippRoute", YR)

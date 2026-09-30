@@ -48,6 +48,7 @@ function InCombatLockdown() return COMBAT == true end
 function InCinematic() return false end
 GUID = "Player-1-0000MAIN"
 function UnitGUID() return GUID end
+function date() return ", 30 Sep 21:14" end
 function time() return 1000 end
 function GetRealmName() return "Realm" end
 ME = { name = "Main", class = "PALADIN" }
@@ -345,4 +346,74 @@ ok = g.RXP.loaded == "YippRoute Launch (A)|01-06 Northshire (Launch)"
 print(("ok  " if ok else "FAIL"), f"a Human starts on the Northshire route: {g.RXP.loaded}")
 bad += not ok
 lua.execute("RACE = 'Dwarf'")
+
+# The Character setup options. Start each case from a clean new character.
+lua.execute('''
+C_Item.PickupItem = function(id) CURSOR_ITEM = id end
+local place = PlaceAction
+function PlaceAction(s)
+    if CURSOR_ITEM then BAR[s] = { kind = "item", id = CURSOR_ITEM } CURSOR_ITEM = nil return end
+    place(s)
+end
+function Fresh(opts)
+    ME.name = "Alt"; GUID = "Player-1-0000ALT"; RACE = "Dwarf"; LOADED = {}
+    MACROS = {}; BAR = {}; KNOWN = { [635] = true, [20594] = true, [1152] = true }
+    YippSetupDB.options = nil
+    local o = YR_SETUP:Options()
+    for k, v in pairs(opts or {}) do o[k] = v end
+end
+''')
+g.YR_SETUP = YS
+lua.execute("Fresh({ items = true })")
+YS.Apply(YS)
+ok = g.BAR[8] is not None and g.BAR[8].kind == "item" and g.BAR[8].id == 6948
+print(("ok  " if ok else "FAIL"), "items on: the Hearthstone goes back on its slot")
+bad += not ok
+
+lua.execute("Fresh({ placeholders = false })")
+YS.Apply(YS)
+ok = g.BAR[4] is None and g.BAR[1] is not None and g.BAR[1].kind == "spell"
+print(("ok  " if ok else "FAIL"), "placeholders off: an unlearned spell's slot stays empty, a known one is placed")
+bad += not ok
+lua.execute("KNOWN[21082] = true")
+events._OnEvent(events, "SPELLS_CHANGED")
+ok = g.BAR[4] is not None and g.BAR[4].kind == "spell" and g.BAR[4].id == 21082
+print(("ok  " if ok else "FAIL"), "... and goes in when it is learned")
+bad += not ok
+
+lua.execute("Fresh({ professions = false }); KNOWN[2580] = true")
+YS.Apply(YS)
+events._OnEvent(events, "SPELLS_CHANGED")
+ok = g.BAR[10] is None
+print(("ok  " if ok else "FAIL"), "professions off: Find Minerals is not placed, even when known")
+bad += not ok
+
+lua.execute("Fresh({ maxLevel = 20 })")
+YS.Apply(YS)
+ok = g.BAR[2] is not None and g.BAR[2].kind == "macro"
+print(("ok  " if ok else "FAIL"), "level limit 20: Flash of Light (level 20) gets its placeholder")
+bad += not ok
+
+lua.execute("Fresh({ clearBars = false }); BAR[20] = { kind = 'spell', id = 635 }")
+YS.Apply(YS)
+ok = g.BAR[20] is not None and g.BAR[20].id == 635
+print(("ok  " if ok else "FAIL"), "clear bars off: a button the saved layout doesn't use is kept")
+bad += not ok
+
+lua.execute("Fresh({ classSpells = false, racials = false })")
+YS.Apply(YS)
+ok = g.BAR[1] is None and g.BAR[13] is None and g.BAR[11] is not None
+print(("ok  " if ok else "FAIL"), "class spells and racials off: only macros go on (your Heal macro is there)")
+bad += not ok
+
+lua.execute("Fresh({ mouseover = 'Holy Light' })")
+YS.Apply(YS)
+lua.execute("KNOWN[635] = nil")
+lua.execute("Fresh({ mouseover = 'Holy Light' }); KNOWN[635] = nil")
+YS.Apply(YS)
+m = g.MACROS[g.BAR[1].id] if g.BAR[1] and g.BAR[1].kind == "macro" else None
+ok = m is not None and "@mouseover" in m[3]
+print(("ok  " if ok else "FAIL"), f"mouseover list: Holy Light becomes a mouseover macro: {m and m[3]!r}")
+bad += not ok
+lua.execute("Fresh()")
 sys.exit(1 if bad else 0)

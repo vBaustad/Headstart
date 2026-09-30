@@ -867,28 +867,36 @@ local settings = { controls = {} }
 local KIND_LABEL = {}
 for _, k in ipairs(YR.REWARD_KINDS) do KIND_LABEL[k.key] = k.label end
 
-local function BuildSettings(page)
-    local area = S.ScrollArea(page, PW - 24, PH - 64)
+-- A scrolling page of sections, each a grid of two-column rows: the label on the left and its control
+-- (switch, slider, dropdown, input, button) on the right. controls collects them for Refresh.
+local function RowPage(page, controls, bottom)
+    local area = S.ScrollArea(page, PW - 24, PH - (bottom or 64))
     area:SetPoint("TOPLEFT", 16, -10)
     local c = area.content
     c:SetWidth(PW - 40)
-    local colW = (PW - 52) / 2
-    local y, col, rowIndex = -6, 0, 0
-
-    local function Section(title)
-        if col == 1 then y = y - 36 col = 0 end
-        y = y - 12
-        local t = S.Text(c, 12, S.C.accent)
-        t:SetPoint("TOPLEFT", 4, y)
-        t:SetText(title:upper())
-        y = y - 20
-        rowIndex = 0
+    local L = { c = c, colW = (PW - 52) / 2, y = -6, col = 0, rowIndex = 0 }
+    function L.Break()
+        if L.col == 1 then L.y = L.y - 36 L.col = 0 end
     end
-    local function Row(label, control, tip)
+    function L.Section(title, note)
+        L.Break()
+        L.y = L.y - 12
+        local t = S.Text(c, 12, S.C.accent)
+        t:SetPoint("TOPLEFT", 4, L.y)
+        t:SetText(title:upper())
+        if note then
+            local n = S.Text(c, 11, S.C.muted)
+            n:SetPoint("LEFT", t, "RIGHT", 12, 0)
+            n:SetText(note)
+        end
+        L.y = L.y - 20
+        L.rowIndex = 0
+    end
+    function L.Row(label, control, tip)
         local r = CreateFrame("Frame", nil, c)
-        r:SetSize(colW, 34)
-        r:SetPoint("TOPLEFT", col * (colW + 12), y)
-        S.Fill(r, (math.floor(rowIndex / 2) % 2 == 0) and S.C.card or ZEBRA)
+        r:SetSize(L.colW, 34)
+        r:SetPoint("TOPLEFT", L.col * (L.colW + 12), L.y)
+        S.Fill(r, (math.floor(L.rowIndex / 2) % 2 == 0) and S.C.card or ZEBRA)
         local l = S.Text(r, 13)
         l:SetPoint("LEFT", 12, 0)
         l:SetText(label)
@@ -900,23 +908,22 @@ local function BuildSettings(page)
         control:SetParent(r)
         control:ClearAllPoints()
         control:SetPoint("RIGHT", -12, 0)
-        settings.controls[#settings.controls + 1] = control
-        rowIndex = rowIndex + 1
-        if col == 0 then col = 1 else col = 0 y = y - 36 end
+        controls[#controls + 1] = control
+        L.rowIndex = L.rowIndex + 1
+        if L.col == 0 then L.col = 1 else L.col = 0 L.y = L.y - 36 end
         return r
     end
+    return L
+end
+
+local function BuildSettings(page)
+    local L = RowPage(page, settings.controls)
+    local c, colW = L.c, L.colW
+    local Section, Row = L.Section, L.Row
     local function Opt(key) return function() return YR.Option(key) end end
     local function SetOpt(key, after) return function(on) YippRouteDB[key] = on if after then after(on) end end end
     local st = function() return YR:SplitsStyle() end
     local function Style(field) return function(v) st()[field] = v YR:ApplySplitsStyle() end end
-
-    Section("Character setup")
-    local copy = S.Button(c, "Copy this layout", function() YR.Setup:Copy() YR:RefreshWindow() end, nil, 170)
-    copy.tip = "On your main: save its bars, macros, Edit Mode layout and game settings"
-    Row("Save this character's layout", copy)
-    local apply = S.Button(c, "Set up layout", function() YR.Setup:Apply() YR:RefreshWindow() end, "primary", 170)
-    apply.tip = "On a new character: put the saved layout on this one"
-    Row("Set this character up from it", apply)
 
     Section("General")
     Row("Minimap button", S.Switch(c, Opt("minimapButton"), SetOpt("minimapButton", function(on) YR:ShowMinimapButton(on) end)))
@@ -953,7 +960,8 @@ local function BuildSettings(page)
     end)
     function fallback:Refresh() self:SetValue(YR:RewardSettings().fallback == "value" and "The most valuable" or "Let me choose") end
     Row("Nothing from the list on offer", fallback)
-    if col == 1 then y = y - 36 col = 0 end
+    L.Break()
+    local y = L.y
 
     y = y - 10
     local t = S.Text(c, 12, S.C.muted)
@@ -1049,11 +1057,95 @@ local function RefreshSettings()
 end
 
 -- ---------------------------------------------------------------------------
+-- Character setup: what a new character gets from your main, part by part
+-- ---------------------------------------------------------------------------
+local setup = { controls = {} }
+
+local function BuildSetup(page)
+    local YS = YR.Setup
+    local o = function() return YS:Options() end
+
+    -- the saved layout and the two actions, above the options
+    local card = CreateFrame("Frame", nil, page)
+    card:SetPoint("TOPLEFT", 16, -14)
+    card:SetPoint("TOPRIGHT", -16, -14)
+    card:SetHeight(64)
+    S.Fill(card, S.C.card)
+    S.Border(card)
+    setup.saved = S.Text(card, 14)
+    setup.saved:SetPoint("TOPLEFT", 14, -14)
+    setup.note = S.Text(card, 12, S.C.muted)
+    setup.note:SetPoint("TOPLEFT", 14, -36)
+    setup.note:SetText("Copy on your main; Set up on a new character of the same class. Everything below is what Set up carries over.")
+    local apply = S.Button(card, "Set up layout", function() YS:Apply() YR:RefreshWindow() end, "primary")
+    apply:SetPoint("RIGHT", -12, 0)
+    apply.tip = "Put the saved layout on this character, with the choices below"
+    local copy = S.Button(card, "Copy this layout", function() YS:Copy() YR:RefreshWindow() end)
+    copy:SetPoint("RIGHT", apply, "LEFT", -8, 0)
+    copy.tip = "Save this character's bars, macros, items, Edit Mode layout and game settings"
+    setup.apply = apply
+
+    local rows = CreateFrame("Frame", nil, page)
+    rows:SetPoint("TOPLEFT", 0, -84)
+    rows:SetPoint("BOTTOMRIGHT")
+    local L = RowPage(rows, setup.controls, 100)
+    local Section, Row = L.Section, L.Row
+    local function Sw(key) local b = S.Switch(L.c, function() return o()[key] end, function(on) o()[key] = on end) return b end
+
+    Section("Spells")
+    Row("Class spells", Sw("classSpells"))
+    Row("Class spells up to level", S.Slider(L.c, 1, 60, 1, function() return o().maxLevel end,
+        function(v) o().maxLevel = v end), "Spells your main has on its bars that are learned at this level or lower")
+    Row("Placeholders for spells not learned yet", Sw("placeholders"),
+        "On: a question-mark macro holds the spell's slot until you learn it. Off: the slot stays empty and the spell goes in when learned")
+    Row("Racial spells", Sw("racials"), "Stoneform, Shadowmeld and the like")
+    Row("Profession spells", Sw("professions"), "Find Minerals, Smelting, Cooking and the rest; each goes in when you learn the profession")
+    local mo = S.Input(L.c, { width = 200, placeholder = "e.g. Purify, Holy Light", onCommit = function(t) o().mouseover = t end })
+    function mo:Refresh() if not self:HasFocus() then self:SetValue(o().mouseover) end end
+    Row("Mouseover macros for", mo, "These spells become /cast [@mouseover] macros: on who you point at, else yourself. Separate with commas")
+
+    Section("Macros and items")
+    Row("Your own macros", Sw("macros"))
+    Row("AutoFeed's macros", Sw("autofeed"), "Only the ones AutoFeed has made on this character are placed; AutoFeed fills them")
+    Row("Items (Hearthstone, food, potions)", Sw("items"), "Items your main has on its bars. Copy this layout again if your saved copy is older than this option")
+
+    Section("Before setting up")
+    Row("Clear all action bars first", Sw("clearBars"), "Off: the saved buttons go over what is there; empty saved slots leave yours alone")
+    Row("Remove this character's old macros", Sw("clearMacros"), "Character macros only; account macros and AutoFeed's are never touched")
+
+    Section("Interface")
+    Row("Game settings", Sw("settings"), "Auto loot, interact on click, nameplates, camera distance and the rest of the list")
+    Row("Edit Mode layout", Sw("editMode"), "Left alone anyway when a UI suite like ElvUI or EllesmereUI is loaded")
+    Row("Which action bars are shown", Sw("barVisibility"), "Left alone anyway when a bar addon like Bartender or Dominos is loaded")
+    Row("Pick the RestedXP route for my race", Sw("guide"))
+    Row("Stop Blizzard placing new spells", Sw("noAutoPush"), "Blizzard drops every new spell on the first empty slot; with a set-up layout that only makes duplicates")
+
+    Section("While levelling")
+    Row("Put spells on the bars as I learn them", Sw("swap"), "A placeholder becomes the real spell, or an empty saved slot gets it")
+    Row("Show the setup window on new characters", Sw("popup"))
+    L.Break()
+    L.c:SetHeight(-L.y + 20)
+end
+
+local function RefreshSetup()
+    win.subtitle:SetText("")
+    local YS = YR.Setup
+    local p = YS:Profile()
+    local _, class = UnitClass("player")
+    setup.saved:SetText(p and ("Saved layout  |cffffffff" .. YS:Describe(p) .. "|r  |cff8899aa" .. p.class:lower() .. "|r")
+        or "No layout saved yet")
+    setup.apply:SetEnabled(p ~= nil and p.class == class)
+    for _, ctl in ipairs(setup.controls) do if ctl.Refresh then ctl:Refresh() end end
+end
+
+-- ---------------------------------------------------------------------------
 -- The window
 -- ---------------------------------------------------------------------------
 local PAGES = {
     { key = "routes", label = "Routes", icon = "Interface\\Icons\\INV_Misc_Map_01", build = BuildRoutes, refresh = RefreshRoutes },
     { key = "run", label = "This run", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", build = BuildRun, refresh = RefreshRun },
+    { key = "setup", label = "Character setup", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore", build = BuildSetup,
+      refresh = RefreshSetup },
     { key = "share", label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,
       refresh = function() win.subtitle:SetText("") end },
     { key = "settings", label = "Settings", icon = "Interface\\Icons\\Trade_Engineering", build = BuildSettings,
