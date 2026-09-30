@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Groups: **Blackfathom Deeps** at the Zoram Strand in 21-23 Ashenvale, about 41,000 XP on Forever. The Darnassus quests are taken at the start of the route (Hunters already have them from 19-21) and handed in on the route's Darnassus visit. Knowledge in the Deeps is taken in Ironforge with the Hall of Thanes and handed in on the way to the Wetlands.
+- Groups: the **Hall of Thanes** under Ironforge (new in Forever) in both Loch Modan routes, around level 14.
+
 - Stormwind and Redridge arrows point to the right place: Forever draws those two maps differently from Classic, and the routes' map positions there (RestedXP's included) were for the Classic maps, 100-200 yards off. They're converted now.
 - Groups: the Stockade in the 24-27 route, with every quest picked up on the way (Lakeshire, Darkshire, Stormwind) and handed in after, about 38,000 XP on Forever.
 - New-character window: **Set up layout** is instant again. **Copy this layout...** now opens the Character settings first, so you see what a new character will get before copying.
