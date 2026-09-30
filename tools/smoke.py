@@ -728,4 +728,13 @@ check(not YR.RunStopped(YR) and run.ev[len(run.ev)][2] == "resume", "Resume: log
 YR.SetRunCounts(YR, False)
 check(not YR.RunCounts(YR), "a run can be kept out of vs best")
 YR.SetRunCounts(YR, True)
+
+# Every death skip in the shipped routes is followed by a step not already done (else it vanishes)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import check_deathskips
+import glob as _glob
+vanish = []
+for f in _glob.glob(os.path.join(check_deathskips.ROOT, "Guides", "*.lua")) + _glob.glob(os.path.join(check_deathskips.ROOT, "Guides", "Levelling", "*.lua")):
+    vanish += check_deathskips.check(f)
+check(not vanish, "every death skip is followed by a step still to do" + "".join("\n     " + v for v in dict.fromkeys(vanish)))
 sys.exit(1 if bad else 0)
