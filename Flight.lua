@@ -54,63 +54,67 @@ local function Place()
     end
 end
 
--- The route: a dotted track between the two places, the part flown drawn solid, the flight-master
--- icon riding along it (bobbing a little), and the destination's dot pulsing. The dots ahead drift
--- towards the destination, so the bar moves even when there is no time to count down.
-local W, H, PAD, TRACK_Y = 300, 64, 16, -32
-local DASH, GAP = 4, 5
-local ICON = "Interface\\Minimap\\Tracking\\FlightMaster"
+-- The route, like water in a hose: no background, a thick line between the two places, the part
+-- flown filled in, and a bulge (the bubble) where you are, wobbling a little as it goes. On a first
+-- flight, with no time to measure against, bubbles keep running from start to end instead.
+local W, H, PAD, TRACK_Y, THICK = 300, 56, 8, -26, 6
+local BUBBLE_W, BUBBLE_H = 24, 14
+local LOOP = 2.4     -- seconds for a bubble to run the whole line, while a first flight is timed
 
-local function Dot(parent, size, color)
-    local t = parent:CreateTexture(nil, "ARTWORK")
-    t:SetSize(size, size)
+local function Dot(parent, w, h, color, layer)
+    local t = parent:CreateTexture(nil, layer or "ARTWORK")
+    t:SetSize(w, h)
     YR.Style.ArtTexture(t, "dot")
     t:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
     return t
 end
+
+-- Text over the game world needs its own shadow, with no panel behind it.
+local function Shadowed(fs)
+    fs:SetShadowOffset(1, -1)
+    fs:SetShadowColor(0, 0, 0, 1)
+    return fs
+end
+
+local REST = { 1, 1, 1, 0.22 }
 
 local function Build()
     local S = YR.Style
     frame = CreateFrame("Frame", "HeadstartFlightFrame", UIParent)
     frame:SetSize(W, H)
     frame:SetFrameStrata("MEDIUM")
-    S.Fill(frame, S.C.window)
-    S.Border(frame, S.C.line)
-    frame.from = S.Text(frame, 12, S.C.sub)
-    frame.from:SetPoint("TOPLEFT", PAD - 6, -7)
+    frame.len = W - 2 * PAD
+    frame.from = Shadowed(S.Text(frame, 13, S.C.sub))
+    frame.from:SetPoint("TOPLEFT", PAD - 2, -2)
     frame.from:SetWidth(W / 2 - PAD)
-    frame.to = S.Text(frame, 12, S.C.text)
-    frame.to:SetPoint("TOPRIGHT", -(PAD - 6), -7)
+    frame.to = Shadowed(S.Text(frame, 13, S.C.text))
+    frame.to:SetPoint("TOPRIGHT", -(PAD - 2), -2)
     frame.to:SetWidth(W / 2 - PAD)
     frame.to:SetJustifyH("RIGHT")
-    frame.len = W - 2 * PAD
-    -- the dots of the track; the part flown is one solid line under the icon
-    frame.dashes = {}
-    for i = 1, floor(frame.len / (DASH + GAP)) + 1 do
-        local d = frame:CreateTexture(nil, "BORDER")
-        d:SetSize(DASH, 2)
-        S.Set(d, S.C.lineHi)
-        frame.dashes[i] = d
-    end
+    -- the hose: the whole line, the part flown over it, and round ends
+    frame.rest = frame:CreateTexture(nil, "BORDER")
+    frame.rest:SetHeight(THICK)
+    frame.rest:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
+    frame.rest:SetPoint("RIGHT", frame, "TOPRIGHT", -PAD, TRACK_Y)
+    S.Set(frame.rest, REST)
     frame.flown = frame:CreateTexture(nil, "ARTWORK")
-    frame.flown:SetHeight(2)
+    frame.flown:SetHeight(THICK)
     frame.flown:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
     S.Set(frame.flown, S.C.accent)
-    frame.start = Dot(frame, 10, S.C.accent)
-    frame.start:SetPoint("CENTER", frame, "TOPLEFT", PAD, TRACK_Y)
-    frame.goal = Dot(frame, 10, S.C.gold)
-    frame.goal:SetPoint("CENTER", frame, "TOPLEFT", W - PAD, TRACK_Y)
-    frame.halo = Dot(frame, 22, S.C.gold)
-    frame.halo:SetDrawLayer("BORDER")
-    frame.halo:SetPoint("CENTER", frame.goal)
-    frame.icon = frame:CreateTexture(nil, "OVERLAY")
-    frame.icon:SetSize(20, 20)
-    frame.icon:SetTexture(ICON)
-    frame.time = S.Text(frame, 13, S.C.text)
-    frame.time:SetPoint("BOTTOM", 0, 7)
+    frame.startCap = Dot(frame, THICK, THICK, S.C.accent)
+    frame.startCap:SetPoint("CENTER", frame, "TOPLEFT", PAD, TRACK_Y)
+    frame.endCap = Dot(frame, THICK, THICK, REST, "BORDER")
+    frame.endCap:SetPoint("CENTER", frame, "TOPLEFT", W - PAD, TRACK_Y)
+    -- the bubble, with a glint on top
+    frame.glow = Dot(frame, BUBBLE_W + 10, BUBBLE_H + 8, { S.C.accent[1], S.C.accent[2], S.C.accent[3], 0.25 }, "ARTWORK")
+    frame.bubble = Dot(frame, BUBBLE_W, BUBBLE_H, S.C.accent, "OVERLAY")
+    frame.glint = Dot(frame, 7, 3, { 1, 1, 1, 0.55 }, "OVERLAY")
+    frame.glint:SetDrawLayer("OVERLAY", 1)
+    frame.time = Shadowed(S.Text(frame, 13, S.C.text))
+    frame.time:SetPoint("BOTTOM", -12, 2)
     frame.time:SetJustifyH("CENTER")
-    frame.note = S.Text(frame, 11, S.C.muted)
-    frame.note:SetPoint("LEFT", frame.time, "RIGHT", 6, 0)
+    frame.note = Shadowed(S.Text(frame, 11, S.C.sub))
+    frame.note:SetPoint("LEFT", frame.time, "RIGHT", 5, 0)
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
@@ -120,7 +124,7 @@ local function Build()
         self:StopMovingOrSizing()
         YippRouteDB.flightPos = { floor(self:GetLeft() + 0.5), floor(self:GetTop() - UIParent:GetTop() + 0.5) }
     end)
-    -- the track moves every frame; the words change ten times a second
+    -- the bubble moves every frame; the words change ten times a second
     local tick = 0
     frame:SetScript("OnUpdate", function(_, elapsed)
         YR:AnimateFlight()
@@ -144,26 +148,30 @@ function YR:AnimateFlight()
     if not (frame and flight) then return end
     local now = GetTime()
     local p = Progress()
-    local x = (p or 0) * frame.len
-    -- the dots ahead of the icon drift towards the destination
-    local shift = (now * 12) % (DASH + GAP)
-    for i, d in ipairs(frame.dashes) do
-        local dx = (i - 1) * (DASH + GAP) + shift
-        if dx > x + 10 and dx + DASH < frame.len then
-            d:ClearAllPoints()
-            d:SetPoint("LEFT", frame, "TOPLEFT", PAD + dx, TRACK_Y)
-            d:Show()
-        else
-            d:Hide()
-        end
+    local x
+    if p then
+        x = p * frame.len
+        frame.flown:SetWidth(math.max(1, x))
+        frame.flown:SetShown(x > 1)
+    else
+        -- no time to go by: a bubble runs the line again and again, nothing is filled in
+        x = ((now - flight.started) % LOOP) / LOOP * frame.len
+        frame.flown:Hide()
     end
-    frame.flown:SetWidth(math.max(1, x))
-    frame.flown:SetShown(x > 1)
-    frame.icon:ClearAllPoints()
-    frame.icon:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y + 1 + math.sin(now * 2.5) * 1.5)
-    -- the destination breathes; faster once you are there
-    local speed = (p == 1) and 6 or 2.2
-    frame.halo:SetAlpha(0.12 + 0.18 * (0.5 + 0.5 * math.sin(now * speed)))
+    local a = YR.Style.C.accent
+    if p == 1 then frame.endCap:SetVertexColor(a[1], a[2], a[3], 1) else frame.endCap:SetVertexColor(unpack(REST)) end
+    -- the bulge squeezes and swells a little, like water pushing through
+    local wob = math.sin(now * 7)
+    local bw, bh = BUBBLE_W + 2 * wob, BUBBLE_H - 1.2 * wob
+    frame.bubble:SetSize(bw, bh)
+    frame.glow:SetSize(bw + 10, bh + 8)
+    frame.glow:SetAlpha(0.6 + 0.4 * math.sin(now * 3))
+    for _, t in ipairs({ frame.bubble, frame.glow }) do
+        t:ClearAllPoints()
+        t:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y)
+    end
+    frame.glint:ClearAllPoints()
+    frame.glint:SetPoint("CENTER", frame, "TOPLEFT", PAD + x - bw * 0.18, TRACK_Y + bh * 0.22)
 end
 
 function YR:RefreshFlight()
