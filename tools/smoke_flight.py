@@ -50,7 +50,9 @@ function hooksecurefunc(name, fn) HOOKS[name] = fn end
 ONTAXI = false
 function UnitOnTaxi() return ONTAXI end
 -- the flight map: node 1 is where you are, 2 and 3 are destinations; one hop each
-NODES = { { "Ironforge, Dun Morogh", "CURRENT" }, { "Thelsamar, Loch Modan", "REACHABLE" }, { "Menethil Harbor, Wetlands", "REACHABLE" } }
+NODES = { { "Ironforge, Dun Morogh", "CURRENT", 0.5, 0.5 }, { "Thelsamar, Loch Modan", "REACHABLE", 0.6, 0.5 },
+    { "Menethil Harbor, Wetlands", "REACHABLE", 0.3, 0.3 }, { "Thandol Span, Arathi Highlands", "REACHABLE", 0.3, 0.5 } }
+function TaxiNodePosition(i) return NODES[i][3], NODES[i][4] end
 HOPS = { [2] = { { 0.5, 0.5, 0.6, 0.5 } }, [3] = { { 0.5, 0.5, 0.3, 0.5 }, { 0.3, 0.5, 0.3, 0.3 } } }
 function NumTaxiNodes() return #NODES end
 function TaxiNodeName(i) return NODES[i][1] end
@@ -104,8 +106,12 @@ strtrim = function(s) return s end
     check(texts[0] == "1:00" or texts[0] == "0:59", f"second time: counts down from the learned time: {texts[0]}")
     check(mid == "0:01", f"a second before landing: {mid}")
 
-    # Menethil: never flown, two hops of 0.2 against Thelsamar's one of 0.1: four times the minute
+    # Menethil: never flown, two hops of 0.2 against Thelsamar's one of 0.1: four times the minute,
+    # by way of Thandol Span, halfway
     texts, _ = fly(3, 235)
+    check("Thandol Span in 2:00" in texts[3] or "Thandol Span in 1:59" in texts[3], f"the next stop on the way and when: {texts[3]}")
+    marks = [m for m in g.HeadstartFlightFrame.markers.values() if m.at is not None]
+    check(sorted(round(m.at, 2) for m in marks) == [0, 0.5, 1], f"markers at the start, the stop and the end: {[m.at for m in marks]}")
     check(texts[0] in ("about 4:00", "about 3:59"), f"a new route is estimated from its length: {texts[0]}")
 
     lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] = nil')

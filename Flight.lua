@@ -16,16 +16,37 @@ local function Short(name)
     return name and (name:match("^([^,]+)") or name) or "?"
 end
 
+local function HopLength(i, h)
+    local dx = (TaxiGetDestX(i, h) or 0) - (TaxiGetSrcX(i, h) or 0)
+    local dy = (TaxiGetDestY(i, h) or 0) - (TaxiGetSrcY(i, h) or 0)
+    return math.sqrt(dx * dx + dy * dy)
+end
+
 -- The length of the route to node i on the flight map: the sum of its hops.
 local function RouteLength(i)
     local hops = GetNumRoutes and GetNumRoutes(i) or 0
     local len = 0
-    for h = 1, hops do
-        local dx = (TaxiGetDestX(i, h) or 0) - (TaxiGetSrcX(i, h) or 0)
-        local dy = (TaxiGetDestY(i, h) or 0) - (TaxiGetSrcY(i, h) or 0)
-        len = len + math.sqrt(dx * dx + dy * dy)
-    end
+    for h = 1, hops do len = len + HopLength(i, h) end
     return len > 0 and len or nil
+end
+
+-- The flight points a flight to node i passes on the way: { name, at = share of the route's length }.
+-- The game gives each hop's end as a position on the flight map; the node there is the stop.
+local function Stops(i, length)
+    local hops = GetNumRoutes and GetNumRoutes(i) or 0
+    if hops < 2 or not length then return nil end
+    local stops, run = {}, 0
+    for h = 1, hops - 1 do
+        run = run + HopLength(i, h)
+        local x, y = TaxiGetDestX(i, h), TaxiGetDestY(i, h)
+        local name
+        for j = 1, NumTaxiNodes() do
+            local nx, ny = TaxiNodePosition(j)
+            if nx and x and math.abs(nx - x) < 0.003 and math.abs(ny - y) < 0.003 then name = TaxiNodeName(j) break end
+        end
+        stops[#stops + 1] = { name = name or "?", at = run / length }
+    end
+    return stops
 end
 
 local function Expected(f)
@@ -54,19 +75,36 @@ local function Place()
     end
 end
 
--- The route, like water in a hose: no background, a thick line between the two places, the part
--- flown filled in, and a bulge (the bubble) where you are, wobbling a little as it goes. On a first
--- flight, with no time to measure against, bubbles keep running from start to end instead.
-local W, H, PAD, TRACK_Y, THICK = 300, 56, 8, -26, 6
-local BUBBLE_W, BUBBLE_H = 24, 14
-local LOOP = 2.4     -- seconds for a bubble to run the whole line, while a first flight is timed
+-- The route: no panel, a white track with a dark outline, and a fill that grows from the left as you
+-- fly, amber at take-off turning green as you get close. A round marker at the start, at every flight
+-- point the flight passes (its name above it when there is room) and at the end; a marker you have
+-- passed takes the fill's colour. Solid textures and whole-pixel positions only, so it stays crisp.
+-- On a first flight, with no time to measure against, a light sweeps along the track instead.
+local W, H, PAD, TRACK_Y, THICK = 380, 74, 12, -34, 12
+local MARK = 16                       -- a stop's marker; its outline is 2 pixels wider all round
+local FAR, NEAR = { 1.00, 0.62, 0.22 }, { 0.36, 0.86, 0.46 }
+local TRACK, OUTLINE = { 0.92, 0.93, 0.95, 0.92 }, { 0, 0, 0, 0.85 }
+local SWEEP = 1.8                     -- seconds for the light to cross the track on a first flight
 
-local function Dot(parent, w, h, color, layer)
-    local t = parent:CreateTexture(nil, layer or "ARTWORK")
-    t:SetSize(w, h)
-    YR.Style.ArtTexture(t, "dot")
-    t:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+local function Mix(a, b, t)
+    return a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t
+end
+
+local function Solid(parent, layer, sub, color)
+    local t = parent:CreateTexture(nil, layer, nil, sub)
+    t:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
     return t
+end
+
+-- The fill: amber at the left edge to the colour of how far you are at its right edge.
+local function Shade(tex, p)
+    local r, g, b = Mix(FAR, NEAR, p)
+    if tex.SetGradient and CreateColor then
+        tex:SetColorTexture(1, 1, 1, 1)
+        tex:SetGradient("HORIZONTAL", CreateColor(FAR[1], FAR[2], FAR[3], 1), CreateColor(r, g, b, 1))
+    else
+        tex:SetColorTexture(r, g, b, 1)
+    end
 end
 
 -- Text over the game world needs its own shadow, with no panel behind it.
@@ -76,7 +114,34 @@ local function Shadowed(fs)
     return fs
 end
 
-local REST = { 1, 1, 1, 0.22 }
+local function Round(x) return floor(x + 0.5) end
+
+-- A round marker: a dark ring with a white (or filled) middle, from our dot art scaled down.
+local function Marker()
+    local m = {}
+    m.ring = frame:CreateTexture(nil, "ARTWORK", nil, 1)
+    m.ring:SetSize(MARK + 4, MARK + 4)
+    YR.Style.ArtTexture(m.ring, "dot")
+    m.ring:SetVertexColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], 1)
+    m.dot = frame:CreateTexture(nil, "ARTWORK", nil, 2)
+    m.dot:SetSize(MARK, MARK)
+    YR.Style.ArtTexture(m.dot, "dot")
+    m.label = Shadowed(YR.Style.Text(frame, 12, YR.Style.C.sub))
+    m.label:SetJustifyH("CENTER")
+    function m:At(x)
+        for _, t in ipairs({ self.ring, self.dot }) do
+            t:ClearAllPoints()
+            t:SetPoint("CENTER", frame, "TOPLEFT", PAD + Round(x), TRACK_Y)
+        end
+        self.label:ClearAllPoints()
+        self.label:SetPoint("BOTTOM", frame, "TOPLEFT", PAD + Round(x), TRACK_Y + MARK / 2 + 4)
+    end
+    function m:Show(on)
+        self.ring:SetShown(on) self.dot:SetShown(on)
+        if not on then self.label:Hide() end
+    end
+    return m
+end
 
 local function Build()
     local S = YR.Style
@@ -84,37 +149,30 @@ local function Build()
     frame:SetSize(W, H)
     frame:SetFrameStrata("MEDIUM")
     frame.len = W - 2 * PAD
-    frame.from = Shadowed(S.Text(frame, 13, S.C.sub))
-    frame.from:SetPoint("TOPLEFT", PAD - 2, -2)
-    frame.from:SetWidth(W / 2 - PAD)
-    frame.to = Shadowed(S.Text(frame, 13, S.C.text))
-    frame.to:SetPoint("TOPRIGHT", -(PAD - 2), -2)
-    frame.to:SetWidth(W / 2 - PAD)
+    frame.from = Shadowed(S.Text(frame, 14, S.C.text))
+    frame.from:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", PAD - 4, TRACK_Y + MARK / 2 + 4)
+    frame.from:SetWidth(W / 3)
+    frame.to = Shadowed(S.Text(frame, 14, S.C.text))
+    frame.to:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -(PAD - 4), TRACK_Y + MARK / 2 + 4)
+    frame.to:SetWidth(W / 3)
     frame.to:SetJustifyH("RIGHT")
-    -- the hose: the whole line, the part flown over it, and round ends
-    frame.rest = frame:CreateTexture(nil, "BORDER")
-    frame.rest:SetHeight(THICK)
-    frame.rest:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
-    frame.rest:SetPoint("RIGHT", frame, "TOPRIGHT", -PAD, TRACK_Y)
-    S.Set(frame.rest, REST)
-    frame.flown = frame:CreateTexture(nil, "ARTWORK")
-    frame.flown:SetHeight(THICK)
-    frame.flown:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
-    S.Set(frame.flown, S.C.accent)
-    frame.startCap = Dot(frame, THICK, THICK, S.C.accent)
-    frame.startCap:SetPoint("CENTER", frame, "TOPLEFT", PAD, TRACK_Y)
-    frame.endCap = Dot(frame, THICK, THICK, REST, "BORDER")
-    frame.endCap:SetPoint("CENTER", frame, "TOPLEFT", W - PAD, TRACK_Y)
-    -- the bubble, with a glint on top
-    frame.glow = Dot(frame, BUBBLE_W + 10, BUBBLE_H + 8, { S.C.accent[1], S.C.accent[2], S.C.accent[3], 0.25 }, "ARTWORK")
-    frame.bubble = Dot(frame, BUBBLE_W, BUBBLE_H, S.C.accent, "OVERLAY")
-    frame.glint = Dot(frame, 7, 3, { 1, 1, 1, 0.55 }, "OVERLAY")
-    frame.glint:SetDrawLayer("OVERLAY", 1)
-    frame.time = Shadowed(S.Text(frame, 13, S.C.text))
-    frame.time:SetPoint("BOTTOM", -12, 2)
-    frame.time:SetJustifyH("CENTER")
-    frame.note = Shadowed(S.Text(frame, 11, S.C.sub))
-    frame.note:SetPoint("LEFT", frame.time, "RIGHT", 5, 0)
+    -- the track: outline, white inside, the fill, and the light that sweeps a first flight
+    frame.outline = Solid(frame, "BORDER", 0, OUTLINE)
+    frame.outline:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD - 1, TRACK_Y + THICK / 2 + 1)
+    frame.outline:SetSize(frame.len + 2, THICK + 2)
+    frame.track = Solid(frame, "BORDER", 1, TRACK)
+    frame.track:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, TRACK_Y + THICK / 2)
+    frame.track:SetSize(frame.len, THICK)
+    frame.fill = Solid(frame, "ARTWORK", 0, NEAR)
+    frame.fill:SetPoint("TOPLEFT", frame.track, "TOPLEFT")
+    frame.fill:SetHeight(THICK)
+    frame.sweep = Solid(frame, "ARTWORK", 0, { NEAR[1], NEAR[2], NEAR[3], 0.55 })
+    frame.sweep:SetSize(40, THICK)
+    frame.markers = {}
+    frame.time = Shadowed(S.Text(frame, 15, S.C.text))
+    frame.time:SetPoint("TOP", frame, "TOPLEFT", W / 2 - 20, TRACK_Y - MARK / 2 - 5)
+    frame.note = Shadowed(S.Text(frame, 12, S.C.sub))
+    frame.note:SetPoint("LEFT", frame.time, "RIGHT", 6, -1)
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
@@ -124,7 +182,7 @@ local function Build()
         self:StopMovingOrSizing()
         YippRouteDB.flightPos = { floor(self:GetLeft() + 0.5), floor(self:GetTop() - UIParent:GetTop() + 0.5) }
     end)
-    -- the bubble moves every frame; the words change ten times a second
+    -- the fill moves every frame; the words change ten times a second
     local tick = 0
     frame:SetScript("OnUpdate", function(_, elapsed)
         YR:AnimateFlight()
@@ -144,34 +202,57 @@ local function Progress()
     return math.min(1, (GetTime() - flight.started) / total)
 end
 
+-- The markers for this flight: the start, each stop on the way (at its share of the route's
+-- length) and the end. Names over the stops only where they don't crowd the ends or each other.
+local function LayOut()
+    local points = { { at = 0 } }
+    for _, s in ipairs(flight.stops or {}) do points[#points + 1] = { at = s.at, name = s.name } end
+    points[#points + 1] = { at = 1 }
+    local lastLabel = 70                   -- pixels kept clear of the start's name
+    for n, pt in ipairs(points) do
+        local m = frame.markers[n] or Marker()
+        frame.markers[n] = m
+        local x = pt.at * frame.len
+        m:At(x)
+        m:Show(true)
+        m.at = pt.at
+        if pt.name and x - lastLabel > 60 and frame.len - x > 70 then
+            m.label:SetText(Short(pt.name))
+            m.label:Show()
+            lastLabel = x
+        else
+            m.label:Hide()
+        end
+    end
+    for n = #points + 1, #frame.markers do frame.markers[n]:Show(false) end
+    frame.laid = flight
+end
+
 function YR:AnimateFlight()
     if not (frame and flight) then return end
-    local now = GetTime()
+    if frame.laid ~= flight then LayOut() end
     local p = Progress()
-    local x
+    local now = GetTime()
     if p then
-        x = p * frame.len
-        frame.flown:SetWidth(math.max(1, x))
-        frame.flown:SetShown(x > 1)
+        local x = Round(p * frame.len)
+        frame.fill:SetWidth(math.max(1, x))
+        frame.fill:SetShown(x >= 1)
+        Shade(frame.fill, p)
+        frame.sweep:Hide()
     else
-        -- no time to go by: a bubble runs the line again and again, nothing is filled in
-        x = ((now - flight.started) % LOOP) / LOOP * frame.len
-        frame.flown:Hide()
+        frame.fill:Hide()
+        local x = Round(((now - flight.started) % SWEEP) / SWEEP * (frame.len - 40))
+        frame.sweep:ClearAllPoints()
+        frame.sweep:SetPoint("TOPLEFT", frame.track, "TOPLEFT", x, 0)
+        frame.sweep:Show()
     end
-    local a = YR.Style.C.accent
-    if p == 1 then frame.endCap:SetVertexColor(a[1], a[2], a[3], 1) else frame.endCap:SetVertexColor(unpack(REST)) end
-    -- the bulge squeezes and swells a little, like water pushing through
-    local wob = math.sin(now * 7)
-    local bw, bh = BUBBLE_W + 2 * wob, BUBBLE_H - 1.2 * wob
-    frame.bubble:SetSize(bw, bh)
-    frame.glow:SetSize(bw + 10, bh + 8)
-    frame.glow:SetAlpha(0.6 + 0.4 * math.sin(now * 3))
-    for _, t in ipairs({ frame.bubble, frame.glow }) do
-        t:ClearAllPoints()
-        t:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y)
+    for _, m in ipairs(frame.markers) do
+        if m.at and p and p >= m.at then
+            m.dot:SetVertexColor(Mix(FAR, NEAR, m.at))
+        else
+            m.dot:SetVertexColor(TRACK[1], TRACK[2], TRACK[3], 1)
+        end
     end
-    frame.glint:ClearAllPoints()
-    frame.glint:SetPoint("CENTER", frame, "TOPLEFT", PAD + x - bw * 0.18, TRACK_Y + bh * 0.22)
 end
 
 function YR:RefreshFlight()
@@ -187,7 +268,12 @@ function YR:RefreshFlight()
         local left = total - gone
         if left >= 0 then
             frame.time:SetText((guess and "about " or "") .. Clock(left))
-            frame.note:SetText("left")
+            -- the next stop on the way, and when you are there
+            local nextStop
+            for _, st in ipairs(flight.stops or {}) do
+                if st.at * total > gone then nextStop = st break end
+            end
+            frame.note:SetText(nextStop and ("left, " .. Short(nextStop.name) .. " in " .. Clock(nextStop.at * total - gone)) or "left")
         else
             frame.time:SetText("landing")
             frame.note:SetText(Clock(-left) .. " over")
@@ -227,7 +313,7 @@ local function TakeOff()
     flight.total, flight.guess = Expected(flight)
     -- kept over a reload mid-flight, so the bar carries on
     YippRouteDB.flightNow = { from = flight.from, to = flight.to, key = flight.key, length = flight.length,
-        map = flight.map, rxp = flight.rxp, at = time() }
+        map = flight.map, rxp = flight.rxp, stops = flight.stops, at = time() }
     if YR.Option("flightTimer") then ShowBar(true) end
 end
 
@@ -277,7 +363,8 @@ hooksecurefunc("TakeTaxiNode", function(i)
     if not (from and to) then return end
     local info = type(RXP) == "table" and type(RXP.flightInfo) == "table" and RXP.flightInfo
     local rxp = info and info.activeIndex == i and tonumber(info.timer) or nil
-    pending = { from = from, to = to, key = from .. ">" .. to, length = RouteLength(i),
+    local length = RouteLength(i)
+    pending = { from = from, to = to, key = from .. ">" .. to, length = length, stops = Stops(i, length),
         map = GetTaxiMapID and GetTaxiMapID() or 0, rxp = rxp }
     waited = 0
     watcher:SetScript("OnUpdate", WaitForTaxi)
@@ -293,7 +380,7 @@ watcher:SetScript("OnEvent", function(_, event)
         if now and UnitOnTaxi("player") and not flight then
             -- back from a reload in the air: the bar carries on from when the flight started
             flight = { from = now.from, to = now.to, key = now.key, length = now.length, map = now.map,
-                rxp = now.rxp, resumed = true }
+                rxp = now.rxp, stops = now.stops, resumed = true }
             flight.started = GetTime() - (time() - (now.at or time()))
             flight.total, flight.guess = Expected(flight)
             if YR.Option("flightTimer") then ShowBar(true) end
