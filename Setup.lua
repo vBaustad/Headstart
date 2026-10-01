@@ -19,7 +19,7 @@ local OPTION_DEFAULTS = {
     macros = true, autofeed = true, items = false,
     clearBars = true, clearMacros = true,
     settings = true, editMode = true, barVisibility = true, guide = true, noAutoPush = true,
-    swap = true, popup = true, skipIntro = true,
+    swap = true, popup = true, skipIntro = true, chat = true, camera = true,
 }
 
 -- Everything is kept per class: a warrior main's bars and choices don't land on a new paladin.
@@ -547,6 +547,17 @@ local function SkipIntro()
 end
 YS.SkipIntro = SkipIntro
 
+-- A new character comes out of the intro with the camera all the way in: once, at level 1, out to the
+-- main's distance (from the saved layout), or a normal third-person distance without one.
+local function FirstZoom()
+    if UnitLevel("player") > 1 or not YippSetupDB or not YS:Options().camera or YippSetupCharDB.zoomed then return end
+    if InCinematic and InCinematic() then return end        -- after it ends (CINEMATIC_STOP)
+    YippSetupCharDB.zoomed = true
+    local p = YS:Profile()
+    C_Timer.After(1, function() YS.ApplyCamera(p and p.ui and p.ui.camera or 15) end)
+end
+YS.FirstZoom = FirstZoom
+
 -- A layout copied before Edit Mode, bars and settings were saved has no ui part. Logging in on the
 -- character it was copied from fills it in, so the bars aren't copied again just for that.
 local function FillInUI()
@@ -586,6 +597,7 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
     elseif event == "PLAYER_ENTERING_WORLD" and (arg1 or arg2) then   -- login or reload only
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
         SkipIntro()
+        C_Timer.After(0.5, FirstZoom)
         C_Timer.After(2, FirstTimeHere)
         C_Timer.After(3, FillInUI)
         if YippSetupCharDB.applied then NoAutoPush() end
@@ -598,4 +610,7 @@ end)
 local intro = CreateFrame("Frame")
 intro:RegisterEvent("CINEMATIC_START")
 intro:RegisterEvent("PLAY_MOVIE")
-intro:SetScript("OnEvent", function() C_Timer.After(0, SkipIntro) end)
+intro:RegisterEvent("CINEMATIC_STOP")
+intro:SetScript("OnEvent", function(_, event)
+    if event == "CINEMATIC_STOP" then C_Timer.After(0.5, FirstZoom) else C_Timer.After(0, SkipIntro) end
+end)

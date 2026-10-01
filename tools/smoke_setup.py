@@ -479,4 +479,128 @@ ok = g.CANCELLED == 0
 print(("ok  " if ok else "FAIL"), "... unless the option is off")
 bad += not ok
 lua.execute("YR_SETUP:Options().skipIntro = true; IN_CINEMATIC = false")
+
+
+def report(ok, what):
+    global bad
+    print(("ok  " if ok else "FAIL"), what)
+    bad += not ok
+
+
+# Without a reload: the game's own functions switch Edit Mode and the bars; Blizzard's Edit Mode code
+# (SelectLayout) and Settings are not touched, so no reload is asked. Checked a moment later.
+lua.execute(r'''
+LOADED = {}; RACE = "Dwarf"; EDIT.selected = nil; POPUP = nil
+StaticPopup_Show = function(w) POPUP = w end
+LATER = {}
+C_Timer.After = function(_, fn) table.insert(LATER, fn) end
+function RunLater() local l = LATER LATER = {} for _, fn in ipairs(l) do fn() end end
+EditModeManagerFrame.layoutInfo.activeLayout = 1
+EditModeManagerFrame.layoutInfo.layouts[3].layoutName = "Main"
+TOGGLES = { false, false, false, false, false, false, false }
+function GetActionBarToggles() return unpack(TOGGLES) end
+function SetActionBarToggles(...) TOGGLES = { ... } end
+for i, name in ipairs({ "MultiBarBottomLeft", "MultiBarBottomRight", "MultiBarRight" }) do
+    _G[name] = { IsShown = function() return TOGGLES[i] end }
+end
+SETTINGS_TOUCHED = false
+Settings.SetValue = function() SETTINGS_TOUCHED = true end
+C_EditMode.SetActiveLayout = function(i) EditModeManagerFrame.layoutInfo.activeLayout = i end
+C_EditMode.SaveLayouts = function(info) SAVED_LAYOUTS = info end
+C_EditMode.OnLayoutAdded = function(i) EditModeManagerFrame.layoutInfo.activeLayout = i end
+UI_TEST = { layout = { name = "Main", type = 1 }, bars = { [2] = true, [3] = true, [4] = false }, cvars = {} }
+''')
+YS.ApplyUI(YS, g.UI_TEST)
+g.RunLater()
+report(g.EditModeManagerFrame.layoutInfo.activeLayout == 3 and g.EDIT.selected is None,
+       "Edit Mode switched through C_EditMode, not Blizzard's SelectLayout")
+report(g.TOGGLES[1] is True and g.TOGGLES[2] is True and g.TOGGLES[3] is False and not g.SETTINGS_TOUCHED,
+       "the bars switched through SetActionBarToggles, Settings untouched")
+report(g.POPUP is None, f"no reload asked when both took ({g.POPUP})")
+# the layout didn't take: the old way, and a reload
+lua.execute('''EditModeManagerFrame.layoutInfo.activeLayout = 1; EDIT.selected = nil; POPUP = nil
+C_EditMode.SetActiveLayout = function() end''')
+YS.ApplyUI(YS, g.UI_TEST)
+g.RunLater()
+report(g.EDIT.selected == 3 and g.POPUP == "YIPPSETUP_RELOAD", "a layout that didn't switch: the old way, and the reload popup")
+# a layout this account doesn't have: imported on our own copy of the list, made active
+lua.execute('''EditModeManagerFrame.layoutInfo.activeLayout = 1; EDIT.selected = nil; EDIT.made = nil; POPUP = nil
+C_EditMode.SetActiveLayout = function(i) EditModeManagerFrame.layoutInfo.activeLayout = i end
+UI_NEW = { layout = { name = "Fresh", type = 1, export = "x" }, bars = {}, cvars = {} }''')
+YS.ApplyUI(YS, g.UI_NEW)
+report(g.SAVED_LAYOUTS is not None and g.SAVED_LAYOUTS.layouts[3].layoutName == "Fresh" and g.EDIT.made is None
+       and len(g.EditModeManagerFrame.layoutInfo.layouts) == 3,
+       "a new layout: saved on a copy of the list (Blizzard's own list untouched), no MakeNewLayout")
+lua.execute("LATER = {}")
+
+# Chat windows: the main's tabs, what they show, colour, transparency, size; a tab the new character
+# has that the main doesn't, closed.
+lua.execute(r'''
+C_Timer.After = function(_, fn) fn() end
+local function Chat(i, name, shown, docked)
+    local f = { id = i, name = name, shown = shown, isDocked = docked, alpha = 0.25, size = 14,
+        messageTypeList = { "SAY" }, channelList = {} }
+    function f:GetPoint() return "BOTTOMLEFT", UIParent, "BOTTOMLEFT", 40, 60 end
+    function f:GetWidth() return 400 end
+    function f:GetHeight() return 180 end
+    function f:RemoveAllMessageGroups() self.messageTypeList = {} end
+    function f:AddMessageGroup(g) table.insert(self.messageTypeList, g) end
+    function f:RemoveAllChannels() self.channelList = {} end
+    function f:AddChannel(c) table.insert(self.channelList, c) end
+    function f:ClearAllPoints() end
+    function f:SetPoint(...) self.point = { ... } end
+    function f:SetSize(w, h) self.w, self.h = w, h end
+    function f:Show() self.shown = true end
+    _G["ChatFrame" .. i] = f
+    return f
+end
+NUM_CHAT_WINDOWS = 10
+function ResetChats()
+    for i = 1, 10 do Chat(i, i == 1 and "General" or i == 2 and "Combat Log" or "", i <= 2, i <= 2) end
+end
+ResetChats()
+function GetChatWindowInfo(i) local f = _G["ChatFrame" .. i] return f.name, f.size, 0, 0, 0, f.alpha, f.shown, false, f.isDocked end
+GENERAL_CHAT_DOCK = {}
+function FCFDock_GetChatFrames() return {} end
+function FCF_SetWindowName(f, n) f.name = n end
+function FCF_SetWindowColor() end
+function FCF_SetWindowAlpha(f, a) f.alpha = a end
+function FCF_SetChatWindowFontSize(_, f, s) f.size = s end
+function FCF_SetLocked() end
+function FCF_DockFrame(f) f.isDocked = true; f.shown = true end
+function FCF_UnDockFrame(f) f.isDocked = false end
+function FCF_SavePositionAndDimensions() end
+function FCF_SelectDockFrame() end
+function FCF_Close(f) f.shown = false; f.isDocked = false; f.name = "" end
+function FCF_OpenNewWindow(name)
+    for i = 3, 10 do local f = _G["ChatFrame" .. i] if not f.shown and not f.isDocked then f.name = name f.shown = true f.isDocked = true return f, i end end
+end
+-- the main: General at 20% with Say and Guild, a docked "Loot" tab, a floating "Whispers"
+ChatFrame1.alpha = 0.2; ChatFrame1.messageTypeList = { "SAY", "GUILD" }
+FCF_OpenNewWindow("Loot"); ChatFrame3.messageTypeList = { "LOOT", "MONEY" }; ChatFrame3.alpha = 0.5
+FCF_OpenNewWindow("Whispers"); ChatFrame4.isDocked = false; ChatFrame4.messageTypeList = { "WHISPER" }; ChatFrame4.size = 16
+MAIN_CHAT = YR_SETUP.ScanChat()
+ResetChats()
+FCF_OpenNewWindow("Trade junk")       -- this character's own tab, not the main's
+''')
+said = YS.ApplyChat(g.MAIN_CHAT)
+frames = [getattr(g, f"ChatFrame{i}") for i in range(3, 11)]
+names = {f.name for f in frames if f.shown}
+f1 = g.ChatFrame1
+report(f1.alpha == 0.2 and list(f1.messageTypeList.values()) == ["SAY", "GUILD"], "General: the main's transparency and messages")
+report(names == {"Loot", "Whispers"}, f"the main's tabs, and the new character's own tab closed: {names} ({said})")
+loot = [f for f in frames if f.name == "Loot"][0]
+whis = [f for f in frames if f.name == "Whispers"][0]
+report(loot.alpha == 0.5 and loot.isDocked and list(loot.messageTypeList.values()) == ["LOOT", "MONEY"],
+       "a docked tab: its transparency and messages")
+report(not whis.isDocked and whis.size == 16 and whis.w == 400 and whis.point is not None,
+       "a floating window: undocked, its font size, size and position")
+
+# Camera: out to the main's distance
+lua.execute('''CAM = 3
+function GetCameraZoom() return CAM end
+function CameraZoomOut(d) CAM = CAM + d end
+function CameraZoomIn(d) CAM = CAM - d end''')
+YS.ApplyCamera(18)
+report(abs(g.CAM - 18) < 0.01, f"camera out to the main's distance: {g.CAM}")
 sys.exit(1 if bad else 0)
