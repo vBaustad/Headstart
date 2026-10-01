@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- New spell ranks from the trainer replace the old rank on your bars. A spell on a bar is one rank only, and Blizzard doesn't upgrade it (Headstart turns off Blizzard's placing of new spells), so a set-up character kept casting Rank 1. Only the slots from your main's layout are changed.
+- New spell ranks from the trainer replace the old rank on your bars. A spell on a bar is one rank only, and Blizzard doesn't upgrade it (Headstart turns off Blizzard's placing of new spells), so a set-up character kept casting Rank 1. Only the slots from your main's layout are changed. A spell your main keeps at a lower rank on purpose (downranking) stays at that rank: copy your layout again on the main to save which ones. Turn it off under Settings, Character: Put new ranks on the bars.
 
 - **Darkshore: Forever's Swelling Forces.** Take it from Arbal next to Onu, and kill the Stormscale naga at the Ruins of Mathystra while you loot the Mathystra Relics there; hand it in with the relics. In a group, the naga's 20 Mathystral Amulet Fragments summon Baron Marinous (elite) at the Fathom Stone at the bottom of the pool; his Clouded Water Globe starts the quest of the same name for Onu.
 

@@ -334,6 +334,19 @@ bad += not ok
 lua.execute("""KNOWN[639] = true; NAMEID["Holy Light"] = 639
 local f = C_Spell.GetSpellName; C_Spell.GetSpellName = function(id) if id == 639 then return "Holy Light" end return f(id) end""")
 ok = g.BAR[1].id == 635
+# the main keeps Holy Light at Rank 1 on purpose (downranking): it stays Rank 1
+lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]; e.down, e.id = true, 635""")
+events._OnEvent(events, "SPELLS_CHANGED")
+ok2 = g.BAR[1].id == 635
+print(("ok  " if ok2 else "FAIL"), f"downranked on the main: slot 1 stays Rank 1 ({g.BAR[1].id})")
+bad += not ok2
+lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]; e.down, e.id = nil, nil""")
+YS.Options(YS).rankUp = False
+events._OnEvent(events, "SPELLS_CHANGED")
+ok2 = g.BAR[1].id == 635
+print(("ok  " if ok2 else "FAIL"), f"new ranks turned off: slot 1 stays Rank 1 ({g.BAR[1].id})")
+bad += not ok2
+YS.Options(YS).rankUp = True
 events._OnEvent(events, "SPELLS_CHANGED")
 ok = ok and g.BAR[1].id == 639
 print(("ok  " if ok else "FAIL"), f"Holy Light Rank 2 trained: slot 1 now holds {g.BAR[1].id} (was Rank 1, 635)")
