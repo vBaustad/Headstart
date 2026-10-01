@@ -262,7 +262,8 @@ C_Item = { GetItemInfoInstant = function(id) local i = ITEMS[id] or { "", 12, 0 
            GetItemInfo = function(id) return nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, ITEMS[id][5] end }
 CHOICES = {}
 function GetNumQuestChoices() return #CHOICES end
-function GetQuestItemInfo(_, i) return "item" .. CHOICES[i], 0, 1, 1, true, CHOICES[i] end
+QUALITY = {}
+function GetQuestItemInfo(_, i) return "item" .. CHOICES[i], 0, 1, QUALITY[CHOICES[i]] or 1, true, CHOICES[i] end
 function GetQuestItemLink(_, i) return "item" .. CHOICES[i] end
 function GetQuestReward(i) PICKED = i end
 function Pick(...) CHOICES = { ... } PICKED = nil Fire("QUEST_COMPLETE") return PICKED end
@@ -294,6 +295,34 @@ check(g.Pick(247840, 247841, 247846) is None, "Rascally Rodents' three professio
 lua.execute("QUEST = 201; CHOICES = { 9, 10 }")
 g.HOOKS["GetQuestReward"](2)                           # you took the herb bag by hand
 check(g.Pick(9, 10) == 2, "but the one you picked by hand for that quest is taken again")
+lua.execute("QUEST = 202; QUALITY = { [3] = 2 }")
+check(g.Pick(3, 2, 1) is None, "a green among the rewards: you choose")
+lua.execute("QUEST = 200; QUALITY = { [8] = 2 }")
+check(g.Pick(1, 2, 8) == 3, "... unless you picked for that quest by hand before")
+lua.execute("QUEST = 202; QUALITY = { [3] = 2 }; YippRouteDB.rewardClasses.PALADIN.greenStop = false")
+check(g.Pick(3, 2, 1) == 3, "the green stop is a setting")
+lua.execute("YippRouteDB.rewardClasses.PALADIN.greenStop = true; QUALITY = {}")
+# RestedXP's automation: Shift keeps it out of the window you open; a green keeps its built-in picks out
+lua.execute('''
+LATER = {}
+local after = C_Timer.After
+C_Timer.After = function(_, fn) table.insert(LATER, fn) end
+local function Panel() local p = { hooks = {} } function p:HookScript(_, fn) table.insert(self.hooks, fn) end return p end
+GossipFrame, QuestFrameDetailPanel, QuestFrameRewardPanel = Panel(), Panel(), Panel()
+RXP = RXP or {}
+RXP.settings = { profile = { enableQuestAutomation = true, enableQuestRewardAutomation = true } }
+YR_HOOK = true
+''')
+YR.HookQuestWindows(YR)
+lua.execute("SHIFT = true; for _, fn in ipairs(QuestFrameDetailPanel.hooks) do fn() end")
+check(g.RXP.settings.profile.enableQuestAutomation is False, "Shift: RestedXP's quest automation is off for that window")
+lua.execute("for _, fn in ipairs(LATER) do fn() end LATER = {}")
+check(g.RXP.settings.profile.enableQuestAutomation is True, "... and back on right after")
+lua.execute("SHIFT = false; CHOICES = { 3, 2 }; QUALITY = { [3] = 2 }; for _, fn in ipairs(QuestFrameRewardPanel.hooks) do fn() end")
+check(g.RXP.settings.profile.enableQuestRewardAutomation is False and g.RXP.settings.profile.enableQuestAutomation is True,
+      "a green: RestedXP's built-in reward pick waits, the rest of its automation doesn't")
+lua.execute("for _, fn in ipairs(LATER) do fn() end LATER = {}; QUALITY = {}; C_Timer.After = function(_, fn) fn() end")
+check(g.RXP.settings.profile.enableQuestRewardAutomation is True, "... and is back on right after")
 lua.execute("QUEST = 200")
 lua.execute("LEVEL = 5")
 

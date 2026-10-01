@@ -5,7 +5,10 @@
 --      weapon, then mail, then water. Of two of the same kind, the one that sells for more.
 --   3. Nothing in the list on offer: the most valuable reward, or leave it to you (a setting).
 -- Only up to the level limit, and never while Shift is held - that is how you choose yourself, and
--- a choice made by hand is remembered for that quest.
+-- a choice made by hand is remembered for that quest. A choice with a green (or better) among it is
+-- yours too (greenStop, per class, on by default), unless you chose for that quest by hand before.
+-- Holding Shift also stops RestedXP's own quest automation (accept, hand in, its built-in reward
+-- picks) for the window you open, and a green stops RestedXP's built-in reward picks.
 --   YippRouteDB.rewardClasses[CLASS] = { on, maxLevel, order = { kind, ... }, off = { [kind] = true },
 --       remember, fallback = "value" | "ask", chosen = { [questID] = { item, name, title } } }
 local _, YR = ...
@@ -70,7 +73,8 @@ function YR:RewardSettings(class)
             local order = {}
             for _, k in ipairs(DEFAULT_ORDER[class] or DEFAULT_ORDER.WARRIOR) do order[#order + 1] = k end
             db = { maxLevel = old and old.maxLevel or 10, order = order, off = {},
-                remember = not old or old.remember ~= false, fallback = old and old.fallback or "value", chosen = {} }
+                remember = not old or old.remember ~= false, fallback = old and old.fallback or "value", chosen = {},
+                greenStop = true }
             for quest, pick in pairs(old and old.chosen or {}) do
                 if pick.item and YR.RewardKind(pick.item) == nil then db.chosen[quest] = Copy(pick) end
             end
@@ -79,6 +83,7 @@ function YR:RewardSettings(class)
         YippRouteDB.rewardClasses[class] = db
     end
     if db.on == nil then db.on = true end
+    if db.greenStop == nil then db.greenStop = true end
     -- every kind is in the list once, so the settings can switch any of them on
     local seen = {}
     for _, k in ipairs(db.order) do seen[k] = true end
@@ -124,6 +129,18 @@ local function Take(index)
     picking = false
 end
 
+-- Whether a choice of rewards has a green or better among it.
+local function HasGreen()
+    local n = GetNumQuestChoices()
+    if n < 2 then return false end
+    for i = 1, n do
+        local _, _, _, quality = GetQuestItemInfo("choice", i)
+        if quality and quality >= 2 then return true end
+    end
+    return false
+end
+YR.RewardHasGreen = HasGreen   -- for the tests
+
 local function Choose(tries)
     local n = GetNumQuestChoices()
     local db = YR:RewardSettings()
@@ -142,6 +159,11 @@ local function Choose(tries)
     local mine = db.remember and db.chosen[GetQuestID()]
     if mine then
         for i = 1, n do if items[i] == mine.item then return Take(i) end end
+    end
+    -- a green among the choices: yours
+    if db.greenStop and HasGreen() then
+        YR.Print("a green among this quest's rewards: pick the one you want.")
+        return
     end
     -- a choice that isn't gear or food (a profession to learn, a profession bag, a pet): yours, unless you chose
     -- it by hand on this quest before (above)
@@ -181,4 +203,37 @@ end)
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("QUEST_COMPLETE")
-f:SetScript("OnEvent", function() Choose(10) end)
+f:RegisterEvent("PLAYER_LOGIN")
+f:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_LOGIN" then return YR:HookQuestWindows() end
+    Choose(10)
+end)
+
+-- RestedXP acts on the same events as these windows, after them (Blizzard's frames were there first):
+-- switching one of its settings off when a window opens, back on the next frame, keeps it out of that
+-- one window. Only a setting that was on, and only for that moment.
+local function Pause(key)
+    local p = type(RXP) == "table" and type(RXP.settings) == "table" and RXP.settings.profile
+    if type(p) ~= "table" or p[key] == false then return end
+    p[key] = false
+    C_Timer.After(0, function() p[key] = true end)
+end
+
+function YR:HookQuestWindows()
+    for _, name in ipairs({ "GossipFrame", "QuestFrameGreetingPanel", "QuestFrameDetailPanel",
+            "QuestFrameProgressPanel", "QuestFrameRewardPanel" }) do
+        local frame = _G[name]
+        if frame and frame.HookScript then
+            frame:HookScript("OnShow", function()
+                if IsShiftKeyDown() then Pause("enableQuestAutomation") end
+            end)
+        end
+    end
+    local reward = _G.QuestFrameRewardPanel
+    if reward and reward.HookScript then
+        reward:HookScript("OnShow", function()
+            local db = YR:RewardSettings()
+            if db.on and db.greenStop and HasGreen() then Pause("enableQuestRewardAutomation") end
+        end)
+    end
+end
