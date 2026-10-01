@@ -19,7 +19,7 @@ local OPTION_DEFAULTS = {
     macros = true, autofeed = true, items = false,
     clearBars = true, clearMacros = true,
     settings = true, editMode = true, barVisibility = true, guide = true, noAutoPush = true,
-    swap = true, popup = true, skipIntro = true, chat = true, camera = true,
+    swap = true, rankUp = true, popup = true, skipIntro = true, chat = true, camera = true,
 }
 
 -- Everything is kept per class: a warrior main's bars and choices don't land on a new paladin.
@@ -112,6 +112,9 @@ function YS:Scan()
                 lvl = name and (levels[name] or (YS.RACIALS[name] and 1))
                 if lvl and lvl <= maxLevel then
                     entry = { kind = "spell", name = name, level = lvl, racial = YS.RACIALS[name] or nil }
+                    -- a lower rank than the main's best, kept on purpose (downranking): that rank, by ID
+                    local best = C_Spell.GetSpellInfo(name)
+                    if best and best.spellID ~= id then entry.id, entry.down = id, true end
                 elseif lvl then
                     n.later = n.later + 1
                 elseif name and YS.PROFESSIONS[name] then
@@ -211,7 +214,10 @@ local function RealSpell(e)
     if e.kind ~= "spell" then return nil end
     if e.prof then return ProfessionSpellID(e) end
     local spell = REPLACE[e.name] or e.name
-    return not MOUSEOVER_SET()[spell] and KnownSpellID(spell) or nil
+    if MOUSEOVER_SET()[spell] then return nil end
+    -- a downranked slot: the main's rank once known; until then this character's best, which is lower
+    if e.down and spell == e.name and IsPlayerSpell(e.id) then return e.id end
+    return KnownSpellID(spell)
 end
 
 -- Whether the options carry this saved button over. levels: this class's spell levels; autofeed:
@@ -428,8 +434,8 @@ function YS:Upgrade()
                 PlaceSpell(slot, id)
                 swapped[m.name] = m.body
             -- a new rank from the trainer: a spell on the bar is that rank only, so the slot gets the
-            -- highest one (a lookup by name gives it)
-            elseif kind == "spell" and actionID ~= id and not e.prof
+            -- highest one, or for a downranked slot the main's rank (RealSpell)
+            elseif o.rankUp and kind == "spell" and actionID ~= id and not e.prof
                     and C_Spell.GetSpellName(actionID) == C_Spell.GetSpellName(id) then
                 PlaceSpell(slot, id)
             end
