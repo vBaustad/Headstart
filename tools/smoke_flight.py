@@ -129,6 +129,13 @@ strtrim = function(s) return s end
     lua.execute("Tick(15); ONTAXI = false; Fire('PLAYER_CONTROL_GAINED')")
     check(g.YippRouteDB.flights["Ironforge, Dun Morogh>Thelsamar, Loch Modan"] == 60, "a flight through a reload isn't learned")
 
+    # landing seen in game: PLAYER_CONTROL_GAINED came while still on the taxi, then nothing; the bar
+    # still goes when the game stops saying you're on a taxi
+    g.HOOKS.TakeTaxiNode(2)
+    lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(30); Fire('PLAYER_CONTROL_GAINED'); Tick(30); ONTAXI = false; Tick(0.3)")
+    bar = g.HeadstartFlightFrame
+    check(not bar.IsShown(bar), "landing without an event after it: the bar goes anyway")
+
     # the setting off: no bar
     lua.execute("YippRouteDB.flightTimer = false")
     g.HOOKS.TakeTaxiNode(2)

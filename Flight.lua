@@ -168,12 +168,28 @@ end
 
 local watcher = CreateFrame("Frame")
 local waited = 0
+
+-- In the air: landing is when the game stops saying you are on a taxi. Checked a few times a second:
+-- PLAYER_CONTROL_GAINED can come while UnitOnTaxi still says yes, and then nothing else tells us
+-- (seen in game: Ratchet to Theramore, the bar stayed up "landing").
+local function WhileFlying(self, elapsed)
+    waited = waited + elapsed
+    if waited < 0.25 then return end
+    waited = 0
+    if not flight then
+        self:SetScript("OnUpdate", nil)
+    elseif not UnitOnTaxi("player") then
+        self:SetScript("OnUpdate", nil)
+        Land()
+    end
+end
 -- after the click the game takes a moment to put you on the taxi: wait for it (5 seconds at most)
 local function WaitForTaxi(self, elapsed)
     waited = waited + elapsed
     if UnitOnTaxi("player") then
-        self:SetScript("OnUpdate", nil)
         TakeOff()
+        waited = 0
+        self:SetScript("OnUpdate", WhileFlying)
     elseif waited > 5 then
         self:SetScript("OnUpdate", nil)
         pending = nil
@@ -209,6 +225,8 @@ watcher:SetScript("OnEvent", function(_, event)
             flight.started = GetTime() - (time() - (now.at or time()))
             flight.total, flight.guess = Expected(flight)
             if YR.Option("flightTimer") then ShowBar(true) end
+            waited = 0
+            watcher:SetScript("OnUpdate", WhileFlying)
         elseif now and not UnitOnTaxi("player") then
             YippRouteDB.flightNow = nil
         end
