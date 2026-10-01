@@ -596,6 +596,19 @@ report(loot.alpha == 0.5 and loot.isDocked and list(loot.messageTypeList.values(
 report(not whis.isDocked and whis.size == 16 and whis.w == 400 and whis.point is not None,
        "a floating window: undocked, its font size, size and position")
 
+# A new character's first login: the main's bars are set while Headstart loads (Blizzard shows them
+# at SETTINGS_LOADED), so Set up layout has no bars left to change and asks for no reload.
+lua.execute('''TOGGLES = { false, false, false, false, false, false, false }
+LOADED = {}
+local p = YR_SETUP:Profile()
+p.ui = p.ui or {}
+p.ui.bars = { [2] = true, [3] = true, [4] = false }''')
+n = YS.EarlyBars()
+report(n == 2 and g.TOGGLES[1] is True and g.TOGGLES[2] is True, f"first login: the main's bars set before Blizzard shows the bars ({n} changed)")
+lua.execute('''LOADED = { "Bartender4" }; TOGGLES = { false, false, false, false, false, false, false }''')
+report(YS.EarlyBars() is None and g.TOGGLES[1] is False, "... not with a bar addon loaded")
+lua.execute("LOADED = {}")
+
 # Camera: out to the main's distance
 lua.execute('''CAM = 3
 function GetCameraZoom() return CAM end
