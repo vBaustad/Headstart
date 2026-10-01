@@ -121,6 +121,18 @@ step
     .target Salma Saldean
     .accept 38 >> Accept Westfall Stew
     .accept 22 >> Accept Goretusk Liver Pie
+step
+    .goto 1436,51.40,32.20
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Ozwin Ironsprocket|r
+    .target Ozwin Ironsprocket
+    .accept 92909 >> Accept Harvesting the Harvesters
+step
+    #sticky
+    #label Harvesters
+    >>As you go: |cRXP_LOOT_Golem Isosprings|r drop fast from the |cRXP_ENEMY_Rusty Harvest Golems|r north of Saldean's Farm; |cRXP_LOOT_Harvester Gyrostabilizers|r from |cRXP_ENEMY_Harvest Watchers|r and |cRXP_ENEMY_Golems|r (rarely)
+    .complete 92909,1
+    .complete 92909,2
+    .isOnQuest 92909
 step << Human
     #label Lewis
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Quartermaster Lewis|r
@@ -420,6 +432,17 @@ step
     .turnin 38 >> Turn in Westfall Stew
     .turnin 22 >> Turn in Goretusk Liver Pie
 step
+    .goto 1436,51.40,32.20
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Ozwin Ironsprocket|r
+    .target Ozwin Ironsprocket
+    .turnin 92909 >> Turn in Harvesting the Harvesters
+    .isQuestComplete 92909
+step
+    .goto 1436,51.4,32.2
+    .turnin 92910 >> Turn in Harvesting the Harvesters
+    .isOnQuest 92910
+    >>If a golem dropped a |cRXP_LOOT_Precessive Autocognition Assembly|r, use it to start the quest
+step
     #completewith next
     >>Kill |cRXP_ENEMY_Defias Trappers|r and |cRXP_ENEMY_Defias Smugglers|r. Loot them for their |T133694:0|t|cRXP_LOOT_Red Leather Bandanas|r
     >>|cRXP_WARN_It is a dynamic respawn area meaning if you kill enough they will keep respawning|r
@@ -451,6 +474,11 @@ step
     .goto 1436/0,1045.12,-10508.80
     .turnin 12 >> Turn in The People's Militia
 step
+    .goto 1436,56.33,47.52
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gryan Stoutmantle|r
+    .target Gryan Stoutmantle
+    .accept 13 >> Accept The People's Militia
+step
 	.xp <14,1
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gryan Stoutmantle|r
 	.target Gryan Stoutmantle
@@ -473,11 +501,62 @@ step
     .turnin 92742 >>Turn in Testing the Wells
     .turnin 92744 >>Turn in Murloc Gills
 step
+    .goto 1436,52.40,53.00
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Alba Fairmoon|r
+    .target Alba Fairmoon
+    .accept 92745 >> Accept The State of the Mines
+step
+    .goto 1436,44.5,21.5
+    >>Kill |cRXP_ENEMY_Kobold Diggers|r in the Jangolode Mine
+    .complete 92745,1
+    .mob Kobold Digger
+step
+    .goto 1436,29.3,49.5
+    >>Kill |cRXP_ENEMY_Riverpaw Miners|r in the Gold Coast Quarry
+    .complete 92745,2
+    .mob Riverpaw Miner
+step
+    .goto 1436,52.40,53.00
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Alba Fairmoon|r
+    .target Alba Fairmoon
+    .turnin 92745 >> Turn in The State of the Mines
+    .accept 92747 >> Accept Moonbrook Espionage
+step
+    .goto 1436,43.5,70.0
+    >>Kill |cRXP_ENEMY_Defias Pillagers|r and |cRXP_ENEMY_Defias Looters|r in Moonbrook
+    .complete 13,1
+    .complete 13,2
+    .mob Defias Pillager
+    .mob Defias Looter
+    .isOnQuest 13
+step
+    .goto 1436,42.5,71.5
+    >>Into the Defias building in Moonbrook and down the tunnel toward the Deadmines: loot the |cRXP_PICK_Suspicious Industrial Supplies|r crates
+    .complete 92747,1
+step
+    .goto 1436,52.40,53.00
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Alba Fairmoon|r
+    .target Alba Fairmoon
+    .turnin 92747 >> Turn in Moonbrook Espionage
+    .accept 92748 >> Accept Explosive Consultation
+step
+    .goto 1436,56.33,47.52
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gryan Stoutmantle|r
+    .target Gryan Stoutmantle
+    .turnin 13 >> Turn in The People's Militia
+    .isQuestComplete 13
+step
     .hs >> Hearth to Stormwind
     .bindlocation 16509,1
     .cooldown item,6948,>2,1
     .zoneskip Stormwind City
     .zoneskip Darkshore
+step
+    .goto 1453,54.60,8.00
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Sprite Jumpsprocket|r
+    .target Sprite Jumpsprocket
+    .turnin 92748 >> Turn in Explosive Consultation
+    .isOnQuest 92748
 step
     #completewith DarkshoreBoat
     .goto 1436/0,1037.42,-10628.27

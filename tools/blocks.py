@@ -110,7 +110,48 @@ LM_EAST = [
     "turnin 298 | accept 301",
 ]
 
+# Westfall, solo (2026-10-01): RestedXP's route is one visit (Sentinel Hill, the farms, the coast) and
+# hearths to Stormwind for the Darkshore boat. Added on that visit, from Forever's Toxic Soil chain and
+# the quests RestedXP leaves out:
+#  - Harvesting the Harvesters (Ozwin at Saldean's Farm, 800): 14 Golem Isosprings (fast from the Rusty
+#    Harvest Golems north of the farm, ~56,21) and 5 Harvester Gyrostabilizers (Harvest Watchers, the
+#    Killing Fields mobs; a very low drop rate, ~60 kills for one player): as you go, handed in if
+#    done. Its second part starts from an item almost any golem drops (800). The third needs
+#    Engineering parts: left out.
+#  - At the end: The State of the Mines (490: Jangolode Mine kobolds, Gold Coast Quarry gnolls),
+#    Moonbrook Espionage (550: crates in the tunnel down to the Deadmines) with The People's Militia 2
+#    (975: Defias in Moonbrook), and Explosive Consultation (575, a delivery to Sprite Jumpsprocket in
+#    Stormwind, where the route hearths anyway). A Dynamite Plan (10 Coarse Dynamite: Engineering or
+#    the auction house) and the rest of the chain after it are not solo: left out.
+# Positions: Questie, Wowhead's Forever pages and their comments.
+WF_HARVEST = [
+    "accept 92909",
+    "raw #sticky | raw #label Harvesters | raw >>As you go: |cRXP_LOOT_Golem Isosprings|r drop fast from the |cRXP_ENEMY_Rusty Harvest Golems|r north of Saldean's Farm; |cRXP_LOOT_Harvester Gyrostabilizers|r from |cRXP_ENEMY_Harvest Watchers|r and |cRXP_ENEMY_Golems|r (rarely) | raw .complete 92909,1 | raw .complete 92909,2 | raw .isOnQuest 92909",
+]
+WF_HARVEST_TURNIN = [
+    "turnin 92909 | raw .isQuestComplete 92909",
+    "goto 1436 51.4 32.2 | turnin 92910 | raw .isOnQuest 92910 | raw >>If a golem dropped a |cRXP_LOOT_Precessive Autocognition Assembly|r, use it to start the quest",
+]
+WF_END = [
+    "accept 92745",
+    "goto 1436 44.5 21.5 | raw >>Kill |cRXP_ENEMY_Kobold Diggers|r in the Jangolode Mine | raw .complete 92745,1 | raw .mob Kobold Digger",
+    "goto 1436 29.3 49.5 | raw >>Kill |cRXP_ENEMY_Riverpaw Miners|r in the Gold Coast Quarry | raw .complete 92745,2 | raw .mob Riverpaw Miner",
+    "turnin 92745 | accept 92747",
+    "goto 1436 43.5 70.0 | raw >>Kill |cRXP_ENEMY_Defias Pillagers|r and |cRXP_ENEMY_Defias Looters|r in Moonbrook | raw .complete 13,1 | raw .complete 13,2 | raw .mob Defias Pillager | raw .mob Defias Looter | raw .isOnQuest 13",
+    "goto 1436 42.5 71.5 | raw >>Into the Defias building in Moonbrook and down the tunnel toward the Deadmines: loot the |cRXP_PICK_Suspicious Industrial Supplies|r crates | raw .complete 92747,1",
+    "turnin 92747 | accept 92748",
+    "turnin 13 | raw .isQuestComplete 13",
+]
+
 BLOCKS = {
+    # Westfall, solo (above)
+    "13-15 Westfall": [
+        (r"#label SalmaS", "after", WF_HARVEST),
+        (r"#label SaldeanVendor", "after", WF_HARVEST_TURNIN),
+        (r"\.turnin 12 >> Turn in The People's Militia", "after", ["accept 13"]),
+        (r"\.turnin 92742 >>Turn in Testing the Wells", "after", WF_END),
+        (r"\.hs >> Hearth to Stormwind", "after", ["turnin 92748 | raw .isOnQuest 92748"]),
+    ],
     # the Hunters' route ends in Darnassus: the BFD quests there
     "19-21 Darkshore/Ashenvale": [
         (r"\.turnin 741\b", "before", ["group: accept 1198", "group: accept 1199"]),
