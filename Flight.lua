@@ -76,8 +76,9 @@ local function Place()
 end
 
 -- The route: no panel, a white track with a dark outline, and a fill that grows from the left as you
--- fly, amber at take-off turning green as you get close, its front end rounded. At every flight point
--- the flight passes on the way (its name above it when there is room) the line swells into a hump,
+-- fly, amber at take-off turning green as you get close, its front end rounded. At the start, at every
+-- flight point the flight passes (its name above it when there is room) and at the end, the line
+-- swells into a hump,
 -- like a snake that has eaten something: the outline runs round each hump with the line (all the
 -- outline is one layer, all the white the next, all the fill the one above), and the fill flows
 -- through a hump as you pass it. Opaque colours, so nothing doubles up where the pieces overlap, and
@@ -225,10 +226,12 @@ local function Progress()
     return math.min(1, (GetTime() - flight.started) / total)
 end
 
--- The humps for this flight: each stop on the way, at its share of the route's length. Names over the stops only where they don't crowd the ends or each other.
+-- The humps for this flight: the start, each stop on the way (at its share of the route's length)
+-- and the end. Names over the stops only where they don't crowd the ends or each other.
 local function LayOut()
-    local points = {}
+    local points = { { at = 0 } }
     for _, s in ipairs(flight.stops or {}) do points[#points + 1] = { at = s.at, name = s.name } end
+    points[#points + 1] = { at = 1 }
     local lastLabel = 70                   -- pixels kept clear of the start's name
     for n, pt in ipairs(points) do
         local m = frame.markers[n] or Marker()
@@ -272,13 +275,14 @@ function YR:AnimateFlight()
         frame.sweep:SetPoint("TOPLEFT", frame.track, "TOPLEFT", x, 0)
         frame.sweep:Show()
     end
-    -- each hump fills as the fill reaches it, in the fill's colour where it is
+    -- each hump fills as the fill reaches it, in the fill's colour where it is (the start's is full
+    -- from take-off: you are there)
     local fillX = p and p * frame.len or 0
     for _, m in ipairs(frame.markers) do
         if m.at and m.ring:IsShown() then
             local here = p and p > 0 and math.min(1, m.at / p) or 0
             local r, g, b = Mix(FAR, { Mix(FAR, NEAR, p or 0) }, here)
-            m:Fill(p and fillX or nil, r, g, b)
+            m:Fill(m.at == 0 and math.max(fillX, HUMP_W) or (p and fillX or nil), r, g, b)
         end
     end
 end
