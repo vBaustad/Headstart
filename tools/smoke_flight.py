@@ -111,7 +111,7 @@ strtrim = function(s) return s end
     texts, _ = fly(3, 235)
     check("Thandol Span in 2:00" in texts[3] or "Thandol Span in 1:59" in texts[3], f"the next stop on the way and when: {texts[3]}")
     marks = [m for m in g.HeadstartFlightFrame.markers.values() if m.at is not None]
-    shown = [m for m in marks if m.ring.IsShown(m.ring)]
+    shown = [m for m in marks if m.dot.IsShown(m.dot)]
     check([round(m.at, 2) for m in shown] == [0, 0.5, 1], f"humps at the start, the stop halfway and the end: {[m.at for m in shown]}")
     check(texts[0] in ("about 4:00", "about 3:59"), f"a new route is estimated from its length: {texts[0]}")
 
