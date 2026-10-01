@@ -76,8 +76,9 @@ local function Place()
 end
 
 -- The route: no panel. The time on the left, big, in the fill's colour; a slim dark bar with a round
--- node at the start, at every flight point the flight passes and at the end (names above them, where
--- there is room); and on the right a button to land at the next stop. The fill runs along the bar
+-- node at each end; and on the right, on a flight with stops on the way, a button to land at the next
+-- one. The stops themselves aren't drawn: the game doesn't say how long each leg takes, and sharing
+-- the time out by the legs' lengths put them in the wrong place (tried in game, 2026-10-01). The fill runs along the bar
 -- from the left, amber at take-off turning green as you get close, with a round front, and flows into
 -- each node as you pass it. The bar and its nodes are one solid colour and the bar runs on under the
 -- nodes, so no seam shows where they meet. Round shapes are art/circle at their real size, positions
@@ -161,24 +162,20 @@ local function Marker()
     return m
 end
 
--- The next stop ahead, or nil (only known with a time to go by).
-local function NextStop()
-    local total = flight and flight.total
-    if not (total and total > 0) then return nil end
-    local gone = GetTime() - flight.started
-    for _, st in ipairs(flight.stops or {}) do
-        if st.at * total > gone + 2 then return st end
-    end
+-- Whether the button can land you early: a flight with stops on the way, not already asked.
+local function CanStop()
+    return TaxiRequestEarlyLanding ~= nil and flight ~= nil and not flight.cut
+        and type(flight.stops) == "table" and #flight.stops > 0
 end
 
--- The game's own "request stop": the taxi lands at the next flight point on the way. A flight cut
--- short is not the route's time, so it is never learned (Land).
+-- The game's own "request stop": the taxi lands at the next flight point on the way. Where that is
+-- and when isn't known, so the bar counts up from then; a flight cut short is not the route's time,
+-- so it is never learned (Land).
 local function StopAtNext()
-    local st = NextStop()
-    if not (st and TaxiRequestEarlyLanding) then return end
+    if not CanStop() then return end
     TaxiRequestEarlyLanding()
-    flight.cut = st
-    if YippRouteDB.flightNow then YippRouteDB.flightNow.cut = st end
+    flight.cut = true
+    if YippRouteDB.flightNow then YippRouteDB.flightNow.cut = true end
     YR:RefreshFlight()
 end
 
@@ -219,9 +216,8 @@ local function Build()
     frame.stop = S.IconButton(frame, "down", StopAtNext, nil, S.C.sub, 22)
     frame.stop:SetPoint("LEFT", frame, "TOPLEFT", X1 + NODE / 2 + 6, TRACK_Y)
     frame.stop:HookScript("OnEnter", function(self)
-        local st = NextStop()
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(st and ("Land at " .. Short(st.name)) or "Land at the next stop")
+        GameTooltip:AddLine("Land at the next stop")
         GameTooltip:AddLine("The next flight point on the way", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
@@ -255,12 +251,9 @@ local function Progress()
     return math.min(1, (GetTime() - flight.started) / total)
 end
 
--- The nodes for this flight: the start, each stop on the way (at its share of the route's length)
--- and the end. Names over the stops only where they don't crowd the ends or each other.
+-- The nodes for this flight: the start and the end.
 local function LayOut()
-    local points = { { at = 0 } }
-    for _, s in ipairs(flight.stops or {}) do points[#points + 1] = { at = s.at, name = s.name } end
-    points[#points + 1] = { at = 1 }
+    local points = { { at = 0 }, { at = 1 } }
     local lastLabel = 80                   -- pixels kept clear of the start's name
     for n, pt in ipairs(points) do
         local m = frame.markers[n] or Marker()
@@ -323,32 +316,24 @@ function YR:RefreshFlight()
     local gone = GetTime() - flight.started
     local total, guess, cut = flight.total, flight.guess, flight.cut
     frame.from:SetText(Short(flight.from))
-    frame.to:SetText(Short(cut and cut.name or flight.to))
-    local nextStop = NextStop()
-    if total and total > 0 then
-        local left = (cut and cut.at or 1) * total - gone
+    frame.to:SetText(Short(flight.to))
+    if total and total > 0 and not cut then
+        local left = total - gone
         local r, g, b = Mix(FAR, NEAR, math.min(1, gone / total))
         frame.time:SetTextColor(r, g, b)
         if left >= 0 then
             frame.time:SetText((guess and "~" or "") .. Clock(left))
+            frame.note:SetText(guess and "estimated from the route's length" or "")
         else
             frame.time:SetText("+" .. Clock(-left))
-        end
-        if cut then
-            frame.note:SetText("landing at " .. Short(cut.name))
-        elseif left < 0 then
             frame.note:SetText("landing")
-        elseif nextStop then
-            frame.note:SetText(Short(nextStop.name) .. " in " .. Clock(nextStop.at * total - gone))
-        else
-            frame.note:SetText(guess and "estimated from the route's length" or "")
         end
     else
         frame.time:SetTextColor(unpack(YR.Style.C.sub))
         frame.time:SetText(Clock(gone))
-        frame.note:SetText(cut and ("landing at " .. Short(cut.name)) or "first flight here: timing it")
+        frame.note:SetText(cut and "landing at the next stop" or "first flight here: timing it")
     end
-    frame.stop:SetShown(TaxiRequestEarlyLanding ~= nil and not cut and nextStop ~= nil)
+    frame.stop:SetShown(CanStop())
 end
 
 local function ShowBar(on)

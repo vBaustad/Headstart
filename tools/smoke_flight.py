@@ -109,10 +109,9 @@ strtrim = function(s) return s end
     # Menethil: never flown, two hops of 0.2 against Thelsamar's one of 0.1: four times the minute,
     # by way of Thandol Span, halfway
     texts, _ = fly(3, 235)
-    check("Thandol Span in 2:00" in texts[3] or "Thandol Span in 1:59" in texts[3], f"the next stop on the way and when: {texts[3]}")
     marks = [m for m in g.HeadstartFlightFrame.markers.values() if m.at is not None]
     shown = [m for m in marks if m.dot.IsShown(m.dot)]
-    check([round(m.at, 2) for m in shown] == [0, 0.5, 1], f"humps at the start, the stop halfway and the end: {[m.at for m in shown]}")
+    check([round(m.at, 2) for m in shown] == [0, 1], f"nodes at the start and the end only: {[m.at for m in shown]}")
     check(texts[0] in ("~4:00", "~3:59"), f"a new route is estimated from its length: {texts[0]}")
 
     lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] = nil')
@@ -149,12 +148,20 @@ strtrim = function(s) return s end
     g.HOOKS.TakeTaxiNode(3)
     lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(30); Tick(0.2)")
     bar = g.HeadstartFlightFrame
-    check(bar.stop.IsShown(bar.stop), "the stop button shows with a stop ahead")
+    check(bar.stop.IsShown(bar.stop), "the stop button shows on a flight with a stop on the way")
+    lua.execute("ONTAXI = false; Tick(0.3)")
+    g.HOOKS.TakeTaxiNode(2)
+    lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(1)")
+    check(not bar.stop.IsShown(bar.stop), "no stop button on a flight with no stops")
+    lua.execute("ONTAXI = false; Tick(0.3)")
+    lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Thelsamar, Loch Modan"] = 60')
+    lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] = 240')
+    g.HOOKS.TakeTaxiNode(3)
+    lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(30); Tick(0.2)")
     bar.stop._OnClick(bar.stop)
     lua.execute("Tick(0.2)")
-    check(g.EARLY == 1 and bar.note.GetText(bar.note) == "landing at Thandol Span" and bar.to.GetText(bar.to) == "Thandol Span",
-          f"stop pressed: the game asked, the bar says {bar.note.GetText(bar.note)!r} to {bar.to.GetText(bar.to)!r}")
-    check(bar.time.GetText(bar.time) in ("1:30", "1:29"), f"time left to the stop: {bar.time.GetText(bar.time)}")
+    check(g.EARLY == 1 and bar.note.GetText(bar.note) == "landing at the next stop",
+          f"stop pressed: the game asked, the bar says {bar.note.GetText(bar.note)!r}")
     check(not bar.stop.IsShown(bar.stop), "the button goes once pressed")
     lua.execute("Tick(90); ONTAXI = false; Tick(0.3)")
     check(g.YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] == 240, "a flight landed early isn't learned")
