@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Darkshore: Forever's Swelling Forces.** Take it from Arbal next to Onu, and kill the Stormscale naga at the Ruins of Mathystra while you loot the Mathystra Relics there; hand it in with the relics. In a group, the naga's 20 Mathystral Amulet Fragments summon Baron Marinous (elite) at the Fathom Stone at the bottom of the pool; his Clouded Water Globe starts the quest of the same name for Onu.
+
 - **Wetlands, Forever's Menethil quests:** Spoils of War (timber and iron piles around Menethil), Alchemical Hazards (a stalker gland at Thelgen Rock, next to the excavation quests), Return the Statuette, and two notes carried in (Hollee's from Auberdine, Tom's from Southshore). On the second visit, Howin Kindfeather's Razormaw Needling and Trying Times (the razormaws on the way north to Dun Modr).
 - **Redridge** (second visit, around 26): Forever's Alther's Mill (Greater Tarantulas and their eggs, on the way east) and Missing In Action (escort Corporal Keeshan from the cave where you kill the Blackrock Champions; he's elite and tanks). Howling in the Hills and Gath'Ilzogg are left out (group quests).
 - **Duskwood: Forever's Valor family.** The Valor Family (the Raven Hill Tome, in a house in Raven Hill) from Sirra Von'Indi in Darkshire; Merrick's Bow from the bow the Lost Watcher ghost drops by the road (36,63), done where the 28-30 route kills its way through the south-west; Ira's Dagger's steps show if you have it.

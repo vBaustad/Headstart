@@ -261,6 +261,17 @@ step
     .target Onu
     .isOnQuest 951
 step
+    .goto 1439,43.6,76.4
+    .turnin 98013 >> Turn in Swelling Forces
+    .target Arbal
+    .isQuestComplete 98013
+step
+    #role A,B,C
+    .goto 1439,43.555,76.293
+    .turnin 98028 >> Turn in Baron Marinous
+    .target Onu
+    .isOnQuest 98028
+step
     .goto 1439,44.401,76.425
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Kerlonian Evershade|r to start the escort
     >>|cRXP_WARN_Skip this step if he is not there. It can take up to 25 minutes for him to respawn|r

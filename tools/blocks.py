@@ -182,6 +182,30 @@ DW_MERRICK_TURNIN = [
     "goto 1431 72.4 47.4 | raw .turnin 96137 >> Turn in Ira's Dagger | raw .target Sirra Von'Indi | raw .isQuestComplete 96137",
 ]
 
+# Darkshore (2026-10-01): Forever's two quests at the Grove of the Ancients.
+#  - Swelling Forces (1550, solo): Arbal, next to Onu, wants 12 Stormscale Myrmidons, 8 Sorceresses and
+#    6 Warriors, the naga at the Ruins of Mathystra (~58,20), where 16-19 already loots the Mathystra
+#    Relics (the naga also stand in for the grind step before it). Handed in with the relics, in
+#    19-21 (Hunters) or 20-21.
+#  - Baron Marinous (2050, group): the naga drop Mathystral Amulet Fragments (20, no quest needed);
+#    they make an amulet that summons Baron Marinous (elite elemental, 2.4k health, 100+ Frostbolts) at
+#    the Fathom Stone at the bottom of the pool at 59.1,22.3. His Clouded Water Globe starts the quest,
+#    handed to Onu. Solo only by line-of-sighting him behind the pillars (Wowhead comments): group.
+#  - Left out: Gaffer Jacks and Electropellers, One Shot. One Kill. (level 12-15, RestedXP skips them);
+#    Supplies to Auberdine (Feero Ironhand's escort, level 24).
+# Positions: Wowhead's Forever pages (Arbal, the naga, Baron Marinous, the Fathom Stone).
+DS_ARBAL = ["goto 1439 43.6 76.4 | raw .accept 98013 >> Accept Swelling Forces | raw .target Arbal"]
+DS_NAGA = [
+    "goto 1439 58.0 20.5 | raw >>Kill |cRXP_ENEMY_Stormscale Myrmidons|r, |cRXP_ENEMY_Sorceresses|r and |cRXP_ENEMY_Warriors|r around the Ruins of Mathystra | raw .complete 98013,1 | raw .complete 98013,2 | raw .complete 98013,3 | raw .mob Stormscale Myrmidon | raw .mob Stormscale Sorceress | raw .mob Stormscale Warrior | raw .isOnQuest 98013",
+    "group: raw #completewith next | goto 1439 58.0 20.5 | raw >>Keep killing the naga until you have 20 |cRXP_LOOT_Mathystral Amulet Fragments|r, then combine them into the amulet | raw .collect 279276,20 | raw .mob Stormscale Myrmidon | raw .mob Stormscale Sorceress | raw .mob Stormscale Warrior | raw .isNotOnQuest 98028",
+    "group: goto 1439 59.1 22.3 | raw >>Dive to the |cRXP_PICK_Fathom Stone|r at the bottom of the pool and use the amulet there. Kill |cRXP_ENEMY_Baron Marinous|r (elite, Frostbolts: fight him around the pillars) and loot his |cRXP_LOOT_Clouded Water Globe|r | raw .collect 279275,1 | raw .mob Baron Marinous | raw .isNotOnQuest 98028",
+    "group: raw .accept 98028 >> Accept Baron Marinous | raw .use 279275 | raw >>Use the |cRXP_LOOT_Clouded Water Globe|r",
+]
+DS_ONU = [
+    "goto 1439 43.6 76.4 | raw .turnin 98013 >> Turn in Swelling Forces | raw .target Arbal | raw .isQuestComplete 98013",
+    "group: goto 1439 43.555 76.293 | raw .turnin 98028 >> Turn in Baron Marinous | raw .target Onu | raw .isOnQuest 98028",
+]
+
 # Wetlands, solo (2026-10-01): Forever's quests around Menethil Harbor, in the free route's two visits.
 #  - 23-24: Spoils of War (1750: Khaz Modan Timber and Iron, piles in and around Menethil), Alchemical
 #    Hazards (1750: an Unruptured Stalker Gland from the stalkers at Thelgen Rock, near the route's
@@ -237,8 +261,17 @@ BLOCKS = {
         (r"\.turnin 92742 >>Turn in Testing the Wells", "after", WF_END),
         (r"\.hs >> Hearth to Stormwind", "after", ["turnin 92748 | raw .isOnQuest 92748"]),
     ],
+    # Darkshore (DS_* above)
+    "16-19 Darkshore": [
+        (r"\.turnin 948 >> Turn in Onu", "after", DS_ARBAL),
+        (r"\.complete 951,1", "after", DS_NAGA),
+    ],
+    "20-21 Darkshore/Ashenvale": [
+        (r"#xprate <1.5[\s\S]*\.turnin 951 >> Turn in Mathystra Relics", "after", DS_ONU),
+    ],
     # the Hunters' route ends in Darnassus: the BFD quests there
     "19-21 Darkshore/Ashenvale": [
+        (r"\.turnin 951 >> Turn in Mathystra Relics[\s\S]*\.isOnQuest 951", "after", DS_ONU),
         (r"\.turnin 741\b", "before", ["group: accept 1198", "group: accept 1199"]),
     ],
     "21-23 Ashenvale": [

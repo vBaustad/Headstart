@@ -217,6 +217,10 @@ step
     .accept 944 >> Accept The Master's Glaive
     .target Onu
 step
+    .goto 1439,43.6,76.4
+    .accept 98013 >> Accept Swelling Forces
+    .target Arbal
+step
     #completewith MasterG
     >>Kill |cRXP_ENEMY_Moonstalker Sires|r. Loot them for their |cRXP_LOOT_Pelts|r
     >>Care as they can cast |T132090:0|t[Exploit Weakness] a backstab attack dealing 20-40 damage if you turn your back to them
@@ -737,6 +741,38 @@ step
     .goto 1439/1,-1005.36,7383.58
     >>Loot the |cRXP_LOOT_Mathystra Relics|r on the ground
     .complete 951,1 -- Mathystra Relics (6)
+step
+    .goto 1439,58.0,20.5
+    >>Kill |cRXP_ENEMY_Stormscale Myrmidons|r, |cRXP_ENEMY_Sorceresses|r and |cRXP_ENEMY_Warriors|r around the Ruins of Mathystra
+    .complete 98013,1
+    .complete 98013,2
+    .complete 98013,3
+    .mob Stormscale Myrmidon
+    .mob Stormscale Sorceress
+    .mob Stormscale Warrior
+    .isOnQuest 98013
+step
+    #role A,B,C
+    #completewith next
+    .goto 1439,58.0,20.5
+    >>Keep killing the naga until you have 20 |cRXP_LOOT_Mathystral Amulet Fragments|r, then combine them into the amulet
+    .collect 279276,20
+    .mob Stormscale Myrmidon
+    .mob Stormscale Sorceress
+    .mob Stormscale Warrior
+    .isNotOnQuest 98028
+step
+    #role A,B,C
+    .goto 1439,59.1,22.3
+    >>Dive to the |cRXP_PICK_Fathom Stone|r at the bottom of the pool and use the amulet there. Kill |cRXP_ENEMY_Baron Marinous|r (elite, Frostbolts: fight him around the pillars) and loot his |cRXP_LOOT_Clouded Water Globe|r
+    .collect 279275,1
+    .mob Baron Marinous
+    .isNotOnQuest 98028
+step
+    #role A,B,C
+    .accept 98028 >> Accept Baron Marinous
+    .use 279275
+    >>Use the |cRXP_LOOT_Clouded Water Globe|r
 step
     .goto 1439,56.654,13.484
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gelkak Gyromast|r
