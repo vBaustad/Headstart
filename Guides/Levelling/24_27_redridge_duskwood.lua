@@ -188,6 +188,11 @@ step
 >>Talk to |cRXP_FRIENDLY_Commander Althea Ebonlocke|r
     .accept 56 >> Accept The Night Watch
 step
+    .goto 1431,72.40,47.40
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Sirra Von'Indi|r
+    .target Sirra Von'Indi
+    .accept 96139 >> Accept The Valor Family
+step
     .goto 1431,72.6,46.9
 >>Talk to |cRXP_FRIENDLY_Clerk Daltry|r
     .turnin 66 >> Turn in The Legend of Stalvan
@@ -262,6 +267,10 @@ step
 .target Jitters
     .accept 5 >> Accept Jitters' Growling Gut
 step
+    .goto 1431,21.2,55.7
+    >>In Raven Hill: the |cRXP_PICK_Raven Hill Tome|r, on a broken octagonal table inside a house
+    .complete 96139,1
+step
     .goto 1431,7.781,34.069
 >>Talk to |cRXP_FRIENDLY_Sven Yorgen|r
     .turnin 164 >> Turn in Deliveries to Sven
@@ -322,6 +331,23 @@ step
     .turnin 56 >> Turn in The Night Watch
 .target Commander Althea Ebonlocke
     .accept 57 >> Accept The Night Watch
+step
+    .goto 1431,72.40,47.40
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Sirra Von'Indi|r
+    .target Sirra Von'Indi
+    .turnin 96139 >> Turn in The Valor Family
+    .isQuestComplete 96139
+step
+    .goto 1431,60.8,45.1
+    >>If you have Ira's Dagger: kill |cRXP_ENEMY_Young Black Ravagers|r and |cRXP_ENEMY_Black Ravagers|r
+    .complete 96137,1
+    .complete 96137,2
+    .isOnQuest 96137
+step
+    .goto 1431,72.4,47.4
+    .turnin 96137 >> Turn in Ira's Dagger
+    .target Sirra Von'Indi
+    .isQuestComplete 96137
 step
     .goto 1431,72.642,47.613
 .target Sirra Von'Indi
@@ -554,6 +580,17 @@ step
     .accept 19 >> Accept Tharil'zun
     .accept 115 >> Accept Shadow Magic
 step
+    .goto 1433,27.00,48.60
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Foreman Oslow|r
+    .target Foreman Oslow
+    .accept 98386 >> Accept Alther's Mill
+step
+    .goto 1433,45.0,40.5
+    >>Alther's Mill: kill |cRXP_ENEMY_Greater Tarantulas|r and destroy the |cRXP_PICK_Tarantula Eggs|r
+    .complete 98386,1
+    .complete 98386,2
+    .mob Greater Tarantula
+step
     .goto 1433,75.214,37.200
 	>> Kill Fangore, and loot him for his Paw. Be careful as lots of gnolls patrol around him, he is shadow immune, and can social aggro all gnolls at any time within 40 yards.
     .complete 180,1 --Collect Fangore's Paw (x1)
@@ -589,6 +626,15 @@ step
     .complete 128,1 --Kill Blackrock Champion (x15)
     .isOnQuest 128
 step
+    .goto 1433,23.30,12.55
+    >>Corporal Keeshan, in the cave here
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Corporal Keeshan|r
+    .target Corporal Keeshan
+    .accept 219 >> Accept Missing In Action
+step
+    >>Escort |cRXP_FRIENDLY_Keeshan|r back to Lakeshire. He's elite and tanks: attack what he attacks. The cave mouth gets busy, so group up if you can
+    .complete 219,1
+step
     .goto 1433,28.418,48.969
 .target Marshal Marris
 >>Talk to |cRXP_FRIENDLY_Marshal Marris|r
@@ -599,6 +645,18 @@ step
 .target Marshal Marris
 >>Talk to |cRXP_FRIENDLY_Marshal Marris|r
     .turnin 115 >> Turn in Shadow Magic
+step
+    .goto 1433,27.00,48.60
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Foreman Oslow|r
+    .target Foreman Oslow
+    .turnin 98386 >> Turn in Alther's Mill
+    .isQuestComplete 98386
+step
+    .goto 1433,28.41,48.97
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Marshal Marris|r
+    .target Marshal Marris
+    .turnin 219 >> Turn in Missing In Action
+    .isQuestComplete 219
 step << !Warlock
     .goto 1433,24.514,44.300
 .target Bailiff Conacher

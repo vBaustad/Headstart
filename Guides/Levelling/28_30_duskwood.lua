@@ -337,6 +337,16 @@ step
     >>Loot the chest inside the small house
     .complete 1244,1 --Collect Defias Docket (x1)
 step
+    .goto 1431,36.0,63.0
+    >>Kill the |cRXP_ENEMY_Lost Watcher|r, a ghost by the road. He drops |cRXP_LOOT_Merrick's Bow|r: use it to start the quest. Not around? Skip this step
+    .accept 96138 >> Accept Merrick's Bow
+step
+    .goto 1431,35.5,74.5
+    >>Kill |cRXP_ENEMY_Splinter Fist Warriors|r and |cRXP_ENEMY_Splinter Fist Taskmasters|r
+    .complete 96138,1
+    .complete 96138,2
+    .isOnQuest 96138
+step
     .goto 1431,33.5,76.3
     >>Loot the crate next to the cave entrance
     .complete 134,1 --Collect Abercrombie's Crate (x1)
@@ -406,6 +416,16 @@ step
 .target Viktori Prism'Antras
 >>Talk to |cRXP_FRIENDLY_Viktori Prism'Antras|r
     .turnin 181 >> Turn in Look To The Stars
+step
+    .goto 1431,72.4,47.4
+    .turnin 96138 >> Turn in Merrick's Bow
+    .target Sirra Von'Indi
+    .isQuestComplete 96138
+step
+    .goto 1431,72.4,47.4
+    .turnin 96137 >> Turn in Ira's Dagger
+    .target Sirra Von'Indi
+    .isQuestComplete 96137
 step
     .goto 1431,75.3,47.9
 >>Talk to |cRXP_FRIENDLY_Calor|r

@@ -143,7 +143,51 @@ WF_END = [
     "turnin 13 | raw .isQuestComplete 13",
 ]
 
+# Redridge and Duskwood, solo (2026-10-01), in the free 23-30 route's visits:
+#  - Redridge, second visit (~26, it passes Alther's Mill going east): Forever's Alther's Mill (1650:
+#    Greater Tarantulas and their eggs, Foreman Oslow in Lakeshire), and Missing In Action (2550: the
+#    escort of Corporal Keeshan, elite and he tanks, from the cave north where the route kills its
+#    Blackrock Champions). Howling in the Hills (Yowler sits in a camp of 5-6 gnolls) and Gath'Ilzogg
+#    (elite) are group quests: left out. Gearing Redridge is Blacksmithing crafts: left out.
+#  - Duskwood: Forever's Valor family. The Valor Family (1750: the Raven Hill Tome, in a house at
+#    21.2,55.7) from Sirra Von'Indi in Darkshire; Merrick's Bow (2300) starts from a bow the Lost Watcher
+#    drops (a ghost by the road at 36,63), its Splinter Fist gnolls are where the 28-30 route goes;
+#    Ira's Dagger (1950) has no known start: its steps show only if you have it.
+# Wowhead's Redridge positions are on the Classic map; converted (fork_rxp.to_forever) or Questie's.
+RR_MILL = [
+    "accept 98386",
+    "goto 1433 45.0 40.5 | raw >>Alther's Mill: kill |cRXP_ENEMY_Greater Tarantulas|r and destroy the |cRXP_PICK_Tarantula Eggs|r | raw .complete 98386,1 | raw .complete 98386,2 | raw .mob Greater Tarantula",
+]
+RR_KEESHAN = [
+    "accept 219 : Corporal Keeshan, in the cave here",
+    "raw >>Escort |cRXP_FRIENDLY_Keeshan|r back to Lakeshire. He's elite and tanks: attack what he attacks. The cave mouth gets busy, so group up if you can | raw .complete 219,1",
+]
+RR_TURNINS = [
+    "turnin 98386 | raw .isQuestComplete 98386",
+    "turnin 219 | raw .isQuestComplete 219",
+]
+DW_VALOR = ["accept 96139"]
+DW_TOME = ["goto 1431 21.2 55.7 | raw >>In Raven Hill: the |cRXP_PICK_Raven Hill Tome|r, on a broken octagonal table inside a house | raw .complete 96139,1"]
+DW_VALOR_TURNIN = [
+    "turnin 96139 | raw .isQuestComplete 96139",
+    "goto 1431 60.8 45.1 | raw >>If you have Ira's Dagger: kill |cRXP_ENEMY_Young Black Ravagers|r and |cRXP_ENEMY_Black Ravagers|r | raw .complete 96137,1 | raw .complete 96137,2 | raw .isOnQuest 96137",
+    "goto 1431 72.4 47.4 | raw .turnin 96137 >> Turn in Ira's Dagger | raw .target Sirra Von'Indi | raw .isQuestComplete 96137",
+]
+DW_MERRICK = [
+    "goto 1431 36.0 63.0 | raw >>Kill the |cRXP_ENEMY_Lost Watcher|r, a ghost by the road. He drops |cRXP_LOOT_Merrick's Bow|r: use it to start the quest. Not around? Skip this step | raw .accept 96138 >> Accept Merrick's Bow",
+    "goto 1431 35.5 74.5 | raw >>Kill |cRXP_ENEMY_Splinter Fist Warriors|r and |cRXP_ENEMY_Splinter Fist Taskmasters|r | raw .complete 96138,1 | raw .complete 96138,2 | raw .isOnQuest 96138",
+]
+DW_MERRICK_TURNIN = [
+    "goto 1431 72.4 47.4 | raw .turnin 96138 >> Turn in Merrick's Bow | raw .target Sirra Von'Indi | raw .isQuestComplete 96138",
+    "goto 1431 72.4 47.4 | raw .turnin 96137 >> Turn in Ira's Dagger | raw .target Sirra Von'Indi | raw .isQuestComplete 96137",
+]
+
 BLOCKS = {
+    # Redridge and Duskwood, solo (above)
+    "28-30 Duskwood": [
+        (r"\.complete 134,1", "before", DW_MERRICK),
+        (r"\.turnin 181 >> Turn in Look To The Stars", "after", DW_MERRICK_TURNIN),
+    ],
     # Westfall, solo (above)
     "13-15 Westfall": [
         (r"#label SalmaS", "after", WF_HARVEST),
@@ -186,6 +230,12 @@ BLOCKS = {
     # Thelwater and Nikova in Stormwind), run at the end of the route in Stormwind (about level 27),
     # then the two out-of-town hand-ins by flight path.
     "24-27 Redridge/Duskwood": [
+        (r"\.accept 56 >> Accept The Night Watch", "after", DW_VALOR),
+        (r"\.turnin 163 >> Turn in Raven Hill", "after", DW_TOME),
+        (r"\.turnin 56 >> Turn in The Night Watch", "after", DW_VALOR_TURNIN),
+        (r"\.accept 115 >> Accept Shadow Magic", "after", RR_MILL),
+        (r"\.complete 128,1", "after", RR_KEESHAN),
+        (r"\.turnin 115 >> Turn in Shadow Magic", "after", RR_TURNINS),
         (r"\.accept 244\b", "after", ["group: accept 386"]),
         (r"\.accept 163\b", "after", ["group: accept 377"]),
         (r"\.accept 1274\b", "after", [
