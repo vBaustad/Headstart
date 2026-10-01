@@ -1420,6 +1420,8 @@ local function BuildSetup(page)
     Row("Game settings", Sw("settings"), "Auto loot, interact on click, nameplates, camera distance and the rest of the list")
     Row("Edit Mode layout", Sw("editMode"), "Left alone anyway when a UI suite like ElvUI or EllesmereUI is loaded")
     Row("Which action bars are shown", Sw("barVisibility"), "Left alone anyway when a bar addon like Bartender or Dominos is loaded")
+    Row("Chat windows", Sw("chat"), "Your main's chat tabs: names, what each shows (channels and messages), font size, colour, transparency, docked or where they float")
+    Row("Camera distance", Sw("camera"), "As far out as on your main. A new character also gets it once after the intro, which leaves the camera all the way in")
     Row("Pick the RestedXP route for my race", Sw("guide"))
     Row("Stop Blizzard placing new spells", Sw("noAutoPush"), "Blizzard drops every new spell on the first empty slot; with a set-up layout that only makes duplicates")
 

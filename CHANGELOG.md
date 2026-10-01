@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Set up layout without a reload (try it):** Edit Mode and the extra action bars are now switched through the game's own functions, which Blizzard's UI then applies itself, untainted. Headstart checks a moment later; if either didn't take, it falls back to the old way and the reload popup.
+- **Chat windows are copied** (Settings, Character, on by default): your main's tabs, what each shows (channels and message types), font size, colour, transparency, docked or where they float. Tabs the new character has that the main doesn't are closed. Copy this layout on your main again to save them.
+- **Camera distance:** copied from the main, and a new character comes out of the intro zoomed out instead of all the way in (once, at level 1).
 - **Quest rewards stop at greens** (on by default, Settings, Route, per class): a choice with a green or better among it waits for you, and RestedXP's built-in reward picks wait too. A reward you picked by hand for that quest before is still taken again.
 - **Hold Shift to stop all quest automation**: with Shift held when you talk to an NPC, neither Headstart nor RestedXP accepts, hands in or picks anything in that window (RestedXP's own key is Ctrl; Shift now works too).
 - Dun Morogh: **Father Gavin's chain** (new in Forever, 4 x 700 XP), right after Dawn in the Mountains and before Vagash: Finding Warmth (firewood), then Rime's Wrath (Minor Ice Elementals), Rime's Wrath (Avala) and Treacherous Cold (three rifles by fallen mountaineers, west, south, then on the path to Vagash's cave). Its XP is most of the way to the level 10 Vagash now asks for.
