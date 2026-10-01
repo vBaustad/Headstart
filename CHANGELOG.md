@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The route list folds by level bracket (1-10, 10-20, 20-30 ...): click a heading to open or close it. Only the bracket of the route you have open starts open; what you open or close is remembered.
 - **Dwarves and Gnomes go from Dun Morogh straight to Loch Modan** (not Elwynn, where launch-day Humans crowd the same quests): tram back to Ironforge, fly to Thelsamar, hearth there. Warlocks still go via Elwynn for their Voidwalker.
 - **Loch Modan, the parts RestedXP left out** (about 10,000 quest XP at 13-16, plus the kills):
   - Stonesplinter Valley after the South Gate hand-ins: In Defense of the King's Lands 2 and 3, and Forever's Banner of the Fallen (plant the banner, hold off the waves, kill Headsplitter).

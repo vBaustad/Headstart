@@ -1705,14 +1705,61 @@ local function Build()
     toggle:SetPoint("TOPRIGHT", side, "TOPRIGHT", -12, y - 6)
     toggle.text = S.Text(toggle, 11, S.C.accent)
     toggle.text:SetPoint("RIGHT")
+    -- Level brackets (1-10, 10-20, 20-30 ...) that fold: a route sits in the bracket it starts in.
+    -- Unless you opened or closed one yourself (YippRouteDB.routeBrackets[from] = true/false), only
+    -- the bracket of the route open in the editor is open.
+    local headers = {}
+    local function Header(from)
+        if headers[from] then return headers[from] end
+        local h = CreateFrame("Button", nil, list.content)
+        h:SetSize(SIDE - 16, 20)
+        h.text = S.Text(h, 11, S.C.muted)
+        h.text:SetPoint("LEFT", 26, 0)
+        h.text:SetText(("LEVELS %d-%d"):format(math.max(from, 1), from + 10))
+        h.arrow = h:CreateTexture(nil, "ARTWORK")
+        h.arrow:SetSize(10, 10)
+        h.arrow:SetPoint("LEFT", 10, 0)
+        S.ArtTexture(h.arrow, "down")
+        h.arrow:SetVertexColor(unpack(S.C.muted))
+        h:SetScript("OnEnter", function(self) self.text:SetTextColor(unpack(S.C.text)) end)
+        h:SetScript("OnLeave", function(self) self.text:SetTextColor(unpack(S.C.muted)) end)
+        h:SetScript("OnClick", function(self)
+            YippRouteDB.routeBrackets = YippRouteDB.routeBrackets or {}
+            YippRouteDB.routeBrackets[from] = not self.open
+            ui.LayoutRoutes()
+        end)
+        headers[from] = h
+        return h
+    end
     function ui.LayoutRoutes()
         local mine = YR.MyRoutes()
         local all = YippRouteDB.allRoutes or not next(mine)
         label:SetText(all and "ALL ROUTES" or "YOUR ROUTES")
         toggle.text:SetText(all and "Mine" or "Show all")
-        local ry = 0
+        local chosen = YippRouteDB.routeBrackets or {}
+        local current
+        for _, b in ipairs(ui.routeTabs) do
+            if b.selected then current = math.floor(b.from / 10) * 10 end
+        end
+        for _, h in pairs(headers) do h:Hide() end
+        local ry, bracket, open = 0, nil, true
         for _, b in ipairs(ui.routeTabs) do
             local on = all or mine[b.key] or b.selected
+            if on then
+                local from = math.floor(b.from / 10) * 10
+                if from ~= bracket then
+                    bracket = from
+                    if chosen[from] ~= nil then open = chosen[from] else open = current == nil or current == from end
+                    local h = Header(from)
+                    h.open = open
+                    h.arrow:SetRotation(open and 0 or math.pi / 2)
+                    h:ClearAllPoints()
+                    h:SetPoint("TOPLEFT", 8, ry)
+                    h:Show()
+                    ry = ry - 22
+                end
+                on = open
+            end
             b:SetShown(on)
             if on then
                 b:ClearAllPoints()
