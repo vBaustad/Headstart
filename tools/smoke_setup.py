@@ -330,6 +330,16 @@ ok = g.BAR[15] is None and "Tackle" not in [g.MACROS[k][1] for k in g.MACROS]
 print(("ok  " if ok else "FAIL"), "Bait and Tackle (a Fishing passive) gets no question-mark macro")
 bad += not ok
 
+# Holy Light Rank 2 from the trainer: slot 1 holds Rank 1 (635) and gets Rank 2 (639)
+lua.execute("""KNOWN[639] = true; NAMEID["Holy Light"] = 639
+local f = C_Spell.GetSpellName; C_Spell.GetSpellName = function(id) if id == 639 then return "Holy Light" end return f(id) end""")
+ok = g.BAR[1].id == 635
+events._OnEvent(events, "SPELLS_CHANGED")
+ok = ok and g.BAR[1].id == 639
+print(("ok  " if ok else "FAIL"), f"Holy Light Rank 2 trained: slot 1 now holds {g.BAR[1].id} (was Rank 1, 635)")
+bad += not ok
+lua.execute("""KNOWN[639] = nil; NAMEID["Holy Light"] = 635""")   # back to Rank 1 for the tests below
+
 # Other UI addons: action slots are shared by every bar addon, so they are set as always; Edit Mode is
 # left to a UI suite and the Blizzard bar settings to any bar addon, and without those no reload is asked.
 lua.execute('''LOADED = { "Bartender4" }; EDIT.selected = nil; EditModeManagerFrame.layoutInfo.activeLayout = 1

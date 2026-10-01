@@ -401,7 +401,8 @@ function YS:Apply(force)
 end
 
 -- A spell just learned: its placeholder macro is swapped for the spell itself and then deleted; a
--- profession spell (it has no placeholder) goes into its slot if that is still empty.
+-- profession spell (it has no placeholder) goes into its slot if that is still empty; a new rank
+-- replaces the old rank in the main's slot for that spell.
 -- Only on a character that was set up, and never in combat (it waits for combat to end).
 local waiting = false
 function YS:Upgrade()
@@ -426,6 +427,11 @@ function YS:Upgrade()
             if m and m.body == select(3, MacroFor(e)) then
                 PlaceSpell(slot, id)
                 swapped[m.name] = m.body
+            -- a new rank from the trainer: a spell on the bar is that rank only, so the slot gets the
+            -- highest one (a lookup by name gives it)
+            elseif kind == "spell" and actionID ~= id and not e.prof
+                    and C_Spell.GetSpellName(actionID) == C_Spell.GetSpellName(id) then
+                PlaceSpell(slot, id)
             end
         end
     end
