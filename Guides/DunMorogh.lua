@@ -187,10 +187,6 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tharek Blackstone|r
     .accept 400 >> Accept Tools for Steelgrill
     .target Tharek Blackstone
-step << Paladin/Warrior/Rogue
-    #optional
-    #completewith Blacksmithing1
-    .goto 1426,45.695,51.911,20 >> Enter the Blacksmith building
 step << Gnome Warrior
     .goto 1426,45.288,52.193
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grawn Thromwyn|r
@@ -248,16 +244,6 @@ step << Paladin
     .use 2493
     .itemcount 2493,1
     .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<4.99
-step << Warrior/Rogue/Paladin
-    #label Blacksmithing1
-    #requires DeleteOldDaggers << Rogue
-    .goto 1426,45.344,51.936
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r
-    >>|cRXP_WARN_This will allow you to make|r |T135248:0|t[Rough Sharpening Stones] |cRXP_WARN_which increase your melee damage by 2|r << Warrior/Rogue
-    >>|cRXP_WARN_This will allow you to make|r |T135255:0|t[Rough Weightstones] |cRXP_WARN_which increase your melee damage by 2|r << Paladin
-    >>|cRXP_WARN_If you don't want to do this, skip this step|r
-    .train 2018 >> Train |T136241:0|t[Blacksmithing]
-    .target Tognus Flintfire
 step << Shaman
     .goto 1426,45.288,52.193
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grawn Thromwyn|r
@@ -272,11 +258,6 @@ step << Shaman
     .use 2495
     .itemcount 2495,1
     .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<4.20
-step
-    .goto 1426/0,-431.000,-5582.400
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire::1241|r 
-    .target Tognus Flintfire::1241
-    .accept 98321 >>Accept Flintfire's Shipment
 step
     #optional
     #completewith next
@@ -462,6 +443,63 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire::1241|r
     .target Tognus Flintfire::1241
     .turnin 98321 >>Turn in Flintfire's Shipment
+step << Gnome Warrior
+    .goto 1426,45.288,52.193
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grawn Thromwyn|r
+    >>|cRXP_BUY_Buy a|r |T135321:0|t[Gladius]
+    .target Grawn Thromwyn
+    .money <0.0536
+    .collect 2488,1 --Collect Gladius (1)
+    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<3.80
+step << Gnome Warrior
+    #completewith next
+    +|cRXP_WARN_Equip the|r |T135321:0|t[Gladius]
+    .use 2488
+    .itemcount 2488,1
+    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<3.79
+step << Dwarf Warrior
+    .goto 1426,45.288,52.193
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grawn Thromwyn|r
+    >>|cRXP_BUY_Buy a|r |T132401:0|t[Large Axe]
+    .target Grawn Thromwyn
+    .money <0.0460
+    .collect 2491,1 --Collect Large Axe (1)
+    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<4.30
+step << Dwarf Warrior
+    #completewith next
+    +|cRXP_WARN_Equip the|r |T132401:0|t[Large Axe]
+    .use 2491
+    .itemcount 2491,1
+    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<4.29
+step << Rogue
+    .goto 1426,45.288,52.193
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grawn Thromwyn|r
+    >>|cRXP_BUY_Buy a|r |T135641:0|t[Stiletto]
+    .target Grawn Thromwyn
+    .money <0.0400
+    .collect 2494,1 --Collect Stiletto (1)
+    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<3.3
+step << Rogue
+    #completewith next
+    +|cRXP_WARN_Equip the|r |T135641:0|t[Stiletto]
+    .use 2494
+    .itemcount 2494,1
+    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<3.29
+step << Paladin
+    .goto 1426,45.288,52.193
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grawn Thromwyn|r
+    >>|cRXP_BUY_Buy a|r |T133053:0|t[Wooden Mallet]
+    .target Grawn Thromwyn
+    .money <0.0631
+    .goto 1426/0,-428.45,-5590.65--c:Dun Morogh,45.290,52.190
+    .collect 2493,1 --Collect Wooden Mallet (1)
+    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<5.00
+step << Paladin
+    #completewith next
+    +|cRXP_WARN_Equip the|r |T133053:0|t[Wooden Mallet]
+    .use 2493
+    .itemcount 2493,1
+    .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<4.99
 step << Warrior/Paladin/Rogue
     .goto 1426,45.344,51.936
     >>At the forge and anvil by |cRXP_FRIENDLY_Tognus Flintfire|r: smelt all your |cRXP_LOOT_Copper Ore|r

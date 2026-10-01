@@ -161,6 +161,28 @@ i = guide.index("    .turnin 287 >>Turn in Frostmane Hold")
 i = guide.index("\nstep", i) + 1
 guide = guide[:i] + CRAFT.replace("Skip this step and finish at the next forge", "Skip this step") + guide[i:]
 
+# The blacksmith visit RestedXP makes after the campfire: the weapons at Grawn Thromwyn (Gladius 5s36,
+# Large Axe 4s60, Stiletto 4s, Wooden Mallet 6s31), then Blacksmithing and Flintfire's Shipment at
+# Tognus. Those two Headstart already does at the first visit (FIRST, above): they came up done, and
+# looked skipped. And no logged run had the money for a weapon there (each step needs its price), so
+# every run skipped those too (the user, 2026-10-01). The Tognus steps go; the weapons stay, and come
+# again at the Flintfire's Shipment hand-in, next to Grawn, when Stocking Jetsteam has paid (~12s in a
+# logged run).
+start = guide.index("step << Paladin/Warrior/Rogue\n    #optional\n    #completewith Blacksmithing1\n")
+weapons_at = guide.index("step << Gnome Warrior\n", start)
+bs = guide.index("step << Warrior/Rogue/Paladin\n    #label Blacksmithing1\n")
+WEAPONS = guide[weapons_at:bs]
+assert "Wooden Mallet" in WEAPONS and "Gladius" in WEAPONS and "#label" not in WEAPONS
+bs_end = guide.index("\nstep", bs + 1) + 1
+guide = guide[:start] + WEAPONS + guide[bs_end:]
+dup = guide.index("    .target Tognus Flintfire::1241\n    .accept 98321 >>Accept Flintfire's Shipment\n")
+dup_start = guide.rindex("\nstep\n", 0, dup) + 1
+assert guide[dup_start:dup].count("\n") == 3, guide[dup_start:dup]
+guide = guide[:dup_start] + guide[guide.index("\nstep", dup) + 1:]
+i = guide.index("    .turnin 98321 >>Turn in Flintfire's Shipment")
+i = guide.index("\nstep", i) + 1
+guide = guide[:i] + WEAPONS + guide[i:]
+
 # Camping 101: Mining goes to Yarr Hammerstone, downstairs at Steelgrill's Depot, next to Bellowfiz.
 sub("""    .turnin 320 >> Turn in Return to Bellowfiz
     .target Pilot Bellowfiz
