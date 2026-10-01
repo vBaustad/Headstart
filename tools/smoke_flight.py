@@ -87,14 +87,14 @@ strtrim = function(s) return s end
         g.HOOKS.TakeTaxiNode(i)
         lua.execute("Tick(0.5); ONTAXI = true; Tick(0.5)")
         bar = g.HeadstartFlightFrame
-        texts = (bar.time.GetText(bar.time), bar["from"].GetText(bar["from"]), bar.to.GetText(bar.to)) if bar else None
+        texts = (bar.time.GetText(bar.time), bar["from"].GetText(bar["from"]), bar.to.GetText(bar.to), bar.note.GetText(bar.note)) if bar else None
         lua.execute(f"Tick({seconds - 1})")
         mid = bar.time.GetText(bar.time) if bar else None
         lua.execute("Tick(1); ONTAXI = false; Fire('PLAYER_CONTROL_GAINED')")
         return texts, mid
 
     texts, _ = fly(2, 60)
-    check(texts and texts[0].startswith("0:00") and "timing it" in texts[0], f"first flight counts up while it learns: {texts}")
+    check(texts and texts[0] == "0:00" and "timing it" in texts[3], f"first flight counts up while it learns: {texts}")
     check(texts and texts[1] == "Ironforge" and texts[2] == "Thelsamar", f"from and to, without the zone: {texts}")
     check(not g.HeadstartFlightFrame.IsShown(g.HeadstartFlightFrame), "the bar goes on landing")
     learned = g.YippRouteDB.flights["Ironforge, Dun Morogh>Thelsamar, Loch Modan"]

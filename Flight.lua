@@ -54,35 +54,63 @@ local function Place()
     end
 end
 
+-- The route: a dotted track between the two places, the part flown drawn solid, the flight-master
+-- icon riding along it (bobbing a little), and the destination's dot pulsing. The dots ahead drift
+-- towards the destination, so the bar moves even when there is no time to count down.
+local W, H, PAD, TRACK_Y = 300, 64, 16, -32
+local DASH, GAP = 4, 5
+local ICON = "Interface\\Minimap\\Tracking\\FlightMaster"
+
+local function Dot(parent, size, color)
+    local t = parent:CreateTexture(nil, "ARTWORK")
+    t:SetSize(size, size)
+    YR.Style.ArtTexture(t, "dot")
+    t:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
+    return t
+end
+
 local function Build()
     local S = YR.Style
     frame = CreateFrame("Frame", "HeadstartFlightFrame", UIParent)
-    frame:SetSize(280, 46)
+    frame:SetSize(W, H)
     frame:SetFrameStrata("MEDIUM")
     S.Fill(frame, S.C.window)
     S.Border(frame, S.C.line)
     frame.from = S.Text(frame, 12, S.C.sub)
-    frame.from:SetPoint("TOPLEFT", 8, -7)
-    frame.from:SetWidth(118)
-    frame.from:SetJustifyH("LEFT")
+    frame.from:SetPoint("TOPLEFT", PAD - 6, -7)
+    frame.from:SetWidth(W / 2 - PAD)
     frame.to = S.Text(frame, 12, S.C.text)
-    frame.to:SetPoint("TOPRIGHT", -8, -7)
-    frame.to:SetWidth(118)
+    frame.to:SetPoint("TOPRIGHT", -(PAD - 6), -7)
+    frame.to:SetWidth(W / 2 - PAD)
     frame.to:SetJustifyH("RIGHT")
-    frame.arrow = S.Text(frame, 12, S.C.muted)
-    frame.arrow:SetPoint("TOP", 0, -7)
-    frame.arrow:SetText("to")
-    frame.bar = CreateFrame("StatusBar", nil, frame)
-    frame.bar:SetPoint("BOTTOMLEFT", 8, 8)
-    frame.bar:SetPoint("BOTTOMRIGHT", -8, 8)
-    frame.bar:SetHeight(16)
-    frame.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8x8")
-    local a = S.C.accent
-    frame.bar:SetStatusBarColor(a[1], a[2], a[3], 0.85)
-    frame.bar:SetMinMaxValues(0, 1)
-    S.Fill(frame.bar, S.C.field, "BACKGROUND")
-    frame.time = S.Text(frame.bar, 12, S.C.text, "OVERLAY")
-    frame.time:SetPoint("CENTER")
+    frame.len = W - 2 * PAD
+    -- the dots of the track; the part flown is one solid line under the icon
+    frame.dashes = {}
+    for i = 1, floor(frame.len / (DASH + GAP)) + 1 do
+        local d = frame:CreateTexture(nil, "BORDER")
+        d:SetSize(DASH, 2)
+        S.Set(d, S.C.lineHi)
+        frame.dashes[i] = d
+    end
+    frame.flown = frame:CreateTexture(nil, "ARTWORK")
+    frame.flown:SetHeight(2)
+    frame.flown:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
+    S.Set(frame.flown, S.C.accent)
+    frame.start = Dot(frame, 10, S.C.accent)
+    frame.start:SetPoint("CENTER", frame, "TOPLEFT", PAD, TRACK_Y)
+    frame.goal = Dot(frame, 10, S.C.gold)
+    frame.goal:SetPoint("CENTER", frame, "TOPLEFT", W - PAD, TRACK_Y)
+    frame.halo = Dot(frame, 22, S.C.gold)
+    frame.halo:SetDrawLayer("BORDER")
+    frame.halo:SetPoint("CENTER", frame.goal)
+    frame.icon = frame:CreateTexture(nil, "OVERLAY")
+    frame.icon:SetSize(20, 20)
+    frame.icon:SetTexture(ICON)
+    frame.time = S.Text(frame, 13, S.C.text)
+    frame.time:SetPoint("BOTTOM", 0, 7)
+    frame.time:SetJustifyH("CENTER")
+    frame.note = S.Text(frame, 11, S.C.muted)
+    frame.note:SetPoint("LEFT", frame.time, "RIGHT", 6, 0)
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
@@ -92,8 +120,10 @@ local function Build()
         self:StopMovingOrSizing()
         YippRouteDB.flightPos = { floor(self:GetLeft() + 0.5), floor(self:GetTop() - UIParent:GetTop() + 0.5) }
     end)
+    -- the track moves every frame; the words change ten times a second
     local tick = 0
     frame:SetScript("OnUpdate", function(_, elapsed)
+        YR:AnimateFlight()
         tick = tick + elapsed
         if tick < 0.1 then return end
         tick = 0
@@ -101,6 +131,39 @@ local function Build()
     end)
     Place()
     frame:Hide()
+end
+
+-- How far along: 0 to 1, or nil while a first flight is being timed.
+local function Progress()
+    local total = flight.total
+    if not (total and total > 0) then return nil end
+    return math.min(1, (GetTime() - flight.started) / total)
+end
+
+function YR:AnimateFlight()
+    if not (frame and flight) then return end
+    local now = GetTime()
+    local p = Progress()
+    local x = (p or 0) * frame.len
+    -- the dots ahead of the icon drift towards the destination
+    local shift = (now * 12) % (DASH + GAP)
+    for i, d in ipairs(frame.dashes) do
+        local dx = (i - 1) * (DASH + GAP) + shift
+        if dx > x + 10 and dx + DASH < frame.len then
+            d:ClearAllPoints()
+            d:SetPoint("LEFT", frame, "TOPLEFT", PAD + dx, TRACK_Y)
+            d:Show()
+        else
+            d:Hide()
+        end
+    end
+    frame.flown:SetWidth(math.max(1, x))
+    frame.flown:SetShown(x > 1)
+    frame.icon:ClearAllPoints()
+    frame.icon:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y + 1 + math.sin(now * 2.5) * 1.5)
+    -- the destination breathes; faster once you are there
+    local speed = (p == 1) and 6 or 2.2
+    frame.halo:SetAlpha(0.12 + 0.18 * (0.5 + 0.5 * math.sin(now * speed)))
 end
 
 function YR:RefreshFlight()
@@ -113,16 +176,17 @@ function YR:RefreshFlight()
     frame.from:SetText(Short(flight.from))
     frame.to:SetText(Short(flight.to))
     if total and total > 0 then
-        frame.bar:SetValue(math.min(1, gone / total))
         local left = total - gone
         if left >= 0 then
             frame.time:SetText((guess and "about " or "") .. Clock(left))
+            frame.note:SetText("left")
         else
-            frame.time:SetText("landing (" .. Clock(-left) .. " over)")
+            frame.time:SetText("landing")
+            frame.note:SetText(Clock(-left) .. " over")
         end
     else
-        frame.bar:SetValue(0)
-        frame.time:SetText(Clock(gone) .. "  (first time: timing it)")
+        frame.time:SetText(Clock(gone))
+        frame.note:SetText("first time: timing it")
     end
 end
 
