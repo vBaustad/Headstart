@@ -75,18 +75,22 @@ local function Place()
     end
 end
 
--- The route: no panel, a white track with a dark outline, and a fill that grows from the left as you
--- fly, amber at take-off turning green as you get close, its front end rounded. At the start, at every
--- flight point the flight passes (its name above it when there is room) and at the end, the line
--- swells into a hump,
--- like a snake that has eaten something: the outline runs round each hump with the line (all the
--- outline is one layer, all the white the next, all the fill the one above), and the fill flows
--- through a hump as you pass it. Opaque colours, so nothing doubles up where the pieces overlap, and
--- whole-pixel positions, so it stays crisp. On a first flight a light sweeps along the track instead.
+-- The route: no panel, a white track with a soft dark shadow round it, and a fill that grows from the
+-- left as you fly, amber at take-off turning green as you get close, its front end rounded. At the
+-- start, at every flight point the flight passes (its name above it when there is room) and at the
+-- end, the line swells into a hump, like a snake that has eaten something: the shadow runs round the
+-- humps with the line (all the shadow is one layer, all the white the next, all the fill the one
+-- above), and the fill flows through a hump as you pass it. Opaque white and fill, so nothing doubles
+-- up where the pieces overlap, and whole-pixel positions, so it stays crisp. On a first flight a
+-- light sweeps along the track instead.
 local W, H, PAD, TRACK_Y, THICK = 380, 78, 18, -38, 10
 local HUMP_W, HUMP_H = 25, 20         -- a hump (an ellipse); its outline is a pixel wider all round
 local FAR, NEAR = { 1.00, 0.62, 0.22 }, { 0.36, 0.86, 0.46 }
-local TRACK, OUTLINE = { 0.92, 0.93, 0.95, 1 }, { 0.05, 0.05, 0.06, 1 }
+local TRACK = { 0.92, 0.93, 0.95, 1 }
+local OUTLINE = nil                   -- a colour draws a dark edge round line and humps; tried, not wanted
+-- instead a soft dark shadow round line and humps, fading out over SPREAD pixels (art/soft and
+-- art/softline: solid in the middle 45%, fading to nothing at the edge), so it reads on bright ground
+local SHADOW, SPREAD = { 0, 0, 0, 0.45 }, 6
 local SWEEP = 1.8                     -- seconds for the light to cross the track on a first flight
 
 local function Mix(a, b, t)
@@ -130,14 +134,18 @@ local function Marker()
         t:SetVertexColor(color[1], color[2], color[3], 1)
         return t
     end
-    m.ring = Ellipse("BORDER", 0, HUMP_W + 2, HUMP_H + 2, OUTLINE)
+    m.ring = OUTLINE and Ellipse("BORDER", 0, HUMP_W + 2, HUMP_H + 2, OUTLINE)
+    m.shade = frame:CreateTexture(nil, "BACKGROUND")
+    m.shade:SetSize(HUMP_W + 2 * SPREAD, HUMP_H + 2 * SPREAD)
+    YR.Style.ArtTexture(m.shade, "soft")
+    m.shade:SetVertexColor(SHADOW[1], SHADOW[2], SHADOW[3], SHADOW[4])
     m.dot = Ellipse("BORDER", 1, HUMP_W, HUMP_H, TRACK)
     m.fill = Ellipse("ARTWORK", 0, HUMP_W, HUMP_H, NEAR)
     m.label = Shadowed(YR.Style.Text(frame, 12, YR.Style.C.sub))
     m.label:SetJustifyH("CENTER")
     function m:At(x)
         self.x = Round(x)
-        for _, t in ipairs({ self.ring, self.dot }) do
+        for _, t in ipairs({ self.dot, self.shade, self.ring }) do
             t:ClearAllPoints()
             t:SetPoint("CENTER", frame, "TOPLEFT", PAD + self.x, TRACK_Y)
         end
@@ -157,7 +165,8 @@ local function Marker()
         self.fill:Show()
     end
     function m:Show(on)
-        self.ring:SetShown(on) self.dot:SetShown(on)
+        self.dot:SetShown(on) self.shade:SetShown(on)
+        if self.ring then self.ring:SetShown(on) end
         if not on then self.label:Hide() self.fill:Hide() end
     end
     return m
@@ -176,10 +185,17 @@ local function Build()
     frame.to:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -(PAD - 12), TRACK_Y + HUMP_H / 2 + 3)
     frame.to:SetWidth(W / 3)
     frame.to:SetJustifyH("RIGHT")
-    -- the track: outline, white inside, the fill, and the light that sweeps a first flight
-    frame.outline = Solid(frame, "BORDER", 0, OUTLINE)
-    frame.outline:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD - 1, TRACK_Y + THICK / 2 + 1)
-    frame.outline:SetSize(frame.len + 2, THICK + 2)
+    -- the track: (an outline,) white inside, the fill, and the light that sweeps a first flight
+    frame.shade = frame:CreateTexture(nil, "BACKGROUND")
+    YR.Style.ArtTexture(frame.shade, "softline")
+    frame.shade:SetVertexColor(SHADOW[1], SHADOW[2], SHADOW[3], SHADOW[4])
+    frame.shade:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
+    frame.shade:SetSize(frame.len, THICK + 2 * SPREAD)
+    if OUTLINE then
+        frame.outline = Solid(frame, "BORDER", 0, OUTLINE)
+        frame.outline:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD - 1, TRACK_Y + THICK / 2 + 1)
+        frame.outline:SetSize(frame.len + 2, THICK + 2)
+    end
     frame.track = Solid(frame, "BORDER", 1, TRACK)
     frame.track:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, TRACK_Y + THICK / 2)
     frame.track:SetSize(frame.len, THICK)
@@ -279,7 +295,7 @@ function YR:AnimateFlight()
     -- from take-off: you are there)
     local fillX = p and p * frame.len or 0
     for _, m in ipairs(frame.markers) do
-        if m.at and m.ring:IsShown() then
+        if m.at and m.dot:IsShown() then
             local here = p and p > 0 and math.min(1, m.at / p) or 0
             local r, g, b = Mix(FAR, { Mix(FAR, NEAR, p or 0) }, here)
             m:Fill(m.at == 0 and math.max(fillX, HUMP_W) or (p and fillX or nil), r, g, b)
