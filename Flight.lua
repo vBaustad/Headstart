@@ -76,14 +76,16 @@ local function Place()
 end
 
 -- The route: no panel, a white track with a dark outline, and a fill that grows from the left as you
--- fly, amber at take-off turning green as you get close. A round marker at the start, at every flight
--- point the flight passes (its name above it when there is room) and at the end; a marker you have
--- passed takes the fill's colour. Solid textures and whole-pixel positions only, so it stays crisp.
--- On a first flight, with no time to measure against, a light sweeps along the track instead.
-local W, H, PAD, TRACK_Y, THICK = 380, 74, 12, -34, 12
-local MARK = 16                       -- a stop's marker; its outline is 2 pixels wider all round
+-- fly, amber at take-off turning green as you get close. At the start, at every flight point the
+-- flight passes (its name above it when there is room) and at the end, the line swells into a hump,
+-- like a snake that has eaten something: the outline runs round each hump with the line (all the
+-- outline is one layer, all the white the next, all the fill the one above), and the fill flows
+-- through a hump as you pass it. Opaque colours, so nothing doubles up where the pieces overlap, and
+-- whole-pixel positions, so it stays crisp. On a first flight a light sweeps along the track instead.
+local W, H, PAD, TRACK_Y, THICK = 380, 78, 18, -38, 10
+local HUMP_W, HUMP_H = 30, 22         -- a hump (an ellipse); its outline is a pixel wider all round
 local FAR, NEAR = { 1.00, 0.62, 0.22 }, { 0.36, 0.86, 0.46 }
-local TRACK, OUTLINE = { 0.92, 0.93, 0.95, 0.92 }, { 0, 0, 0, 0.85 }
+local TRACK, OUTLINE = { 0.92, 0.93, 0.95, 1 }, { 0.05, 0.05, 0.06, 1 }
 local SWEEP = 1.8                     -- seconds for the light to cross the track on a first flight
 
 local function Mix(a, b, t)
@@ -116,29 +118,46 @@ end
 
 local function Round(x) return floor(x + 0.5) end
 
--- A round marker: a dark ring with a white (or filled) middle, from our dot art scaled down.
+-- A hump in the line: its outline (under all the white), its white, and the part of it filled (cut
+-- off at the fill's edge, so the colour flows through it).
 local function Marker()
     local m = {}
-    m.ring = frame:CreateTexture(nil, "ARTWORK", nil, 1)
-    m.ring:SetSize(MARK + 4, MARK + 4)
-    YR.Style.ArtTexture(m.ring, "dot")
-    m.ring:SetVertexColor(OUTLINE[1], OUTLINE[2], OUTLINE[3], 1)
-    m.dot = frame:CreateTexture(nil, "ARTWORK", nil, 2)
-    m.dot:SetSize(MARK, MARK)
-    YR.Style.ArtTexture(m.dot, "dot")
+    local function Ellipse(layer, sub, w, h, color)
+        local t = frame:CreateTexture(nil, layer, nil, sub)
+        t:SetSize(w, h)
+        YR.Style.ArtTexture(t, "dot")
+        t:SetVertexColor(color[1], color[2], color[3], 1)
+        return t
+    end
+    m.ring = Ellipse("BORDER", 0, HUMP_W + 2, HUMP_H + 2, OUTLINE)
+    m.dot = Ellipse("BORDER", 1, HUMP_W, HUMP_H, TRACK)
+    m.fill = Ellipse("ARTWORK", 0, HUMP_W, HUMP_H, NEAR)
     m.label = Shadowed(YR.Style.Text(frame, 12, YR.Style.C.sub))
     m.label:SetJustifyH("CENTER")
     function m:At(x)
+        self.x = Round(x)
         for _, t in ipairs({ self.ring, self.dot }) do
             t:ClearAllPoints()
-            t:SetPoint("CENTER", frame, "TOPLEFT", PAD + Round(x), TRACK_Y)
+            t:SetPoint("CENTER", frame, "TOPLEFT", PAD + self.x, TRACK_Y)
         end
+        self.fill:ClearAllPoints()
+        self.fill:SetPoint("LEFT", frame, "TOPLEFT", PAD + self.x - HUMP_W / 2, TRACK_Y)
         self.label:ClearAllPoints()
-        self.label:SetPoint("BOTTOM", frame, "TOPLEFT", PAD + Round(x), TRACK_Y + MARK / 2 + 4)
+        self.label:SetPoint("BOTTOM", frame, "TOPLEFT", PAD + self.x, TRACK_Y + HUMP_H / 2 + 3)
+    end
+    -- fillX: where the fill ends (pixels from the start), or nil for none
+    function m:Fill(fillX, r, g, b)
+        local part = fillX and math.max(0, math.min(1, (fillX - (self.x - HUMP_W / 2)) / HUMP_W)) or 0
+        local w = Round(part * HUMP_W)
+        if w < 1 then self.fill:Hide() return end
+        self.fill:SetWidth(w)
+        self.fill:SetTexCoord(0, w / HUMP_W, 0, 1)
+        self.fill:SetVertexColor(r, g, b, 1)
+        self.fill:Show()
     end
     function m:Show(on)
         self.ring:SetShown(on) self.dot:SetShown(on)
-        if not on then self.label:Hide() end
+        if not on then self.label:Hide() self.fill:Hide() end
     end
     return m
 end
@@ -150,10 +169,10 @@ local function Build()
     frame:SetFrameStrata("MEDIUM")
     frame.len = W - 2 * PAD
     frame.from = Shadowed(S.Text(frame, 14, S.C.text))
-    frame.from:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", PAD - 4, TRACK_Y + MARK / 2 + 4)
+    frame.from:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", PAD - 12, TRACK_Y + HUMP_H / 2 + 3)
     frame.from:SetWidth(W / 3)
     frame.to = Shadowed(S.Text(frame, 14, S.C.text))
-    frame.to:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -(PAD - 4), TRACK_Y + MARK / 2 + 4)
+    frame.to:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -(PAD - 12), TRACK_Y + HUMP_H / 2 + 3)
     frame.to:SetWidth(W / 3)
     frame.to:SetJustifyH("RIGHT")
     -- the track: outline, white inside, the fill, and the light that sweeps a first flight
@@ -170,7 +189,7 @@ local function Build()
     frame.sweep:SetSize(40, THICK)
     frame.markers = {}
     frame.time = Shadowed(S.Text(frame, 15, S.C.text))
-    frame.time:SetPoint("TOP", frame, "TOPLEFT", W / 2 - 20, TRACK_Y - MARK / 2 - 5)
+    frame.time:SetPoint("TOP", frame, "TOPLEFT", W / 2 - 20, TRACK_Y - HUMP_H / 2 - 4)
     frame.note = Shadowed(S.Text(frame, 12, S.C.sub))
     frame.note:SetPoint("LEFT", frame.time, "RIGHT", 6, -1)
     frame:SetMovable(true)
@@ -246,11 +265,14 @@ function YR:AnimateFlight()
         frame.sweep:SetPoint("TOPLEFT", frame.track, "TOPLEFT", x, 0)
         frame.sweep:Show()
     end
+    -- each hump fills as the fill reaches it, in the fill's colour where it is (at the start the
+    -- start hump is already amber: you are there)
+    local fillX = p and p * frame.len or 0
     for _, m in ipairs(frame.markers) do
-        if m.at and p and p >= m.at then
-            m.dot:SetVertexColor(Mix(FAR, NEAR, m.at))
-        else
-            m.dot:SetVertexColor(TRACK[1], TRACK[2], TRACK[3], 1)
+        if m.at and m.ring:IsShown() then
+            local here = p and p > 0 and math.min(1, m.at / p) or 0
+            local r, g, b = Mix(FAR, { Mix(FAR, NEAR, p or 0) }, here)
+            m:Fill(m.at == 0 and math.max(fillX, HUMP_W) or (p and fillX or nil), r, g, b)
         end
     end
 end
