@@ -98,6 +98,39 @@ step << NightElf !Druid
     #label start
     .hs >> Hearth to Auberdine
 step
+    #role A,B,C
+    .goto 1439,32.4,43.7
+    .zone Hillsbrad Foothills >> Ruins of Lordaeron with your group (about two levels of quest XP at 16): take the Menethil Harbor boat from Auberdine's dock and stay on board past Menethil until Southshore
+step
+    #role A,B,C
+    .zone Tirisfal Glades >> From Southshore follow the road north past Hillsbrad Fields and round Dalaran, then swim north up Lordamere Lake into Tirisfal Glades. Horde land: keep off the roads
+step
+    #role A,B,C
+    .goto 1420,61.9,70.5
+    >>Enter the Ruins of Lordaeron: the ruined city above the Undercity, on the east side of the courtyard on the way to the elevators, up the stairs behind an iron portcullis
+step
+    #role A,B,C
+    .accept 95250 >> Accept Abominable Creatures
+    .target Captain Truman
+    >>|cRXP_FRIENDLY_Captain Truman|r is on your left as you zone in
+step
+    #role A,B,C
+    >>Clear the Ruins (the bosses in any order). Kill |cRXP_ENEMY_The Baron|r for his head. Loot what starts the other three (click each in your bags): the first |cRXP_LOOT_Bloodied Insignia|r from the undead, then nine more; the |cRXP_LOOT_Crest of Lordaeron|r (top of the tower by the spider courtyard or by The Abandoned, behind the banshee's door in the spider courtyard, or the floor of the stair room across from Bjork's courtyard); the |cRXP_LOOT_Blood-Stained Letter|r by Edward Heartweaver's body near |cRXP_ENEMY_Rath'mael|r
+    .complete 95250,1
+    .accept 95195 >> Accept Bloodied Insignia
+    .complete 95195,1
+    .accept 95189 >> Accept Crest of Lordaeron
+    .accept 92415 >> Accept Remember That I Love You
+step
+    #role A,B,C
+    .turnin 95250 >> Turn in Abominable Creatures
+    .target Captain Truman
+    .isQuestComplete 95250
+step
+    #role A,B,C
+    .hs >> Hearth back to Auberdine
+    .zoneskip Darkshore
+step
     .goto 1439/1,504.41,6402.39
     >>Click the |cRXP_PICK_Wanted Poster|r
     .accept 4740 >> Accept WANTED: Murkdeep!
@@ -4311,6 +4344,27 @@ step << !Hunter
     .zoneskip Stormwind City
     .zoneskip Redridge Mountains
 
+step
+    #role A,B,C
+    .goto 1453,68.4,29.1
+    .turnin 95189 >> Turn in Crest of Lordaeron
+    .target Lady Dena Kennedy
+    >>In Stormwind Keep's Royal Gallery
+    .isOnQuest 95189
+step
+    #role A,B,C
+    .goto 1453,56.3,54.0
+    .turnin 92415 >> Turn in Remember That I Love You
+    .target Orphan Matron Nightingale
+    >>In front of the Cathedral of Light
+    .isOnQuest 92415
+step
+    #role A,B,C
+    .goto 1453,69.2,82.7
+    .turnin 95195 >> Turn in Bloodied Insignia
+    .target General Marcus Jonathan
+    >>By the city gate
+    .isQuestComplete 95195
 step << Shaman
     #xprate <1.59
     .money <0.08

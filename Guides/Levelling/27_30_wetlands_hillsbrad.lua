@@ -503,35 +503,6 @@ step
     .goto 1424,49.3,52.3
     .fp Southshore >> Get the Southshore flight path
 step
-    #role A,B,C
-    .zone Tirisfal Glades >> Ruins of Lordaeron with your group: from Southshore follow the road north past Hillsbrad Fields and round Dalaran, then swim north up Lordamere Lake into Tirisfal Glades. Horde land: keep off the roads
-step
-    #role A,B,C
-    .goto 1420,61.9,70.5
-    >>Enter the Ruins of Lordaeron: the ruined city above the Undercity, on the east side of the courtyard on the way to the elevators, up the stairs behind an iron portcullis
-step
-    #role A,B,C
-    .accept 95250 >> Accept Abominable Creatures
-    .target Captain Truman
-    >>|cRXP_FRIENDLY_Captain Truman|r is on your left as you zone in
-step
-    #role A,B,C
-    >>Clear the Ruins (the bosses in any order). Kill |cRXP_ENEMY_The Baron|r for his head. Loot what starts the other three (click each in your bags): the first |cRXP_LOOT_Bloodied Insignia|r from the undead, then nine more; the |cRXP_LOOT_Crest of Lordaeron|r (top of the tower by the spider courtyard or by The Abandoned, behind the banshee's door in the spider courtyard, or the floor of the stair room across from Bjork's courtyard); the |cRXP_LOOT_Blood-Stained Letter|r by Edward Heartweaver's body near |cRXP_ENEMY_Rath'mael|r
-    .complete 95250,1
-    .accept 95195 >> Accept Bloodied Insignia
-    .complete 95195,1
-    .accept 95189 >> Accept Crest of Lordaeron
-    .accept 92415 >> Accept Remember That I Love You
-step
-    #role A,B,C
-    .turnin 95250 >> Turn in Abominable Creatures
-    .target Captain Truman
-    .isQuestComplete 95250
-step
-    #role A,B,C
-    .zone Western Plaguelands >> Leave the Ruins and head east into the Western Plaguelands, then south to Chillwind Camp
-    .isOnQuest 95189
-step
     .goto 1422,42.9,85.0
     >>Head north farming turtle meat along the river, once you get at the end of the river, head northwest into WPL. You don't need all 10 meat yet.
     .fp Chillwind >> Get the Chillwind Camp flight path
@@ -592,29 +563,4 @@ step
     .turnin 686 >> Turn in A King's Tribute
 .target Grand Mason Marblesten
     .accept 689 >> Accept A King's Tribute
-
-step
-    #role A,B,C
-    .zone Stormwind City >> Take the Deeprun Tram to Stormwind: the Ruins of Lordaeron hand-ins
-    .isOnQuest 95189
-step
-    #role A,B,C
-    .goto 1453,68.4,29.1
-    .turnin 95189 >> Turn in Crest of Lordaeron
-    .target Lady Dena Kennedy
-    >>In Stormwind Keep's Royal Gallery
-    .isOnQuest 95189
-step
-    #role A,B,C
-    .goto 1453,56.3,54.0
-    .turnin 92415 >> Turn in Remember That I Love You
-    .target Orphan Matron Nightingale
-    >>In front of the Cathedral of Light
-    .isOnQuest 92415
-step
-    #role A,B,C
-    .goto 1453,69.2,82.7
-    .turnin 95195 >> Turn in Bloodied Insignia
-    .target General Marcus Jonathan
-    >>By the city gate
-    .isQuestComplete 95195]])
+]])
