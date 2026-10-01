@@ -5,7 +5,6 @@
 
 The addon tints them (SetVertexColor), so one white icon serves every colour.
 """
-import math
 import os
 
 from PIL import Image, ImageDraw
@@ -109,22 +108,7 @@ rounded("round", False)
 rounded("roundline", True)
 
 
-# The flight timer's soft shadow: solid in the middle 45%, then a smooth fade to nothing at the edge.
-# "soft" is a round blob (under the humps), "softline" the same fade across a line (stretched along it).
-def fade(d):
-    a = 1.0 if d < 0.45 else max(0.0, 1 - (d - 0.45) / 0.55)
-    return int(a * a * (3 - 2 * a) * 255 + 0.5)
-
-
-soft = Image.new("RGBA", (64, 64))
-for y in range(64):
-    for x in range(64):
-        soft.putpixel((x, y), (255, 255, 255, fade(math.hypot(x + 0.5 - 32, y + 0.5 - 32) / 32)))
-soft.save(os.path.join(OUT, "soft.tga"), orientation=1)
-softline = Image.new("RGBA", (8, 32))
-for y in range(32):
-    for x in range(8):
-        softline.putpixel((x, y), (255, 255, 255, fade(abs(y + 0.5 - 16) / 16)))
-softline.save(os.path.join(OUT, "softline.tga"), orientation=1)
-
-print("icons in", OUT, sorted(os.listdir(OUT)))
+# A full-size circle (edge to edge, unlike "dot"), drawn at 4x: the flight timer's nodes and round ends.
+img, d = canvas()
+d.ellipse((2, 2, S - 3, S - 3), fill=(255, 255, 255, 255))
+save(img, "circle")
