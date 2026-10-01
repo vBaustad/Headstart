@@ -710,6 +710,14 @@ step
     .target Prospector Ironband
     .accept 298 >> Accept Excavation Progress Report
 step
+    #sticky
+    #label ExcavationTools
+    .goto 1432,69.5,64.5
+    >>As you go round the dig: pick up the |cRXP_PICK_Excavation Tools|r lying on the ground (66-72, 59-68). The first one starts Excavation Tools: click it in your bags
+    .accept 86613 >> Accept Excavation Tools
+    .use 278049
+    .complete 86613,1
+step
     .goto 1432,70.0,63.5
     >>Kill |cRXP_ENEMY_Stonesplinter Geomancers|r, |cRXP_ENEMY_Diggers|r and |cRXP_ENEMY_Berserk Troggs|r in the excavation. Loot their |cRXP_LOOT_Carved Stone Idols|r
     .complete 297,1
@@ -721,6 +729,11 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magmar Fellhew|r
     .target Magmar Fellhew
     .turnin 297 >> Turn in Gathering Idols
+step
+    .goto 1432,65.8,65.5
+    .turnin 86613 >> Turn in Excavation Tools
+    .target Prospector Ironband
+    .isQuestComplete 86613
 step
     .goto 1432,62.9,50.4
     >>Kill |cRXP_ENEMY_Daggerfang|r, the big crocolisk by the shore. Loot Marek's knife

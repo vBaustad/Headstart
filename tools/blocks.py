@@ -84,7 +84,8 @@ LM_SOUTH = [
 ]
 # The east, after Silver of the Waves: the Farstrider Lodge (Crocolisk Hunting 1050, Forever's
 # Twisting the Knife 1150, A Hunter's Boast 875), Ironband's Excavation (Ironband's Excavation 340,
-# Gathering Idols 1350, the Excavation Progress Report 270), then north along the shore: Daggerfang
+# Gathering Idols 1350, the Excavation Progress Report 270, and Forever's Excavation Tools 1350: six
+# tools lying round the same dig, the first one looted starts it), then north along the shore: Daggerfang
 # (63,50), the crocolisks, Bingles' four tools (Bingles' Missing Supplies 1050), back to the lodge,
 # and the hearth to Thelsamar for Report to Ironforge (550, handed in in Ironforge on the way out).
 LM_EAST = [
@@ -95,8 +96,10 @@ LM_EAST = [
     "turnin 257",
     "turnin 436 | accept 297",
     "accept 298",
+    "raw #sticky | raw #label ExcavationTools | goto 1432 69.5 64.5 | raw >>As you go round the dig: pick up the |cRXP_PICK_Excavation Tools|r lying on the ground (66-72, 59-68). The first one starts Excavation Tools: click it in your bags | raw .accept 86613 >> Accept Excavation Tools | raw .use 278049 | raw .complete 86613,1",
     "goto 1432 70.0 63.5 | raw >>Kill |cRXP_ENEMY_Stonesplinter Geomancers|r, |cRXP_ENEMY_Diggers|r and |cRXP_ENEMY_Berserk Troggs|r in the excavation. Loot their |cRXP_LOOT_Carved Stone Idols|r | raw .complete 297,1 | raw .mob Stonesplinter Geomancer | raw .mob Stonesplinter Digger | raw .mob Berserk Trogg",
     "turnin 297",
+    "goto 1432 65.8 65.5 | raw .turnin 86613 >> Turn in Excavation Tools | raw .target Prospector Ironband | raw .isQuestComplete 86613",
     "goto 1432 62.9 50.4 | raw >>Kill |cRXP_ENEMY_Daggerfang|r, the big crocolisk by the shore. Loot Marek's knife | raw .complete 86758,1 | raw .mob Daggerfang",
     "accept 2038",
     "goto 1432 59.0 38.0 | raw >>Kill |cRXP_ENEMY_Loch Crocolisks|r along the north-east shore. Loot their meat and skins | raw .complete 385,1 | raw .complete 385,2 | raw .mob Loch Crocolisk | raw .mob Large Loch Crocolisk",
