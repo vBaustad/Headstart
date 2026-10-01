@@ -75,31 +75,36 @@ local function Place()
     end
 end
 
--- The route: no panel, a white track with a soft dark shadow round it, and a fill that grows from the
--- left as you fly, amber at take-off turning green as you get close, its front end rounded. At the
--- start, at every flight point the flight passes (its name above it when there is room) and at the
--- end, the line swells into a hump, like a snake that has eaten something: the shadow runs round the
--- humps with the line (all the shadow is one layer, all the white the next, all the fill the one
--- above), and the fill flows through a hump as you pass it. Opaque white and fill, so nothing doubles
--- up where the pieces overlap, and whole-pixel positions, so it stays crisp. On a first flight a
--- light sweeps along the track instead.
-local W, H, PAD, TRACK_Y, THICK = 380, 78, 18, -38, 10
-local HUMP_W, HUMP_H = 25, 20         -- a hump (an ellipse); its outline is a pixel wider all round
+-- The route: no panel. A slim dark bar with a round node at the start, at every flight point the
+-- flight passes (its name above it when there is room) and at the end, the bar swelling into each
+-- node. The fill runs along it from the left, amber at take-off turning green as you get close, with
+-- a round front, and flows into each node as you pass it. Every round shape is art/circle (a circle
+-- edge to edge of its image) at its real size; the bar runs between the nodes, so the see-through
+-- dark never overlaps itself; positions are whole pixels. On a first flight, with no time to measure
+-- against, a light runs along the bar instead.
+local W, H, PAD, TRACK_Y = 380, 60, 10, -30
+local THICK, NODE = 8, 16
 local FAR, NEAR = { 1.00, 0.62, 0.22 }, { 0.36, 0.86, 0.46 }
-local TRACK = { 0.92, 0.93, 0.95, 1 }
-local OUTLINE = nil                   -- a colour draws a dark edge round line and humps; tried, not wanted
--- instead a soft dark shadow round line and humps, fading out over SPREAD pixels (art/soft and
--- art/softline: solid in the middle 45%, fading to nothing at the edge), so it reads on bright ground
-local SHADOW, SPREAD = { 0, 0, 0, 0.45 }, 6
-local SWEEP = 1.8                     -- seconds for the light to cross the track on a first flight
+local DARK = { 0.06, 0.07, 0.09, 0.82 }
+local SWEEP = 1.8                     -- seconds for the light to run the bar on a first flight
 
 local function Mix(a, b, t)
     return a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t
 end
 
-local function Solid(parent, layer, sub, color)
-    local t = parent:CreateTexture(nil, layer, nil, sub)
+local function Round(x) return floor(x + 0.5) end
+
+local function Solid(layer, sub, color)
+    local t = frame:CreateTexture(nil, layer, nil, sub)
     t:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
+    return t
+end
+
+local function Circle(layer, sub, size, color)
+    local t = frame:CreateTexture(nil, layer, nil, sub)
+    t:SetSize(size, size)
+    YR.Style.ArtTexture(t, "circle")
+    t:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
     return t
 end
 
@@ -121,53 +126,49 @@ local function Shadowed(fs)
     return fs
 end
 
-local function Round(x) return floor(x + 0.5) end
-
--- A hump in the line: its outline (under all the white), its white, and the part of it filled (cut
--- off at the fill's edge, so the colour flows through it).
+-- A node: its dark circle, the part of it filled (cut off at the fill's front, so the colour flows in),
+-- its name, and the piece of bar from it to the next node.
 local function Marker()
     local m = {}
-    local function Ellipse(layer, sub, w, h, color)
-        local t = frame:CreateTexture(nil, layer, nil, sub)
-        t:SetSize(w, h)
-        YR.Style.ArtTexture(t, "dot")
-        t:SetVertexColor(color[1], color[2], color[3], 1)
-        return t
-    end
-    m.ring = OUTLINE and Ellipse("BORDER", 0, HUMP_W + 2, HUMP_H + 2, OUTLINE)
-    m.shade = frame:CreateTexture(nil, "BACKGROUND")
-    m.shade:SetSize(HUMP_W + 2 * SPREAD, HUMP_H + 2 * SPREAD)
-    YR.Style.ArtTexture(m.shade, "soft")
-    m.shade:SetVertexColor(SHADOW[1], SHADOW[2], SHADOW[3], SHADOW[4])
-    m.dot = Ellipse("BORDER", 1, HUMP_W, HUMP_H, TRACK)
-    m.fill = Ellipse("ARTWORK", 0, HUMP_W, HUMP_H, NEAR)
+    m.dot = Circle("BORDER", 0, NODE, DARK)
+    m.fill = Circle("ARTWORK", 1, NODE, NEAR)
+    m.bar = Solid("BORDER", 0, DARK)
+    m.bar:SetHeight(THICK)
     m.label = Shadowed(YR.Style.Text(frame, 12, YR.Style.C.sub))
     m.label:SetJustifyH("CENTER")
-    function m:At(x)
+    function m:At(x, nextX)
         self.x = Round(x)
-        for _, t in ipairs({ self.dot, self.shade, self.ring }) do
-            t:ClearAllPoints()
-            t:SetPoint("CENTER", frame, "TOPLEFT", PAD + self.x, TRACK_Y)
-        end
+        self.dot:ClearAllPoints()
+        self.dot:SetPoint("CENTER", frame, "TOPLEFT", PAD + self.x, TRACK_Y)
         self.fill:ClearAllPoints()
-        self.fill:SetPoint("LEFT", frame, "TOPLEFT", PAD + self.x - HUMP_W / 2, TRACK_Y)
+        self.fill:SetPoint("LEFT", frame, "TOPLEFT", PAD + self.x - NODE / 2, TRACK_Y)
         self.label:ClearAllPoints()
-        self.label:SetPoint("BOTTOM", frame, "TOPLEFT", PAD + self.x, TRACK_Y + HUMP_H / 2 + 3)
+        self.label:SetPoint("BOTTOM", frame, "TOPLEFT", PAD + self.x, TRACK_Y + NODE / 2 + 3)
+        -- the bar starts and ends where the circle is as wide as the bar is thick, so it meets the
+        -- circle's edge without covering it
+        local inset = floor(math.sqrt((NODE / 2) ^ 2 - (THICK / 2) ^ 2))
+        if nextX and Round(nextX) - self.x > 2 * inset then
+            self.bar:ClearAllPoints()
+            self.bar:SetPoint("LEFT", frame, "TOPLEFT", PAD + self.x + inset, TRACK_Y)
+            self.bar:SetWidth(Round(nextX) - self.x - 2 * inset)
+            self.bar:Show()
+        else
+            self.bar:Hide()
+        end
     end
-    -- fillX: where the fill ends (pixels from the start), or nil for none
+    -- fillX: where the fill's front is (pixels from the start), or nil for none
     function m:Fill(fillX, r, g, b)
-        local part = fillX and math.max(0, math.min(1, (fillX - (self.x - HUMP_W / 2)) / HUMP_W)) or 0
-        local w = Round(part * HUMP_W)
+        local part = fillX and math.max(0, math.min(1, (fillX - (self.x - NODE / 2)) / NODE)) or 0
+        local w = Round(part * NODE)
         if w < 1 then self.fill:Hide() return end
         self.fill:SetWidth(w)
-        self.fill:SetTexCoord(0, w / HUMP_W, 0, 1)
+        self.fill:SetTexCoord(0, w / NODE, 0, 1)
         self.fill:SetVertexColor(r, g, b, 1)
         self.fill:Show()
     end
     function m:Show(on)
-        self.dot:SetShown(on) self.shade:SetShown(on)
-        if self.ring then self.ring:SetShown(on) end
-        if not on then self.label:Hide() self.fill:Hide() end
+        self.dot:SetShown(on)
+        if not on then self.label:Hide() self.fill:Hide() self.bar:Hide() end
     end
     return m
 end
@@ -178,39 +179,23 @@ local function Build()
     frame:SetSize(W, H)
     frame:SetFrameStrata("MEDIUM")
     frame.len = W - 2 * PAD
-    frame.from = Shadowed(S.Text(frame, 14, S.C.text))
-    frame.from:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", PAD - 12, TRACK_Y + HUMP_H / 2 + 3)
+    frame.from = Shadowed(S.Text(frame, 13, S.C.text))
+    frame.from:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", PAD - NODE / 2, TRACK_Y + NODE / 2 + 3)
     frame.from:SetWidth(W / 3)
-    frame.to = Shadowed(S.Text(frame, 14, S.C.text))
-    frame.to:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -(PAD - 12), TRACK_Y + HUMP_H / 2 + 3)
+    frame.to = Shadowed(S.Text(frame, 13, S.C.text))
+    frame.to:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -(PAD - NODE / 2), TRACK_Y + NODE / 2 + 3)
     frame.to:SetWidth(W / 3)
     frame.to:SetJustifyH("RIGHT")
-    -- the track: (an outline,) white inside, the fill, and the light that sweeps a first flight
-    frame.shade = frame:CreateTexture(nil, "BACKGROUND")
-    YR.Style.ArtTexture(frame.shade, "softline")
-    frame.shade:SetVertexColor(SHADOW[1], SHADOW[2], SHADOW[3], SHADOW[4])
-    frame.shade:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
-    frame.shade:SetSize(frame.len, THICK + 2 * SPREAD)
-    if OUTLINE then
-        frame.outline = Solid(frame, "BORDER", 0, OUTLINE)
-        frame.outline:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD - 1, TRACK_Y + THICK / 2 + 1)
-        frame.outline:SetSize(frame.len + 2, THICK + 2)
-    end
-    frame.track = Solid(frame, "BORDER", 1, TRACK)
-    frame.track:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, TRACK_Y + THICK / 2)
-    frame.track:SetSize(frame.len, THICK)
-    frame.fill = Solid(frame, "ARTWORK", 0, NEAR)
-    frame.fill:SetPoint("TOPLEFT", frame.track, "TOPLEFT")
+    -- the fill along the bar, its round front, and the light that runs a first flight
+    frame.fill = Solid("ARTWORK", 0, NEAR)
     frame.fill:SetHeight(THICK)
-    -- the fill's rounded front
-    frame.head = frame:CreateTexture(nil, "ARTWORK", nil, 1)
-    frame.head:SetSize(THICK, THICK)
-    YR.Style.ArtTexture(frame.head, "dot")
-    frame.sweep = Solid(frame, "ARTWORK", 0, { NEAR[1], NEAR[2], NEAR[3], 0.55 })
-    frame.sweep:SetSize(40, THICK)
+    frame.fill:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
+    frame.head = Circle("ARTWORK", 2, THICK, NEAR)
+    frame.sweep = Solid("ARTWORK", 0, { NEAR[1], NEAR[2], NEAR[3], 0.6 })
+    frame.sweep:SetSize(36, THICK)
     frame.markers = {}
-    frame.time = Shadowed(S.Text(frame, 15, S.C.text))
-    frame.time:SetPoint("TOP", frame, "TOPLEFT", W / 2 - 20, TRACK_Y - HUMP_H / 2 - 4)
+    frame.time = Shadowed(S.Text(frame, 14, S.C.text))
+    frame.time:SetPoint("TOP", frame, "TOPLEFT", W / 2 - 20, TRACK_Y - NODE / 2 - 4)
     frame.note = Shadowed(S.Text(frame, 12, S.C.sub))
     frame.note:SetPoint("LEFT", frame.time, "RIGHT", 6, -1)
     frame:SetMovable(true)
@@ -242,8 +227,9 @@ local function Progress()
     return math.min(1, (GetTime() - flight.started) / total)
 end
 
--- The humps for this flight: the start, each stop on the way (at its share of the route's length)
--- and the end. Names over the stops only where they don't crowd the ends or each other.
+-- The nodes for this flight: the start, each stop on the way (at its share of the route's length)
+-- and the end, each with the bar to the next. Names over the stops only where they don't crowd the
+-- ends or each other.
 local function LayOut()
     local points = { { at = 0 } }
     for _, s in ipairs(flight.stops or {}) do points[#points + 1] = { at = s.at, name = s.name } end
@@ -253,7 +239,7 @@ local function LayOut()
         local m = frame.markers[n] or Marker()
         frame.markers[n] = m
         local x = pt.at * frame.len
-        m:At(x)
+        m:At(x, points[n + 1] and points[n + 1].at * frame.len)
         m:Show(true)
         m.at = pt.at
         if pt.name and x - lastLabel > 60 and frame.len - x > 70 then
@@ -264,7 +250,7 @@ local function LayOut()
             m.label:Hide()
         end
     end
-    for n = #points + 1, #frame.markers do frame.markers[n]:Show(false) end
+    for n = #points + 1, #frame.markers do frame.markers[n]:Show(false) frame.markers[n].at = nil end
     frame.laid = flight
 end
 
@@ -272,33 +258,32 @@ function YR:AnimateFlight()
     if not (frame and flight) then return end
     if frame.laid ~= flight then LayOut() end
     local p = Progress()
-    local now = GetTime()
+    local fillX
     if p then
-        local x = Round(p * frame.len)
-        frame.fill:SetWidth(math.max(1, x))
-        frame.fill:SetShown(x >= 1)
+        fillX = Round(p * frame.len)
+        frame.fill:SetWidth(math.max(1, fillX))
+        frame.fill:SetShown(fillX >= 1)
         Shade(frame.fill, p)
         frame.head:ClearAllPoints()
-        frame.head:SetPoint("CENTER", frame.track, "LEFT", math.min(x, frame.len - THICK / 2), 0)
+        frame.head:SetPoint("CENTER", frame, "TOPLEFT", PAD + fillX, TRACK_Y)
         frame.head:SetVertexColor(Mix(FAR, NEAR, p))
-        frame.head:SetShown(x >= THICK / 2 and x < frame.len)
+        frame.head:SetShown(fillX >= 1 and fillX < frame.len)
         frame.sweep:Hide()
     else
         frame.fill:Hide()
         frame.head:Hide()
-        local x = Round(((now - flight.started) % SWEEP) / SWEEP * (frame.len - 40))
+        local x = Round(((GetTime() - flight.started) % SWEEP) / SWEEP * (frame.len - 36))
         frame.sweep:ClearAllPoints()
-        frame.sweep:SetPoint("TOPLEFT", frame.track, "TOPLEFT", x, 0)
+        frame.sweep:SetPoint("LEFT", frame, "TOPLEFT", PAD + x, TRACK_Y)
         frame.sweep:Show()
     end
-    -- each hump fills as the fill reaches it, in the fill's colour where it is (the start's is full
+    -- each node fills as the fill reaches it, in the fill's colour where it is (the start's is full
     -- from take-off: you are there)
-    local fillX = p and p * frame.len or 0
+    local cur = { Mix(FAR, NEAR, p or 0) }
     for _, m in ipairs(frame.markers) do
-        if m.at and m.dot:IsShown() then
-            local here = p and p > 0 and math.min(1, m.at / p) or 0
-            local r, g, b = Mix(FAR, { Mix(FAR, NEAR, p or 0) }, here)
-            m:Fill(m.at == 0 and math.max(fillX, HUMP_W) or (p and fillX or nil), r, g, b)
+        if m.at then
+            local r, g, b = Mix(FAR, cur, (p and p > 0) and math.min(1, m.at / p) or 0)
+            m:Fill(m.at == 0 and NODE or fillX, r, g, b)
         end
     end
 end
