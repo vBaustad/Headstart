@@ -182,7 +182,48 @@ DW_MERRICK_TURNIN = [
     "goto 1431 72.4 47.4 | raw .turnin 96137 >> Turn in Ira's Dagger | raw .target Sirra Von'Indi | raw .isQuestComplete 96137",
 ]
 
+# Wetlands, solo (2026-10-01): Forever's quests around Menethil Harbor, in the free route's two visits.
+#  - 23-24: Spoils of War (1750: Khaz Modan Timber and Iron, piles in and around Menethil), Alchemical
+#    Hazards (1750: an Unruptured Stalker Gland from the stalkers at Thelgen Rock, near the route's
+#    excavation quests), Return the Statuette (200, Karl Boran to Captain Stoutfist, inside Menethil),
+#    and Unrequited Love (170, Archaeologist Hollee in Auberdine to Tarrel Rockweaver, on the boat over).
+#  - 27-30: Howin Kindfeather (49.4,41.8, by the route's path through the middle of the zone):
+#    Razormaw Needling and Trying Times (2350 each: Razormaw Incisors and Perfect Razormaw Eggs, the
+#    razormaws at ~60,28 on the way north to Dun Modr); A Lack of Virtue (170, Tom in Southshore to
+#    Bart Tidewater in Menethil).
+#  - Left out: Crocs of the Sky, Forced Disarmament and the Crimson Crate (no known giver yet); A Dark
+#    Threat Looms and The Algaz Gauntlet (level 18-21, grey by the time the route passes).
+# Positions: Wowhead's Forever pages (NPCs, the timber and iron piles, the stalkers, the razormaws).
+WL_MENETHIL = [
+    "goto 1437 8.5 58.5 | raw .accept 98189 >> Accept Return the Statuette | raw .target Karl Boran",
+    "goto 1437 9.8 57.4 | raw .turnin 98189 >> Turn in Return the Statuette | raw .target Captain Stoutfist",
+    "goto 1437 10.0 56.8 | raw .accept 98197 >> Accept Spoils of War | raw .target Valstag Ironjaw",
+    "goto 1437 11.7 58.5 | raw .accept 98282 >> Accept Alchemical Hazards | raw .target Caitlin Grassman",
+    "goto 1437 8.0 54.0 | raw >>Pick up |cRXP_PICK_Khaz Modan Timber|r and |cRXP_PICK_Khaz Modan Iron|r from the piles in and around Menethil Harbor | raw .complete 98197,1 | raw .complete 98197,2",
+]
+WL_TARREL = ["goto 1437 11.4 52.2 | raw .turnin 98461 >> Turn in Unrequited Love | raw .target Tarrel Rockweaver | raw .isOnQuest 98461"]
+WL_THELGEN = ["goto 1437 49.5 61.5 | raw >>Thelgen Rock: kill |cRXP_ENEMY_Leech Stalkers|r and |cRXP_ENEMY_Cave Stalkers|r until one drops an |cRXP_LOOT_Unruptured Stalker Gland|r | raw .complete 98282,1 | raw .mob Leech Stalker | raw .mob Cave Stalker"]
+WL_TURNINS = [
+    "goto 1437 10.0 56.8 | raw .turnin 98197 >> Turn in Spoils of War | raw .target Valstag Ironjaw | raw .isQuestComplete 98197",
+    "goto 1437 11.7 58.5 | raw .turnin 98282 >> Turn in Alchemical Hazards | raw .target Caitlin Grassman | raw .isQuestComplete 98282",
+]
+WL_HOWIN = ["goto 1437 49.4 41.8 | raw .accept 98245 >> Accept Razormaw Needling | raw .accept 98246 >> Accept Trying Times | raw .target Howin Kindfeather"]
+WL_RAZORMAWS = [
+    "goto 1437 59.9 28.0 | raw >>Kill |cRXP_ENEMY_Highland Razormaws|r and |cRXP_ENEMY_Elder Razormaws|r for |cRXP_LOOT_Razormaw Incisors|r, and pick up |cRXP_PICK_Perfect Razormaw Eggs|r around them | raw .complete 98245,1 | raw .complete 98246,1 | raw .mob Highland Razormaw | raw .mob Elder Razormaw | raw .isOnQuest 98245",
+    "goto 1437 49.4 41.8 | raw .turnin 98245 >> Turn in Razormaw Needling | raw .target Howin Kindfeather | raw .isQuestComplete 98245",
+    "goto 1437 49.4 41.8 | raw .turnin 98246 >> Turn in Trying Times | raw .target Howin Kindfeather | raw .isQuestComplete 98246",
+]
+WL_TOM = ["goto 1424 51.0 66.6 | raw .accept 98459 >> Accept A Lack of Virtue | raw >>Talk to |cRXP_FRIENDLY_Tom \"Half-fish\"|r in Southshore"]
+WL_BART = ["goto 1437 7.8 57.4 | raw .turnin 98459 >> Turn in A Lack of Virtue | raw .target Bart Tidewater | raw .isOnQuest 98459"]
+
 BLOCKS = {
+    # Wetlands, solo (above); 21-23 Ashenvale and 23-24 Wetlands are further down, with their dungeon parts
+    "27-30 Wetlands/Hillsbrad": [
+        (r"\.turnin 465 >> Turn in Nek'rosh's Gambit", "after", WL_HOWIN),
+        (r"\.turnin 275 >> Turn in Blisters on The Land", "after", WL_RAZORMAWS),
+        (r"\.turnin 647 >> Turn in MacKreel's Moonshine", "after", WL_TOM),
+        (r"\.turnin 292 >> Turn in The Eye of Paleth", "after", WL_BART),
+    ],
     # Redridge and Duskwood, solo (above)
     "28-30 Duskwood": [
         (r"\.complete 134,1", "before", DW_MERRICK),
@@ -205,10 +246,18 @@ BLOCKS = {
         (r"\.turnin 1009\b", "after", BFD_RUN),
         (r"Exit Darnassus through the purple portal", "before", BFD_TURNIN),
         (r"Fly back to Auberdine", "after", ["group: goto 1438 58.399 94.016 | fly Auberdine | raw .isNotOnQuest 942"]),
+        # Wetlands, solo: Hollee's note for Tarrel Rockweaver, taken in Auberdine before the boat
+        (r"\.turnin 731 >> Turn in The Absent Minded Prospector", "after",
+         ["goto 1439 37.4 41.8 | raw .accept 98461 >> Accept Unrequited Love | raw .target Archaeologist Hollee"]),
     ],
     # everyone passes Ironforge on the way to the Wetlands
     "23-24 Wetlands": [
         (r"\.train 197\b", "after", ["group: turnin 971 | raw .isOnQuest 971"]),
+        # Wetlands, solo (WL_*)
+        (r"\.accept 279 >> Accept Claws from the Deep", "after", WL_MENETHIL),
+        (r"\.accept 305 >> Accept In Search of The Excavation Team", "after", WL_TARREL),
+        (r"\.turnin 296 >> Turn in Ormer's Revenge", "after", WL_THELGEN),
+        (r"\.turnin 484 >> Turn in Young Crocolisk Skins", "after", WL_TURNINS),
     ],
     # Dwarf/Gnome: the route ends in Ironforge (about level 14) before the tram: the Hall first.
     # Solo: Dwarves and Gnomes come here straight from Dun Morogh (not Elwynn), so the route gets the

@@ -38,6 +38,27 @@ step
 >>Talk to |cRXP_FRIENDLY_Karl Boran|r
     .accept 279 >> Accept Claws from the Deep
 step
+    .goto 1437,8.5,58.5
+    .accept 98189 >> Accept Return the Statuette
+    .target Karl Boran
+step
+    .goto 1437,9.8,57.4
+    .turnin 98189 >> Turn in Return the Statuette
+    .target Captain Stoutfist
+step
+    .goto 1437,10.0,56.8
+    .accept 98197 >> Accept Spoils of War
+    .target Valstag Ironjaw
+step
+    .goto 1437,11.7,58.5
+    .accept 98282 >> Accept Alchemical Hazards
+    .target Caitlin Grassman
+step
+    .goto 1437,8.0,54.0
+    >>Pick up |cRXP_PICK_Khaz Modan Timber|r and |cRXP_PICK_Khaz Modan Iron|r from the piles in and around Menethil Harbor
+    .complete 98197,1
+    .complete 98197,2
+step
     .goto 1437,8.6,55.8
 .target James Halloran
 >>Talk to |cRXP_FRIENDLY_James Halloran|r
@@ -91,6 +112,11 @@ step
 .target Tarrel Rockweaver
 >>Talk to |cRXP_FRIENDLY_Tarrel Rockweaver|r
     .accept 305 >> Accept In Search of The Excavation Team
+step
+    .goto 1437,11.4,52.2
+    .turnin 98461 >> Turn in Unrequited Love
+    .target Tarrel Rockweaver
+    .isOnQuest 98461
 step
 	#sticky
 	#label crocs
@@ -162,6 +188,12 @@ step << Hunter/Warlock
 .target Ormer Ironbraid
 >>Talk to |cRXP_FRIENDLY_Ormer Ironbraid|r
     .turnin 296 >> Turn in Ormer's Revenge
+step
+    .goto 1437,49.5,61.5
+    >>Thelgen Rock: kill |cRXP_ENEMY_Leech Stalkers|r and |cRXP_ENEMY_Cave Stalkers|r until one drops an |cRXP_LOOT_Unruptured Stalker Gland|r
+    .complete 98282,1
+    .mob Leech Stalker
+    .mob Cave Stalker
 step
 	.goto 1437,34.3,41.2,60,0
     .goto 1437,44.8,43.9
@@ -262,6 +294,16 @@ step
     .turnin 484 >> Turn in Young Crocolisk Skins
     .isOnQuest 484
     .zoneskip Wetlands,1
+step
+    .goto 1437,10.0,56.8
+    .turnin 98197 >> Turn in Spoils of War
+    .target Valstag Ironjaw
+    .isQuestComplete 98197
+step
+    .goto 1437,11.7,58.5
+    .turnin 98282 >> Turn in Alchemical Hazards
+    .target Caitlin Grassman
+    .isQuestComplete 98282
 step
     .goto 1437,8.6,55.8
 .target James Halloran

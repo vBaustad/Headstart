@@ -139,6 +139,14 @@ def insert_blocks(name, text):
     """Our own steps (tools/route_builder.py specs, in blocks.py) put into a route: each block names a
     step of the route by a pattern and goes before or after the first step that matches it."""
     from blocks import BLOCKS
+    # a route named twice in BLOCKS keeps only its last list (a dict literal): fail instead
+    import ast
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "blocks.py"), encoding="utf-8").read()
+    for node in ast.walk(ast.parse(src)):
+        if isinstance(node, ast.Dict):
+            keys = [k.value for k in node.keys if isinstance(k, ast.Constant)]
+            twice = sorted({k for k in keys if keys.count(k) > 1})
+            assert not twice, f"blocks.py names a route twice: {twice}"
     from route_builder import build
     for anchor, where, spec in BLOCKS.get(name, []):
         parts = re.split(r"\n(?=step\b)", text)

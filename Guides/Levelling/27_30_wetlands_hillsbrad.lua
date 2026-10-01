@@ -232,6 +232,11 @@ step
     .turnin 465 >> Turn in Nek'rosh's Gambit
     .accept 474 >> Accept Defeat Nek'rosh
 step
+    .goto 1437,49.4,41.8
+    .accept 98245 >> Accept Razormaw Needling
+    .accept 98246 >> Accept Trying Times
+    .target Howin Kindfeather
+step
     .isOnQuest 474
     .goto 1437,53.5,54.6
 	>> Kill Nek'rosh and loot him for his head
@@ -314,6 +319,24 @@ step
 >>Talk to |cRXP_FRIENDLY_Rethiel the Greenwarden|r
     .turnin 275 >> Turn in Blisters on The Land
     .isOnQuest 275
+step
+    .goto 1437,59.9,28.0
+    >>Kill |cRXP_ENEMY_Highland Razormaws|r and |cRXP_ENEMY_Elder Razormaws|r for |cRXP_LOOT_Razormaw Incisors|r, and pick up |cRXP_PICK_Perfect Razormaw Eggs|r around them
+    .complete 98245,1
+    .complete 98246,1
+    .mob Highland Razormaw
+    .mob Elder Razormaw
+    .isOnQuest 98245
+step
+    .goto 1437,49.4,41.8
+    .turnin 98245 >> Turn in Razormaw Needling
+    .target Howin Kindfeather
+    .isQuestComplete 98245
+step
+    .goto 1437,49.4,41.8
+    .turnin 98246 >> Turn in Trying Times
+    .target Howin Kindfeather
+    .isQuestComplete 98246
 step
     .goto 1437,49.9,18.3
     .turnin -472 >> Turn in Fall of Dun Modr
@@ -409,6 +432,10 @@ step
 >>Talk to |cRXP_FRIENDLY_Brewmeister Bilger|r
     .turnin 647 >> Turn in MacKreel's Moonshine
 step
+    .goto 1424,51.0,66.6
+    .accept 98459 >> Accept A Lack of Virtue
+    >>Talk to |cRXP_FRIENDLY_Tom "Half-fish"|r in Southshore
+step
 	.goto 1424,50.5,57.2
 .target Loremaster Dibbs
 >>Talk to |cRXP_FRIENDLY_Loremaster Dibbs|r
@@ -489,6 +516,11 @@ step
     .turnin 292 >> Turn in The Eye of Paleth
 .target Glorin Steelbrow
     .accept 293 >> Accept Cleansing the Eye
+step
+    .goto 1437,7.8,57.4
+    .turnin 98459 >> Turn in A Lack of Virtue
+    .target Bart Tidewater
+    .isOnQuest 98459
 step
     .goto 1437,12.1,64.1
     .turnin 321 >> Turn in Lightforge Iron

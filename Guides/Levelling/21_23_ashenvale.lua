@@ -357,6 +357,10 @@ step
     .turnin 731 >> Turn in The Absent Minded Prospector
 .target Archaeologist Hollee
 	.accept 741 >> Accept The Absent Minded Prospector << !Hunter !NightElf !Rogue
+step
+    .goto 1439,37.4,41.8
+    .accept 98461 >> Accept Unrequited Love
+    .target Archaeologist Hollee
 step << !Hunter !NightElf !Rogue
     .goto 1439,33.1,39.9
     .isOnQuest 741
