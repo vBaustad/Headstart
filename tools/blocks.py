@@ -209,6 +209,37 @@ DS_ONU = [
     "group: goto 1439 43.555 76.293 | raw .turnin 98028 >> Turn in Baron Marinous | raw .target Onu | raw .isOnQuest 98028",
 ]
 
+# Ruins of Lordaeron (group, 2026-10-01): Forever's dungeon in the ruins above the Undercity, Tirisfal
+# (Horde land). In 27-30, between Southshore and Chillwind Camp: the route is already that far north,
+# and at 27-28 its quests still pay most of their XP (on our server scan): Remember That I Love You,
+# Crest of Lordaeron and Bloodied Insignia 9750 each (quest level 22), Abominable Creatures 6200 (21).
+#  - The way: north from Southshore past Hillsbrad Fields and round Dalaran, then swim north up
+#    Lordamere Lake into Tirisfal; afterwards east into the Western Plaguelands to Chillwind Camp,
+#    which is where the route goes next.
+#  - Captain Truman stands on the left as you zone in (Abominable Creatures: the Baron's head). The
+#    other three start from what you loot inside: the first Bloodied Insignia from the undead (ten in
+#    all), the Crest of Lordaeron (one of four places: the top of the tower by the spider courtyard or
+#    by The Abandoned, behind the banshee's door in the spider courtyard, or the floor of the stair room
+#    across from Bjork's courtyard) and the Blood-Stained Letter by Edward Heartweaver's body near
+#    Rath'mael. Those three are handed in in Stormwind, at the end of the route (tram from Ironforge).
+#  - Left out: Remember That I Love You's second part (180 XP, Avette Fellwood in Darkshire).
+# Positions: Wowhead's Forever pages and comments, warcrafttavern.com, gamer-guides.com; Stormwind's
+# NPCs from our NPC data (Forever's Stormwind map; Lady Dena Kennedy converted from Wowhead's Classic one).
+RL_RUN = [
+    "group: raw .zone Tirisfal Glades >> Ruins of Lordaeron with your group: from Southshore follow the road north past Hillsbrad Fields and round Dalaran, then swim north up Lordamere Lake into Tirisfal Glades. Horde land: keep off the roads",
+    "group: goto 1420 61.9 70.5 : Enter the Ruins of Lordaeron: the ruined city above the Undercity, on the east side of the courtyard on the way to the elevators, up the stairs behind an iron portcullis",
+    "group: raw .accept 95250 >> Accept Abominable Creatures | raw .target Captain Truman | raw >>|cRXP_FRIENDLY_Captain Truman|r is on your left as you zone in",
+    "group: raw >>Clear the Ruins (the bosses in any order). Kill |cRXP_ENEMY_The Baron|r for his head. Loot what starts the other three (click each in your bags): the first |cRXP_LOOT_Bloodied Insignia|r from the undead, then nine more; the |cRXP_LOOT_Crest of Lordaeron|r (top of the tower by the spider courtyard or by The Abandoned, behind the banshee's door in the spider courtyard, or the floor of the stair room across from Bjork's courtyard); the |cRXP_LOOT_Blood-Stained Letter|r by Edward Heartweaver's body near |cRXP_ENEMY_Rath'mael|r | raw .complete 95250,1 | raw .accept 95195 >> Accept Bloodied Insignia | raw .complete 95195,1 | raw .accept 95189 >> Accept Crest of Lordaeron | raw .accept 92415 >> Accept Remember That I Love You",
+    "group: raw .turnin 95250 >> Turn in Abominable Creatures | raw .target Captain Truman | raw .isQuestComplete 95250",
+    "group: raw .zone Western Plaguelands >> Leave the Ruins and head east into the Western Plaguelands, then south to Chillwind Camp | raw .isOnQuest 95189",
+]
+RL_TURNINS = [
+    "group: raw .zone Stormwind City >> Take the Deeprun Tram to Stormwind: the Ruins of Lordaeron hand-ins | raw .isOnQuest 95189",
+    "group: goto 1453 68.4 29.1 | raw .turnin 95189 >> Turn in Crest of Lordaeron | raw .target Lady Dena Kennedy | raw >>In Stormwind Keep's Royal Gallery | raw .isOnQuest 95189",
+    "group: goto 1453 56.3 54.0 | raw .turnin 92415 >> Turn in Remember That I Love You | raw .target Orphan Matron Nightingale | raw >>In front of the Cathedral of Light | raw .isOnQuest 92415",
+    "group: goto 1453 69.2 82.7 | raw .turnin 95195 >> Turn in Bloodied Insignia | raw .target General Marcus Jonathan | raw >>By the city gate | raw .isQuestComplete 95195",
+]
+
 # Wetlands, solo (2026-10-01): Forever's quests around Menethil Harbor, in the free route's two visits.
 #  - 23-24: Spoils of War (1750: Khaz Modan Timber and Iron, piles in and around Menethil), Alchemical
 #    Hazards (1750: an Unruptured Stalker Gland from the stalkers at Thelgen Rock, near the route's
@@ -250,6 +281,9 @@ BLOCKS = {
         (r"\.turnin 275 >> Turn in Blisters on The Land", "after", WL_RAZORMAWS),
         (r"\.turnin 647 >> Turn in MacKreel's Moonshine", "after", WL_TOM),
         (r"\.turnin 292 >> Turn in The Eye of Paleth", "after", WL_BART),
+        # Ruins of Lordaeron, group (RL_* above)
+        (r"\.fp Southshore >> Get the Southshore flight path", "after", RL_RUN),
+        (r"\.accept 689 >> Accept A King's Tribute", "after", RL_TURNINS),
     ],
     # Redridge and Duskwood, solo (above)
     "28-30 Duskwood": [
