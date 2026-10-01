@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Westfall, more on the one visit:** Forever's Harvesting the Harvesters (as you go: Isosprings come fast from the Rusty Harvest Golems north of Saldean's Farm, the Gyrostabilizers are a rare drop from the Harvest Watchers; handed in if done, and its second part if a golem drops the Assembly), and at the end The State of the Mines, Moonbrook Espionage (the crates are in the tunnel to the Deadmines) with The People's Militia 2, and Explosive Consultation, handed in in Stormwind. The rest of the Toxic Soil chain needs 10 Coarse Dynamite (Engineering or the auction house) and is left out.
 - The route list folds by level bracket (1-10, 10-20, 20-30 ...): click a heading to open or close it. Only the bracket of the route you have open starts open; what you open or close is remembered.
 - **Dwarves and Gnomes go from Dun Morogh straight to Loch Modan** (not Elwynn, where launch-day Humans crowd the same quests): tram back to Ironforge, fly to Thelsamar, hearth there. Warlocks still go via Elwynn for their Voidwalker.
 - **Loch Modan, the parts RestedXP left out** (about 10,000 quest XP at 13-16, plus the kills):
