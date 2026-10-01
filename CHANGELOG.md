@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Flight timer:** a bar while you fly, with where you took off, where you're going, and the time left. Each flight is timed the first time you take it and remembered for all your characters. Until then it uses RestedXP's time for that flight, or an estimate from the flight's length (shown as "about"), or it counts up while it learns. RestedXP's own flight bar is hidden while ours shows. A reload in the air keeps the bar going. Drag it where you want it; /headstart flight shows a sample to move. On/off under Settings, Route.
+
 - New spell ranks from the trainer replace the old rank on your bars. A spell on a bar is one rank only, and Blizzard doesn't upgrade it (Headstart turns off Blizzard's placing of new spells), so a set-up character kept casting Rank 1. Only the slots from your main's layout are changed. A spell your main keeps at a lower rank on purpose (downranking) stays at that rank: copy your layout again on the main to save which ones. Turn it off under Settings, Character: Put new ranks on the bars.
 
 - **Darkshore: Forever's Swelling Forces.** Take it from Arbal next to Onu, and kill the Stormscale naga at the Ruins of Mathystra while you loot the Mathystra Relics there; hand it in with the relics. In a group, the naga's 20 Mathystral Amulet Fragments summon Baron Marinous (elite) at the Fathom Stone at the bottom of the pool; his Clouded Water Globe starts the quest of the same name for Onu.

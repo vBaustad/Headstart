@@ -41,11 +41,13 @@ SlashCmdList.HEADSTART = function(msg)
         YR:SetLogging(arg ~= "off")
     elseif cmd == "splits" then
         if arg == "reset" then YR:ResetSplits() else YR:ShowSplits(arg ~= "off") end
+    elseif cmd == "flight" then
+        YR:PreviewFlight()
     elseif cmd == "status" then
         YR:ScanStatus()
         YR:LogStatus()
         YR.Print("/headstart - the window; /hs - Settings; /headstart scan (stop) - ask the server about every known quest;"
-            .. " /headstart log on|off; /headstart splits on|off|reset")
+            .. " /headstart log on|off; /headstart splits on|off|reset; /headstart flight - a sample flight bar to move")
     else
         YR:ToggleWindow()
     end

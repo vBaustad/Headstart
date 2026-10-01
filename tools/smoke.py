@@ -766,4 +766,8 @@ vanish = []
 for f in _glob.glob(os.path.join(check_deathskips.ROOT, "Guides", "*.lua")) + _glob.glob(os.path.join(check_deathskips.ROOT, "Guides", "Levelling", "*.lua")):
     vanish += check_deathskips.check(f)
 check(not vanish, "every death skip is followed by a step still to do" + "".join("\n     " + v for v in dict.fromkeys(vanish)))
+
+# The flight timer (its own fake API)
+import smoke_flight
+bad += smoke_flight.run()
 sys.exit(1 if bad else 0)
