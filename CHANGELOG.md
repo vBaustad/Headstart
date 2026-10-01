@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Wetlands: A Lack of Virtue is out again. It's a level 21 quest you'd hand in at 29-30, for 44 XP.
+
 - **Ruins of Lordaeron (group), at about 16:** at the start of 16-19 Darkshore, from Auberdine: the Menethil boat on to Southshore, north round Dalaran and up Lordamere Lake into Tirisfal, Captain Truman's Abominable Creatures at the entrance, the three quests that start from loot inside (Bloodied Insignia, Crest of Lordaeron with its four possible spots, Remember That I Love You), then the hearth back to Auberdine. The three are handed in in Stormwind where the route's boat lands. About 35k quest XP at 16, two levels, and the mobs still give XP.
 
 - **Loch Modan: Forever's Excavation Tools** (1350 XP), at the dig where you collect the trogg idols: six tools lie on the ground round it, and the first one you pick up starts the quest (click it in your bags). Handed in to Prospector Ironband with Gathering Idols.
