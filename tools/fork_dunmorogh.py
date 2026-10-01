@@ -40,7 +40,13 @@ sub("#defaultfor Dwarf/Gnome\n", "")
 nxt = re.search(r"#next (.*)\n", guide).group(1)
 # the next routes: our copies where tools/fork_rxp.py makes one (same group, no prefix), else RestedXP's
 OURS = {"11-12 Elwynn (Dwarf/Gnome)", "12-14 Loch Modan (Dwarf/Gnome)", "11-13 Loch Modan (Hunter)"}
-sub(f"#next {nxt}\n", "#next " + ";".join(n if n in OURS else RXP_GROUP + "\\" + n for n in nxt.split(";")) + "\n")
+assert nxt.split(";")[0] == "11-12 Elwynn (Dwarf/Gnome)", nxt
+# Solo at launch: Elwynn is the Humans' crowd, and Loch Modan has more than enough quests (blocks.py
+# LM_*): straight on to Loch Modan. Warlocks still go via Elwynn, for their Voidwalker (The Binding).
+nxt_all = [n if n in OURS else RXP_GROUP + "\\" + n for n in nxt.split(";")]
+warlock = [n for n in nxt_all if "Elwynn" in n or "Voidwalker" in n]
+others = [n for n in nxt_all if n not in warlock]
+sub(f"#next {nxt}\n", "#next " + ";".join(warlock) + " << Warlock\n#next " + ";".join(others) + " << !Warlock\n")
 
 # Blacksmithing and Tools for Steelgrill first, then the campfire: find the step with The Adventurer
 # Flintfire's Shipment is taken at the same visit (a logged run took it there anyway; RestedXP had it

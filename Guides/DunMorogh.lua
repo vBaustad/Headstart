@@ -10,7 +10,8 @@ YR:ShipGuide("dunmorogh", [[
 #group Headstart Launch (A)
 #subgroup Launch day
 #name 5-11 Dun Morogh (Launch)
-#next 11-12 Elwynn (Dwarf/Gnome);RestedXP Forever Guide (A)\11-12 Voidwalker Quest;12-14 Loch Modan (Dwarf/Gnome);11-13 Loch Modan (Hunter)
+#next 11-12 Elwynn (Dwarf/Gnome);RestedXP Forever Guide (A)\11-12 Voidwalker Quest << Warlock
+#next 12-14 Loch Modan (Dwarf/Gnome);11-13 Loch Modan (Hunter) << !Warlock
 
 step
     #optional

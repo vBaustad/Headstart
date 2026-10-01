@@ -56,6 +56,14 @@ EDITS = {
     "21-23 Ashenvale": [
         ("<< Alliance !Warlock/Alliance wotlk\n", "<< Alliance\n", "every class goes this way from our 20-21"),
     ],
+    # The grind to 13+9600 before the South Gate hand-ins filled the gap before Westfall; Stonesplinter
+    # Valley and the east now come after it (blocks.py LM_*). The step stays (others end with its label).
+    "12-14 Loch Modan (Dwarf/Gnome)": [
+        ("    .xp 13+9600 >> Grind to 9600+/11400xp\n"
+         "    >>|cRXP_WARN_If you're planning on running the Hall of Thanes dungeon in Ironforge later, skip this step|r\n",
+         "    .xp 12 >> No grinding here: Stonesplinter Valley and the east of the lake come next\n",
+         "no grind: the valley and the east follow"),
+    ],
     # Warlocks kill Hogger here (Fear), but RestedXP's hand-in step is marked "skip": hand it in to
     # Marshal Dughan with Deliver Thomas' Report, the route's next visit to him
     "11-12 Elwynn (Dwarf/Gnome)": [

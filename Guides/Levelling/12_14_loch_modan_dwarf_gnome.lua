@@ -109,6 +109,15 @@ step << Paladin
     .target Gryth Thurden
     .zoneskip Ironforge,1
 step
+    .zone Ironforge >> Take the Deeprun Tram back to Ironforge
+    .zoneskip Ironforge
+    .zoneskip Loch Modan
+step
+    .goto 1455,55.5,47.7
+    .fly Loch Modan >> Fly to Loch Modan
+    .target Gryth Thurden
+    .zoneskip Loch Modan
+step
     #optional
     .goto 1432/0,-2954.42,-5394.10
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Vidra Hearthstove|r
@@ -132,6 +141,10 @@ step << Dwarf/Gnome
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Brock Stoneseeker|r
     .turnin 6392 >> Turn in Return to Brock
     .target Brock Stoneseeker
+step
+    .goto 1432,35.5,48.4
+    .home >> Set your Hearthstone to Thelsamar
+    .target Innkeeper Hearthstove
 step
     .goto 1432/0,-3003.30,-5376.02
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grenhild Darktalon|r
@@ -529,8 +542,7 @@ step
     #label RatAbandon
     #optional
     .goto 1432/0,-2729.40,-5534.96
-    .xp 13+9600 >> Grind to 9600+/11400xp
-    >>|cRXP_WARN_If you're planning on running the Hall of Thanes dungeon in Ironforge later, skip this step|r
+    .xp 12 >> No grinding here: Stonesplinter Valley and the east of the lake come next
 step << Shaman
     #completewith next
     .goto 1432/0,-2915.500,-5576.500,20,0
@@ -573,6 +585,51 @@ step
     .turnin 224 >> Turn in In Defense of the King's Lands
     .target Mountaineer Cobbleflint
     .isQuestComplete 224
+step
+    .goto 1432,23.54,76.40
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Mountaineer Gravelgaw|r
+    .target Mountaineer Gravelgaw
+    .accept 237 >> Accept In Defense of the King's Lands
+step
+    .goto 1432,31.9,86.5
+    .accept 86585 >> Accept Banner of the Fallen
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Mountaineer Ylva|r, up Stonesplinter Valley (the path at 34,78)
+    .target Mountaineer Ylva
+step
+    .goto 1432,34.5,82.0
+    >>Kill |cRXP_ENEMY_Stonesplinter Skullthumpers|r and |cRXP_ENEMY_Stonesplinter Seers|r in the valley
+    .complete 237,1
+    .complete 237,2
+    .mob Stonesplinter Skullthumper
+    .mob Stonesplinter Seer
+step
+    .goto 1432,32.2,86.5
+    >>Plant the banner back where you took it, next to Ylva. Kill the troggs that come from both sides, then |cRXP_ENEMY_Headsplitter|r
+    .complete 86585,1
+    .mob Headsplitter
+step
+    .goto 1432,23.54,76.40
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Mountaineer Gravelgaw|r
+    .target Mountaineer Gravelgaw
+    .turnin 237 >> Turn in In Defense of the King's Lands
+    .accept 263 >> Accept In Defense of the King's Lands
+step
+    .goto 1432,23.2,73.8
+    .turnin 86585 >> Turn in Banner of the Fallen
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Captain Rugelfuss|r
+    .target Captain Rugelfuss
+step
+    .goto 1432,35.0,88.0
+    >>Back up the valley: kill |cRXP_ENEMY_Stonesplinter Shamans|r and |cRXP_ENEMY_Stonesplinter Bonesnappers|r
+    .complete 263,1
+    .complete 263,2
+    .mob Stonesplinter Shaman
+    .mob Stonesplinter Bonesnapper
+step
+    .goto 1432,23.47,74.51
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Mountaineer Wallbang|r
+    .target Mountaineer Wallbang
+    .turnin 263 >> Turn in In Defense of the King's Lands
 step << Shaman
     #completewith shamfire2
     #label southgate
@@ -615,6 +672,107 @@ step
     .target Khara Deepwater::1684
     .turnin 86614 >>Turn in Silver of the Waves
     .xp <13,1
+step
+    .goto 1432,37.24,47.38
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Jern Hornhelm|r
+    .target Jern Hornhelm
+    .accept 436 >> Accept Ironband's Excavation
+step
+    .goto 1432,81.76,61.66
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Marek Ironheart|r
+    .target Marek Ironheart
+    .accept 385 >> Accept Crocolisk Hunting
+    .accept 86758 >> Accept Twisting the Knife
+step
+    .goto 1432,83.47,65.46
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Daryl the Youngling|r
+    .target Daryl the Youngling
+    .accept 257 >> Accept A Hunter's Boast
+step
+    .goto 1432,75.0,64.0
+    >>Kill |cRXP_ENEMY_Mountain Buzzards|r south-west of the lodge, within 15 minutes
+    .complete 257,1
+    .mob Mountain Buzzard
+step
+    .goto 1432,83.47,65.46
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Daryl the Youngling|r
+    .target Daryl the Youngling
+    .turnin 257 >> Turn in A Hunter's Boast
+step
+    .goto 1432,64.90,66.66
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magmar Fellhew|r
+    .target Magmar Fellhew
+    .turnin 436 >> Turn in Ironband's Excavation
+    .accept 297 >> Accept Gathering Idols
+step
+    .goto 1432,65.93,65.62
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Prospector Ironband|r
+    .target Prospector Ironband
+    .accept 298 >> Accept Excavation Progress Report
+step
+    .goto 1432,70.0,63.5
+    >>Kill |cRXP_ENEMY_Stonesplinter Geomancers|r, |cRXP_ENEMY_Diggers|r and |cRXP_ENEMY_Berserk Troggs|r in the excavation. Loot their |cRXP_LOOT_Carved Stone Idols|r
+    .complete 297,1
+    .mob Stonesplinter Geomancer
+    .mob Stonesplinter Digger
+    .mob Berserk Trogg
+step
+    .goto 1432,64.90,66.66
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magmar Fellhew|r
+    .target Magmar Fellhew
+    .turnin 297 >> Turn in Gathering Idols
+step
+    .goto 1432,62.9,50.4
+    >>Kill |cRXP_ENEMY_Daggerfang|r, the big crocolisk by the shore. Loot Marek's knife
+    .complete 86758,1
+    .mob Daggerfang
+step
+    .goto 1432,63.56,47.92
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Bingles Blastenheimer|r
+    .target Bingles Blastenheimer
+    .accept 2038 >> Accept Bingles' Missing Supplies
+step
+    .goto 1432,59.0,38.0
+    >>Kill |cRXP_ENEMY_Loch Crocolisks|r along the north-east shore. Loot their meat and skins
+    .complete 385,1
+    .complete 385,2
+    .mob Loch Crocolisk
+    .mob Large Loch Crocolisk
+step
+    .goto 1432,54.0,27.0
+    >>Pick up |cRXP_PICK_Bingles' Blastencapper|r
+    .complete 2038,4
+step
+    .goto 1432,52.0,24.0
+    >>Pick up |cRXP_PICK_Bingles' Hammer|r
+    .complete 2038,3
+step
+    .goto 1432,48.0,20.0
+    >>Pick up |cRXP_PICK_Bingles' Screwdriver|r
+    .complete 2038,2
+step
+    .goto 1432,49.0,30.0
+    >>Pick up |cRXP_PICK_Bingles' Wrench|r
+    .complete 2038,1
+step
+    .goto 1432,63.56,47.92
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Bingles Blastenheimer|r
+    .target Bingles Blastenheimer
+    .turnin 2038 >> Turn in Bingles' Missing Supplies
+step
+    .goto 1432,81.76,61.66
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Marek Ironheart|r
+    .target Marek Ironheart
+    .turnin 385 >> Turn in Crocolisk Hunting
+    .turnin 86758 >> Turn in Twisting the Knife
+step
+    .hs >> Hearth to Thelsamar
+step
+    .goto 1432,37.24,47.38
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Jern Hornhelm|r
+    .target Jern Hornhelm
+    .turnin 298 >> Turn in Excavation Progress Report
+    .accept 301 >> Accept Report to Ironforge
 step << !Dwarf/!Paladin
     .goto 1432/0,-2929.87,-5424.84
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thorgrum Borrelson|r
@@ -765,6 +923,12 @@ step
     .bronzetube
     .target Gearcutter Cogspinner
     .subzoneskip 2257
+step
+    .goto 1455,74.64,11.74
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Prospector Stormpike|r
+    .target Prospector Stormpike
+    .turnin 301 >> Turn in Report to Ironforge
+    .isOnQuest 301
 step
     #optional
     #requires Salvation << Dwarf Rogue/Gnome Rogue

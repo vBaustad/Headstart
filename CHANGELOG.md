@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Dwarves and Gnomes go from Dun Morogh straight to Loch Modan** (not Elwynn, where launch-day Humans crowd the same quests): tram back to Ironforge, fly to Thelsamar, hearth there. Warlocks still go via Elwynn for their Voidwalker.
+- **Loch Modan, the parts RestedXP left out** (about 10,000 quest XP at 13-16, plus the kills):
+  - Stonesplinter Valley after the South Gate hand-ins: In Defense of the King's Lands 2 and 3, and Forever's Banner of the Fallen (plant the banner, hold off the waves, kill Headsplitter).
+  - The east: Farstrider Lodge (Crocolisk Hunting, Forever's Twisting the Knife, A Hunter's Boast), Ironband's Excavation (Gathering Idols, the Excavation Progress Report), Daggerfang, the crocolisks and Bingles' four tools, then the hearth to Thelsamar and Report to Ironforge on the way out.
+  - No more grinding to 13 before the South Gate hand-ins.
 - **Set up layout without a reload (try it):** Edit Mode and the extra action bars are now switched through the game's own functions, which Blizzard's UI then applies itself, untainted. Headstart checks a moment later; if either didn't take, it falls back to the old way and the reload popup.
 - **Chat windows are copied** (Settings, Character, on by default): your main's tabs, what each shows (channels and message types), font size, colour, transparency, docked or where they float. Tabs the new character has that the main doesn't are closed. Copy this layout on your main again to save them.
 - **Camera distance:** copied from the main, and a new character comes out of the intro zoomed out instead of all the way in (once, at level 1).
