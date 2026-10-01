@@ -248,8 +248,8 @@ RL_TURNINS = [
 #    and Unrequited Love (170, Archaeologist Hollee in Auberdine to Tarrel Rockweaver, on the boat over).
 #  - 27-30: Howin Kindfeather (49.4,41.8, by the route's path through the middle of the zone):
 #    Razormaw Needling and Trying Times (2350 each: Razormaw Incisors and Perfect Razormaw Eggs, the
-#    razormaws at ~60,28 on the way north to Dun Modr); A Lack of Virtue (170, Tom in Southshore to
-#    Bart Tidewater in Menethil).
+#    razormaws at ~60,28 on the way north to Dun Modr). A Lack of Virtue (Tom in Southshore to Bart
+#    Tidewater in Menethil) was here too: quest level 21, it pays 44 XP at the 29-30 you are by then.
 #  - Left out: Crocs of the Sky, Forced Disarmament and the Crimson Crate (no known giver yet); A Dark
 #    Threat Looms and The Algaz Gauntlet (level 18-21, grey by the time the route passes).
 # Positions: Wowhead's Forever pages (NPCs, the timber and iron piles, the stalkers, the razormaws).
@@ -272,16 +272,12 @@ WL_RAZORMAWS = [
     "goto 1437 49.4 41.8 | raw .turnin 98245 >> Turn in Razormaw Needling | raw .target Howin Kindfeather | raw .isQuestComplete 98245",
     "goto 1437 49.4 41.8 | raw .turnin 98246 >> Turn in Trying Times | raw .target Howin Kindfeather | raw .isQuestComplete 98246",
 ]
-WL_TOM = ["goto 1424 51.0 66.6 | raw .accept 98459 >> Accept A Lack of Virtue | raw >>Talk to |cRXP_FRIENDLY_Tom \"Half-fish\"|r in Southshore"]
-WL_BART = ["goto 1437 7.8 57.4 | raw .turnin 98459 >> Turn in A Lack of Virtue | raw .target Bart Tidewater | raw .isOnQuest 98459"]
 
 BLOCKS = {
     # Wetlands, solo (above); 21-23 Ashenvale and 23-24 Wetlands are further down, with their dungeon parts
     "27-30 Wetlands/Hillsbrad": [
         (r"\.turnin 465 >> Turn in Nek'rosh's Gambit", "after", WL_HOWIN),
         (r"\.turnin 275 >> Turn in Blisters on The Land", "after", WL_RAZORMAWS),
-        (r"\.turnin 647 >> Turn in MacKreel's Moonshine", "after", WL_TOM),
-        (r"\.turnin 292 >> Turn in The Eye of Paleth", "after", WL_BART),
     ],
     # Redridge and Duskwood, solo (above)
     "28-30 Duskwood": [

@@ -432,10 +432,6 @@ step
 >>Talk to |cRXP_FRIENDLY_Brewmeister Bilger|r
     .turnin 647 >> Turn in MacKreel's Moonshine
 step
-    .goto 1424,51.0,66.6
-    .accept 98459 >> Accept A Lack of Virtue
-    >>Talk to |cRXP_FRIENDLY_Tom "Half-fish"|r in Southshore
-step
 	.goto 1424,50.5,57.2
 .target Loremaster Dibbs
 >>Talk to |cRXP_FRIENDLY_Loremaster Dibbs|r
@@ -516,11 +512,6 @@ step
     .turnin 292 >> Turn in The Eye of Paleth
 .target Glorin Steelbrow
     .accept 293 >> Accept Cleansing the Eye
-step
-    .goto 1437,7.8,57.4
-    .turnin 98459 >> Turn in A Lack of Virtue
-    .target Bart Tidewater
-    .isOnQuest 98459
 step
     .goto 1437,12.1,64.1
     .turnin 321 >> Turn in Lightforge Iron
