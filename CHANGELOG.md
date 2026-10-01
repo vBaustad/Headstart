@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- No grey quest is handed in anywhere on the route, for any race and class (checked on every build; the Paladin's Tome of Divinity, which teaches Redemption, is the one exception). New steps go where their quests are yellow or orange, green at worst.
+
 - Wetlands: A Lack of Virtue is out again. It's a level 21 quest you'd hand in at 29-30, for 44 XP.
 
 - **Ruins of Lordaeron (group), at about 16:** at the start of 16-19 Darkshore, from Auberdine: the Menethil boat on to Southshore, north round Dalaran and up Lordamere Lake into Tirisfal, Captain Truman's Abominable Creatures at the entrance, the three quests that start from loot inside (Bloodied Insignia, Crest of Lordaeron with its four possible spots, Remember That I Love You), then the hearth back to Auberdine. The three are handed in in Stormwind where the route's boat lands. About 35k quest XP at 16, two levels, and the mobs still give XP.
