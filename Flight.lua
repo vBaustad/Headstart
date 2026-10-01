@@ -76,14 +76,14 @@ local function Place()
 end
 
 -- The route: no panel, a white track with a dark outline, and a fill that grows from the left as you
--- fly, amber at take-off turning green as you get close. At the start, at every flight point the
--- flight passes (its name above it when there is room) and at the end, the line swells into a hump,
+-- fly, amber at take-off turning green as you get close, its front end rounded. At every flight point
+-- the flight passes on the way (its name above it when there is room) the line swells into a hump,
 -- like a snake that has eaten something: the outline runs round each hump with the line (all the
 -- outline is one layer, all the white the next, all the fill the one above), and the fill flows
 -- through a hump as you pass it. Opaque colours, so nothing doubles up where the pieces overlap, and
 -- whole-pixel positions, so it stays crisp. On a first flight a light sweeps along the track instead.
 local W, H, PAD, TRACK_Y, THICK = 380, 78, 18, -38, 10
-local HUMP_W, HUMP_H = 30, 22         -- a hump (an ellipse); its outline is a pixel wider all round
+local HUMP_W, HUMP_H = 25, 20         -- a hump (an ellipse); its outline is a pixel wider all round
 local FAR, NEAR = { 1.00, 0.62, 0.22 }, { 0.36, 0.86, 0.46 }
 local TRACK, OUTLINE = { 0.92, 0.93, 0.95, 1 }, { 0.05, 0.05, 0.06, 1 }
 local SWEEP = 1.8                     -- seconds for the light to cross the track on a first flight
@@ -185,6 +185,10 @@ local function Build()
     frame.fill = Solid(frame, "ARTWORK", 0, NEAR)
     frame.fill:SetPoint("TOPLEFT", frame.track, "TOPLEFT")
     frame.fill:SetHeight(THICK)
+    -- the fill's rounded front
+    frame.head = frame:CreateTexture(nil, "ARTWORK", nil, 1)
+    frame.head:SetSize(THICK, THICK)
+    YR.Style.ArtTexture(frame.head, "dot")
     frame.sweep = Solid(frame, "ARTWORK", 0, { NEAR[1], NEAR[2], NEAR[3], 0.55 })
     frame.sweep:SetSize(40, THICK)
     frame.markers = {}
@@ -221,12 +225,10 @@ local function Progress()
     return math.min(1, (GetTime() - flight.started) / total)
 end
 
--- The markers for this flight: the start, each stop on the way (at its share of the route's
--- length) and the end. Names over the stops only where they don't crowd the ends or each other.
+-- The humps for this flight: each stop on the way, at its share of the route's length. Names over the stops only where they don't crowd the ends or each other.
 local function LayOut()
-    local points = { { at = 0 } }
+    local points = {}
     for _, s in ipairs(flight.stops or {}) do points[#points + 1] = { at = s.at, name = s.name } end
-    points[#points + 1] = { at = 1 }
     local lastLabel = 70                   -- pixels kept clear of the start's name
     for n, pt in ipairs(points) do
         local m = frame.markers[n] or Marker()
@@ -257,22 +259,26 @@ function YR:AnimateFlight()
         frame.fill:SetWidth(math.max(1, x))
         frame.fill:SetShown(x >= 1)
         Shade(frame.fill, p)
+        frame.head:ClearAllPoints()
+        frame.head:SetPoint("CENTER", frame.track, "LEFT", math.min(x, frame.len - THICK / 2), 0)
+        frame.head:SetVertexColor(Mix(FAR, NEAR, p))
+        frame.head:SetShown(x >= THICK / 2 and x < frame.len)
         frame.sweep:Hide()
     else
         frame.fill:Hide()
+        frame.head:Hide()
         local x = Round(((now - flight.started) % SWEEP) / SWEEP * (frame.len - 40))
         frame.sweep:ClearAllPoints()
         frame.sweep:SetPoint("TOPLEFT", frame.track, "TOPLEFT", x, 0)
         frame.sweep:Show()
     end
-    -- each hump fills as the fill reaches it, in the fill's colour where it is (at the start the
-    -- start hump is already amber: you are there)
+    -- each hump fills as the fill reaches it, in the fill's colour where it is
     local fillX = p and p * frame.len or 0
     for _, m in ipairs(frame.markers) do
         if m.at and m.ring:IsShown() then
             local here = p and p > 0 and math.min(1, m.at / p) or 0
             local r, g, b = Mix(FAR, { Mix(FAR, NEAR, p or 0) }, here)
-            m:Fill(m.at == 0 and math.max(fillX, HUMP_W) or (p and fillX or nil), r, g, b)
+            m:Fill(p and fillX or nil, r, g, b)
         end
     end
 end
