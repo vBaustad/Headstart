@@ -401,7 +401,8 @@ end
 -- /headstart flight: a 20-second sample bar, to drag where you want it.
 function YR:PreviewFlight()
     if flight then return end
-    flight = { from = "Ironforge", to = "Thelsamar, Loch Modan", key = "", started = GetTime(), total = 20 }
+    flight = { from = "Ratchet, The Barrens", to = "Auberdine, Darkshore", key = "", started = GetTime(), total = 20,
+        stops = { { name = "Astranaar, Ashenvale", at = 0.4 } } }
     ShowBar(true)
     C_Timer.After(20, function()
         if flight and flight.key == "" then flight = nil ShowBar(false) end
