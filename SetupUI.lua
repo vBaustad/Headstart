@@ -345,7 +345,19 @@ function YS:ApplyUI(ui, o)
     if taint then
         YS.Print("reload to finish: until then the action bars can be blocked in combat.")
         StaticPopup_Show("YIPPSETUP_RELOAD")
-    elseif (clean and layoutChanged) or (cleanBars or 0) > 0 then
-        CheckLater(clean and layoutChanged and ui.layout or nil, (cleanBars or 0) > 0 and ui.bars or nil)
+    elseif (clean and layoutChanged) or cleanBars then
+        -- the bars are checked even when nothing changed now: set at login (EarlyBars), they may not show yet
+        CheckLater(clean and layoutChanged and ui.layout or nil, cleanBars and ui.bars or nil)
     end
+end
+
+-- SetActionBarToggles only saves which bars show; Blizzard shows them when its own setting changes (a
+-- reload away, since calling that from an addon taints the bars) or once at login, at SETTINGS_LOADED.
+-- So on a new character's first login the main's bars are set while Headstart loads, before that:
+-- Blizzard then shows them itself, and Set up layout finds them right, with nothing to reload for.
+function YS.EarlyBars()
+    local p, o = YS:Profile(), YS:Options()
+    if not (p and p.ui and p.ui.bars and o.barVisibility) then return end
+    if FirstLoaded(UI_SUITES) or FirstLoaded(BAR_ADDONS) then return end
+    return ApplyBarsClean(p.ui.bars)
 end

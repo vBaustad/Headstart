@@ -592,8 +592,14 @@ f:RegisterEvent("SPELLS_CHANGED")        -- a spell learned (it also fires for m
 f:RegisterEvent("PLAYER_REGEN_ENABLED")
 f:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "ADDON_LOADED" and arg1 == ADDON then
+        local fresh = YippSetupCharDB == nil       -- this character's first login with Headstart
         YippSetupDB = YippSetupDB or {}
         YippSetupCharDB = YippSetupCharDB or {}
+        -- a new character: the main's action bars now, so Blizzard shows them while logging in
+        local level = UnitLevel("player") or 0
+        if fresh and level <= 1 and YS.EarlyBars then
+            YippSetupCharDB.earlyBars = YS.EarlyBars()
+        end
     elseif event == "PLAYER_ENTERING_WORLD" and (arg1 or arg2) then   -- login or reload only
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
         SkipIntro()
