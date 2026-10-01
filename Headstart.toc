@@ -18,6 +18,7 @@ Scan.lua
 Needs.lua
 Log.lua
 DeathSkip.lua
+Flight.lua
 Rewards.lua
 Splits.lua
 Options.lua

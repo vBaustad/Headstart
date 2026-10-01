@@ -1200,6 +1200,10 @@ local function BuildRouteSettings(page)
     Row("Release at death skips", S.Switch(c, Opt("deathSkipRelease"), SetOpt("deathSkipRelease")),
         "When the route step you are on says to die and respawn at the Spirit Healer, your spirit is released"
         .. " at once, and RestedXP accepts the Spirit Healer for you. Any other death is left to you")
+    Row("Flight timer", S.Switch(c, Opt("flightTimer"), SetOpt("flightTimer", function(on) YR:SetFlightTimer(on) end)),
+        "A bar while you fly: where from, where to and the time left. Each flight is timed the first time you"
+        .. " take it; until then the time is estimated from the route's length. Drag the bar to move it"
+        .. " (/headstart flight shows a sample)")
 
     Section("Group play", "a duo or trio sharing quests")
     local role = S.Dropdown(c, 190, YR.ROLES, function(v) YR:SetRole(v) YR:RefreshWindow() end)
