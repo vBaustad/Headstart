@@ -298,6 +298,89 @@ i = guide.index("    .turnin 96044 >>Turn in Camping 101: Blacksmithing")
 i = guide.index("\nstep", i) + 1
 guide = guide[:i] + COOK_AGAIN + guide[i:]
 
+# Father Gavin's chain (new in Forever, 4 x 700 XP at level 8): he is the Dawn in the Mountains hand-in,
+# just before Vagash, so the chain is the XP for level 10 before him. Finding Warmth first (the other
+# three open after it), then Rime's Wrath (10 Minor Ice Elementals, around him), Rime's Wrath (Avala,
+# just north of him) and Treacherous Cold (three rifles by fallen mountaineers). Positions: Wowhead's
+# Forever pages (Gavin, the elementals, Avala) and their comments (the rifles' map, 52/44, 53/59,
+# 60/50; the firewood: white trunks on the ground by the trees, some give 2, sparse). In the order
+# west, south, then east toward the ranch, the Sunhammer rifle is on the way to Rudra.
+def gavin(cls):
+    head = "step << " + cls
+    talk = ("    .goto 1426,57.5,44.8\n"
+            "    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r\n")
+    return f"""{head}
+{talk}    .accept 99159 >> Accept Finding Warmth
+    .target Father Gavin
+{head}
+    .goto 1426,55.0,46.0,60,0
+    .goto 1426,53.0,44.0,60,0
+    .goto 1426,56.0,48.5
+    >>Loot |cRXP_PICK_Mostly Dry Firewood|r: the large white trunks lying by the trees around Father Gavin's. Some give 2
+    .complete 99159,1 --Mostly Dry Firewood (14)
+{head}
+{talk}    .turnin 99159 >> Turn in Finding Warmth
+    .accept 99160 >> Accept Rime's Wrath
+    .accept 99161 >> Accept Rime's Wrath
+    .accept 99162 >> Accept Treacherous Cold
+    .target Father Gavin
+{head}
+    #sticky
+    #label IceElementals
+    >>Kill |cRXP_ENEMY_Minor Ice Elementals|r as you go: they are all around Father Gavin's
+    .complete 99160,1 --Minor Ice Elemental slain (10)
+    .mob Minor Ice Elemental
+    .isOnQuest 99160
+{head}
+    .goto 1426,57.6,42.8
+    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
+    .complete 99161,1 --Avala's Core (1)
+    .mob Avala
+    .isOnQuest 99161
+{head}
+    .goto 1426,52.0,44.0
+    >>Loot the rifle by the fallen mountaineer under the tree lying across the frozen river
+    .collect 286358,1,99162 --Coalbeard's Rifle
+    .isOnQuest 99162
+{head}
+    .goto 1426,53.0,59.0
+    >>Loot the rifle by the fallen mountaineer next to a cart, in the valley to the south
+    .collect 286360,1,99162 --Stoneanvil's Rifle
+    .isOnQuest 99162
+{head}
+    .goto 1426,60.0,50.0
+    >>Loot the rifle by the fallen mountaineer next to a cart, on the small path up to Vagash's cave
+    >>|cRXP_WARN_A player reported it wouldn't loot: if so, skip this step|r
+    .collect 286359,1,99162 --Sunhammer's Rifle
+    .isOnQuest 99162
+{head}
+    .goto 1426,55.0,46.0,60,0
+    .goto 1426,57.0,48.0
+    >>Finish the |cRXP_ENEMY_Minor Ice Elementals|r on the way back to Father Gavin
+    .complete 99160,1 --Minor Ice Elemental slain (10)
+    .mob Minor Ice Elemental
+    .isOnQuest 99160
+{head}
+{talk}    .turnin 99160 >> Turn in Rime's Wrath
+    .target Father Gavin
+    .isQuestComplete 99160
+{head}
+{talk}    .turnin 99161 >> Turn in Rime's Wrath
+    .target Father Gavin
+    .isQuestComplete 99161
+{head}
+{talk}    .turnin 99162 >> Turn in Treacherous Cold
+    .target Father Gavin
+    .isQuestComplete 99162
+"""
+
+
+ends = [m.end() for m in re.finditer(r"    \.turnin 99158 >>Turn in Dawn in the Mountains\n", guide)]
+assert len(ends) == 2, "Dawn in the Mountains: the Hunters' hand-in and everyone else's"
+for end, cls in reversed(list(zip(ends, ("Hunter", "!Hunter")))):
+    i = guide.index("\nstep", end - 1) + 1
+    guide = guide[:i] + gavin(cls) + guide[i:]
+
 # The Mining Pack is 25c for 4 slots: nice, not needed. When money is short it waits.
 sub("""    >>|cRXP_BUY_Buy a|r |T134708:0|t[Mining Pick]|cRXP_BUY_, an|r |T133635:0|t[Apprentice's Mining Pack] |cRXP_BUY_and a|r |T133057:0|t[Blacksmith Hammer]
 """, """    >>|cRXP_BUY_Buy a|r |T134708:0|t[Mining Pick] |cRXP_BUY_(10c) and a|r |T133057:0|t[Blacksmith Hammer] |cRXP_BUY_(18c). The|r |T133635:0|t[Apprentice's Mining Pack] |cRXP_BUY_(25c) only if you have money left|r

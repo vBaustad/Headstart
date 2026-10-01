@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Dun Morogh: **Father Gavin's chain** (new in Forever, 4 x 700 XP), right after Dawn in the Mountains and before Vagash: Finding Warmth (firewood), then Rime's Wrath (Minor Ice Elementals), Rime's Wrath (Avala) and Treacherous Cold (three rifles by fallen mountaineers, west, south, then on the path to Vagash's cave). Its XP is most of the way to the level 10 Vagash now asks for.
 - Dun Morogh: level 10 before Vagash (a level 11 elite), for every class but Hunters: a Paladin gets Lay on Hands, everyone a new rank or two.
 - Dun Morogh: **Never Saddle on Quality** (new in Forever, 625 XP). Taken from Rudra Amberstill with Protecting the Herd, the 6 Pristine Leopard Pelts collected while doing the Gol'Bolar Quarry quests (the Elder Snow Leopards live there), handed in after the Stolen Blasting Powder.
 - Dun Morogh: the death skip after Brewnall no longer vanishes. It ended with the step after it, which was taking The Reports from Senir, and Headstart already has you take that when handing in Frostmane Hold: already done, it took the death skip with it and the route said to walk. That step is gone; the death skip now ends at Return to Bellowfiz. A new check keeps every route's death skips from being followed by a step already done.

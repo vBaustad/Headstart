@@ -777,6 +777,79 @@ step << Hunter
     .target Father Gavin::1253
     .turnin 99158 >>Turn in Dawn in the Mountains
 step << Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .accept 99159 >> Accept Finding Warmth
+    .target Father Gavin
+step << Hunter
+    .goto 1426,55.0,46.0,60,0
+    .goto 1426,53.0,44.0,60,0
+    .goto 1426,56.0,48.5
+    >>Loot |cRXP_PICK_Mostly Dry Firewood|r: the large white trunks lying by the trees around Father Gavin's. Some give 2
+    .complete 99159,1 --Mostly Dry Firewood (14)
+step << Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .turnin 99159 >> Turn in Finding Warmth
+    .accept 99160 >> Accept Rime's Wrath
+    .accept 99161 >> Accept Rime's Wrath
+    .accept 99162 >> Accept Treacherous Cold
+    .target Father Gavin
+step << Hunter
+    #sticky
+    #label IceElementals
+    >>Kill |cRXP_ENEMY_Minor Ice Elementals|r as you go: they are all around Father Gavin's
+    .complete 99160,1 --Minor Ice Elemental slain (10)
+    .mob Minor Ice Elemental
+    .isOnQuest 99160
+step << Hunter
+    .goto 1426,57.6,42.8
+    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
+    .complete 99161,1 --Avala's Core (1)
+    .mob Avala
+    .isOnQuest 99161
+step << Hunter
+    .goto 1426,52.0,44.0
+    >>Loot the rifle by the fallen mountaineer under the tree lying across the frozen river
+    .collect 286358,1,99162 --Coalbeard's Rifle
+    .isOnQuest 99162
+step << Hunter
+    .goto 1426,53.0,59.0
+    >>Loot the rifle by the fallen mountaineer next to a cart, in the valley to the south
+    .collect 286360,1,99162 --Stoneanvil's Rifle
+    .isOnQuest 99162
+step << Hunter
+    .goto 1426,60.0,50.0
+    >>Loot the rifle by the fallen mountaineer next to a cart, on the small path up to Vagash's cave
+    >>|cRXP_WARN_A player reported it wouldn't loot: if so, skip this step|r
+    .collect 286359,1,99162 --Sunhammer's Rifle
+    .isOnQuest 99162
+step << Hunter
+    .goto 1426,55.0,46.0,60,0
+    .goto 1426,57.0,48.0
+    >>Finish the |cRXP_ENEMY_Minor Ice Elementals|r on the way back to Father Gavin
+    .complete 99160,1 --Minor Ice Elemental slain (10)
+    .mob Minor Ice Elemental
+    .isOnQuest 99160
+step << Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .turnin 99160 >> Turn in Rime's Wrath
+    .target Father Gavin
+    .isQuestComplete 99160
+step << Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .turnin 99161 >> Turn in Rime's Wrath
+    .target Father Gavin
+    .isQuestComplete 99161
+step << Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .turnin 99162 >> Turn in Treacherous Cold
+    .target Father Gavin
+    .isQuestComplete 99162
+step << Hunter
     #completewith Rudra
     #label Dirt
     .goto 1426/0,-1145.04,-5504.30,40,0
@@ -1141,6 +1214,79 @@ step << !Hunter
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin::1253|r
     .target Father Gavin::1253
     .turnin 99158 >>Turn in Dawn in the Mountains
+step << !Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .accept 99159 >> Accept Finding Warmth
+    .target Father Gavin
+step << !Hunter
+    .goto 1426,55.0,46.0,60,0
+    .goto 1426,53.0,44.0,60,0
+    .goto 1426,56.0,48.5
+    >>Loot |cRXP_PICK_Mostly Dry Firewood|r: the large white trunks lying by the trees around Father Gavin's. Some give 2
+    .complete 99159,1 --Mostly Dry Firewood (14)
+step << !Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .turnin 99159 >> Turn in Finding Warmth
+    .accept 99160 >> Accept Rime's Wrath
+    .accept 99161 >> Accept Rime's Wrath
+    .accept 99162 >> Accept Treacherous Cold
+    .target Father Gavin
+step << !Hunter
+    #sticky
+    #label IceElementals
+    >>Kill |cRXP_ENEMY_Minor Ice Elementals|r as you go: they are all around Father Gavin's
+    .complete 99160,1 --Minor Ice Elemental slain (10)
+    .mob Minor Ice Elemental
+    .isOnQuest 99160
+step << !Hunter
+    .goto 1426,57.6,42.8
+    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
+    .complete 99161,1 --Avala's Core (1)
+    .mob Avala
+    .isOnQuest 99161
+step << !Hunter
+    .goto 1426,52.0,44.0
+    >>Loot the rifle by the fallen mountaineer under the tree lying across the frozen river
+    .collect 286358,1,99162 --Coalbeard's Rifle
+    .isOnQuest 99162
+step << !Hunter
+    .goto 1426,53.0,59.0
+    >>Loot the rifle by the fallen mountaineer next to a cart, in the valley to the south
+    .collect 286360,1,99162 --Stoneanvil's Rifle
+    .isOnQuest 99162
+step << !Hunter
+    .goto 1426,60.0,50.0
+    >>Loot the rifle by the fallen mountaineer next to a cart, on the small path up to Vagash's cave
+    >>|cRXP_WARN_A player reported it wouldn't loot: if so, skip this step|r
+    .collect 286359,1,99162 --Sunhammer's Rifle
+    .isOnQuest 99162
+step << !Hunter
+    .goto 1426,55.0,46.0,60,0
+    .goto 1426,57.0,48.0
+    >>Finish the |cRXP_ENEMY_Minor Ice Elementals|r on the way back to Father Gavin
+    .complete 99160,1 --Minor Ice Elemental slain (10)
+    .mob Minor Ice Elemental
+    .isOnQuest 99160
+step << !Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .turnin 99160 >> Turn in Rime's Wrath
+    .target Father Gavin
+    .isQuestComplete 99160
+step << !Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .turnin 99161 >> Turn in Rime's Wrath
+    .target Father Gavin
+    .isQuestComplete 99161
+step << !Hunter
+    .goto 1426,57.5,44.8
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
+    .turnin 99162 >> Turn in Treacherous Cold
+    .target Father Gavin
+    .isQuestComplete 99162
 step << !Hunter
     #completewith Rudra
     #label Dirt
