@@ -771,8 +771,7 @@ check(not vanish, "every death skip is followed by a step still to do" + "".join
 import check_levels
 greys = check_levels.everyone()
 check(not greys, "no grey hand-ins for any race and class" + "".join(
-    f"
-     {race} {cls}: {r[0]} step {r[1]}: {r[3]} {r[4]} (quest {r[5]}, you ~{r[6]})" for race, cls, r in greys))
+    f"\n     {race} {cls}: {r[0]} step {r[1]}: {r[3]} {r[4]} (quest {r[5]}, you ~{r[6]})" for race, cls, r in greys))
 
 # The flight timer (its own fake API)
 import smoke_flight
