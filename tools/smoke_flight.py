@@ -113,7 +113,7 @@ strtrim = function(s) return s end
     marks = [m for m in g.HeadstartFlightFrame.markers.values() if m.at is not None]
     shown = [m for m in marks if m.dot.IsShown(m.dot)]
     check([round(m.at, 2) for m in shown] == [0, 0.5, 1], f"humps at the start, the stop halfway and the end: {[m.at for m in shown]}")
-    check(texts[0] in ("about 4:00", "about 3:59"), f"a new route is estimated from its length: {texts[0]}")
+    check(texts[0] in ("~4:00", "~3:59"), f"a new route is estimated from its length: {texts[0]}")
 
     lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] = nil')
     texts, _ = fly(3, 170, rxp=170)
@@ -142,6 +142,22 @@ strtrim = function(s) return s end
     lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(30); Fire('PLAYER_CONTROL_GAINED'); Tick(30); ONTAXI = false; Tick(0.3)")
     bar = g.HeadstartFlightFrame
     check(not bar.IsShown(bar), "landing without an event after it: the bar goes anyway")
+
+    # the stop button: lands at the next stop; the bar retargets, and the cut flight isn't learned
+    lua.execute("EARLY = 0; function TaxiRequestEarlyLanding() EARLY = EARLY + 1 end")
+    lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] = 240')
+    g.HOOKS.TakeTaxiNode(3)
+    lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(30); Tick(0.2)")
+    bar = g.HeadstartFlightFrame
+    check(bar.stop.IsShown(bar.stop), "the stop button shows with a stop ahead")
+    bar.stop._OnClick(bar.stop)
+    lua.execute("Tick(0.2)")
+    check(g.EARLY == 1 and bar.note.GetText(bar.note) == "landing at Thandol Span" and bar.to.GetText(bar.to) == "Thandol Span",
+          f"stop pressed: the game asked, the bar says {bar.note.GetText(bar.note)!r} to {bar.to.GetText(bar.to)!r}")
+    check(bar.time.GetText(bar.time) in ("1:30", "1:29"), f"time left to the stop: {bar.time.GetText(bar.time)}")
+    check(not bar.stop.IsShown(bar.stop), "the button goes once pressed")
+    lua.execute("Tick(90); ONTAXI = false; Tick(0.3)")
+    check(g.YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] == 240, "a flight landed early isn't learned")
 
     # the setting off: no bar
     lua.execute("YippRouteDB.flightTimer = false")

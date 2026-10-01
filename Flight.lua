@@ -75,17 +75,18 @@ local function Place()
     end
 end
 
--- The route: no panel. A slim dark bar with a round node at the start, at every flight point the
--- flight passes (its name above it when there is room) and at the end, the bar swelling into each
--- node. The fill runs along it from the left, amber at take-off turning green as you get close, with
--- a round front, and flows into each node as you pass it. Every round shape is art/circle (a circle
--- edge to edge of its image) at its real size; the bar runs between the nodes, so the see-through
--- dark never overlaps itself; positions are whole pixels. On a first flight, with no time to measure
--- against, a light runs along the bar instead.
-local W, H, PAD, TRACK_Y = 380, 60, 10, -30
+-- The route: no panel. The time on the left, big, in the fill's colour; a slim dark bar with a round
+-- node at the start, at every flight point the flight passes and at the end (names above them, where
+-- there is room); and on the right a button to land at the next stop. The fill runs along the bar
+-- from the left, amber at take-off turning green as you get close, with a round front, and flows into
+-- each node as you pass it. The bar and its nodes are one solid colour and the bar runs on under the
+-- nodes, so no seam shows where they meet. Round shapes are art/circle at their real size, positions
+-- whole pixels, text outlined. On a first flight, with no time to go by, a light runs along the bar.
+local W, H, TRACK_Y = 410, 46, -26
+local X0, X1 = 64, 410 - 40           -- the start and end nodes' centres
 local THICK, NODE = 8, 16
 local FAR, NEAR = { 1.00, 0.62, 0.22 }, { 0.36, 0.86, 0.46 }
-local DARK = { 0.06, 0.07, 0.09, 0.82 }
+local DARK = { 0.08, 0.09, 0.11, 1 }
 local SWEEP = 1.8                     -- seconds for the light to run the bar on a first flight
 
 local function Mix(a, b, t)
@@ -119,42 +120,29 @@ local function Shade(tex, p)
     end
 end
 
--- Text over the game world needs its own shadow, with no panel behind it.
-local function Shadowed(fs)
-    fs:SetShadowOffset(1, -1)
-    fs:SetShadowColor(0, 0, 0, 1)
+-- Text over the game world: outlined, so it reads on snow and on shadow alike.
+local function Label(size, color)
+    local fs = YR.Style.Text(frame, size, color)
+    fs:SetFont(YR.Style.FONT, size, "OUTLINE")
     return fs
 end
 
--- A node: its dark circle, the part of it filled (cut off at the fill's front, so the colour flows in),
--- its name, and the piece of bar from it to the next node.
+-- A node: its circle, the part of it filled (cut off at the fill's front, so the colour flows in),
+-- and its name.
 local function Marker()
     local m = {}
-    m.dot = Circle("BORDER", 0, NODE, DARK)
+    m.dot = Circle("BORDER", 1, NODE, DARK)
     m.fill = Circle("ARTWORK", 1, NODE, NEAR)
-    m.bar = Solid("BORDER", 0, DARK)
-    m.bar:SetHeight(THICK)
-    m.label = Shadowed(YR.Style.Text(frame, 12, YR.Style.C.sub))
+    m.label = Label(12, YR.Style.C.sub)
     m.label:SetJustifyH("CENTER")
-    function m:At(x, nextX)
+    function m:At(x)
         self.x = Round(x)
         self.dot:ClearAllPoints()
-        self.dot:SetPoint("CENTER", frame, "TOPLEFT", PAD + self.x, TRACK_Y)
+        self.dot:SetPoint("CENTER", frame, "TOPLEFT", X0 + self.x, TRACK_Y)
         self.fill:ClearAllPoints()
-        self.fill:SetPoint("LEFT", frame, "TOPLEFT", PAD + self.x - NODE / 2, TRACK_Y)
+        self.fill:SetPoint("LEFT", frame, "TOPLEFT", X0 + self.x - NODE / 2, TRACK_Y)
         self.label:ClearAllPoints()
-        self.label:SetPoint("BOTTOM", frame, "TOPLEFT", PAD + self.x, TRACK_Y + NODE / 2 + 3)
-        -- the bar starts and ends where the circle is as wide as the bar is thick, so it meets the
-        -- circle's edge without covering it
-        local inset = floor(math.sqrt((NODE / 2) ^ 2 - (THICK / 2) ^ 2))
-        if nextX and Round(nextX) - self.x > 2 * inset then
-            self.bar:ClearAllPoints()
-            self.bar:SetPoint("LEFT", frame, "TOPLEFT", PAD + self.x + inset, TRACK_Y)
-            self.bar:SetWidth(Round(nextX) - self.x - 2 * inset)
-            self.bar:Show()
-        else
-            self.bar:Hide()
-        end
+        self.label:SetPoint("BOTTOM", frame, "TOPLEFT", X0 + self.x, TRACK_Y + NODE / 2 + 2)
     end
     -- fillX: where the fill's front is (pixels from the start), or nil for none
     function m:Fill(fillX, r, g, b)
@@ -168,9 +156,30 @@ local function Marker()
     end
     function m:Show(on)
         self.dot:SetShown(on)
-        if not on then self.label:Hide() self.fill:Hide() self.bar:Hide() end
+        if not on then self.label:Hide() self.fill:Hide() end
     end
     return m
+end
+
+-- The next stop ahead, or nil (only known with a time to go by).
+local function NextStop()
+    local total = flight and flight.total
+    if not (total and total > 0) then return nil end
+    local gone = GetTime() - flight.started
+    for _, st in ipairs(flight.stops or {}) do
+        if st.at * total > gone + 2 then return st end
+    end
+end
+
+-- The game's own "request stop": the taxi lands at the next flight point on the way. A flight cut
+-- short is not the route's time, so it is never learned (Land).
+local function StopAtNext()
+    local st = NextStop()
+    if not (st and TaxiRequestEarlyLanding) then return end
+    TaxiRequestEarlyLanding()
+    flight.cut = st
+    if YippRouteDB.flightNow then YippRouteDB.flightNow.cut = st end
+    YR:RefreshFlight()
 end
 
 local function Build()
@@ -178,26 +187,45 @@ local function Build()
     frame = CreateFrame("Frame", "HeadstartFlightFrame", UIParent)
     frame:SetSize(W, H)
     frame:SetFrameStrata("MEDIUM")
-    frame.len = W - 2 * PAD
-    frame.from = Shadowed(S.Text(frame, 13, S.C.text))
-    frame.from:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", PAD - NODE / 2, TRACK_Y + NODE / 2 + 3)
+    frame.len = X1 - X0
+    frame.from = Label(12, S.C.text)
+    frame.from:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", X0 - NODE / 2, TRACK_Y + NODE / 2 + 2)
     frame.from:SetWidth(W / 3)
-    frame.to = Shadowed(S.Text(frame, 13, S.C.text))
-    frame.to:SetPoint("BOTTOMRIGHT", frame, "TOPRIGHT", -(PAD - NODE / 2), TRACK_Y + NODE / 2 + 3)
+    frame.to = Label(12, S.C.text)
+    frame.to:SetPoint("BOTTOMRIGHT", frame, "TOPLEFT", X1 + NODE / 2, TRACK_Y + NODE / 2 + 2)
     frame.to:SetWidth(W / 3)
     frame.to:SetJustifyH("RIGHT")
-    -- the fill along the bar, its round front, and the light that runs a first flight
+    -- the bar, under the nodes from the first to the last; the fill, its round front, and the light
+    -- that runs a first flight
+    frame.bar = Solid("BORDER", 0, DARK)
+    frame.bar:SetHeight(THICK)
+    frame.bar:SetPoint("LEFT", frame, "TOPLEFT", X0, TRACK_Y)
+    frame.bar:SetWidth(frame.len)
     frame.fill = Solid("ARTWORK", 0, NEAR)
     frame.fill:SetHeight(THICK)
-    frame.fill:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
+    frame.fill:SetPoint("LEFT", frame, "TOPLEFT", X0, TRACK_Y)
     frame.head = Circle("ARTWORK", 2, THICK, NEAR)
     frame.sweep = Solid("ARTWORK", 0, { NEAR[1], NEAR[2], NEAR[3], 0.6 })
     frame.sweep:SetSize(36, THICK)
     frame.markers = {}
-    frame.time = Shadowed(S.Text(frame, 14, S.C.text))
-    frame.time:SetPoint("TOP", frame, "TOPLEFT", W / 2 - 20, TRACK_Y - NODE / 2 - 4)
-    frame.note = Shadowed(S.Text(frame, 12, S.C.sub))
-    frame.note:SetPoint("LEFT", frame.time, "RIGHT", 6, -1)
+    -- the time, left of the bar; a line under the bar for the next stop or what is happening
+    frame.time = Label(17, S.C.text)
+    frame.time:SetPoint("RIGHT", frame, "TOPLEFT", X0 - NODE / 2 - 6, TRACK_Y)
+    frame.time:SetJustifyH("RIGHT")
+    frame.note = Label(11, S.C.sub)
+    frame.note:SetPoint("TOP", frame, "TOPLEFT", (X0 + X1) / 2, TRACK_Y - NODE / 2 - 2)
+    frame.note:SetJustifyH("CENTER")
+    -- land at the next stop: only while there is one ahead and the game can do it
+    frame.stop = S.IconButton(frame, "down", StopAtNext, nil, S.C.sub, 22)
+    frame.stop:SetPoint("LEFT", frame, "TOPLEFT", X1 + NODE / 2 + 6, TRACK_Y)
+    frame.stop:HookScript("OnEnter", function(self)
+        local st = NextStop()
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(st and ("Land at " .. Short(st.name)) or "Land at the next stop")
+        GameTooltip:AddLine("The next flight point on the way", 0.8, 0.8, 0.8)
+        GameTooltip:Show()
+    end)
+    frame.stop:Hide()
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
@@ -228,21 +256,20 @@ local function Progress()
 end
 
 -- The nodes for this flight: the start, each stop on the way (at its share of the route's length)
--- and the end, each with the bar to the next. Names over the stops only where they don't crowd the
--- ends or each other.
+-- and the end. Names over the stops only where they don't crowd the ends or each other.
 local function LayOut()
     local points = { { at = 0 } }
     for _, s in ipairs(flight.stops or {}) do points[#points + 1] = { at = s.at, name = s.name } end
     points[#points + 1] = { at = 1 }
-    local lastLabel = 70                   -- pixels kept clear of the start's name
+    local lastLabel = 80                   -- pixels kept clear of the start's name
     for n, pt in ipairs(points) do
         local m = frame.markers[n] or Marker()
         frame.markers[n] = m
         local x = pt.at * frame.len
-        m:At(x, points[n + 1] and points[n + 1].at * frame.len)
+        m:At(x)
         m:Show(true)
         m.at = pt.at
-        if pt.name and x - lastLabel > 60 and frame.len - x > 70 then
+        if pt.name and x - lastLabel > 60 and frame.len - x > 80 then
             m.label:SetText(Short(pt.name))
             m.label:Show()
             lastLabel = x
@@ -265,7 +292,7 @@ function YR:AnimateFlight()
         frame.fill:SetShown(fillX >= 1)
         Shade(frame.fill, p)
         frame.head:ClearAllPoints()
-        frame.head:SetPoint("CENTER", frame, "TOPLEFT", PAD + fillX, TRACK_Y)
+        frame.head:SetPoint("CENTER", frame, "TOPLEFT", X0 + fillX, TRACK_Y)
         frame.head:SetVertexColor(Mix(FAR, NEAR, p))
         frame.head:SetShown(fillX >= 1 and fillX < frame.len)
         frame.sweep:Hide()
@@ -274,7 +301,7 @@ function YR:AnimateFlight()
         frame.head:Hide()
         local x = Round(((GetTime() - flight.started) % SWEEP) / SWEEP * (frame.len - 36))
         frame.sweep:ClearAllPoints()
-        frame.sweep:SetPoint("LEFT", frame, "TOPLEFT", PAD + x, TRACK_Y)
+        frame.sweep:SetPoint("LEFT", frame, "TOPLEFT", X0 + x, TRACK_Y)
         frame.sweep:Show()
     end
     -- each node fills as the fill reaches it, in the fill's colour where it is (the start's is full
@@ -294,27 +321,34 @@ function YR:RefreshFlight()
     local rxpBar = type(RXP) == "table" and type(RXP.flightInfo) == "table" and RXP.flightInfo.flightBar
     if type(rxpBar) == "table" and rxpBar.IsShown and rxpBar:IsShown() then rxpBar:Hide() end
     local gone = GetTime() - flight.started
-    local total, guess = flight.total, flight.guess
+    local total, guess, cut = flight.total, flight.guess, flight.cut
     frame.from:SetText(Short(flight.from))
-    frame.to:SetText(Short(flight.to))
+    frame.to:SetText(Short(cut and cut.name or flight.to))
+    local nextStop = NextStop()
     if total and total > 0 then
-        local left = total - gone
+        local left = (cut and cut.at or 1) * total - gone
+        local r, g, b = Mix(FAR, NEAR, math.min(1, gone / total))
+        frame.time:SetTextColor(r, g, b)
         if left >= 0 then
-            frame.time:SetText((guess and "about " or "") .. Clock(left))
-            -- the next stop on the way, and when you are there
-            local nextStop
-            for _, st in ipairs(flight.stops or {}) do
-                if st.at * total > gone then nextStop = st break end
-            end
-            frame.note:SetText(nextStop and ("left, " .. Short(nextStop.name) .. " in " .. Clock(nextStop.at * total - gone)) or "left")
+            frame.time:SetText((guess and "~" or "") .. Clock(left))
         else
-            frame.time:SetText("landing")
-            frame.note:SetText(Clock(-left) .. " over")
+            frame.time:SetText("+" .. Clock(-left))
+        end
+        if cut then
+            frame.note:SetText("landing at " .. Short(cut.name))
+        elseif left < 0 then
+            frame.note:SetText("landing")
+        elseif nextStop then
+            frame.note:SetText(Short(nextStop.name) .. " in " .. Clock(nextStop.at * total - gone))
+        else
+            frame.note:SetText(guess and "estimated from the route's length" or "")
         end
     else
+        frame.time:SetTextColor(unpack(YR.Style.C.sub))
         frame.time:SetText(Clock(gone))
-        frame.note:SetText("first time: timing it")
+        frame.note:SetText(cut and ("landing at " .. Short(cut.name)) or "first flight here: timing it")
     end
+    frame.stop:SetShown(TaxiRequestEarlyLanding ~= nil and not cut and nextStop ~= nil)
 end
 
 local function ShowBar(on)
@@ -351,7 +385,8 @@ local function TakeOff()
 end
 
 local function Land()
-    if flight and not flight.resumed then Learn(flight, GetTime() - flight.started) end
+    -- a flight landed early (the stop button) or carried over a reload is not the route's time
+    if flight and not flight.resumed and not flight.cut then Learn(flight, GetTime() - flight.started) end
     flight = nil
     YippRouteDB.flightNow = nil
     ShowBar(false)
@@ -413,7 +448,7 @@ watcher:SetScript("OnEvent", function(_, event)
         if now and UnitOnTaxi("player") and not flight then
             -- back from a reload in the air: the bar carries on from when the flight started
             flight = { from = now.from, to = now.to, key = now.key, length = now.length, map = now.map,
-                rxp = now.rxp, stops = now.stops, resumed = true }
+                rxp = now.rxp, stops = now.stops, cut = now.cut, resumed = true }
             flight.started = GetTime() - (time() - (now.at or time()))
             flight.total, flight.guess = Expected(flight)
             if YR.Option("flightTimer") then ShowBar(true) end
