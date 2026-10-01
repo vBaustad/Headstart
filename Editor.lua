@@ -1252,6 +1252,10 @@ local function BuildRouteSettings(page)
         function(v) YR:RewardSettings(ViewClass()).maxLevel = v end))
     Row("Take the reward I chose before", S.Switch(c, function() return YR:RewardSettings(ViewClass()).remember end,
         function(on) YR:RewardSettings(ViewClass()).remember = on end), "A reward you picked by hand for a quest is taken again")
+    Row("Let me pick when there's a green", S.Switch(c, function() return YR:RewardSettings(ViewClass()).greenStop end,
+        function(on) YR:RewardSettings(ViewClass()).greenStop = on end),
+        "A choice with a green (or better) among it waits for you, and RestedXP's built-in picks wait too."
+        .. " Hold Shift when talking to an NPC to stop all quest automation, Headstart's and RestedXP's, for that window")
     local fallback = S.Dropdown(c, 170, { { "value", "The most valuable" }, { "ask", "Let me choose" } }, function(v)
         YR:RewardSettings(ViewClass()).fallback = v
         YR:RefreshWindow()

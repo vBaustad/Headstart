@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Quest rewards stop at greens** (on by default, Settings, Route, per class): a choice with a green or better among it waits for you, and RestedXP's built-in reward picks wait too. A reward you picked by hand for that quest before is still taken again.
+- **Hold Shift to stop all quest automation**: with Shift held when you talk to an NPC, neither Headstart nor RestedXP accepts, hands in or picks anything in that window (RestedXP's own key is Ctrl; Shift now works too).
 - Dun Morogh: **Father Gavin's chain** (new in Forever, 4 x 700 XP), right after Dawn in the Mountains and before Vagash: Finding Warmth (firewood), then Rime's Wrath (Minor Ice Elementals), Rime's Wrath (Avala) and Treacherous Cold (three rifles by fallen mountaineers, west, south, then on the path to Vagash's cave). Its XP is most of the way to the level 10 Vagash now asks for.
 - Dun Morogh: level 10 before Vagash (a level 11 elite), for every class but Hunters: a Paladin gets Lay on Hands, everyone a new rank or two.
 - Dun Morogh: **Never Saddle on Quality** (new in Forever, 625 XP). Taken from Rudra Amberstill with Protecting the Herd, the 6 Pristine Leopard Pelts collected while doing the Gol'Bolar Quarry quests (the Elder Snow Leopards live there), handed in after the Stolen Blasting Powder.
