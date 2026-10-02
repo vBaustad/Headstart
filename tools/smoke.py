@@ -501,6 +501,9 @@ check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a 
 YR.RevertGuide(YR, "coldridge")
 YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
 check(True, "settings page with reward settings opens")
+YR.ShowSettingsTab(YR, "trainer")        # the Trainer tab: the class's spells with a choice each
+check(True, "settings Trainer tab opens")
+YR.ShowSettingsTab(YR, "route")
 # the minimap button exists and the settings switch hides it
 check(g.HeadstartMinimapButton is not None and g.HeadstartMinimapButton.hidden is not True, "minimap button shown")
 YR.ShowMinimapButton(YR, False)
@@ -780,4 +783,8 @@ check(not reds, "no red mobs to kill outside dungeons" + "".join(
 # The flight timer (its own fake API)
 import smoke_flight
 bad += smoke_flight.run()
+
+# The auto trainer (its own fake API)
+import smoke_trainer
+bad += smoke_trainer.run()
 sys.exit(1 if bad else 0)
