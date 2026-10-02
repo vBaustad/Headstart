@@ -2177,11 +2177,13 @@ step << Dwarf Hunter
     #optional
     #completewith next
     .deathskip >> Grind until your HS cooldown is <6 minutes. Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
 step << !NightElf !Hunter
     #xprate <1.59
     #optional
     #completewith next
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step << !NightElf
     #xprate <1.59
@@ -3871,6 +3873,7 @@ step
     #xprate >1.59 << !Hunter
     #completewith DeadminesEnd
     .deathskip >> Die and Respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
     .dungeon DM
 step << Paladin/Warrior
@@ -4254,6 +4257,8 @@ step
     .dungeon DM
 
 .deathskip
+
+.xp 10,1 -- none from level 10: 10 min sickness on Forever
 step << !Hunter
     #xprate <1.59
     .goto 1439/1,488.69,6564.830

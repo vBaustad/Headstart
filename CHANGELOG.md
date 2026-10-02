@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **No death skip from level 10.** On Forever the Spirit Healer gives 10 minutes of Resurrection Sickness (-75% stats and damage) as soon as you are 10, not from 11 at a minute a level as in Classic (an open Forever bug). Every death skip in the routes now goes away at 10: at 9 you still die and skip, at 10 the route has you walk or hearth instead.
+- Dun Morogh: sell your junk to Gretta Ganter (she's a vendor) right before you hand her Frosthowl.
+
 - **Heavy Copper Maul for Dwarf Paladins and Warriors** (2H mace, 10.8 damage per second, level 11; the Wooden Mallet is about 4): Dun Morogh now asks you to keep mining until Frostmane Hold (about 40 Rough Stone and 12 Copper Ore more), and at the Kharanos forge after Frostmane Hold takes Blacksmithing from 20 to 40 (Rough Sharpening Stones to 25, then Rough Grinding Stones, a point each) and buys 2 Weak Flux. On the way through Ironforge at the start of Loch Modan: 2 Light Leather at the auction house, the recipe from Bengus Deepforge, the Maul at the Great Forge, and equip it at 11. The Ironforge steps only show at Blacksmithing 40. On Forever the Maul is learned at 40 (65 in Classic).
 
 - **QoL tab in Settings.** Headstart is also the home of the YippYapp quality-of-life features now, the ones that help on any character whether you follow a route or not. The new QoL tab has the campfire icon and the bank (below), and the Flight timer and Quest rewards moved there from the Route tab, unchanged.

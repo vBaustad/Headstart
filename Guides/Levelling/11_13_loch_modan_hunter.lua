@@ -379,6 +379,7 @@ step
 step
     #completewith next
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step
     .goto 1432/0,-3019.02,-5369.40,8,0

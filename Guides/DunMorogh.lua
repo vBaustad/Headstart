@@ -38,6 +38,7 @@ step
     #completewith next
     >>|cRXP_WARN_Make sure your subzone is NOT Coldridge Pass|r
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
     .subzoneskip 131
 step
@@ -384,6 +385,7 @@ step
     .complete 98321,1 --|8/8 Flintfire's Shipment
 step
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
     .subzoneskip 136,1
 step
@@ -726,6 +728,7 @@ step
 step
     #completewith next
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step
     .goto 1426/0,-501.400,-5643.900
@@ -985,6 +988,7 @@ step << Hunter
 step << Hunter
     #completewith ShimmerweedCollect
     .deathskip >> Die to one of the nearby |cRXP_ENEMY_Scarred Crag Boars|r and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step << Hunter
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Razzle Sprysprocket|r
@@ -1048,6 +1052,7 @@ step
 step
     .goto 1426,31.4,44.6
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gretta Ganter|r
+    >>|cRXP_BUY_She's a vendor: sell your junk to her first|r (keep what the route still needs: its tooltip says so)
     .turnin 98326 >> Turn in Frosthowl
     .target Gretta Ganter
     .isQuestComplete 98326
@@ -1125,6 +1130,7 @@ step << !Hunter
 step
     #completewith next
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
     .subzoneskip 2102
 step
@@ -1827,6 +1833,7 @@ step << !Hunter
 step << Hunter
     #completewith flyIF
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .subzoneskip 2101 -- stoutlager inn
     .subzoneskip 144 -- thelsamar
     .target Spirit Healer

@@ -1813,6 +1813,7 @@ step << NightElf !Druid
     #optional
     #completewith CavetoAuber
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step << !NightElf/Druid
     #completewith CavetoAuber

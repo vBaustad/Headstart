@@ -671,6 +671,7 @@ step << !Dwarf/!Hunter
     #xprate <1.59
     #completewith next
     .deathskip >> Die on the eastern side of the lake and spirit res at Astranaar
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
 step << !Dwarf/!Hunter
     #xprate <1.59
     .goto 1440/1,-284.31,2828.69

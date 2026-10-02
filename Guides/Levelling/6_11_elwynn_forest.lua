@@ -718,6 +718,7 @@ step
 step
     #completewith Exchange
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step
     #label Exchange
@@ -1549,6 +1550,7 @@ step << !Warlock
     #label EVDeathskip
     #completewith RedridgeS
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
     .zoneskip Redridge Mountains
     .xp >10,1 -- shows to 9 and under
@@ -1611,6 +1613,7 @@ step << !Warlock
 step << !Warlock
     #completewith RRFP
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
     .xp >10,1 -- shows to 9 and under
 step << !Warlock

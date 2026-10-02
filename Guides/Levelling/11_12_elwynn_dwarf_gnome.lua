@@ -26,6 +26,7 @@ step << Warlock
     #completewith next
     >>|cRXP_WARN_Cast|r |T136126:0|t[Life Tap] |cRXP_WARN_repeatedly until you have <10% health then jump down the ledge (NOT into the water) next to the flight master and die intentionally|r
     .deathskip >> Respawn at the Spirit Healer
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step
     #optional
@@ -353,6 +354,7 @@ step << Warlock
     .turnin 1689 >> Turn in The Binding
 step << Warlock
     .deathskip >> |cRXP_WARN_Die and respawn at the Spirit Healer by using|r |T136126:0|t[Life Tap] |cRXP_WARN_and standing on the Bonfire next to you|r
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step
     .goto 1429/0,74.02,-9465.52
@@ -483,6 +485,7 @@ step
     #sticky
     #completewith next
     .deathskip >> Die and respawn at the Spirit Healer or run to Sentinel Hill
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step
     #era

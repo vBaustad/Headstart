@@ -583,6 +583,7 @@ step
     .mob Gnarlpine Mystic
 step
     .deathskip >> Die and respawn at the Spirit Healer
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step
     .goto 1438/1,953.07,9788.21
@@ -660,6 +661,7 @@ step
 	#completewith next
     .goto 1438/1,1599.71,9509.25
     .deathskip >> Die and respawn at the Dolanaar graveyard
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
 step
 	#xprate <1.5
     .goto 1438/1,956.02,9736.83
@@ -1020,6 +1022,7 @@ step << !Rogue
     #requires xp10
     #completewith next
     .deathskip >> Die and respawn at the Spirit Healer in Darnassus
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step << Hunter
     .goto 1457,58.76,44.48
@@ -1491,6 +1494,7 @@ step << Rogue
     #completewith next
     .goto 1438/1,1574.25,9978.26
     .deathskip >>Once you get past the furbolg area, die on purpose and respawn at the Darnassus graveyard
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step << Rogue
     .goto 1457/1,2534.29,10085.60
@@ -1641,6 +1645,7 @@ step
 step
 	#completewith darn << era
     .deathskip >>Die and respawn at the Darnassus graveyard
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
     .target Spirit Healer
 step << !Warrior
     .goto 1457/1,2009.100,9986.601
@@ -1693,6 +1698,7 @@ step << Warrior
     #completewith next
     .goto 1438/1,1594.62,9988.44
     .deathskip >>Die on purpose after you get past the furbolg area and respawn at Darnassus
+    .xp 10,1 -- none from level 10: 10 min sickness on Forever
 step << Warrior
     .goto 1457/1,2331.89,9994.09
     .target Elanaria

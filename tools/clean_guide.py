@@ -204,3 +204,20 @@ def clean(text):
             raise ValueError("removed step's label is still used: " + label)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text
+
+
+SICK_FROM = 10
+
+
+def no_sick_deathskips(text):
+    """Every death skip step gets ".xp 10,1": RestedXP skips the step from level 10 on. On Forever the
+    Spirit Healer gives 10 minutes of Resurrection Sickness (-75% stats and damage) from level 10, not
+    from 11 at a minute a level as in Classic (github.com/ClassicWoWCommunity/forever-bugs/issues/25,
+    open). Below 10 a death skip costs nothing but the durability; from 10 the route walks or hearths."""
+    parts = re.split(r"\n(?=step\b)", text)
+    for k, step in enumerate(parts):
+        if re.search(r"^\s*\.deathskip\b", step, re.M) and not re.search(r"^\s*\.xp %d,1\b" % SICK_FROM, step, re.M):
+            parts[k] = re.sub(r"^(\s*)(\.deathskip\b[^\n]*)$",
+                              lambda m: f"{m.group(1)}{m.group(2)}\n{m.group(1)}.xp {SICK_FROM},1 -- none from level {SICK_FROM}: 10 min sickness on Forever",
+                              step, count=1, flags=re.M)
+    return "\n".join(parts)
