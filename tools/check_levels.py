@@ -29,7 +29,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, 'S:/forever-data/research/leveling')
 _cwd = os.getcwd()
 os.chdir('S:/forever-data/research/leveling')
-from qdb import SCAN, XP, N  # noqa: E402
+from qdb import SCAN, XP, N, forever_mult  # noqa: E402
 import model  # noqa: E402
 os.chdir(_cwd)
 import blocks  # noqa: E402
@@ -56,8 +56,9 @@ ours |= {int(x) for x in re.findall(r'\.(?:accept|turnin) (\d+)', dm)}
 
 
 def mult(ql, pl):
-    """Share of its XP a quest pays: full up to 5 levels below you, then 80/60/40/20, then 10%."""
-    return max(1, min(10, 2 * (ql - pl) + 20)) / 10
+    """Share of its XP a quest pays on Forever: full up to 5 levels below you, 80% at 6, 60% at 7, then
+    50% (research qdb.forever_mult, measured from a level-20 scan)."""
+    return forever_mult(ql, pl)
 
 
 def grey_level(pl):
