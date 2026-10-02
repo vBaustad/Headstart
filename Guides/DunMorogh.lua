@@ -328,6 +328,9 @@ step << Warrior/Paladin/Rogue
     #label MineCopper
     >>Mine every |cRXP_PICK_Copper Vein|r you pass: most are around the Grizzled Den and south of Kharanos. Keep the ore and the Rough Stones
     .skill mining,20
+step << Paladin/Warrior
+    #completewith GrindStones
+    >>For the |cRXP_LOOT_Heavy Copper Maul|r (level 11, 10.8 damage per second): keep mining every |cRXP_PICK_Copper Vein|r you pass until Frostmane Hold. You want about 40 |cRXP_LOOT_Rough Stone|r and 12 |cRXP_LOOT_Copper Ore|r on top of what Camping 101 uses
 step
     #label RumbleshotAmmo
     .goto 1426/0,-371.400,-5746.900
@@ -744,6 +747,21 @@ step << Warrior/Paladin/Rogue
     .turnin 96044 >>Turn in Camping 101: Blacksmithing
     .target Tognus Flintfire
     .isQuestComplete 96044
+step << Paladin/Warrior
+    #sticky
+    #label GrindStones
+    .goto 1426,45.344,51.936
+    >>Same forge, for the |cRXP_LOOT_Heavy Copper Maul|r: make |cRXP_PICK_Rough Sharpening Stones|r to Blacksmithing 25, train |cRXP_PICK_Rough Grinding Stone|r from |cRXP_FRIENDLY_Tognus Flintfire|r and make them to 40 (each one is a point). Smelt the rest of your |cRXP_LOOT_Copper Ore|r: the Maul needs 12 |cRXP_LOOT_Copper Bars|r
+    >>|cRXP_WARN_Short of stone? Get as far as you can: this stays up until 40, and the Maul waits for it|r
+    .skill blacksmithing,40
+    .skill blacksmithing,<20,1
+step << Paladin/Warrior
+    .goto 1426,45.3,51.53
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thrawn Boltar|r
+    >>|cRXP_BUY_Buy 2|r |T133587:0|t[Weak Flux] |cRXP_BUY_for the Heavy Copper Maul (1s each)|r
+    .collect 2880,2 --Collect Weak Flux (2)
+    .target Thrawn Boltar
+    .skill blacksmithing,<35,1
 step
     #optional
     .goto 1426/0,-531.23,-5601.59

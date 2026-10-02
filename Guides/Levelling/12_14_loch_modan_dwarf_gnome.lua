@@ -112,6 +112,28 @@ step
     .zone Ironforge >> Take the Deeprun Tram back to Ironforge
     .zoneskip Ironforge
     .zoneskip Loch Modan
+step << Paladin/Warrior
+    .goto 1455,24.16,74.67
+    >>Buy 2 |T134256:0|t[Light Leather] at the auction house, for the |cRXP_LOOT_Heavy Copper Maul|r (no vendor sells it)
+    >>|cRXP_WARN_None on sale? Skip this step and the next two|r
+    .collect 2318,2 --Collect Light Leather (2)
+    .target Auctioneer Redmuse
+    .skill blacksmithing,<40,1
+step << Paladin/Warrior
+    .goto 1455,52.55,41.46
+    .train 7408 >> Train |T133052:0|t[Heavy Copper Maul]
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Bengus Deepforge|r at the Great Forge
+    .target Bengus Deepforge
+    .skill blacksmithing,<40,1
+step << Paladin/Warrior
+    .goto 1455,51.6,42.4
+    >>Make the |cRXP_LOOT_Heavy Copper Maul|r at an anvil by the Great Forge (12 Copper Bars, 2 Weak Flux, 2 Light Leather)
+    .collect 6214,1 --Collect Heavy Copper Maul (1)
+    .skill blacksmithing,<40,1
+step << Paladin/Warrior
+    #sticky
+    .equip 16,6214 >> Equip the |T133052:0|t[Heavy Copper Maul] (from level 11)
+    .itemcount 6214,1
 step
     .goto 1455,55.5,47.7
     .fly Loch Modan >> Fly to Loch Modan
