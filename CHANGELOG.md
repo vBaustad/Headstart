@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh, arriving in Thelsamar: Honor Students from Brock and the hand-in at Thorgrum, the flight master a few yards on, come first now, with the Thelsamar flight path. RestedXP left the hand-in for the end, just before the flight out; easy to forget, and the flight path with it.
+
 - **Thelsamar as a crafting stop** (Loch Modan, at the first inn stop): Camping 101 Blacksmithing to 20 at the forge and anvil by the inn while you are still on it (the hand-in stays Tognus in Kharanos), and Cooking: Chunks of Boar Meat into Roasted Boar Meat at the fire outside, a point each up to 45 (10 for Auberdine, 50 for Darkshire later). The Camping 101 reminder also speaks up in Thelsamar now.
 
 - **Mail stops in the routes:** after each hearthstone stop from level 10 (the inn nearly always has a mailbox outside), a step to send your alt what the QoL mail picks (mats, recipes you can't use yet, your own list) and clear bag space. It skips itself unless you have set an alt and something in your bags would go, and it says how many stacks.
