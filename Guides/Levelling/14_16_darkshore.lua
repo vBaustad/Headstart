@@ -832,30 +832,6 @@ step << NightElf/Hunter/Druid/Warrior
     .collect 5469,5,2178,1 --Strider Meat (5)
     .mob Foreststrider Fledgling
     .isQuestTurnedIn 4811
-step << NightElf/Hunter/Druid/Warrior
-    #optional
-    #completewith EarlyCrystalEnd
-    >>Kill |cRXP_ENEMY_Moonkin|r. Loot them for their |T132832:0|t|cRXP_LOOT_[Small Eggs]|r
-    .collect 6889,10,2178,1,0x20,cooking --Small Egg (1-9)
-    .mob Young Moonkin
-    .mob Raging Moonkin
-    .mob Moonkin Oracle
-    .mob Moonkin
-    .skill cooking,10,1 -- shows if cooking is <10
-    .skill cooking,<1,1 -- shows if cooking is >1
-    .isQuestTurnedIn 4811
-step << NightElf/Hunter/Druid/Warrior
-    #optional
-    #completewith EarlyCrystalEnd
-    >>Kill |cRXP_ENEMY_Moonkin|r. Loot them for their |T132832:0|t|cRXP_LOOT_[Small Eggs]|r
-    .collect 6889,50,90,1,0x20,cooking --Small Egg (10-49)
-    .mob Young Moonkin
-    .mob Raging Moonkin
-    .mob Moonkin Oracle
-    .mob Moonkin
-    .skill cooking,<10,1 --XX Shows if cooking skill is 10-50
-    .skill cooking,50,1
-    .isQuestTurnedIn 4811
 step << NightElf/Hunter/Druid/Warrior NightElf
     #optional
     #completewith EndFirstMoonstalker
@@ -871,41 +847,6 @@ step << NightElf/Hunter/Druid/Warrior
     >>|cRXP_WARN_Be careful of the two group of 2 |cRXP_ENEMY_Raging Moonkins|r west of the |cRXP_PICK_Mysterious Red Crystal|r as the duos closest to each other are leashed together|r
     .turnin 4812 >> Turn in As Water Cascades
     .accept 4813 >> Accept The Fragments Within
-    .isQuestTurnedIn 4811
-step << NightElf/Hunter/Druid/Warrior
-    #optional
-    #loop
-    .goto 1439,46.918,48.630,0
-    .goto 1439,45.338,54.337,0
-    .goto 1439,45.108,49.184,0
-    .goto 1439,45.322,44.756,0
-    .goto 1439,46.918,48.630,60,0
-    .goto 1439,46.233,49.578,60,0
-    .goto 1439,46.110,50.828,60,0
-    .goto 1439,45.766,51.560,60,0
-    .goto 1439,45.652,52.729,60,0
-    .goto 1439,45.338,54.337,60,0
-    .goto 1439,44.817,53.601,60,0
-    .goto 1439,44.398,52.137,60,0
-    .goto 1439,44.424,50.766,60,0
-    .goto 1439,45.090,50.415,60,0
-    .goto 1439,45.108,49.184,60,0
-    .goto 1439,44.578,48.547,60,0
-    .goto 1439,44.311,47.903,60,0
-    .goto 1439,43.577,46.772,60,0
-    .goto 1439,42.237,46.108,60,0
-    .goto 1439,42.715,45.372,60,0
-    .goto 1439,43.101,44.400,60,0
-    .goto 1439,45.322,44.756,60,0
-    >>Kill |cRXP_ENEMY_Moonkin|r. Loot them for their |T132832:0|t|cRXP_LOOT_[Small Eggs]|r
-    >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_to 10 later|r
-    .collect 6889,10,2178,1,0x20,cooking --Small Egg (1-9)
-    .mob Young Moonkin
-    .mob Raging Moonkin
-    .mob Moonkin Oracle
-    .mob Moonkin
-    .skill cooking,10,1 -- shows if cooking is <10
-    .skill cooking,<1,1 -- shows if cooking is >1
     .isQuestTurnedIn 4811
 step << NightElf !Hunter/Warrior/Druid
     #optional
@@ -1521,18 +1462,6 @@ step
     >>|cRXP_WARN_Be careful as they|r |T132307:0|t[Flee] |cRXP_WARN_at <30% health|r
     .collect 5469,5,2178,1 --Strider Meat (5)
     .mob Foreststrider Fledgling
-step
-    #optional
-    #completewith BoatSeaCreature
-    >>Kill |cRXP_ENEMY_Moonkin|r. Loot them for their |T132832:0|t|cRXP_LOOT_[Small Eggs]|r
-    .collect 6889,50,90,1,0x20,cooking --Small Egg (10-49)
-    .mob Young Moonkin
-    .mob Raging Moonkin
-    .mob Moonkin Oracle
-    .mob Moonkin
-    .subzoneskip 446 --BashalAran
-    .subzoneskip 452 --Mists Edge
-    .skill cooking,50,1 --XX Shows if cooking skill is between 10-50
 step
     .goto 1439,47.314,48.676
     >>Click the |cRXP_PICK_Mysterious Red Crystal|r

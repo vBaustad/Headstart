@@ -28,24 +28,6 @@ step
     .target Mountaineer Stormpike
 step
     #optional
-    #label BoarMeatLoch1
-    #completewith ThelsamarFirst
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Mountain Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 144 --Thelsamar
-step
-    #optional
-    #requires BoarMeatLoch1
-    #completewith ThelsamarFirst
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Mountain Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 144
-step
-    #optional
     #completewith ThelsamarFirst
     >>Kill |cRXP_ENEMY_Elder Black Bears|r. Loot them for their |T134027:0|t|cRXP_LOOT_Bear Meat|r
     >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T134342:0|t|cRXP_LOOT_Boar Intestines|r
@@ -168,26 +150,6 @@ step
     .complete 86667,1 -- Jar of Snow 1/1
 step
     #optional
-    #label BoarMeatLoch2
-    #completewith SilverStream
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Mountain Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 146 --Stonewrought Dam
-    .subzoneskip 149 --Silver Stream Mine
-step
-    #optional
-    #requires BoarMeatLoch2
-    #completewith SilverStream
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Mountain Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 146 --Stonewrought Dam
-    .subzoneskip 149 --Silver Stream Mine
-step
-    #optional
     #sticky
     #label BoarBearSpider
     >>Kill |cRXP_ENEMY_Elder Black Bears|r. Loot them for their |T134027:0|t|cRXP_LOOT_Bear Meat|r
@@ -308,27 +270,6 @@ step << Human
     .accept 1338 >> Accept Stormpike's Order
     .target Mountaineer Stormpike
     .dungeon !DM
-step
-    #optional
-    #label BoarMeatLoch3
-    #completewith FlintTinder
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Mountain Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 144 --Thelsamar
-    .subzoneskip 925 --Algaz Station
-step
-    #optional
-    #requires BoarMeatLoch3
-    #completewith FlintTinder
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Mountain Boar
-    .skill cooking,<10,1
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 144 --Thelsamar
-    .subzoneskip 925 --Algaz Station
 step
     #loop
     >>Kill |cRXP_ENEMY_Elder Black Bears|r. Loot them for their |T134027:0|t|cRXP_LOOT_Bear Meat|r

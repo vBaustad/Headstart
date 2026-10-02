@@ -271,3 +271,29 @@ def mail_stops(text):
             cond = first[len("step"):] if first.startswith("step <<") or first.startswith("step  <<") else ""
             out.append(MAIL_STEP.format(cond=cond.rstrip(), lvl=MAIL_FROM))
     return "\n".join(out)
+
+
+def no_cooking_meat(text):
+    """Steps whose only job is meat for Cooking skill (#optional, every .collect a skill-up line:
+    ".collect 769,50,2178,1,0x20,cooking", no quest to take, hand in or work) go. They sat in the
+    window across whole zones, two or three at once (to 10, then to 50), for meat you loot anyway
+    (the user, 2026-10-02: "especially the chunk of boar meat"). Quest meat (Stocking Jetsteam) stays;
+    the cooking itself is the Thelsamar stop and RestedXP's boat campfires. A label another kept step
+    waits for (#requires) keeps its step."""
+    parts = re.split(r"\n(?=[ \t]*step\b)", text)
+
+    def meat_only(step):
+        collects = re.findall(r"^\s*\.collect\s+([^\n]*)", step, re.M)
+        return (re.search(r"^\s*#optional\b", step, re.M) and collects
+                and all(",cooking" in c for c in collects)
+                and re.search(r"^\s*\.mob\b", step, re.M)            # kill steps only: vendor stops (spices) stay
+                and not re.search(r"^\s*\.(accept|turnin|complete)\b", step, re.M))
+
+    drop = {k for k, s in enumerate(parts) if k and meat_only(s)}
+    while True:
+        needed = {lab for k, s in enumerate(parts) if k not in drop for lab in re.findall(r"#requires\s+(\S+)", s)}
+        keep = {k for k in drop if set(re.findall(r"#label\s+(\S+)", parts[k])) & needed}
+        if not keep:
+            break
+        drop -= keep
+    return "\n".join(s for k, s in enumerate(parts) if k not in drop)

@@ -234,26 +234,6 @@ step << Shaman
     .accept 94466 >>Accept Call of Fire
 step
     #optional
-    #label BoarMeatLoch3
-    #completewith SilverMine
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Mountain Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 146 --Stonewrought Dam
-    .subzoneskip 149 --Silver Stream Mine
-step
-    #optional
-    #requires BoarMeatLoch3
-    #completewith SilverMine
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Mountain Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 146 --Stonewrought Dam
-    .subzoneskip 149 --Silver Stream Mine
-step
-    #optional
     #completewith SilverMine
     >>Kill |cRXP_ENEMY_Elder Black Bears|r. Loot them for their |cRXP_LOOT_Bear Meat|r
     >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |cRXP_LOOT_Boar Intestines|r
@@ -373,24 +353,6 @@ step
     .mob +Tunnel Rat Geomancer << Shaman
 step
     #optional
-    #label BoarMeatLoch4
-    #completewith PawsDelivery
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Mountain Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 925 --Algaz Station
-step
-    #optional
-    #requires BoarMeatLoch4
-    #completewith PawsDelivery
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Mountain Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 925 --Algaz Station
-step
-    #optional
     #completewith PawsDelivery
     >>Kill |cRXP_ENEMY_Elder Black Bears|r. Loot them for their |cRXP_LOOT_Bear Meat|r
     >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |cRXP_LOOT_Boar Intestines|r
@@ -421,26 +383,6 @@ step
     .turnin 307 >> Turn in Filthy Paws
     .turnin 353 >> Turn in Stormpike's Delivery
     .target Mountaineer Stormpike
-step
-    #optional
-    #label BoarMeatLoch5
-    #completewith RatAbandon
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Mountain Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 144 --Thelsamar
-    .subzoneskip 925 --Algaz Station
-step
-    #optional
-    #requires BoarMeatLoch5
-    #completewith RatAbandon
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Mountain Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 144 --Thelsamar
-    .subzoneskip 925 --Algaz Station
 step
     >>Kill |cRXP_ENEMY_Elder Black Bears|r. Loot them for their |cRXP_LOOT_Bear Meat|r
     >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |cRXP_LOOT_Boar Intestines|r

@@ -257,23 +257,6 @@ step
     .collect 769,4,86,1 --Chunk of Boar Meat (4)
     .mob Stonetusk Boar
 step
-    #optional
-    #requires BoarMeatQuest
-    #label BoarMeatCooking1
-    #completewith Pie
-    >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,86,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Stonetusk Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires BoarMeatCooking1
-    #completewith Pie
-    >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,86,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Stonetusk Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_"Auntie" Bernice Stonefield|r and |cRXP_FRIENDLY_Ma Stonefield|r
     .accept 85 >> Accept Lost Necklace
     .goto 1429/0,338.47,-9889.69
@@ -595,24 +578,6 @@ step
     .turnin 87 >> Turn in Goldtooth
     .target "Auntie" Bernice Stonefield
 step
-    #optional
-    #label BoarMeatCooking2
-    #completewith Exchange
-    >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Stonetusk Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 57 --Fargodeep Mine
-step
-    #optional
-    #requires BoarMeatCooking2
-    #completewith Exchange
-    >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Stonetusk Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 57 --Fargodeep Mine
-step
     #completewith Exchange
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
     .xp 10,1 -- none from level 10: 10 min sickness on Forever
@@ -787,25 +752,6 @@ step
     .vendor >> |cRXP_BUY_Buy up to 20|r |T133995:0|t[Dalaran Sharp] |cRXP_BUY_from him if you can afford it|r << Warrior/Rogue
     .vendor >> |cRXP_BUY_Buy up to 10|r |T133995:0|t[Dalaran Sharp] |cRXP_BUY_and 10|r |T132815:0|t[Ice Cold Milk] |cRXP_BUY_from him if you can afford it|r << Paladin/Hunter
     .target Innkeeper Farley
-step
-    #optional
-    #label WolfMeatCooking1
-    #completewith Jasperlode
-    >>Kill |cRXP_ENEMY_Mangy Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Mangy Wolf
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 54
-step
-    #optional
-    #requires WolfMeatCooking1
-    #completewith Jasperlode
-    >>Kill |cRXP_ENEMY_Mangy Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Mangy Wolf
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 54
-
 step
     .goto 1429,47.5,62.2
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Jason Mathers|r
@@ -1035,23 +981,6 @@ step
     .subzoneskip 54,1
 step
     #optional
-    #requires ExitJasperlode
-    #label WolfMeatCooking2
-    #completewith Find
-    >>Kill |cRXP_ENEMY_Gray Forest Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Gray Forest Wolf
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires WolfMeatCooking2
-    #completewith Find
-    >>Kill |cRXP_ENEMY_Gray Forest Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Gray Forest Wolf
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-step
-    #optional
     #completewith Find
     +|cRXP_WARN_Kite a |cRXP_ENEMY_Young Forest Bear|r toward|r |cRXP_FRIENDLY_Guard Thomas|r
     >>|cRXP_WARN_Try to talk to |cRXP_FRIENDLY_Guard Thomas|r before the |cRXP_ENEMY_Young Forest Bear|r dies to the |cRXP_FRIENDLY_Stormwind Guards|r get quest credit|r
@@ -1075,47 +1004,11 @@ step
     .complete 52,2 --Kill Young Forest Bear (x5)
     .mob +Young Forest Bear
 step
-    #optional
-    #label WolfMeatCooking3
-    #completewith LostGuards
-    >>Kill |cRXP_ENEMY_Gray Forest Wolves|r and |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Gray Forest Wolf
-    .mob Prowler
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires WolfMeatCooking3
-    #completewith LostGuards
-    >>Kill |cRXP_ENEMY_Gray Forest Wolves|r and |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Gray Forest Wolf
-    .mob Prowler
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-step
     #label LostGuards
     .goto 1429/0,-986.35,-9336.06
     >>Click |cRXP_PICK_A half-eaten body|r on the ground
     .turnin 37 >> Turn in Find the Lost Guards
     .accept 45 >> Accept Discover Rolf's Fate
-step
-    #optional
-    #label WolfMeatCooking4
-    #completewith AcceptBundle
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Prowler
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 88 --Eastvale Logging Camp
-step
-    #optional
-    #requires WolfMeatCooking4
-    #completewith AcceptBundle
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Prowler
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 88 --Eastvale Logging Camp
 step
     #label AcceptBundle
     .goto 1429/0,-1289.22,-9469.80
@@ -1129,24 +1022,6 @@ step
     .vendor >> Vendor trash
     .target Rallic Finn
     .subzoneskip 88,1
-step
-    #optional
-    #label WolfMeatCooking5
-    #completewith Prowlers
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Prowler
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 86 --Stone Cairn Lake
-step
-    #optional
-    #requires WolfMeatCooking5
-    #completewith Prowlers
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Prowler
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 86 --Stone Cairn Lake
 step
     #completewith Prowlers
     >>Kill |cRXP_ENEMY_Prowlers|r and |cRXP_ENEMY_Young Forest Bears|r
@@ -1182,22 +1057,6 @@ step << !Paladin
     >>|cRXP_WARN_Pull the 2|r |cRXP_ENEMY_Murlocs|r |cRXP_WARN_in front of the huts, move away and cast|r |T136183:0|t[Fear] |cRXP_WARN_on one of them constantly, and try to keep DoTs on both|r << Warlock
     .turnin 45 >> Turn in Discover Rolf's Fate
     .accept 71 >> Accept Report to Thomas
-step
-    #optional
-    #label WolfMeatCooking6
-    #completewith BundleOT
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Prowler
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires WolfMeatCooking6
-    #completewith BundleOT
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Prowler
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step
     #completewith BundleOT
     >>Kill |cRXP_ENEMY_Prowlers|r and |cRXP_ENEMY_Young Forest Bears|r
@@ -1243,22 +1102,6 @@ step
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Sara Timberlain|r
     .accept 83 >> Accept Red Linen Goods
     .target Sara Timberlain
-step
-    #optional
-    #label WolfMeatCooking7
-    #completewith DeliverStart
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Prowler
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires WolfMeatCooking7
-    #completewith DeliverStart
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Prowler
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step
     #completewith WaterloggedToolbox
     >>Kill |cRXP_ENEMY_Prowlers|r and |cRXP_ENEMY_Young Forest Bears|r
@@ -1417,23 +1260,6 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Merell Ross::248277|r
     .target Merell Ross::248277
     .turnin 91740 >>Turn in Croaky's Head
-step << !Warlock
-    #optional
-    #label WolfMeatCooking8
-    #requires EVDeathskip
-    #completewith RedridgeS
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Prowler
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step << !Warlock
-    #optional
-    #requires WolfMeatCooking8
-    #completewith RedridgeS
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Prowler
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step << !Warlock
     #label RedridgeS
     .goto 1433/0,-1948.56,-9582.75
@@ -1665,22 +1491,6 @@ step
     .turnin 99129 >> Turn in A Man About a Murloc
     .target Remy "Two Times"
 
-step
-    #optional
-    #label BoarMeatCooking3
-    #completewith Garrison
-    >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Stonetusk Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires BoarMeatCooking3
-    #completewith Garrison
-    >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Stonetusk Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step
     #optional
     #requires GoldshireVendor
@@ -2072,24 +1882,6 @@ step << Warlock
     .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<8.9
 step << Warlock
     #optional
-    #label BoarMeatCooking4
-    #completewith SChoker
-    >>Kill |cRXP_ENEMY_Rockhide Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Rockhide Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 62 --Brackwell Pumpkin Patch
-step << Warlock
-    #optional
-    #requires BoarMeatCooking4
-    #completewith SChoker
-    >>Kill |cRXP_ENEMY_Rockhide Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Rockhide Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 62 --Brackwell Pumpkin Patch
-step << Warlock
-    #optional
     #completewith SChoker
     .subzone 62 >> Travel to the Brackwell Pumpkin Patch
     .isOnQuest 1688
@@ -2123,23 +1915,6 @@ step << Warlock
     >>|cRXP_WARN_Cast|r |T136183:0|t[Fear] |cRXP_WARN_on |cRXP_ENEMY_Morgan the Collector|r continously|r
     .complete 1688,1 --Surena's Choker (1)
     .mob Surena Caledon
-step << Warlock
-    #optional
-    #label WolfMeatCooking9
-    #completewith WlockRedridge
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
-    .mob Prowler
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step << Warlock
-    #optional
-    #requires WolfMeatCooking8
-    #completewith WlockRedridge
-    >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
-    .mob Prowler
-    .skill cooking,<10,1
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step << Warlock
     #requires WLBandanaEnd
     .goto 1429/0,-1222.40,-9531.76
@@ -2537,22 +2312,6 @@ step << Warrior/Paladin/Rogue
     .isQuestComplete 96044
 step
     #optional
-    #label BoarMeatDunMorogh1
-    #completewith Dirt
-    >>Kill |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Elder Crag Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires BoarMeatDunMorogh1
-    #completewith Dirt
-    >>Kill |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Elder Crag Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-step
-    #optional
     #label Dirt
     #completewith Rudra
     .goto 1426/0,-1145.04,-5504.30,40,0
@@ -2595,24 +2354,6 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rudra Amberstill|r
     .turnin 314 >> Turn in Protecting the Herd
     .target Rudra Amberstill
-step
-    #optional
-    #label BoarMeatDunMorogh2
-    #completewith QuarryStart
-    >>Kill |cRXP_ENEMY_Large Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Large Crag Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 134 --Gol'Bolar Quarry
-step
-    #optional
-    #requires BoarMeatDunMorogh2
-    #completewith QuarryStart
-    >>Kill |cRXP_ENEMY_Large Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Large Crag Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 134 --Gol'Bolar Quarry
 step
     #label QuarryStart
     .goto 1426/0,-1394.24,-5797.83

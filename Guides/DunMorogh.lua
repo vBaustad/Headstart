@@ -1241,22 +1241,6 @@ step << Warrior
     >>Exit Ironforge. Return to Dun Morogh
     .zone Dun Morogh >> Travel to Dun Morogh
     .zoneskip Ironforge,1
-step
-    #optional
-    #label BoarMeatDunMorogh1
-    #completewith Dirt
-    >>Kill |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Elder Crag Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires BoarMeatDunMorogh1
-    #completewith Dirt
-    >>Kill |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Elder Crag Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step << !Hunter
     .goto 1426/0,-1041.000,-5350.600
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin::1253|r
@@ -1368,24 +1352,6 @@ step << !Hunter
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rudra Amberstill|r
     .turnin 314 >> Turn in Protecting the Herd
     .target Rudra Amberstill
-step
-    #optional
-    #label BoarMeatDunMorogh2
-    #completewith QuarryStart
-    >>Kill |cRXP_ENEMY_Large Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Large Crag Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 134 --Gol'Bolar Quarry
-step
-    #optional
-    #requires BoarMeatDunMorogh2
-    #completewith QuarryStart
-    >>Kill |cRXP_ENEMY_Large Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Large Crag Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 134 --Gol'Bolar Quarry
 step
     .goto 1426/0,-1394.24,-5797.83
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Earthseer Farsen|r
@@ -1501,24 +1467,6 @@ step
     .turnin 433 >> Turn in The Public Servant
     .goto 1426/0,-1579.96,-5714.73
     .target +Foreman Stonebrow  
-step
-    #optional
-    #label BoarMeatDunMorogh3
-    #completewith LochEnter
-    >>Kill |cRXP_ENEMY_Scarred Crag Boars|r and |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Scarred Crag Boar
-    .mob Elder Crag Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-step
-    #optional
-    #requires BoarMeatDunMorogh3
-    #completewith LochEnter
-    >>Kill |cRXP_ENEMY_Scarred Crag Boars|r and |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Scarred Crag Boar
-    .mob Elder Crag Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
 step
     #completewith OII
     >>Kill |cRXP_ENEMY_Rockjaw Ambushers|r. Loot them for the |T132621:0|t[|cRXP_LOOT_Empty Powder Keg|r]
@@ -1721,24 +1669,6 @@ step
     .accept 416 >> Accept Rat Catching
     .accept 1339 >> Accept Mountaineer Stormpike's Task
     .target Mountaineer Kadrell
-step
-    #optional
-    #label BoarMeatLoch1
-    #completewith Algaz
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
-    .mob Mountain Boar
-    .skill cooking,10,1 --XX Shows if cooking skill is <10
-    .subzoneskip 925 --Algaz Station
-step
-    #optional
-    #requires BoarMeatLoch1
-    #completewith Algaz
-    >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
-    .mob Mountain Boar
-    .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
-    .subzoneskip 925 --Algaz Station
 step
     #optional
     #completewith Algaz
