@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh, Never Saddle on Quality: the leopard pelts are marked optional (kill the Elder Snow Leopards you meet at the quarry, don't go looking), and the step goes away at the point where you'd go back to Rudra instead of staying in the window into Loch Modan. The trip back to Rudra still only shows with all six pelts.
+
 - Dun Morogh, Father Gavin: the "kill Minor Ice Elementals as you go" step now gives way to "finish them on the way back" instead of both showing the same count at once.
 
 - **The routes can be switched off as a whole** (account-wide, for every character): no Headstart routes in RestedXP, and nothing that works off them (items kept or bought for a route, the death-skip release, the Camping 101 reminder). Off for a new install, so Headstart can be just the QoL addon; an account that already played the routes keeps them on. Takes a /reload.
