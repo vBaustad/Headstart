@@ -64,14 +64,14 @@ BFD_TURNIN = [
 # Wowhead's Forever pages and their comments (Bingles' tools, the Banner event, the valley entrance).
 # Dun Morogh ends in Stormwind (Stormpike's Delivery, the Deeprun rats): back by tram, fly in. The
 # Thelsamar flight path is learned on Dun Morogh's dip into Loch Modan.
-# Paladins and Warriors with Blacksmithing 40 (fork_dunmorogh.py's Maul steps) make the Heavy Copper
+# Paladins and Warriors who reached Blacksmithing 40 anyway (the route doesn't push it) make the Heavy Copper
 # Maul on the way through Ironforge (about 11): 2 Light Leather at the auction house (no vendor sells
 # it), the recipe from Bengus Deepforge and the anvil at the Great Forge, then the flight out. Skipped
 # below Blacksmithing 40. The Maul: 2H mace, 28-43, 10.8 DPS, +4 Strength, level 11.
 LM_MAUL = [
     "goto 1455 24.16 74.67 | raw >>Buy 2 |T134256:0|t[Light Leather] at the auction house, for the |cRXP_LOOT_Heavy Copper Maul|r (no vendor sells it) | raw >>|cRXP_WARN_None on sale? Skip this step and the next two|r | raw .collect 2318,2 --Collect Light Leather (2) | raw .target Auctioneer Redmuse | raw .skill blacksmithing,<40,1 << Paladin/Warrior",
     "goto 1455 52.55 41.46 | raw .train 7408 >> Train |T133052:0|t[Heavy Copper Maul] | raw >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Bengus Deepforge|r at the Great Forge | raw .target Bengus Deepforge | raw .skill blacksmithing,<40,1 << Paladin/Warrior",
-    "goto 1455 51.6 42.4 | raw >>Make the |cRXP_LOOT_Heavy Copper Maul|r at an anvil by the Great Forge (12 Copper Bars, 2 Weak Flux, 2 Light Leather) | raw .collect 6214,1 --Collect Heavy Copper Maul (1) | raw .skill blacksmithing,<40,1 << Paladin/Warrior",
+    "goto 1455 51.6 42.4 | raw >>Make the |cRXP_LOOT_Heavy Copper Maul|r at an anvil by the Great Forge (12 Copper Bars, 2 Light Leather, and 2 Weak Flux from |cRXP_FRIENDLY_Thurgrum Deepforge|r right there) | raw .collect 6214,1 --Collect Heavy Copper Maul (1) | raw .skill blacksmithing,<40,1 << Paladin/Warrior",
     "raw #sticky | raw .equip 16,6214 >> Equip the |T133052:0|t[Heavy Copper Maul] (from level 11) | raw .itemcount 6214,1 << Paladin/Warrior",
 ]
 LM_ARRIVE = [

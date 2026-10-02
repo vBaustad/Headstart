@@ -127,7 +127,7 @@ step << Paladin/Warrior
     .skill blacksmithing,<40,1
 step << Paladin/Warrior
     .goto 1455,51.6,42.4
-    >>Make the |cRXP_LOOT_Heavy Copper Maul|r at an anvil by the Great Forge (12 Copper Bars, 2 Weak Flux, 2 Light Leather)
+    >>Make the |cRXP_LOOT_Heavy Copper Maul|r at an anvil by the Great Forge (12 Copper Bars, 2 Light Leather, and 2 Weak Flux from |cRXP_FRIENDLY_Thurgrum Deepforge|r right there)
     .collect 6214,1 --Collect Heavy Copper Maul (1)
     .skill blacksmithing,<40,1
 step << Paladin/Warrior

@@ -161,40 +161,10 @@ i = guide.index("    .turnin 287 >>Turn in Frostmane Hold")
 i = guide.index("\nstep", i) + 1
 guide = guide[:i] + CRAFT.replace("Skip this step and finish at the next forge", "Skip this step") + guide[i:]
 
-# --- Heavy Copper Maul (Paladins and Warriors): 2H mace, 10.8 DPS, level 11 -------------------------
-# The best weapon a Dwarf can have at 11: the Wooden Mallet bought in Kharanos is ~4 DPS. Forever's
-# ranges (skilllineability, build 70170): learned at 40 (Classic 65), Rough Grinding Stone orange to 45
-# (learned at 25, 2 Rough Stone, a point every time), Rough Sharpening Stone yellow 15-55 (1 stone).
-# So from the Camping 101 skill of 20: sharpening stones to 25, grinding stones to 40 (~36 Rough Stone),
-# and the Maul itself: 12 Copper Bars, 2 Weak Flux (Thrawn Boltar, by the Kharanos forge), 2 Light
-# Leather (no vendor: Ironforge's auction house, on the way through at the start of Loch Modan, where
-# it is trained from Bengus Deepforge and made at the Great Forge: blocks.py LM_MAUL).
-MAUL_MINE = """step << Paladin/Warrior
-    #completewith GrindStones
-    >>For the |cRXP_LOOT_Heavy Copper Maul|r (level 11, 10.8 damage per second): keep mining every |cRXP_PICK_Copper Vein|r you pass until Frostmane Hold. You want about 40 |cRXP_LOOT_Rough Stone|r and 12 |cRXP_LOOT_Copper Ore|r on top of what Camping 101 uses
-"""
-j = guide.index("    #label RumbleshotAmmo")
-j = guide.rindex("\nstep", 0, j) + 1
-guide = guide[:j] + MAUL_MINE + guide[j:]
-MAUL_FORGE = """step << Paladin/Warrior
-    #sticky
-    #label GrindStones
-    .goto 1426,45.344,51.936
-    >>Same forge, for the |cRXP_LOOT_Heavy Copper Maul|r: make |cRXP_PICK_Rough Sharpening Stones|r to Blacksmithing 25, train |cRXP_PICK_Rough Grinding Stone|r from |cRXP_FRIENDLY_Tognus Flintfire|r and make them to 40 (each one is a point). Smelt the rest of your |cRXP_LOOT_Copper Ore|r: the Maul needs 12 |cRXP_LOOT_Copper Bars|r
-    >>|cRXP_WARN_Short of stone? Get as far as you can: this stays up until 40, and the Maul waits for it|r
-    .skill blacksmithing,40
-    .skill blacksmithing,<20,1
-step << Paladin/Warrior
-    .goto 1426,45.3,51.53
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thrawn Boltar|r
-    >>|cRXP_BUY_Buy 2|r |T133587:0|t[Weak Flux] |cRXP_BUY_for the Heavy Copper Maul (1s each)|r
-    .collect 2880,2 --Collect Weak Flux (2)
-    .target Thrawn Boltar
-    .skill blacksmithing,<35,1
-"""
-i = guide.index("    .turnin 96044 >>Turn in Camping 101: Blacksmithing", guide.index("    .turnin 287 >>Turn in Frostmane Hold"))
-i = guide.index("\nstep", i) + 1
-guide = guide[:i] + MAUL_FORGE + guide[i:]
+# No push for the Heavy Copper Maul here any more: the elite quest's Coldridge Hammer (8.3 DPS, at
+# about 10) covers 10-11, and the extra mining and the forge grind to Blacksmithing 40 weren't worth
+# it for +30% damage after that (the user's call, 2026-10-02). Ironforge still makes the Maul for
+# anyone who reaches 40 anyway (blocks.py LM_MAUL).
 
 # The blacksmith visit RestedXP makes after the campfire: the weapons at Grawn Thromwyn (Gladius 5s36,
 # Large Axe 4s60, Stiletto 4s, Wooden Mallet 6s31), then Blacksmithing and Flintfire's Shipment at
