@@ -281,10 +281,10 @@ FROSTHOWL_ACCEPT = """step
 # up the slope (a logged run, 2026-10-02: ~3.5 min); after it, the way out leads on to MacGrann's
 # meat locker and Tundra, south-west.
 FROSTHOWL_KILL = """step
-    .goto 1426,42.3,54.0,20,0
+    .goto 1426,42.3,55.3,15,0
     .goto 1426,41.9,49.5,20,0
     .goto 1426,39.5,48.8
-    >>Down from the ridge to the |cRXP_PICK_Grizzled Den|r (its entrance is south, about 42,54) and in: kill |cRXP_ENEMY_Frosthowl|r at the back. Loot him for the |cRXP_LOOT_Sack of Fish|r
+    >>Down from the ridge to the |cRXP_PICK_Grizzled Den|r (its entrance is south, at 42,55) and in: kill |cRXP_ENEMY_Frosthowl|r at the back. Loot him for the |cRXP_LOOT_Sack of Fish|r
     .complete 98326,1 --Sack of Fish (1)
     .mob Frosthowl
     .isOnQuest 98326
