@@ -67,6 +67,10 @@ function GetSubZoneText() return SUBZONE end
     check(len(said()) == 1, "told once")
     lua.execute("SUBZONE = 'Kharanos'; Fire('ZONE_CHANGED')")
     check(len(said()) == 2, "told again coming into Kharanos")
+    lua.execute("PRINTS = {}; SUBZONE = 'Thelsamar'; Fire('ZONE_CHANGED')")
+    check(len(said()) == 1 and "by the inn" in said()[0] and "Tognus Flintfire in Kharanos" in said()[0],
+          f"in Thelsamar: the forge there, the hand-in in Kharanos: {said()}")
+    lua.execute("SUBZONE = 'Kharanos'")
     lua.execute("SKILLS = {}; PRINTS = {}; BAGS[2840] = 10")      # untrained: from 1, 19 bars
     check("train Blacksmithing" in YR.CampingNow()[1][2], "not trained yet: says to train it first")
     lua.execute("ONQUEST[96044] = false; ONQUEST[96046] = true; COMPLETE[96046] = true; PRINTS = {}; Fire('QUEST_LOG_UPDATE')")

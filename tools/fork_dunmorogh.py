@@ -465,6 +465,13 @@ i = guide.index("    #completewith Headhunters")
 i = guide.rindex("\nstep", 0, i) + 1
 guide = guide[:i] + SENIR_AGAIN + guide[i:]
 
+# Thelsamar at 11, the route's first stop there: the crafting stop (blocks.py LM_CRAFT), after the hearth
+from blocks import LM_CRAFT          # noqa: E402
+from route_builder import build as build_steps   # noqa: E402
+i = guide.index("    .home >> Set your Hearthstone to Thelsamar")
+i = guide.index("\nstep", i) + 1
+guide = guide[:i] + build_steps("", LM_CRAFT).strip("\n") + "\n" + guide[i:]
+
 guide = mail_stops(no_passing_pins(no_sick_deathskips(clean(guide))))   # mailbox stops after the hearth ones; without the SoD, hardcore and self-found steps; no death skip from 10; no map pins for kill-as-you-pass loot
 guide, shared = mark(guide)   # pick-ups a duo or trio splits (Duo/Trio versions of the route)
 for line in shared:

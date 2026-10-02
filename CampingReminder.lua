@@ -7,6 +7,8 @@
 --     the forge and anvil by Tognus Flintfire in Kharanos. Not trained yet: train it from him first.
 --   * Mining: Camping 101: Mining is complete: hand it in to Yarr Hammerstone in Kharanos.
 -- Said once when it becomes true, and again each time you come into Kharanos with it still to do.
+-- Thelsamar too (the user, 2026-10-02: Loch Modan is a crafting stop): its forge and anvil by the inn
+-- do for the crafting; the hand-ins stay in Kharanos, so there only the Blacksmithing line, saying so.
 -- Account option campReminder (Settings, Route).
 local _, YR = ...
 
@@ -53,13 +55,19 @@ function YR.CampingNow()
         if not s or s < 20 then
             local bars, stones = YR.CampingNeed(s or 1)
             if Count(ORE) + Count(BAR) >= bars and Count(STONE) >= stones then
-                out[#out + 1] = { "bs", ("you have the ore and stone for Blacksmithing 20 (Camping 101). At the forge by"
-                    .. " Tognus Flintfire in Kharanos: %ssmelt your ore, then Copper Rods to 10, Rough Weightstones to 15,"
-                    .. " Copper Bracers to 20."):format(s and "" or "train Blacksmithing from him, ") }
+                if s and GetSubZoneText and GetSubZoneText() == "Thelsamar" then
+                    out[#out + 1] = { "bs", "you have the ore and stone for Blacksmithing 20 (Camping 101). At the forge and"
+                        .. " anvil by the inn: smelt your ore, then Copper Rods to 10, Rough Weightstones to 15, Copper Bracers"
+                        .. " to 20. The hand-in is Tognus Flintfire in Kharanos." }
+                else
+                    out[#out + 1] = { "bs", ("you have the ore and stone for Blacksmithing 20 (Camping 101). At the forge by"
+                        .. " Tognus Flintfire in Kharanos: %ssmelt your ore, then Copper Rods to 10, Rough Weightstones to 15,"
+                        .. " Copper Bracers to 20."):format(s and "" or "train Blacksmithing from him, ") }
+                end
             end
         end
     end
-    if OnQuest(MINING_QUEST) and Complete(MINING_QUEST) then
+    if OnQuest(MINING_QUEST) and Complete(MINING_QUEST) and not (GetSubZoneText and GetSubZoneText() == "Thelsamar") then
         out[#out + 1] = { "mining", "Camping 101: Mining is done: hand it in to Yarr Hammerstone in Kharanos (downstairs in Steelgrill's Depot)." }
     end
     return out
@@ -86,7 +94,8 @@ f:RegisterEvent("ZONE_CHANGED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:SetScript("OnEvent", function(_, event)
     if event == "ZONE_CHANGED" then
-        if GetSubZoneText and GetSubZoneText() == "Kharanos" then Check(true) end
+        local sub = GetSubZoneText and GetSubZoneText()
+        if sub == "Kharanos" or sub == "Thelsamar" then Check(true) end
         return
     end
     -- bags and the quest log fire in bursts: look once they settle

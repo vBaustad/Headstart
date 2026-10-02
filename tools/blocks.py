@@ -303,7 +303,20 @@ EW_CAMPING = [
     "raw .goto 1426,45.344,51.936 | raw >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r | raw .turnin 96044 >>Turn in Camping 101: Blacksmithing | raw .target Tognus Flintfire | raw .isQuestComplete 96044 << Warrior/Paladin/Rogue",
 ]
 
+# Thelsamar as a crafting stop, at the first hearth/inn visit (the user, 2026-10-02): the forge and
+# anvil by the inn (34.3,46.4) for Camping 101: Blacksmithing to 20 while you're still on it (Copper Rods
+# to 10, Rough Weightstones to 15, Copper Bracers to 20; the hand-in stays Tognus in Kharanos), and the
+# Dwarven Fires outside the inn (34.6,48.9) for Cooking: Roasted Boar Meat is orange to 45 on Forever
+# (a point a Chunk of Boar Meat; Cooking 10 for Auberdine, 50 for Darkshire later).
+LM_CRAFT = [
+    "raw .goto 1432,34.4,46.5 | raw >>At the forge and anvil by the inn: smelt your |cRXP_LOOT_Copper Ore|r, then make |cRXP_PICK_Copper Rods|r to Blacksmithing 10, |cRXP_PICK_Rough Weightstones|r to 15, |cRXP_PICK_Copper Bracers|r to 20 | raw >>|cRXP_WARN_Camping 101: Blacksmithing is handed in to Tognus in Kharanos. Not enough ore or stones? Skip this step|r | raw .skill blacksmithing,20 | raw .isOnQuest 96044 << Warrior/Paladin/Rogue",
+    "raw .goto 1432,34.6,48.9 | raw >>Cook your |T133970:0|t[Chunks of Boar Meat] into |T133974:0|t[Roasted Boar Meat] at the fire outside the inn: a point each up to |T133971:0|t[Cooking] 45. You need 10 for a quest in Auberdine and 50 in Darkshire | raw >>|cRXP_WARN_Out of meat? Skip this step|r | raw .usespell 2550 | raw .skill cooking,45 | raw .itemcount 769,1 | raw .skill cooking,<1,1",
+]
+
 BLOCKS = {
+    "11-13 Loch Modan (Hunter)": [
+        (r"\.home >> Set your Hearthstone to Thelsamar", "after", LM_CRAFT),
+    ],
     "6-11 Elwynn (Dwarf/Gnome)": [
         (r"#label Goldshire", "after", EW_MINE),
         (r"\.accept 96408 >>Accept A Visitor to Dun Morogh", "after", EW_CAMPING),
@@ -367,6 +380,7 @@ BLOCKS = {
     "12-14 Loch Modan (Dwarf/Gnome)": [
         (r"\.turnin 418 >> Turn in Thelsamar Blood Sausages", "before", LM_ARRIVE),
         (r"\.turnin 6392 >> Turn in Return to Brock", "after", LM_HOME),
+        (r"\.home >> Set your Hearthstone to Thelsamar", "after", LM_CRAFT),
         (r"\.turnin 224 >> Turn in In Defense of the King's Lands", "after", LM_SOUTH),
         (r"\.turnin 86614 >>Turn in Silver of the Waves", "after", LM_EAST),
         (r"#label Deeprun", "before", ["turnin 301 | raw .isOnQuest 301"]),
@@ -376,6 +390,7 @@ BLOCKS = {
     # the Hall, and hearths from there instead
     "11-13 Loch Modan": [
         (r"\.hs >> Hearth to Stormwind City", "before", ["group: fly Ironforge"] + HALL_OF_THANES),
+        (r"\.vendor 6734 >> \|cRXP_BUY_Buy\|r \|T132815:0\|t\[Ice Cold Milk\]", "after", LM_CRAFT),
     ],
     # Stockade: picked up on the way (Guard Berton in Lakeshire, Councilman Millstipe in Darkshire,
     # Thelwater and Nikova in Stormwind), run at the end of the route in Stormwind (about level 27),

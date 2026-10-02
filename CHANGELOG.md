@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Thelsamar as a crafting stop** (Loch Modan, at the first inn stop): Camping 101 Blacksmithing to 20 at the forge and anvil by the inn while you are still on it (the hand-in stays Tognus in Kharanos), and Cooking: Chunks of Boar Meat into Roasted Boar Meat at the fire outside, a point each up to 45 (10 for Auberdine, 50 for Darkshire later). The Camping 101 reminder also speaks up in Thelsamar now.
+
 - **Mail stops in the routes:** after each hearthstone stop from level 10 (the inn nearly always has a mailbox outside), a step to send your alt what the QoL mail picks (mats, recipes you can't use yet, your own list) and clear bag space. It skips itself unless you have set an alt and something in your bags would go, and it says how many stacks.
 
 - **Elwynn at 6, an option for Dwarves and Gnomes** (not Hunters or Warlocks): "5-6 Kharanos to Elwynn (Launch)" in RestedXP's guide list, under Headstart Launch, Launch day. Pick it by hand when Coldridge ends; the default stays Dun Morogh. Same death skip to Kharanos and its quick stops (the campfire and Camping 101, Senir, Tannok, Cooking, your trainer, the weapon, Tools for Steelgrill and the mining kit at Steelgrill's Depot), then Ironforge, the tram, the Stormwind flight path and Goldshire. From there "6-11 Elwynn (Dwarf/Gnome)": RestedXP's Human 6-11 without the Northshire and Human-only quests, coming back through Dun Morogh at 10-11 (Vagash, Farsen, the quarry), where Camping 101 Mining and Blacksmithing get handed in (mine Elwynn's copper on the way); then 11-13 Loch Modan. Made to time against Dun Morogh on the beta.

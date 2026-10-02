@@ -111,6 +111,20 @@ step << !Warrior !Rogue !Hunter
     .vendor 6734 >> |cRXP_BUY_Buy|r |T132815:0|t[Ice Cold Milk]|cRXP_BUY_. Aim to have about 20|r
     .target Innkeeper Hearthstove
     .xp >15,1
+step << Warrior/Paladin/Rogue
+    .goto 1432,34.4,46.5
+    >>At the forge and anvil by the inn: smelt your |cRXP_LOOT_Copper Ore|r, then make |cRXP_PICK_Copper Rods|r to Blacksmithing 10, |cRXP_PICK_Rough Weightstones|r to 15, |cRXP_PICK_Copper Bracers|r to 20
+    >>|cRXP_WARN_Camping 101: Blacksmithing is handed in to Tognus in Kharanos. Not enough ore or stones? Skip this step|r
+    .skill blacksmithing,20
+    .isOnQuest 96044
+step
+    .goto 1432,34.6,48.9
+    >>Cook your |T133970:0|t[Chunks of Boar Meat] into |T133974:0|t[Roasted Boar Meat] at the fire outside the inn: a point each up to |T133971:0|t[Cooking] 45. You need 10 for a quest in Auberdine and 50 in Darkshire
+    >>|cRXP_WARN_Out of meat? Skip this step|r
+    .usespell 2550
+    .skill cooking,45
+    .itemcount 769,1
+    .skill cooking,<1,1
 step
     #label StormpikeO
     .line Loch Modan,36.72,41.97,37.24,43.19,37.33,45.63,36.77,46.20,35.19,46.88,32.67,49.71,35.19,46.88,36.77,46.20,37.33,45.63,37.24,43.19,36.72,41.97
