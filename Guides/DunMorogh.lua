@@ -1646,6 +1646,20 @@ step
     .accept 416 >> Accept Rat Catching
     .accept 1339 >> Accept Mountaineer Stormpike's Task
     .target Mountaineer Kadrell
+step << Dwarf/Gnome
+    #label HonorStudents
+    .goto 1432/0,-3019.02,-5369.40,8,0
+    .goto 1432/0,-3014.86,-5366.93
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Brock Stoneseeker|r
+    .accept 6387 >> Accept Honor Students
+    .target Brock Stoneseeker
+step << Dwarf/Gnome
+    .goto 1432/0,-2929.87,-5424.84
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thorgrum Borrelson|r
+    .turnin 6387 >> Turn in Honor Students
+    .accept 6391 >> Accept Ride to Ironforge
+    .fp Thelsamar >> Get the Thelsamar flight path
+    .target Thorgrum Borrelson
 step
     #optional
     #completewith ThelsaHS
@@ -1702,13 +1716,6 @@ step << Hunter
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grenhild Darktalon|r
     .accept 86667 >> Accept Snowbound
     .target Grenhild Darktalon
-step << Dwarf/Gnome
-    #label HonorStudents
-    .goto 1432/0,-3019.02,-5369.40,8,0
-    .goto 1432/0,-3014.86,-5366.93
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Brock Stoneseeker|r
-    .accept 6387 >> Accept Honor Students
-    .target Brock Stoneseeker
 step
     .line Loch Modan,36.72,41.97,37.24,43.19,37.33,45.63,36.77,46.20,35.19,46.88,32.67,49.71,35.19,46.88,36.77,46.20,37.33,45.63,37.24,43.19,36.72,41.97
     .goto 1432/0,-3006.61,-5259.57,15,0
@@ -1830,12 +1837,6 @@ step
     .turnin 418 >> Turn in Thelsamar Blood Sausages
     .target Vidra Hearthstove
     .isQuestComplete 418
-step << Dwarf/Gnome
-    .goto 1432/0,-2929.87,-5424.84
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thorgrum Borrelson|r
-    .turnin 6387 >> Turn in Honor Students
-    .accept 6391 >> Accept Ride to Ironforge
-    .target Thorgrum Borrelson
 step
     #label flyIF
     .goto 1432/0,-2929.87,-5424.84

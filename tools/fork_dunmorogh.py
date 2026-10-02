@@ -465,6 +465,28 @@ i = guide.index("    #completewith Headhunters")
 i = guide.rindex("\nstep", 0, i) + 1
 guide = guide[:i] + SENIR_AGAIN + guide[i:]
 
+# Arriving in Thelsamar: Honor Students from Brock and straight on to Thorgrum at the flight master, a few
+# yards on, for the hand-in (Ride to Ironforge) and the flight path, before the inn (the user, 2026-10-02:
+# do it at once so it isn't forgotten). RestedXP had the hand-in at the end, just before the flight out.
+def _step_with(text, needle):
+    parts = re.split(r"\n(?=step\b)", text)
+    k = next(k for k, p in enumerate(parts) if needle in p)
+    return parts, k
+
+
+parts, k = _step_with(guide, ".accept 6387 >> Accept Honor Students")
+brock = parts.pop(k)
+guide = "\n".join(parts)
+parts, k = _step_with(guide, ".turnin 6387 >> Turn in Honor Students")
+thorgrum = parts.pop(k).replace(".target Thorgrum Borrelson",
+                                ".fp Thelsamar >> Get the Thelsamar flight path\n    .target Thorgrum Borrelson")
+assert ".fp Thelsamar" in thorgrum
+guide = "\n".join(parts)
+parts, k = _step_with(guide, "Enter the Stoutlager Inn")
+assert "#completewith ThelsaHS" in parts[k]
+parts[k:k] = [brock.rstrip("\n"), thorgrum.rstrip("\n")]
+guide = "\n".join(parts)
+
 # Thelsamar at 11, the route's first stop there: the crafting stop (blocks.py LM_CRAFT), after the hearth
 from blocks import LM_CRAFT          # noqa: E402
 from route_builder import build as build_steps   # noqa: E402
