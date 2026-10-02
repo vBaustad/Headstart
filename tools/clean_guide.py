@@ -227,14 +227,24 @@ def no_passing_pins(text):
     """Kill-as-you-pass steps (#optional and #completewith, loot from mobs, every .goto with radius 0:
     boar meat for Cooking and the like) lose their .goto lines. Each one was a pin with the step
     number on the map, six or more a step, for something you never walk to (the user, 2026-10-02:
-    "too much map clutter for the boar meat step"). The step and its loot count stay."""
+    "too much map clutter for the boar meat step"). The step and its loot count stay.
+    Their orange advice lines go too ("This will be used to level your Cooking later", "Don't go out of
+    your way...", "You need 50 Cooking for..."): three or four lines a step on top of the kill line,
+    in steps that sit in the window for half a zone (the user, same day: "litt voldsomt med
+    tasks/info text"). Such a step with no .goto at all counts too."""
     parts = re.split(r"\n(?=[ \t]*step\b)", text)   # upstream has a " step" here and there
     for k, step in enumerate(parts):
         gotos = re.findall(r"^\s*\.goto [^\n]*$", step, re.M)
-        if (gotos and all(re.search(r",0\s*(--.*)?$", g) for g in gotos)
-                and re.search(r"^\s*#optional\b", step, re.M) and re.search(r"^\s*#completewith\b", step, re.M)
-                and re.search(r"^\s*\.collect\b", step, re.M) and re.search(r"^\s*\.mob\b", step, re.M)):
-            parts[k] = re.sub(r"\n[ \t]*\.goto [^\n]*", "", step)
+        if not (re.search(r"^\s*#optional\b", step, re.M) and re.search(r"^\s*#completewith\b", step, re.M)
+                and re.search(r"^\s*\.mob\b", step, re.M) and re.search(r"^\s*>>(?!\|cRXP_WARN_)", step, re.M)):
+            continue                                       # (and it keeps its kill line)
+        if all(re.search(r",0\s*(--.*)?$", g) for g in gotos) and re.search(r"^\s*\.collect\b", step, re.M):
+            step = re.sub(r"\n[ \t]*\.goto [^\n]*", "", step)
+        if re.search(r"^\s*\.(collect|complete)\b", step, re.M):
+            # the advice only: warnings about the mobs ("Be careful as they cast Rabies") stay
+            step = re.sub(r"\n[ \t]*>>\|cRXP_WARN_(Don't go out of your way|This will be used|You need \d+|Save (any|all))[^\n]*",
+                          "", step)
+        parts[k] = step
     return "\n".join(parts)
 
 

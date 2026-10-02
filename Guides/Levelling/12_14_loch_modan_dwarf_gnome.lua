@@ -247,7 +247,6 @@ step
     #requires BoarMeatLoch3
     #completewith SilverMine
     >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Mountain Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -386,7 +385,6 @@ step
     #requires BoarMeatLoch4
     #completewith PawsDelivery
     >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Mountain Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -438,7 +436,6 @@ step
     #requires BoarMeatLoch5
     #completewith RatAbandon
     >>Kill |cRXP_ENEMY_Mountain Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Mountain Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50

@@ -340,8 +340,6 @@ step
     #label BoarMeatCooking1
     #completewith Pie
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_later|r
-    >>|cRXP_WARN_You need 10|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Auberdine later|r
     .collect 769,10,86,1,0x20,cooking --Chunk of Boar Meat (1-10)
     .mob Stonetusk Boar
     .skill cooking,10,1 --XX Shows if cooking skill is <10
@@ -350,9 +348,6 @@ step
     #requires BoarMeatCooking1
     #completewith Pie
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_later|r
-    >>|cRXP_WARN_You need 50|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Darkshire later.|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,86,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Stonetusk Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -691,7 +686,6 @@ step
     #requires BoarMeatCooking2
     #completewith Exchange
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Stonetusk Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -886,7 +880,6 @@ step
     #requires WolfMeatCooking1
     #completewith Jasperlode
     >>Kill |cRXP_ENEMY_Mangy Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Mangy Wolf
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -1133,7 +1126,6 @@ step
     #requires WolfMeatCooking2
     #completewith Find
     >>Kill |cRXP_ENEMY_Gray Forest Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Gray Forest Wolf
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -1175,7 +1167,6 @@ step
     #requires WolfMeatCooking3
     #completewith LostGuards
     >>Kill |cRXP_ENEMY_Gray Forest Wolves|r and |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Gray Forest Wolf
     .mob Prowler
@@ -1200,7 +1191,6 @@ step
     #requires WolfMeatCooking4
     #completewith AcceptBundle
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Prowler
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -1223,7 +1213,6 @@ step
     #label WolfMeatCooking5
     #completewith Prowlers
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Prowler
     .skill cooking,10,1 --XX Shows if cooking skill is <10
@@ -1233,7 +1222,6 @@ step
     #requires WolfMeatCooking5
     #completewith Prowlers
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Prowler
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -1286,7 +1274,6 @@ step
     #requires WolfMeatCooking6
     #completewith BundleOT
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Prowler
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -1348,7 +1335,6 @@ step
     #requires WolfMeatCooking7
     #completewith DeliverStart
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Prowler
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -1524,7 +1510,6 @@ step << !Warlock
     #requires WolfMeatCooking8
     #completewith RedridgeS
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Prowler
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -1796,7 +1781,6 @@ step
     #requires BoarMeatCooking3
     #completewith Garrison
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Stonetusk Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -2203,7 +2187,6 @@ step << Warlock
     #requires BoarMeatCooking4
     #completewith SChoker
     >>Kill |cRXP_ENEMY_Rockhide Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Rockhide Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -2256,7 +2239,6 @@ step << Warlock
     #requires WolfMeatCooking8
     #completewith WlockRedridge
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
     .mob Prowler
     .skill cooking,<10,1
@@ -2657,8 +2639,6 @@ step
     #label BoarMeatDunMorogh1
     #completewith Dirt
     >>Kill |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_later|r
-    >>|cRXP_WARN_You need 10|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Auberdine later|r
     .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
     .mob Elder Crag Boar
     .skill cooking,10,1 --XX Shows if cooking skill is <10
@@ -2667,9 +2647,6 @@ step
     #requires BoarMeatDunMorogh1
     #completewith Dirt
     >>Kill |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_later|r
-    >>|cRXP_WARN_You need 50|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Darkshire later|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Elder Crag Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50
@@ -2731,7 +2708,6 @@ step
     #requires BoarMeatDunMorogh2
     #completewith QuarryStart
     >>Kill |cRXP_ENEMY_Large Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
-    >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
     .mob Large Crag Boar
     .skill cooking,50,1 --XX Shows if cooking skill is between 1-50

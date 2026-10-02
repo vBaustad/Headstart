@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Less text in the kill-as-you-pass steps (boar and wolf meat, Thelsamar Blood Sausages and the like): just the kill line and the count. The orange advice under them ("This will be used to level your Cooking later", "You need 50 Cooking for...", "Don't go out of your way...") is gone; warnings about the mobs stay.
+
 - Dun Morogh, arriving in Thelsamar: Honor Students from Brock and the hand-in at Thorgrum, the flight master a few yards on, come first now, with the Thelsamar flight path. RestedXP left the hand-in for the end, just before the flight out; easy to forget, and the flight path with it.
 
 - **Thelsamar as a crafting stop** (Loch Modan, at the first inn stop): Camping 101 Blacksmithing to 20 at the forge and anvil by the inn while you are still on it (the hand-in stays Tognus in Kharanos), and Cooking: Chunks of Boar Meat into Roasted Boar Meat at the fire outside, a point each up to 45 (10 for Auberdine, 50 for Darkshire later). The Camping 101 reminder also speaks up in Thelsamar now.
