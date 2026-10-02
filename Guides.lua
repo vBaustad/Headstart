@@ -195,6 +195,9 @@ end
 
 -- The routes a character of this race can follow: its starting route and every route its #next
 -- lines lead to (ours only), as a set of keys. A Dwarf never plays Human Elwynn's quests.
+-- The starting route's later #next entries are options (Coldridge's "5-6 Kharanos to Elwynn"):
+-- RestedXP goes on with the first, so an option's own routes count only while RestedXP has one of
+-- them loaded. Else a Dwarf on Dun Morogh would keep boar meat for Elwynn's Pie for Billy.
 local START = { Human = "northshire", NightElf = "shadowglen", Dwarf = "coldridge", Gnome = "coldridge" }
 function YR:RoutesFor(race)
     local byName = {}
@@ -202,17 +205,44 @@ function YR:RoutesFor(race)
         local name = (("\n" .. (YR:GuideText(g.key) or "")):match("\n#name ([^\n]+)"))
         if name then byName[name] = g.key end
     end
-    local set, todo = {}, { START[race] }
-    while #todo > 0 do
-        local key = table.remove(todo)
-        if key and not set[key] then
-            set[key] = true
-            for line in ("\n" .. (YR:GuideText(key) or "")):gmatch("\n#next ([^\n]+)") do
-                for entry in (line:gsub("%s*<<.*$", "")):gmatch("[^;]+") do
-                    local name = strtrim(entry):gsub("^Headstart Launch %(A%)\\", "")
-                    if byName[name] then todo[#todo + 1] = byName[name] end
-                end
+    local function Nexts(key, firstOnly)
+        local out = {}
+        for line in ("\n" .. (YR:GuideText(key) or "")):gmatch("\n#next ([^\n]+)") do
+            for entry in (line:gsub("%s*<<.*$", "")):gmatch("[^;]+") do
+                local name = strtrim(entry):gsub("^Headstart Launch %(A%)\\", "")
+                if byName[name] then out[#out + 1] = byName[name] end
+                if firstOnly then break end
             end
+        end
+        return out
+    end
+    local function Walk(set, from)
+        local todo = { unpack(from) }
+        while #todo > 0 do
+            local key = table.remove(todo)
+            if key and not set[key] then
+                set[key] = true
+                for _, n in ipairs(Nexts(key)) do todo[#todo + 1] = n end
+            end
+        end
+        return set
+    end
+    local start = START[race]
+    if not start then return {} end
+    local set = Walk({ [start] = true }, Nexts(start, true))
+    -- the guide RestedXP has loaded ("01-05 ..." padded; Duo/Trio versions add to the name)
+    local current = type(RXP) == "table" and type(RXP.currentGuide) == "table" and RXP.currentGuide.name
+    current = type(current) == "string" and current:gsub("%f[%d]0+(%d)", "%1") or nil
+    for _, opt in ipairs(Nexts(start)) do
+        if not set[opt] then
+            local own = Walk({}, { opt })
+            for key in pairs(set) do own[key] = nil end
+            local on = false
+            for key in pairs(own) do
+                local name = YR.GuideName(key)
+                if current and name and current:sub(1, #name) == name then on = true end
+            end
+            if on then for key in pairs(own) do set[key] = true end end
         end
     end
     return set
