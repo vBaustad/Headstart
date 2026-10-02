@@ -300,15 +300,11 @@ step
     .fly Stormwind >> Fly to Stormwind
     .target Ariena Stormfeather
 step
+    #optional
     .goto 1453/0,660.28,-8814.55--c:Stormwind City,53.612,59.764
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Auctioneer Jaxon|r
-    >>|cRXP_BUY_Buy the following items for faster turn ins at Westfall:|r
-    >>|cRXP_WARN_If you don't want to or can't do this, skip this step|r
-    >>|T133972:0|t[Stringy Vulture Meat]
-    >>|T133884:0|t[Murloc Eye]
-    >>|T135997:0|t[Goretusk Snout]
-    >>|T134185:0|t[Okra]
-    >>|T134341:0|t[Goretusk Liver]
+    >>|cRXP_BUY_Buy|r Stringy Vulture Meat x3, Murloc Eye x3, Goretusk Snout x3, Okra x3, Goretusk Liver x8
+    >>|cRXP_WARN_Only if it's on sale and cheap: don't count on the auction house at launch. Else skip this step|r
     .collect 729,3,38,1 -- Stringy Vulture Meat (3)
     .collect 730,3,38,1 -- Murloc Eye (3)
     .collect 731,3,38,1 -- Goretusk Snout (3)

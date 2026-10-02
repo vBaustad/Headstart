@@ -989,12 +989,13 @@ step << Rogue
     .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<8.69
     .xp <14,1
 step << Mage/Priest/Warlock
+    #optional
     #sticky
     #label Wand1
     .goto 1453/0,660.28,-8814.55
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Auctioneer Jaxon|r
-    >>|cRXP_BUY_Buy a|r |T135144:0|t[Greater Magic Wand] |cRXP_BUY_if you can afford it|r
-    >>|cRXP_WARN_If you don't want to or can't do this, skip this step|r
+    >>|cRXP_BUY_Buy|r Greater Magic Wand x1
+    >>|cRXP_WARN_Only if it's on sale and cheap: don't count on the auction house at launch. Else skip this step|r
     .collect 11288,1 --Greater Magic Wand (1)
     .target Auctioneer Jaxon
     .itemStat 18,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<17.5

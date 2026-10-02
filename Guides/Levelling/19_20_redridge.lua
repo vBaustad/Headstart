@@ -143,15 +143,11 @@ step << Rogue
     .itemStat 16,ITEM_MOD_DAMAGE_PER_SECOND_SHORT,<10.89
     .xp <19,1
 step
+    #optional
     .goto 1453/0,660.28,-8814.55
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Auctioneer Jaxon|r
-    >>Buy the |T134437:0|t[Anti-Venom] for your |T132290:0|t[Poisons] quest later, and the rest for faster turn ins at Redridge Mountains shortly << !Dwarf Rogue
-    >>Buy the following items for faster turn ins at Redridge Mountains shortly << !Rogue/Dwarf Rogue
-    >>This will save you time as you won't need to run around looking for mobs to kill. Skip this step if you wish to not buy any
-    >>|T134437:0|t[Anti-Venom] << !Dwarf Rogue
-    >>|T134172:0|t[Great Goretusk Snout]
-    >>|T134028:0|t[Tough Condor Meat]
-    >>|T134321:0|t[Crisp Spider Meat]
+    >>|cRXP_BUY_Buy|r Anti-Venom x1, Great Goretusk Snout x5, Tough Condor Meat x5, Crisp Spider Meat x5
+    >>|cRXP_WARN_Only if it's on sale and cheap: don't count on the auction house at launch. Else skip this step|r
     .collect 6452,1,2359,1 << !Dwarf Rogue --Anti-Venom (1)
     .collect 2296,5,92,1 -- Great Goretusk Snout (5)
     .collect 1080,5,92,1 -- Tough Condor Meat (5)
@@ -643,15 +639,11 @@ step
     .turnin 389 >> Turn in Bazil Thredd
     .target Warden Thelwater
 step
+    #optional
     .goto 1453/0,660.28,-8814.55
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Auctioneer Jaxon|r
-    >>Buy the |T134437:0|t[Anti-Venom] for your |T132290:0|t[Poisons] quest later, and the rest for faster turn ins at Redridge Mountains shortly << !Dwarf Rogue
-    >>Buy the following items for faster turn ins at Redridge Mountains shortly << !Rogue/Dwarf Rogue
-    >>This will save you time as you won't need to run around looking for mobs to kill. Skip this step if you wish to not buy any
-    >>|T134437:0|t[Anti-Venom] << !Dwarf Rogue
-    >>|T134172:0|t[Great Goretusk Snout]
-    >>|T134028:0|t[Tough Condor Meat]
-    >>|T134321:0|t[Crisp Spider Meat]
+    >>|cRXP_BUY_Buy|r Anti-Venom x1, Great Goretusk Snout x5, Tough Condor Meat x5, Crisp Spider Meat x5
+    >>|cRXP_WARN_Only if it's on sale and cheap: don't count on the auction house at launch. Else skip this step|r
     .collect 6452,1,2359,1 << !Dwarf Rogue --Anti-Venom (1)
     .collect 2296,5,92,1 -- Great Goretusk Snout (5)
     .collect 1080,5,92,1 -- Tough Condor Meat (5)

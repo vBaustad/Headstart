@@ -297,3 +297,40 @@ def no_cooking_meat(text):
             break
         drop -= keep
     return "\n".join(s for k, s in enumerate(parts) if k not in drop)
+
+
+def short_ah(text):
+    """RestedXP's auction house steps, shortened: optional, one line of what to buy and that the auction
+    house can't be counted on at launch (the user, 2026-10-02: "auction house will NOT be reliable at
+    launch, but we can mention it"), instead of five to ten lines; and no meat for Cooking skill (see
+    no_cooking_meat). A step left with nothing to buy goes."""
+    parts = re.split(r"\n(?=[ \t]*step\b)", text)
+    out = [parts[0]]
+    for step in parts[1:]:
+        if not re.search(r"^\s*\.target Auctioneer\b", step, re.M):
+            out.append(step)
+            continue
+        step = re.sub(r"\n[ \t]*\.collect [^\n]*,cooking[^\n]*(\n[ \t]*\.disablecheckbox)?", "", step)
+        items = []
+        for c in re.findall(r"^\s*\.collect [^\n]*?--\s*([^\n]+)$", step, re.M):
+            name = re.sub(r"^Collect\s+", "", c.strip())
+            name = re.sub(r"\s*\((x?\d+)\)$", lambda m: " x" + m.group(1).lstrip("x"), name)
+            if name not in items:
+                items.append(name)
+        if not items:
+            continue
+        lines = step.split("\n")
+        talk = next((l for l in lines if "Talk to" in l and l.strip().startswith(">>")), None)
+        body = [l for l in lines if not l.strip().startswith(">>")]
+        new = ([talk] if talk else []) + [
+            "    >>|cRXP_BUY_Buy|r " + ", ".join(items),
+            "    >>|cRXP_WARN_Only if it's on sale and cheap: don't count on the auction house at launch. Else skip this step|r"]
+        at = next(i for i, l in enumerate(body) if l.strip().startswith(".")) if any(l.strip().startswith(".") for l in body) else len(body)
+        # after the .goto lines, like RestedXP's own
+        while at < len(body) and body[at].strip().startswith(".goto"):
+            at += 1
+        body[at:at] = new
+        if not re.search(r"^\s*#optional\b", step, re.M):
+            body.insert(1, "    #optional")
+        out.append("\n".join(body))
+    return "\n".join(out)

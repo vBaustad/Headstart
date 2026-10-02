@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Auction house steps are short and optional: one line of what to buy, and that the auction house can't be counted on at launch (skip if it isn't there cheap). No more buying meat there for Cooking. And **First Aid**: trained from Thamner Pol in the Thunderbrew Distillery at the second Kharanos visit (about level 8); no route had it.
+
 - No more "kill boars/wolves for meat to level Cooking" steps: they sat in the window across whole zones, two or three at once (to 10, then to 50), for meat you loot anyway. Quest meat (Stocking Jetsteam) stays, and the cooking itself is the Thelsamar stop and the campfire on the boat.
 
 - Less text in the kill-as-you-pass steps (boar and wolf meat, Thelsamar Blood Sausages and the like): just the kill line and the count. The orange advice under them ("This will be used to level your Cooking later", "You need 50 Cooking for...", "Don't go out of your way...") is gone; warnings about the mobs stay.

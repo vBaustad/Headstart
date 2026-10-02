@@ -1788,16 +1788,12 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Priestess A'moora|r
     .turnin 2520 >> Turn in Sathrah's Sacrifice
 step
+    #optional
     .goto 1457/1,2343.10,9856.95,-1
     .goto 1457/1,2341.74,9872.610,-1
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to a |cRXP_FRIENDLY_Darnassus Auctioneer|r
-    >>Buy the following items for instant turn ins at Darkshore later:
-    >>|T133912:0|t[Darkshore Grouper]
-    >>|T133972:0|t[Strider Meat]
-    >>|T134711:0|t[Minor Wizard Oil] << Priest/Druid
-    >>|T133906:0|t[Smoked Sagefish] << Priest/Druid
-    >>|T134711:0|t[Minor Wizard Oil] |cRXP_WARN_and|r |T133906:0|t[Smoked Sagefish] |cRXP_WARN_will provide a high DPS increase in early levels|r << Priest/Druid
-    >>|cRXP_WARN_Also check for any high DPS|r |T132317:0|t[Wand] |cRXP_WARN_upgrades that you can use now/soon|r << Priest
+    >>|cRXP_BUY_Buy|r Strider Meat x5, Darkshore Grouper x6, Minor Wizard Oil x1, Smoked Sagefish x20
+    >>|cRXP_WARN_Only if it's on sale and cheap: don't count on the auction house at launch. Else skip this step|r
     *|cRXP_WARN_Skip this step if you wish to not buy any|r
     .collect 5469,5,2178,1 -- Strider Meat (5)
     .collect 12238,6,1141,1 -- Darkshore Grouper (6)

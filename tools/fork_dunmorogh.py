@@ -14,7 +14,7 @@ Changes, each asserted so an upstream edit that moves them fails loudly instead 
 import os
 import re
 
-from clean_guide import clean, mail_stops, no_cooking_meat, no_passing_pins, no_sick_deathskips
+from clean_guide import clean, mail_stops, no_cooking_meat, no_passing_pins, no_sick_deathskips, short_ah
 from share_split import mark
 
 SRC = "S:/forever-data/external/rxp/Guides/Forever/Alliance-1-14_DwarfGnome.lua"
@@ -465,6 +465,21 @@ i = guide.index("    #completewith Headhunters")
 i = guide.rindex("\nstep", 0, i) + 1
 guide = guide[:i] + SENIR_AGAIN + guide[i:]
 
+# First Aid: no route trained it (the user, 2026-10-02: "we are also missing step to learn first aid").
+# Thamner Pol is in the Thunderbrew Distillery with the class trainers: the second visit there (about
+# level 8, after Frostmane Hold), when there's a little money; Linen Bandages from the cloth you loot.
+FIRST_AID = """step
+    .goto 1426,47.18,52.61
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thamner Pol|r in the Thunderbrew Distillery
+    >>|cRXP_WARN_Then make|r |T133685:0|t[Linen Bandages] |cRXP_WARN_from your Linen Cloth: healing between pulls for nothing. Short of money? Skip this step|r
+    .train 3273 >> Train |T135966:0|t[First Aid]
+    .target Thamner Pol
+"""
+at = [m.start() for m in re.finditer(r"\n    \.target Granis Swiftaxe\n", guide)]
+assert len(at) == 2, len(at)
+i = guide.index("\nstep", at[1] + 1) + 1
+guide = guide[:i] + FIRST_AID + guide[i:]
+
 # Arriving in Thelsamar: Honor Students from Brock and straight on to Thorgrum at the flight master, a few
 # yards on, for the hand-in (Ride to Ironforge) and the flight path, before the inn (the user, 2026-10-02:
 # do it at once so it isn't forgotten). RestedXP had the hand-in at the end, just before the flight out.
@@ -494,7 +509,7 @@ i = guide.index("    .home >> Set your Hearthstone to Thelsamar")
 i = guide.index("\nstep", i) + 1
 guide = guide[:i] + build_steps("", LM_CRAFT).strip("\n") + "\n" + guide[i:]
 
-guide = mail_stops(no_cooking_meat(no_passing_pins(no_sick_deathskips(clean(guide)))))   # mailbox stops after the hearth ones; without the SoD, hardcore and self-found steps; no death skip from 10; no map pins for kill-as-you-pass loot
+guide = mail_stops(short_ah(no_cooking_meat(no_passing_pins(no_sick_deathskips(clean(guide))))))   # mailbox stops after the hearth ones; short auction house steps; without the SoD, hardcore and self-found steps; no death skip from 10; no map pins for kill-as-you-pass loot
 guide, shared = mark(guide)   # pick-ups a duo or trio splits (Duo/Trio versions of the route)
 for line in shared:
     print("   ", line)
