@@ -692,6 +692,13 @@ step
     .accept 320 >> Accept Return to Bellowfiz
     .target Rejold Barleybrew
 step
+    .goto 1426/0,-501.500,-5643.900
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Senir Whitebeard::1252|r in Kharanos
+    >>|cRXP_WARN_You don't have Frostmane Hold: get it before you go in, the headhunters don't count without it|r
+    .accept 287 >>Accept Frostmane Hold
+    .target Senir Whitebeard::1252
+    .isQuestAvailable 287
+step
     #completewith Headhunters
     >>Kill |cRXP_ENEMY_Frostmane Headhunters|r inside the cave
     .complete 287,1 --Kill Frostmane Headhunter (x5)
