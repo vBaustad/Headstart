@@ -830,4 +830,6 @@ check(g.POPUP is None, "your weapon is already better: not asked")
 # The auto trainer (its own fake API)
 import smoke_trainer
 bad += smoke_trainer.run()
+import smoke_mailstep
+bad += smoke_mailstep.run()
 sys.exit(1 if bad else 0)

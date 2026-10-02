@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Mail stops in the routes:** after each hearthstone stop from level 10 (the inn nearly always has a mailbox outside), a step to send your alt what the QoL mail picks (mats, recipes you can't use yet, your own list) and clear bag space. It skips itself unless you have set an alt and something in your bags would go, and it says how many stacks.
+
 - **Elwynn at 6, an option for Dwarves and Gnomes** (not Hunters or Warlocks): "5-6 Kharanos to Elwynn (Launch)" in RestedXP's guide list, under Headstart Launch, Launch day. Pick it by hand when Coldridge ends; the default stays Dun Morogh. Same death skip to Kharanos and its quick stops (the campfire and Camping 101, Senir, Tannok, Cooking, your trainer, the weapon, Tools for Steelgrill and the mining kit at Steelgrill's Depot), then Ironforge, the tram, the Stormwind flight path and Goldshire. From there "6-11 Elwynn (Dwarf/Gnome)": RestedXP's Human 6-11 without the Northshire and Human-only quests, coming back through Dun Morogh at 10-11 (Vagash, Farsen, the quarry), where Camping 101 Mining and Blacksmithing get handed in (mine Elwynn's copper on the way); then 11-13 Loch Modan. Made to time against Dun Morogh on the beta.
 
 - No map pins for the kill-as-you-pass loot steps (boar, wolf and strider meat for Cooking, and the like): six or more numbered pins a step, all over the map, for things you only pick up on the way. The step and its count stay in the guide window.
