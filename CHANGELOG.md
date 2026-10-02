@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh: Frosthowl after Shimmer Ridge, not before. He's at the back of the Grizzled Den right under the ridge, and the cave's way out faces south: first meant out of the cave and back north up the slope (~3.5 min in a logged run); now the way out leads on to MacGrann's meat locker and Tundra.
+
 - Dun Morogh: a second chance at Frostmane Hold just before the hold. If you don't have it (the pick-up in Kharanos went by), the route sends you back to Senir first; with the quest the step never shows. A run got to the hold without it and killed headhunters for nothing.
 
 - **Camping 101 reminder** (Dun Morogh, Warriors, Paladins and Rogues): when your bags hold the ore and stone to take Blacksmithing to 20 (from wherever your skill is: Copper Rods to 10, Rough Weightstones to 15, Copper Bracers to 20), chat and the middle of the screen say so and where (the forge by Tognus in Kharanos; train Blacksmithing first if you haven't); when Camping 101: Mining is done, where to hand it in (Yarr Hammerstone). Again each time you come into Kharanos with it still to do. On autopilot the forge stop went by: in run 10 both quests were left undone (540 XP).
