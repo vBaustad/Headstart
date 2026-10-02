@@ -24,7 +24,8 @@ GROUP = "Headstart Launch (A)"
 
 # (file under RXP, RestedXP's group for #next entries without one, [guide names])
 SOURCES = [
-    ("Forever/Alliance-1-13_Human.lua", "RestedXP Forever Guide (A)", ["6-11 Elwynn Forest", "11-13 Loch Modan"]),
+    ("Forever/Alliance-1-13_Human.lua", "RestedXP Forever Guide (A)",
+     ["6-11 Elwynn Forest", "6-11 Elwynn (Dwarf/Gnome)", "11-13 Loch Modan"]),
     ("Forever/Alliance-1-14_DwarfGnome.lua", "RestedXP Forever Guide (A)",
      ["11-12 Elwynn (Dwarf/Gnome)", "12-14 Loch Modan (Dwarf/Gnome)", "11-13 Loch Modan (Hunter)"]),
     ("Forever/Alliance-1-10_NightElf.lua", "RestedXP Forever Guide (A)", ["6-11 Teldrassil"]),
@@ -39,6 +40,11 @@ SOURCES += [
     ("RestedXP Alliance 23-30.lua", "RestedXP Alliance 20-32",
      ["23-24 Wetlands", "24-27 Redridge/Duskwood", "27-30 Wetlands/Hillsbrad", "28-30 Duskwood"]),
 ]
+
+# Routes of ours built from another RestedXP guide: our name -> the upstream guide it starts from.
+# "6-11 Elwynn (Dwarf/Gnome)": the Human 6-11 for a Dwarf or Gnome who goes to Goldshire at 6 (the
+# "Elwynn at 6" option, tools/fork_dunmorogh.py's opener), without what only Northshire hands out.
+VARIANTS = {"6-11 Elwynn (Dwarf/Gnome)": "6-11 Elwynn Forest"}
 
 # At 30: the paid RestedXP 30-40 guide where it is installed, else the free one
 AT_30 = "RestedXP Survival Guide (A)\\30-32 Duskwood;RestedXP Alliance 20-32\\{free}"
@@ -73,6 +79,11 @@ EDITS = {
          "    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Marshal Dughan|r\n"
          "    .turnin 176,3 >> Turn in Wanted: \"Hogger\"\n    .target Marshal Dughan\n    .isQuestComplete 176\n",
          "Hogger's hand-in for Warlocks"),
+    ],
+    "6-11 Elwynn (Dwarf/Gnome)": [
+        ("#name 6-11 Elwynn Forest\n", "#name 6-11 Elwynn (Dwarf/Gnome)\n", "our name"),
+        ("#version 1\n<< Alliance\n", "#version 1\n<< Alliance Dwarf/Gnome !Hunter !Warlock\n",
+         "Dwarves and Gnomes from Kharanos; Hunters and Warlocks have class quests only Humans get here"),
     ],
     "27-30 Wetlands/Hillsbrad": [
         ("#next RestedXP Alliance 20-32\\30-32 Duskwood/STV\n", "#next " + AT_30.format(free="30-32 Duskwood/STV") + "\n", "hand over at 30"),
@@ -111,7 +122,7 @@ def next_line(line, home, ours):
 
 
 def build(file, home, name, ours):
-    text = block(file, name)
+    text = block(file, VARIANTS.get(name, name))
     text = re.sub(r"\n#group [^\n]*", "\n#group " + GROUP, text, count=1)
     text = re.sub(r"\n#subgroup [^\n]*", "\n#subgroup Levelling", text, count=1)
     text = re.sub(r"\n#defaultfor [^\n]*", "", text)
@@ -124,11 +135,16 @@ def build(file, home, name, ours):
         n = text.count(old)
         assert n == 1, f"{name}: expected one match upstream, found {n}: {old[:70]!r} ({why})"
         text = text.replace(old, new)
+    for old, new in EDITS_ALL.get(name, []):
+        assert old in text, f"{name}: no {old!r} upstream"
+        text = text.replace(old, new)
     text = no_passing_pins(no_sick_deathskips(clean(text)))
     text = map_ids(text)       # after cleaning: TBC/Wrath lines name maps Forever doesn't have
     text = forever_maps(text)  # Stormwind and Redridge are drawn differently on Forever
     text = insert_blocks(name, text)
     text, dropped = drop_missing(text)
+    text, gone = drop_grey(name, text, NOT_HERE)
+    dropped += [f"not here: {g}" for g in gone]
     text, greyed = drop_grey(name, text)
     for d in dropped + [f"grey: {g}" for g in greyed]:
         print(f"    {name}: {d}")
@@ -222,6 +238,23 @@ def known_quest(q):
     return str(q) in _known
 
 
+# Every match of these in a route (for labels a dropped step had: what waited on it waits on another).
+EDITS_ALL = {
+    "6-11 Elwynn (Dwarf/Gnome)": [("#completewith CampQuest\n", "#completewith Goldshire\n")],
+}
+
+# Quests a route's player can't have: route -> {quest: None}, dropped the way GREY's are (below).
+# A Dwarf or Gnome reaching Goldshire from Kharanos has done Dun Morogh's campfire and Camping 101
+# Cooking, not Elwynn's (The Adventurer sends each race to its own), and none of Northshire's
+# breadcrumbs or the Human-only class quests.
+NOT_HERE = {
+    "6-11 Elwynn (Dwarf/Gnome)": dict.fromkeys([
+        96627, 95998, 96626, 97921, 97923, 97924,   # Elwynn's campfire: The Adventurer, The Great Outdoors, Camping 101
+        54, 2158, 91772, 91746, 91751,              # Report to Goldshire, Rest and Relaxation, the kobold tracks, Elmpaw, wolf pelts
+        5623, 5624, 5634, 5635, 2998,               # Human Priest (In Favor of the Light, Desperate Prayer), Human Paladin (Tome of Divinity)
+    ]),
+}
+
 # Quests that would be grey when handed in (tools/check_levels.py; the rule: never hand in a grey quest,
 # green at worst), mostly because Dwarves and Gnomes reach these routes later now (our Loch Modan takes
 # them from 11 to about 16): route -> {quest: who still does it (a RestedXP filter), or None for nobody}.
@@ -241,9 +274,10 @@ GREY = {
 }
 
 
-def drop_grey(name, text):
-    """GREY's quests: their lines go, or carry its filter; a step with nothing else goes or is filtered."""
-    grey = GREY.get(name)
+def drop_grey(name, text, table=None):
+    """GREY's quests (or another such table's): their lines go, or carry its filter; a step with nothing
+    else goes or is filtered."""
+    grey = (GREY if table is None else table).get(name)
     if not grey:
         return text, []
     parts = re.split(r"\n(?=step\b)", text)
@@ -262,7 +296,9 @@ def drop_grey(name, text):
         if not mine:
             out.append(step)
             continue
-        if len(mine) == len(acts):                    # the step is only about these quests
+        # a step that also sets the hearth, trains or buys keeps that: only its quest lines go (below)
+        other = re.search(r"^\s*\.(home|trainer|train \d+ >>|vendor|fp|fly)\b", step, re.M)
+        if len(mine) == len(acts) and not other:      # the step is only about these quests
             filters = {grey[q] for _, q in mine}
             if filters == {None}:
                 # a label others only end at (#completewith: they still end their own way) can go;

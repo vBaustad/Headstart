@@ -1,4 +1,5 @@
 Guides\Levelling\6_11_elwynn_forest.lua
+Guides\Levelling\6_11_elwynn_dwarf_gnome.lua
 Guides\Levelling\11_13_loch_modan.lua
 Guides\Levelling\11_12_elwynn_dwarf_gnome.lua
 Guides\Levelling\12_14_loch_modan_dwarf_gnome.lua

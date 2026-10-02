@@ -409,16 +409,23 @@ lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 # a saved edit replaces the shipped text; reverting brings it back.
 names = [str(g.REGISTERED[i]).split("#name ", 1)[1].splitlines()[0] for i in range(1, len(g.REGISTERED) + 1)]
 solo = [n_ for n_ in names if "(Duo" not in n_ and "(Trio" not in n_]
-check(len(solo) == 21 and len(names) == 21, f"21 routes registered with RestedXP (starting zones and 6-30), solo only while playing solo: {len(names)}")
+check(len(solo) == 23 and len(names) == 23, f"23 routes registered with RestedXP (starting zones and 6-30), solo only while playing solo: {len(names)}")
 lua.execute("YippSetupCharDB = YippSetupCharDB or {}")
 YR.SetRole(YR, "Duo B")
 names = [str(g.REGISTERED[i]).split("#name ", 1)[1].splitlines()[0] for i in range(1, len(g.REGISTERED) + 1)]
 check("1-6 Northshire (Launch) (Duo B)" in names and "16-19 Darkshore (Duo B)" in names and not any("Trio" in n_ or "Duo A" in n_ for n_ in names),
-      f"picking Duo B registers that role's versions only: {len(names) - 21} of them")
+      f"picking Duo B registers that role's versions only: {len(names) - 23} of them")
 YR.SetRole(YR, "solo")
 dwarf = YR.RoutesFor(YR, "Dwarf")
 check(dwarf["coldridge"] and dwarf["dunmorogh"] and dwarf["16_19_darkshore"] and not dwarf["6_11_elwynn_forest"] and not dwarf["northshire"],
       "a Dwarf's routes: Coldridge on through Darkshore, not Human Elwynn or Northshire")
+check(not dwarf["dunmorogh_elwynn"] and not dwarf["6_11_elwynn_dwarf_gnome"],
+      "Coldridge's second way on (Elwynn at 6) is an option: not a Dwarf's route until RestedXP has it loaded")
+lua.execute('SAVED_RXP = RXP; RXP = { currentGuide = { name = "6-11 Elwynn (Dwarf/Gnome)" } }')
+dwarf = YR.RoutesFor(YR, "Dwarf")
+check(dwarf["dunmorogh_elwynn"] and dwarf["6_11_elwynn_dwarf_gnome"] and dwarf["11_13_loch_modan"] and dwarf["dunmorogh"],
+      "on it, its routes count too")
+lua.execute("RXP = SAVED_RXP")
 for key in ("coldridge", "dunmorogh", "northshire", "shadowglen"):
     text = YR.GuideText(YR, key)
     header, steps = YR.SplitSteps(text)

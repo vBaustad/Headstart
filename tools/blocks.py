@@ -290,7 +290,24 @@ WL_RAZORMAWS = [
     "goto 1437 49.4 41.8 | raw .turnin 98246 >> Turn in Trying Times | raw .target Howin Kindfeather | raw .isQuestComplete 98246",
 ]
 
+# "6-11 Elwynn (Dwarf/Gnome)" (the Elwynn-at-6 option): Camping 101 Mining and Blacksmithing are taken
+# in Kharanos and handed in there, so mine Elwynn's copper on the way (the Fargodeep and Jasperlode
+# mines), and when the route comes back through Steelgrill's Depot at 10-11 (A Visitor to Dun Morogh):
+# Mining to Yarr downstairs, then the forge and Blacksmithing at Tognus, 250 yards west in Kharanos.
+EW_MINE = [
+    "raw #sticky | raw >>Mine every |cRXP_PICK_Copper Vein|r you pass, for Camping 101: Mining (the Fargodeep and Jasperlode mines have plenty). Keep the ore and the Rough Stones: Blacksmithing 20 takes them | raw .skill mining,20 | raw .isOnQuest 96046 << Warrior/Paladin/Rogue",
+]
+EW_CAMPING = [
+    "raw .goto 1426/0,-660.91,-5528.93 | raw >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Yarr Hammerstone|r inside downstairs | raw .turnin 96046 >>Turn in Camping 101: Mining | raw .target Yarr Hammerstone | raw .isQuestComplete 96046 << Warrior/Paladin/Rogue",
+    "raw .goto 1426,45.344,51.936 | raw >>At the forge and anvil by |cRXP_FRIENDLY_Tognus Flintfire|r in Kharanos: smelt all your |cRXP_LOOT_Copper Ore|r | raw >>Then make |cRXP_PICK_Copper Rods|r to Blacksmithing 10, |cRXP_PICK_Rough Weightstones|r to 15, |cRXP_PICK_Copper Bracers|r to 20 | raw >>|cRXP_WARN_Not enough ore or stones? Skip this step and the next|r | raw .skill blacksmithing,20 | raw .isOnQuest 96044 << Warrior/Paladin/Rogue",
+    "raw .goto 1426,45.344,51.936 | raw >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tognus Flintfire|r | raw .turnin 96044 >>Turn in Camping 101: Blacksmithing | raw .target Tognus Flintfire | raw .isQuestComplete 96044 << Warrior/Paladin/Rogue",
+]
+
 BLOCKS = {
+    "6-11 Elwynn (Dwarf/Gnome)": [
+        (r"#label Goldshire", "after", EW_MINE),
+        (r"\.accept 96408 >>Accept A Visitor to Dun Morogh", "after", EW_CAMPING),
+    ],
     # Wetlands, solo (above); 21-23 Ashenvale and 23-24 Wetlands are further down, with their dungeon parts
     "27-30 Wetlands/Hillsbrad": [
         (r"\.turnin 465 >> Turn in Nek'rosh's Gambit", "after", WL_HOWIN),

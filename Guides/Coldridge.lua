@@ -5,12 +5,12 @@ local _, YR = ...
 
 YR:ShipGuide("coldridge", [[
 #forever
-#version 19
+#version 20
 << Alliance
 #group Headstart Launch (A)
 #subgroup Launch day
 #name 1-5 Coldridge Valley (Launch)
-#next Headstart Launch (A)\5-11 Dun Morogh (Launch)
+#next Headstart Launch (A)\5-11 Dun Morogh (Launch);Headstart Launch (A)\5-6 Kharanos to Elwynn (Launch)
 
 step
     #optional
