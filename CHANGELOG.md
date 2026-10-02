@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The splits sit on the lowest layer, like RestedXP's guide window: bags, maps and other windows open over them.
+
 - Dun Morogh, Father Gavin: the second Rime's Wrath (Avala's core) is only offered once you hand in the first (the ice elementals). The route asked for both at once, so that step couldn't finish; now it's taken when you hand in the first, and Avala comes after.
 
 - **No death skip from level 10.** On Forever the Spirit Healer gives 10 minutes of Resurrection Sickness (-75% stats and damage) as soon as you are 10, not from 11 at a minute a level as in Classic (an open Forever bug). Every death skip in the routes now goes away at 10: at 9 you still die and skip, at 10 the route has you walk or hearth instead.
@@ -9,7 +11,15 @@
 
 - **Heavy Copper Maul for Dwarf Paladins and Warriors** (2H mace, 10.8 damage per second, level 11; the Wooden Mallet is about 4): Dun Morogh now asks you to keep mining until Frostmane Hold (about 40 Rough Stone and 12 Copper Ore more), and at the Kharanos forge after Frostmane Hold takes Blacksmithing from 20 to 40 (Rough Sharpening Stones to 25, then Rough Grinding Stones, a point each) and buys 2 Weak Flux. On the way through Ironforge at the start of Loch Modan: 2 Light Leather at the auction house, the recipe from Bengus Deepforge, the Maul at the Great Forge, and equip it at 11. The Ironforge steps only show at Blacksmithing 40. On Forever the Maul is learned at 40 (65 in Classic).
 
-- **QoL tab in Settings.** Headstart is also the home of the YippYapp quality-of-life features now, the ones that help on any character whether you follow a route or not. The new QoL tab has the campfire icon and the bank (below), and the Flight timer and Quest rewards moved there from the Route tab, unchanged.
+- **QoL tab in Settings.** Headstart is also the home of the YippYapp quality-of-life features now, the ones that help on any character whether you follow a route or not. The new QoL tab has the campfire icon, the bank, vendor restock, party quests, reminders and better gear (below), and the Flight timer and Quest rewards moved there from the Route tab, unchanged.
+
+- **Vendor restock** (Settings, QoL): at a vendor who sells them, your class reagents, your ammo and your own list are bought back up to the number you keep. The reagents come from the game's own spell data and are only bought while you know a spell that takes them, and only for the top rank you know (a druid with Rebirth 5 doesn't buy Maple Seeds). Hunters get the best arrows or bullets the vendor sells for their ranged weapon that they can use (1000 by default). Shift-click anything else into "Add to my list" with a count. "Keep at least (gold)" stops it before it eats your money; hold Shift as you open a vendor to buy nothing. Chat says what was bought, for how much, and what the money didn't stretch to.
+
+- **Party quests** (Settings, QoL): accept quests and escorts shared by guildies and friends in your party (or anyone in it, or nobody), and if you like, share every quest you take - not only the route's. Hold Shift as the quest opens to be asked. Leatrix Plus's "Block shared quests" declines them before Headstart sees them.
+
+- **Reminders** (Settings, QoL): at a ding (and at login), what your class trainer has for you now and about what it costs - the prices are remembered from your trainer visits - and talent points you haven't spent. A durability warning when your most worn piece drops under 25% (once, until you repair) and a "repair while you're here" when you come into a town under 50%; both lines can be set. And a screenshot at every ding.
+
+- **Better gear** (Settings, QoL): an item in your bags that beats what you wear in that slot - by its stats for your class, its armor and, for weapons, its damage per second - gets a chat line and a small window with an Equip button. Only what you can wear (the game's red text says no), grey to green by default, at least 5% better, once per item and again after a ding. Rings and one-handers are measured against the weaker one you wear, a two-hander against main hand and off hand together.
 
 - **Bank** (Settings, QoL): crafting mats and recipes you can't use yet go to the bank by themselves when you open it, one stack at a time, and chat says what went. Crafting mats: "Not for my professions" (the default) keeps what a profession you have crafts with - ore for a miner, linen for a tailor - and banks the rest; or all of them, or none. Recipes go when you haven't got the profession or need more skill; one you can learn now stays, and one you already know is left for the vendor. Quest items, dynamite and other things you use, anything the route still needs and AutoFeed's food and water never go. Hold Shift as you open the bank to keep everything; a "Bank mats" button under the bank window (and /headstart bank) does it whenever you like. It stops when the bank is full or closes.
 

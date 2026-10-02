@@ -304,6 +304,8 @@ end
 
 local function Build()
     frame = CreateFrame("Frame", "HeadstartSplitsFrame", UIParent)
+    -- the lowest layer, like RestedXP's guide window: bags, maps and other windows open over it
+    frame:SetFrameStrata("BACKGROUND")
     frame:SetSize(246, TOP)
     frame.rows = {}
     frame.bg = frame:CreateTexture(nil, "BACKGROUND")
