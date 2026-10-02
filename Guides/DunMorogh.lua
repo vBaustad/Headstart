@@ -852,7 +852,7 @@ step << Hunter
     .accept 99162 >> Accept Treacherous Cold
     .target Father Gavin
 step << Hunter
-    #sticky
+    #completewith IceFinish
     #label IceElementals
     >>Kill |cRXP_ENEMY_Minor Ice Elementals|r as you go: they are all around Father Gavin's
     .complete 99160,1 --Minor Ice Elemental slain (10)
@@ -875,6 +875,7 @@ step << Hunter
     .collect 286359,1,99162 --Sunhammer's Rifle
     .isOnQuest 99162
 step << Hunter
+    #label IceFinish
     .goto 1426,55.0,46.0,60,0
     .goto 1426,57.0,48.0
     >>Finish the |cRXP_ENEMY_Minor Ice Elementals|r on the way back to Father Gavin
@@ -1320,7 +1321,7 @@ step << !Hunter
     .accept 99162 >> Accept Treacherous Cold
     .target Father Gavin
 step << !Hunter
-    #sticky
+    #completewith IceFinish
     #label IceElementals
     >>Kill |cRXP_ENEMY_Minor Ice Elementals|r as you go: they are all around Father Gavin's
     .complete 99160,1 --Minor Ice Elemental slain (10)
@@ -1343,6 +1344,7 @@ step << !Hunter
     .collect 286359,1,99162 --Sunhammer's Rifle
     .isOnQuest 99162
 step << !Hunter
+    #label IceFinish
     .goto 1426,55.0,46.0,60,0
     .goto 1426,57.0,48.0
     >>Finish the |cRXP_ENEMY_Minor Ice Elementals|r on the way back to Father Gavin

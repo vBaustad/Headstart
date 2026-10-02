@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh, Father Gavin: the "kill Minor Ice Elementals as you go" step now gives way to "finish them on the way back" instead of both showing the same count at once.
+
 - **The routes can be switched off as a whole** (account-wide, for every character): no Headstart routes in RestedXP, and nothing that works off them (items kept or bought for a route, the death-skip release, the Camping 101 reminder). Off for a new install, so Headstart can be just the QoL addon; an account that already played the routes keeps them on. Takes a /reload.
 
 - **Training at 10 and 12.** Dun Morogh: from level 10, your class trainer in the Thunderbrew Distillery right after Bellowfiz at Steelgrill's Depot (~150 yards on); Paladins at 12+ also Brandur in Ironforge's Mystic Ward on the way through (Golnir, the Senator, Gryth). A logged run dinged 10 at Brewnall and learned nothing from 9 until 13: about 1.5 hours without Seal of Righteousness 2.
