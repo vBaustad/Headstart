@@ -148,6 +148,7 @@ for f in TOC:
     chunk("Headstart", YR)
 YR.QUEST_IDS = lua.eval("{ route = { 179 }, new = { 96628, 5 }, rest = { 99999 } }")
 g = lua.globals()
+g.YippRouteDB = lua.table(routes=True)   # the routes switch on, as for anyone who turned it on
 g.Fire("ADDON_LOADED", "Headstart")
 
 bad = 0
@@ -419,6 +420,20 @@ YR.SetRole(YR, "solo")
 dwarf = YR.RoutesFor(YR, "Dwarf")
 check(dwarf["coldridge"] and dwarf["dunmorogh"] and dwarf["16_19_darkshore"] and not dwarf["6_11_elwynn_forest"] and not dwarf["northshire"],
       "a Dwarf's routes: Coldridge on through Darkshore, not Human Elwynn or Northshire")
+# The routes switch: off for a new install (no runs, no edited routes), kept on for an account that played them
+lua.execute("SAVED_ROUTES_DB = YippRouteDB; YippRouteDB = { runs = {}, custom = {} }")
+check(not YR.RoutesOn(), "routes switch: off for a new install")
+n_reg = len(g.REGISTERED)
+YR.RegisterGuides(YR)
+check(len(g.REGISTERED) == n_reg and len(list(YR.RoutesFor(YR, "Dwarf").keys())) == 0,
+      "off: nothing handed to RestedXP, and no routes for a race (nothing kept or bought for one)")
+lua.execute("YippRouteDB = { runs = { ['Old-Realm'] = {} } }")
+check(YR.RoutesOn() and g.YippRouteDB.routes == True, "an account with run logs keeps its routes on (decided once, stored)")
+lua.execute("YippRouteDB = { routes = false, runs = { ['Old-Realm'] = {} } }")
+check(not YR.RoutesOn(), "turned off stays off")
+YR.SetRoutesOn(True)
+check(YR.RoutesOn(), "turned on: on for every character of the account")
+lua.execute("YippRouteDB = SAVED_ROUTES_DB")
 check(not dwarf["dunmorogh_elwynn"] and not dwarf["6_11_elwynn_dwarf_gnome"],
       "Coldridge's second way on (Elwynn at 6) is an option: not a Dwarf's route until RestedXP has it loaded")
 lua.execute('SAVED_RXP = RXP; RXP = { currentGuide = { name = "6-11 Elwynn (Dwarf/Gnome)" } }')

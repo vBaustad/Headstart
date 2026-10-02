@@ -65,7 +65,31 @@ local function TellUpdates()
     end
 end
 
+-- The whole route side can be off (the user, 2026-10-02): Headstart is also a QoL addon, and someone who
+-- only wants that shouldn't get our routes in RestedXP. Account option routes, off for a new install;
+-- on for every character of the account once turned on. With it off: no routes handed to RestedXP
+-- (ours or imported), and nothing keyed to them (YR:RoutesFor is empty, so nothing is kept or bought
+-- for a route; no death-skip release, no Camping 101 reminder). Changing it takes a /reload.
+-- An account that already played our routes (run logs or edited routes) when this came in keeps them:
+-- decided once, the first time, before this login's run log starts.
+function YR.RoutesOn()
+    if YippRouteDB.routes == nil then
+        YippRouteDB.routes = (next(YippRouteDB.runs or {}) ~= nil or next(YippRouteDB.custom or {}) ~= nil)
+    end
+    return YippRouteDB.routes == true
+end
+
+function YR.SetRoutesOn(on)
+    on = on and true or false
+    local was = YR.RoutesOn()
+    YippRouteDB.routes = on
+    if on ~= was then
+        YR.Print(on and "routes on: /reload to load them into RestedXP." or "routes off: /reload to take them out of RestedXP.")
+    end
+end
+
 function YR:RegisterGuides()
+    if not YR.RoutesOn() then return end
     for key, c in pairs(Custom()) do
         c.text = Renamed(c.text)
         -- edited before routes remembered their base: take today's shipped route as it
@@ -200,6 +224,7 @@ end
 -- them loaded. Else a Dwarf on Dun Morogh would keep boar meat for Elwynn's Pie for Billy.
 local START = { Human = "northshire", NightElf = "shadowglen", Dwarf = "coldridge", Gnome = "coldridge" }
 function YR:RoutesFor(race)
+    if not YR.RoutesOn() then return {} end
     local byName = {}
     for _, g in ipairs(YR.shipped) do
         local name = (("\n" .. (YR:GuideText(g.key) or "")):match("\n#name ([^\n]+)"))
@@ -462,6 +487,7 @@ local function Extra()
 end
 
 function YR:RegisterExtras()
+    if not YR.RoutesOn() then return end
     if UnitFactionGroup("player") == "Horde" or not (RXPGuides and RXPGuides.RegisterGuide) then return end
     for name, text in pairs(Extra()) do
         text = Renamed(text)
