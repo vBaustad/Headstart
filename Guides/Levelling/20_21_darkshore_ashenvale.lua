@@ -70,7 +70,7 @@ step
     .equip 15,5387 >>|cRXP_WARN_Equip the|r |T133762:0|t[Enchanted Moonstalker Cloak] |cRXP_WARN_If it's better than your current Cloak|r
     .itemcount 5387,1
     .itemStat 15,QUALITY,<7
-step
+step << NightElf
 	#xprate <1.5 --<< !NightElf/Hunter
     #completewith MasterG
     #optional
@@ -221,7 +221,7 @@ step
     .accept 968 >> Accept The Powers Below
     .use 5352
     .itemcount 5352,1
-step
+step << NightElf
 	#xprate <1.5 --<< !NightElf/Hunter
     #completewith prospectorEscort
     #optional
@@ -366,7 +366,7 @@ step
     .complete 1138,1 -- Fine Crab Chunks (6)
     .mob Encrusted Tide Crawler
     .mob Reef Crawler
-step
+step << NightElf
 	#xprate <1.5 --<< !NightElf/Hunter
     #optional
     .goto 1439/1,227.35,4575.38,50,0
@@ -380,7 +380,7 @@ step
     .complete 1003,1 -- Grizzled Scalp (4)
     .isOnQuest 1003
     .mob Grizzled Thistle Bear
-step
+step << NightElf
     #xprate <1.5 --<< !NightElf/Hunter
     .goto 1439/1,230.69,4815.33
     >>Click the |cRXP_PICK_Buzzbox 525|r on the ground

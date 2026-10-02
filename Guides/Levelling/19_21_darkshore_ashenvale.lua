@@ -166,7 +166,7 @@ step
     .goto 1439,32.644,80.711
     >>Click the |cRXP_PICK_Beached Sea Creature|r
     .accept 4730 >> Accept Beached Sea Creature
-step
+step << NightElf
 	#xprate <1.5
     #optional
     .goto 1439/1,227.35,4575.38,50,0
@@ -180,7 +180,7 @@ step
     .complete 1003,1 -- Grizzled Scalp (4)
     .isOnQuest 1003
     .mob Grizzled Thistle Bear
-step
+step << NightElf
     #xprate <1.5
     .goto 1439/1,230.69,4815.33
     >>Click the |cRXP_PICK_Buzzbox 525|r on the ground

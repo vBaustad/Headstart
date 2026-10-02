@@ -100,7 +100,7 @@ step << NightElf !Druid
 step
     #role A,B,C
     .goto 1439,32.4,43.7
-    .zone Hillsbrad Foothills >> Ruins of Lordaeron with your group (about two levels of quest XP at 16): take the Menethil Harbor boat from Auberdine's dock and stay on board past Menethil until Southshore
+    .zone Hillsbrad Foothills >> Ruins of Lordaeron with your group (over a level of quest XP at 16): take the Menethil Harbor boat from Auberdine's dock and stay on board past Menethil until Southshore
 step
     #role A,B,C
     .zone Tirisfal Glades >> From Southshore follow the road north past Hillsbrad Fields and round Dalaran, then swim north up Lordamere Lake into Tirisfal Glades. Horde land: keep off the roads
@@ -196,7 +196,7 @@ step
     .complete 963,1 --Anaya's Pendant (1)
     .unitscan Anaya Dawnrunner
     .group
-step
+step << NightElf
     #xprate <1.5 --<< !NightElf/Hunter
     #optional
     #completewith CompleteFangs
@@ -260,7 +260,7 @@ step
     .complete 986,1 -- Fine Moonstalker Pelt (5)
     .unitscan Moonstalker Sire
     .isOnQuest 986
-step
+step << NightElf
 	#xprate <1.5 --<< !NightElf/Hunter
     #completewith MasterG
     #optional
@@ -270,7 +270,7 @@ step
     .complete 1003,1 -- Grizzled Scalp (4)
     .isOnQuest 1003
     .mob Grizzled Thistle Bear
-step
+step << NightElf
     #xprate <1.5 --<< !NightElf/Hunter
     #optional
     .goto 1439,41.390,80.563
@@ -364,7 +364,7 @@ step
     .complete 986,1 -- Fine Moonstalker Pelt (5)
     .isOnQuest 986
     .unitscan Moonstalker Sire
-step
+step << NightElf
 	#xprate <1.5 --<< !NightElf/Hunter
     #optional
     .goto 1439/1,227.35,4575.38,50,0
@@ -378,7 +378,7 @@ step
     .complete 1003,1 -- Grizzled Scalp (4)
     .isOnQuest 1003
     .mob Grizzled Thistle Bear
-step
+step << NightElf
     #xprate <1.5 --<< !NightElf/Hunter
     #label LastBuzz
     .goto 1439,41.390,80.563
@@ -676,7 +676,7 @@ step << Hunter
     .xp 18.75 >> Grind to 18 + 75%
     >>Make sure your HS cooldown is <10 min
     >>Skip this step if the area is too crowded
-step
+step << NightElf
     #label LateStalkerFangs
     #xprate <1.5 --<< !NightElf/Hunter
     #optional
@@ -704,7 +704,7 @@ step
     .mob Moonstalker Runt
     .mob Moonstalker
     .isOnQuest 1002
-step
+step << NightElf
     #xprate <1.5 --<< !NightElf/Hunter
     #label Buzzbox323End
     #requires SicklyDeers << Druid --xprate <1.5

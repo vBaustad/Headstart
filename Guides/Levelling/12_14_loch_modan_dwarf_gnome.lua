@@ -699,42 +699,6 @@ step
     .target Daryl the Youngling
     .turnin 257 >> Turn in A Hunter's Boast
 step
-    .goto 1432,64.90,66.66
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magmar Fellhew|r
-    .target Magmar Fellhew
-    .turnin 436 >> Turn in Ironband's Excavation
-    .accept 297 >> Accept Gathering Idols
-step
-    .goto 1432,65.93,65.62
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Prospector Ironband|r
-    .target Prospector Ironband
-    .accept 298 >> Accept Excavation Progress Report
-step
-    #sticky
-    #label ExcavationTools
-    .goto 1432,69.5,64.5
-    >>As you go round the dig: pick up the |cRXP_PICK_Excavation Tools|r lying on the ground (66-72, 59-68). The first one starts Excavation Tools: click it in your bags
-    .accept 86613 >> Accept Excavation Tools
-    .use 278049
-    .complete 86613,1
-step
-    .goto 1432,70.0,63.5
-    >>Kill |cRXP_ENEMY_Stonesplinter Geomancers|r, |cRXP_ENEMY_Diggers|r and |cRXP_ENEMY_Berserk Troggs|r in the excavation. Loot their |cRXP_LOOT_Carved Stone Idols|r
-    .complete 297,1
-    .mob Stonesplinter Geomancer
-    .mob Stonesplinter Digger
-    .mob Berserk Trogg
-step
-    .goto 1432,64.90,66.66
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magmar Fellhew|r
-    .target Magmar Fellhew
-    .turnin 297 >> Turn in Gathering Idols
-step
-    .goto 1432,65.8,65.5
-    .turnin 86613 >> Turn in Excavation Tools
-    .target Prospector Ironband
-    .isQuestComplete 86613
-step
     .goto 1432,62.9,50.4
     >>Kill |cRXP_ENEMY_Daggerfang|r, the big crocolisk by the shore. Loot Marek's knife
     .complete 86758,1
@@ -746,11 +710,10 @@ step
     .accept 2038 >> Accept Bingles' Missing Supplies
 step
     .goto 1432,59.0,38.0
-    >>Kill |cRXP_ENEMY_Loch Crocolisks|r along the north-east shore. Loot their meat and skins
+    >>Kill |cRXP_ENEMY_Loch Crocolisks|r along the north-east shore (not the big Large Loch Crocolisks, level 22). Loot their meat and skins
     .complete 385,1
     .complete 385,2
     .mob Loch Crocolisk
-    .mob Large Loch Crocolisk
 step
     .goto 1432,54.0,27.0
     >>Pick up |cRXP_PICK_Bingles' Blastencapper|r
@@ -778,6 +741,41 @@ step
     .target Marek Ironheart
     .turnin 385 >> Turn in Crocolisk Hunting
     .turnin 86758 >> Turn in Twisting the Knife
+step
+    .goto 1432,64.90,66.66
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magmar Fellhew|r
+    .target Magmar Fellhew
+    .turnin 436 >> Turn in Ironband's Excavation
+    .accept 297 >> Accept Gathering Idols
+step
+    .goto 1432,65.93,65.62
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Prospector Ironband|r
+    .target Prospector Ironband
+    .accept 298 >> Accept Excavation Progress Report
+step
+    #sticky
+    #label ExcavationTools
+    .goto 1432,69.5,64.5
+    >>As you go round the dig: pick up the |cRXP_PICK_Excavation Tools|r lying on the ground (66-72, 59-68). The first one starts Excavation Tools: click it in your bags
+    .accept 86613 >> Accept Excavation Tools
+    .use 278049
+    .complete 86613,1
+step
+    .goto 1432,70.0,63.5
+    >>Kill |cRXP_ENEMY_Stonesplinter Geomancers|r and |cRXP_ENEMY_Diggers|r in the excavation (leave the |cRXP_ENEMY_Berserk Troggs|r, level 19-20). Loot their |cRXP_LOOT_Carved Stone Idols|r
+    .complete 297,1
+    .mob Stonesplinter Geomancer
+    .mob Stonesplinter Digger
+step
+    .goto 1432,64.90,66.66
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magmar Fellhew|r
+    .target Magmar Fellhew
+    .turnin 297 >> Turn in Gathering Idols
+step
+    .goto 1432,65.8,65.5
+    .turnin 86613 >> Turn in Excavation Tools
+    .target Prospector Ironband
+    .isQuestComplete 86613
 step
     .hs >> Hearth to Thelsamar
 step

@@ -129,7 +129,8 @@ def build(file, home, name, ours):
     text = forever_maps(text)  # Stormwind and Redridge are drawn differently on Forever
     text = insert_blocks(name, text)
     text, dropped = drop_missing(text)
-    for d in dropped:
+    text, greyed = drop_grey(name, text)
+    for d in dropped + [f"grey: {g}" for g in greyed]:
         print(f"    {name}: {d}")
     text, shared = mark(text)
     return text, shared
@@ -219,6 +220,82 @@ def known_quest(q):
         _known |= set(json.load(open(d + "scan_70009.json", encoding="utf-8"))["quests"])
         _known |= {str(x[0]) for x in json.load(open(d + "wh_zone_quests.json", encoding="utf-8"))["quests"]}
     return str(q) in _known
+
+
+# Quests that would be grey when handed in (tools/check_levels.py; the rule: never hand in a grey quest,
+# green at worst), mostly because Dwarves and Gnomes reach these routes later now (our Loch Modan takes
+# them from 11 to about 16): route -> {quest: who still does it (a RestedXP filter), or None for nobody}.
+# A step left with nothing to do goes; a step whose quests are all kept for some goes to them only.
+GREY = {
+    "13-15 Westfall": {36: "!Dwarf !Gnome", 38: "!Dwarf !Gnome",          # Westfall Stew, both parts
+                       95065: "!Warlock"},                                 # Fishin' Time
+    "14-16 Darkshore": {958: "NightElf",           # Tools of the Highborne (Night Elves' Expanding Horizons follows)
+                        983: "NightElf", 1001: "NightElf", 1002: "NightElf", 1003: "NightElf"},   # Buzzboxes
+    "16-19 Darkshore": {1002: "NightElf", 1003: "NightElf"},
+    "19-21 Darkshore/Ashenvale": {1003: "NightElf"},
+    "20-21 Darkshore/Ashenvale": {1003: "NightElf"},
+    "19-20 Redridge": {120: None, 121: None,                               # Messenger to Stormwind
+                       129: None, 130: None, 131: None,                    # A Free Lunch and on
+                       3741: None},                                        # Hilary's Necklace
+    "24-27 Redridge/Duskwood": {244: None, 246: None},                     # Encroaching Gnolls, late copy
+}
+
+
+def drop_grey(name, text):
+    """GREY's quests: their lines go, or carry its filter; a step with nothing else goes or is filtered."""
+    grey = GREY.get(name)
+    if not grey:
+        return text, []
+    parts = re.split(r"\n(?=step\b)", text)
+    out, notes, hidden = [parts[0]], [], {}       # hidden: label -> the filter its step now has
+
+    def only(step, keep):
+        lines = step.split("\n")
+        lines[0] = lines[0] + " " + keep if "<<" in lines[0] else "step << " + keep
+        return "\n".join(lines)
+
+    for step in parts[1:]:
+        lines = step.split("\n")
+        acts = [(i, re.match(r"\s*\.(accept|turnin|complete)\s+(\d+)", ln)) for i, ln in enumerate(lines)]
+        acts = [(i, m) for i, m in acts if m]
+        mine = [(i, int(m.group(2))) for i, m in acts if int(m.group(2)) in grey]
+        if not mine:
+            out.append(step)
+            continue
+        if len(mine) == len(acts):                    # the step is only about these quests
+            filters = {grey[q] for _, q in mine}
+            if filters == {None}:
+                # a label others only end at (#completewith: they still end their own way) can go;
+                # one a step waits for (#requires) can't
+                for label in re.findall(r"#label\s+(\S+)", step):
+                    assert not re.search(r"#requires\s+" + re.escape(label) + r"\b", text), \
+                        f"{name}: a step waits for {label}, which would go"
+                notes.append(f"dropped a step: {', '.join(str(q) for _, q in mine)}")
+                continue
+            keep = " ".join(sorted(f for f in filters if f))
+            for label in re.findall(r"#label\s+(\S+)", step):
+                hidden[label] = keep
+            notes.append(f"kept for {keep} only: {', '.join(str(q) for _, q in mine)}")
+            out.append(only(step, keep))
+            continue
+        for i, q in reversed(mine):                   # a shared step: just these lines
+            if grey[q] is None:
+                del lines[i]
+            else:
+                lines[i] = lines[i] + (" " + grey[q] if "<<" in lines[i] else " << " + grey[q])
+        notes.append(f"lines only: {', '.join(str(q) for _, q in mine)}")
+        out.append("\n".join(lines))
+    # a step that only waits for a label now kept for some (#requires, nothing to do of its own) goes
+    # to the same ones; a step that does something and needs it would be stuck: fail instead
+    for k, step in enumerate(out[1:], 1):
+        for label in re.findall(r"#requires\s+(\S+)", step):
+            if label in hidden:
+                acts = re.findall(r"^\s*\.(accept|turnin|complete)\s+(\d+)", step, re.M)
+                assert all(int(q) in grey for _, q in acts), f"{name}: a step needs {label}, now {hidden[label]} only"
+                if not step.split("\n")[0].endswith(hidden[label]):
+                    out[k] = only(step, hidden[label])
+                    notes.append(f"waits for {label}: kept for {hidden[label]} only")
+    return "\n".join(out), notes
 
 
 def drop_missing(text):

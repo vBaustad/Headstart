@@ -101,7 +101,7 @@ step
 step
     .goto 1436/0,919.47,-9853.13
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Verna Furlbrow|r
-    .accept 36 >> Accept Westfall Stew
+    .accept 36 >> Accept Westfall Stew << !Dwarf !Gnome
     .accept 151 >> Accept Poor Old Blanchy
     .target Verna Furlbrow
 step
@@ -117,9 +117,9 @@ step
     #label SalmaS
     .goto 1436/0,1042.67,-10111.670
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Salma Saldean|r
-    .turnin 36 >> Turn in Westfall Stew
+    .turnin 36 >> Turn in Westfall Stew << !Dwarf !Gnome
     .target Salma Saldean
-    .accept 38 >> Accept Westfall Stew
+    .accept 38 >> Accept Westfall Stew << !Dwarf !Gnome
     .accept 22 >> Accept Goretusk Liver Pie
 step
     .goto 1436,51.40,32.20
@@ -344,7 +344,7 @@ step
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Salma Saldean|r
     .goto 1436/0,1042.67,-10111.670
     .turnin 22 >> Turn in Goretusk Liver Pie
-    .turnin 38 >> Turn in Westfall Stew
+    .turnin 38 >> Turn in Westfall Stew << !Dwarf !Gnome
     .isQuestComplete 22
     .isQuestComplete 38
     .target Salma Saldean
@@ -355,7 +355,7 @@ step
     .turnin 22 >> Turn in Goretusk Liver Pie
     .isQuestComplete 22
     .target Salma Saldean
-step
+step << !Dwarf !Gnome
     #optional
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Salma Saldean|r
     .goto 1436/0,1042.67,-10111.670
@@ -429,7 +429,7 @@ step
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Salma Saldean|r
 	.target Salma Saldean
     .goto 1436/0,1042.67,-10111.670
-    .turnin 38 >> Turn in Westfall Stew
+    .turnin 38 >> Turn in Westfall Stew << !Dwarf !Gnome
     .turnin 22 >> Turn in Goretusk Liver Pie
 step
     .goto 1436,51.40,32.20
@@ -697,7 +697,7 @@ step
     .collect 6529,1,95065,1 --|1/1 Shiny Bauble
     .collect 6530,3,95065,1 --|3/3 Nightcrawlers
     .target Catherine Leland
-step
+step << !Warlock
     .goto 1453/0,1269.100,-8540.601
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gilbert Gray::267118|r
     .target Gilbert Gray::267118

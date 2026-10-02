@@ -287,13 +287,6 @@ step
 	.target Wiley the Black
 step
 .dungeon DM
-    .goto 1433/0,-2207.10,-9231.34,15,0
-    .goto 1433/0,-2221.65,-9218.60
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magistrate Solomon|r
-	.target Magistrate Solomon
-    .accept 120 >> Accept Messenger to Stormwind
-step
-.dungeon DM
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Verner Osgood|r
 	.target Verner Osgood
     .goto 1433/0,-2243.14,-9259.43
@@ -479,13 +472,6 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thor|r
     .fly Stormwind >> Fly to Stormwind
     .target Thor
-step
-.dungeon DM
-    .goto 1453/0,520.88,-8954.15
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_General Marcus Jonathan|r
-    .turnin 120 >> Turn in Messenger to Stormwind
-    .accept 121 >> Accept Messenger to Stormwind
-    .target General Marcus Jonathan
 step << Mage
 .dungeon DM
     #completewith next
@@ -772,20 +758,6 @@ step
     .accept 124 >> Accept A Baying of Gnolls
     .accept 122 >> Accept Underbelly Scales
 step
-.dungeon DM
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_General Marcus Jonathan|r
-	.target General Marcus Jonathan
-    .goto 1453/0,520.88,-8954.15
-    .turnin 120 >> Turn in Messenger to Stormwind
-    .accept 121 >> Accept Messenger to Stormwind
-step
-.dungeon !DM
-    .goto 1433/0,-2207.10,-9231.34,15,0
-    .goto 1433/0,-2221.65,-9218.60
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magistrate Solomon|r
-	.target Magistrate Solomon
-    .accept 120 >> Accept Messenger to Stormwind
-step
     .group
     .goto 1433/0,-2208.600,-9243.500
     >>Click the |cRXP_PICK_Wanted Poster|r
@@ -795,13 +767,6 @@ step
 	.target Dockmaster Baren
     .goto 1433/0,-2172.15,-9261.310
     .accept 127 >> Accept Selling Fish
-step
-#xprate <1.5
-    .goto 1433/0,-2152.62,-9217.870
-    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Darcy|r
-    >>|cRXP_FRIENDLY_Darcy|r |cRXP_WARN_walks around inside the Inn|r
-	.target Darcy
-    .accept 129 >> Accept A Free Lunch
 step
     .goto 1433/0,-2164.56,-9213.10,8,0
     .goto 1433/0,-2145.67,-9231.49
@@ -843,30 +808,6 @@ step << Rogue
     .accept 2282 >> Accept Alther's Mill
     .target Lucius
 step
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Shawn|r
-	.target Shawn
-    .goto 1433/0,-2207.10,-9351.52
-    .accept 3741 >> Accept Hilary's Necklace
-step
-    >>|cRXP_WARN_Jump into the Lake|r
-    >>Open the |cRXP_PICK_Glinting Mud|r. Loot it for |cRXP_LOOT_Hilary's Necklace|r
-    >>|cRXP_WARN_It has multiple spawn locations in the Lake|r
-    .goto 1433/0,-2174.32,-9386.56,0
-    .goto 1433/0,-2147.41,-9308.08,0
-    .goto 1433/0,-2090.96,-9373.82,0
-    .goto 1433/0,-1986.76,-9324.30,0
-    .goto 1433/0,-2246.40,-9359.92,0
-    .goto 1433/0,-2309.57,-9376.28,0
-    .goto 1433/0,-2397.70,-9363.97,0
-    .goto 1433/0,-1986.76,-9324.30,70,0
-    .goto 1433/0,-2397.70,-9363.97,70,0
-    .complete 3741,1 --Hilary's Necklace (1)
-step << Druid
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Hilary|r
-	.target Hilary
-    .goto 1433/0,-2205.58,-9351.52
-    .turnin 3741 >> Turn in Hilary's Necklace
-step
     >>Open the |cRXP_PICK_Sunken Chest|r. Loot it for |cRXP_LOOT_Oslow's Toolbox|r
     .goto 1433/0,-2472.16,-9366.72
     .complete 125,1 --Oslow's Toolbox (1)
@@ -891,13 +832,6 @@ step
 	.target Guard Parker
     .goto 1433/0,-1906.400,-9606.800
     .accept 244 >> Accept Encroaching Gnolls
-step
-    #xprate <1.5
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Guard Parker|r
-	.target Guard Parker
-    .goto 1433/0,-1906.400,-9606.800
-    .turnin 129 >> Turn in A Free Lunch
-    .accept 130 >> Accept Visit the Herbalist
 step
     #xprate <1.5
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Deputy Feldon|r
@@ -1073,30 +1007,11 @@ step
     .itemcount 2296,5 -- Great Goretusk Snout (5)
     .itemcount 1080,5 -- Tough Condor Meat (5)
     .itemcount 1081,5 -- Crisp Spider Meat (5)
-step
-#xprate <1.5
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Martie Jainrose|r
-	.target Martie Jainrose
-    .goto 1433/0,-2045.38,-9245.82
-    .turnin 130 >> Turn in Visit the Herbalist
-    .accept 131 >> Accept Delivering Daffodils
-step
-#xprate <1.5
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Darcy|r
-    >>|cRXP_FRIENDLY_Darcy|r |cRXP_WARN_walks around inside the Inn|r
-	.target Darcy
-    .goto 1433/0,-2152.62,-9216.430
-    .turnin 131 >> Turn in Delivering Daffodils
 step << Rogue
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Lucius|r
 	.target Lucius
     .goto 1433/0,-2180.19,-9328.21
     .turnin 2282 >> Turn in Alther's Mill
-step
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Hilary|r
-	.target Hilary
-    .goto 1433/0,-2205.58,-9351.52
-    .turnin 3741 >> Turn in Hilary's Necklace
 step << Rogue
     #optional
 	#completewith InRR
@@ -1544,12 +1459,6 @@ step << Rogue
     .target Master Mathias Shaw
 
 step
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_General Marcus Jonathan|r
-	.target General Marcus Jonathan
-    .goto 1453/0,520.88,-8954.15
-    .turnin 120 >> Turn in Messenger to Stormwind
-    .accept 121 >> Accept Messenger to Stormwind
-step
     #completewith next
     .goto 1429/0,84.61,-9457.95,60 >> Travel to Goldshire
 step
@@ -1589,18 +1498,6 @@ step
     .goto 1433/0,-2243.14,-9259.43
     .accept 122 >> Accept Underbelly Scales
 step
-    #label FlyR
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magistrate Solomon|r
-	.target Magistrate Solomon
-    .goto 1433/0,-2207.10,-9231.34,15,0
-    .goto 1433/0,-2221.65,-9218.60
-    .turnin 121 >> Turn in Messenger to Stormwind
-step
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Hilary|r
-	.target Hilary
-    .goto 1433/0,-2205.58,-9351.52
-    .turnin 3741 >> Turn in Hilary's Necklace
-step
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Dockmaster Baren|r
 	.target Dockmaster Baren
     .goto 1433/0,-2172.59,-9261.02
@@ -1625,13 +1522,6 @@ step
     .goto 1433/0,-2062.96,-9209.62
     .accept 92 >> Accept Redridge Goulash
     .turnin 92 >> Turn in Redridge Goulash
-step
-#xprate <1.5
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Martie Jainrose|r
-	.target Martie Jainrose
-    .goto 1433/0,-2045.38,-9245.82
-    .turnin 130 >> Turn in Visit the Herbalist
-    .accept 131 >> Accept Delivering Daffodils
 step
     #xprate <1.2
 	#completewith next
@@ -1693,13 +1583,6 @@ step
 	>>Kill |cRXP_ENEMY_Black Dragon Whelps|r. Loot them for their |cRXP_LOOT_Scales|r
 	.mob Black Dragon Whelp
     .complete 122,1 --Underbelly Whelp Scale (6)
-step
-#xprate <1.5
-	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Darcy|r
-    >>|cRXP_FRIENDLY_Darcy|r |cRXP_WARN_walks around inside the Inn|r
-	.target Darcy
-    .goto 1433/0,-2152.62,-9216.430
-    .turnin 131 >> Turn in Delivering Daffodils
 step
     #xprate <1.2
     #completewith next

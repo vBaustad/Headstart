@@ -773,6 +773,10 @@ greys = check_levels.everyone()
 check(not greys, "no grey hand-ins for any race and class" + "".join(
     f"\n     {race} {cls}: {r[0]} step {r[1]}: {r[3]} {r[4]} (quest {r[5]}, you ~{r[6]})" for race, cls, r in greys))
 
+reds = check_levels.red_mobs()
+check(not reds, "no red mobs to kill outside dungeons" + "".join(
+    f"\n     {race} {cls}: {r[0]} step {r[1]}: {r[4]} (level {r[5]}, you ~{r[6]})" for race, cls, r in reds))
+
 # The flight timer (its own fake API)
 import smoke_flight
 bad += smoke_flight.run()

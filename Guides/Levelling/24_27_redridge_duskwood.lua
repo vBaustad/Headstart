@@ -88,13 +88,6 @@ step << !Human
 >>Talk to |cRXP_FRIENDLY_Theocritus|r
     .accept 94 >> Accept A Watchful Eye
 step
-    #label exit
-    .goto 1433,12.314,69.600
-	>>Talk to Guard Parker in Redridge Mountains
-.target Guard Parker
->>Talk to |cRXP_FRIENDLY_Guard Parker|r
-    .accept 244 >> Accept Encroaching Gnolls
-step
     #role A,B,C
     .goto 1433,21.17,46.58
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Guard Berton|r
@@ -105,11 +98,6 @@ step
 	#label LakeshireFP
 	.goto 1433,25.414,59.400,-1
     .fp Redridge >> Get the Redridge Mountains flight path
-step
-    .goto 1433,25.714,60.100,-1
-.target Deputy Feldon
->>Talk to |cRXP_FRIENDLY_Deputy Feldon|r
-    .turnin 244 >> Turn in Encroaching Gnolls
 step
 	#requires LakeshireFP
     .goto 1433,28.314,49.100

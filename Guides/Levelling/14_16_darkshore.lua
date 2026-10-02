@@ -47,7 +47,7 @@ step << !NightElf
     #optional
     #completewith next
     .goto 1439/1,525.800,6414.800,8 >> Travel up the ramp toward |cRXP_FRIENDLY_Wizbang Cranktoggle|r
-step
+step << NightElf
     .goto 1439,36.976,44.135
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Wizbang Cranktoggle|r upstairs
     .accept 983 >> Accept Buzzbox 827
@@ -146,7 +146,7 @@ step
     .collect 5469,5,2178,1 --Strider Meat (5)
     .mob Foreststrider Fledgling
     .subzoneskip 442
-step
+step << NightElf
     #sticky
     #label BuzzBox1
     #loop
@@ -248,7 +248,7 @@ step
     #label invisThistle
     #optional
     #requires RabidThistle
-step
+step << NightElf
     #requires BuzzBox1
     .goto 1439,36.634,46.250
     >>Click the |cRXP_PICK_Buzzbox 827|r on the ground
@@ -359,7 +359,7 @@ step
     #optional
     #completewith SeaT1
     .goto 1439,32.432,43.744,15 >> Travel to the end of the dock, then jump into the water
-step
+step << NightElf
     #optional
     #completewith washed1
     .goto 1439/1,741.52,6570.95,0
@@ -481,7 +481,7 @@ step
     .turnin 4761 >> Turn in Thundris Windweaver
     .accept 4762 >> Accept The Cliffspring River
     .accept 954 >> Accept Bashal'Aran
-    .accept 958 >> Accept Tools of the Highborne
+    .accept 958 >> Accept Tools of the Highborne << NightElf
     .target Thundris Windweaver
     .xp >16,1
 step
@@ -500,7 +500,7 @@ step
     .turnin 4761 >> Turn in Thundris Windweaver
     .accept 4762 >> Accept The Cliffspring River
 
-step
+step << NightElf
     #completewith MistVeil
     .goto 1439/1,620.35,6768.76,0
     .goto 1439/1,602.66,6924.21,0
@@ -536,7 +536,7 @@ step
     >>|cRXP_WARN_If you don't want to do this, swim underwater into the bottom floor of the boat then loot the |cRXP_LOOT_Mist Veil's Lockbox|r inside|r
     .complete 982,2 --Mist Veil Lockbox (1)
     .isOnQuest 982
-step
+step << NightElf
     #loop
     .goto 1439/1,310.53,7077.48,0
     .goto 1439/1,404.85,7099.75,0
@@ -564,19 +564,19 @@ step
     >>Click the |cRXP_PICK_Beached Sea Creature|r
     .accept 4723 >> Accept Beached Sea Creature
     .isOnQuest 982
-step
+step << NightElf
     .goto 1439,41.960,28.616
     >>Click the |cRXP_PICK_Buzzbox 411|r on the ground
     .turnin 1001 >> Turn in Buzzbox 411
     .accept 1002 >> Accept Buzzbox 323
     .isQuestComplete 1001
-step
+step << NightElf
     #optional
     .goto 1439,41.960,28.616
     >>Click the |cRXP_PICK_Buzzbox 411|r on the ground
     .accept 1002 >> Accept Buzzbox 323
     .isQuestTurnedIn 1001
-step
+step << NightElf
     #optional
     #completewith AsterionTravel
     .goto 1439,44.190,33.697,0
@@ -726,7 +726,7 @@ step
     .collect 5469,5,2178,1 --Strider Meat (5)
     .mob Foreststrider Fledgling
     .subzoneskip 442
-step
+step << NightElf
     #optional
     #completewith AuberdineTurnin2 << NightElf/Hunter/Druid/Warrior
     #completewith EndFirstMoonstalker << !NightElf !Hunter !Druid !Warrior
@@ -857,7 +857,7 @@ step << NightElf/Hunter/Druid/Warrior
     .skill cooking,<10,1 --XX Shows if cooking skill is 10-50
     .skill cooking,50,1
     .isQuestTurnedIn 4811
-step << NightElf/Hunter/Druid/Warrior
+step << NightElf/Hunter/Druid/Warrior NightElf
     #optional
     #completewith EndFirstMoonstalker
     >>Kill |cRXP_ENEMY_Moonstalker Runts|r. Loot them for their |cRXP_LOOT_Moonstalker Fangs|r
@@ -1010,7 +1010,7 @@ step
 step
     #label EndFirstMoonstalker
 
-step
+step << NightElf
     #optional
     #completewith AmethStart
     >>Kill |cRXP_ENEMY_Moonstalker Runts|r and |cRXP_ENEMY_Moonstalkers|r. Loot them for their |cRXP_LOOT_Moonstalker Fangs|r
@@ -1072,7 +1072,7 @@ step
     >>Kill |cRXP_ENEMY_Anaya Dawnrunner|r. Loot her for her |cRXP_LOOT_Pendant|r
     .complete 963,1 --Anaya's Pendant (1)
     .unitscan Anaya Dawnrunner
-step
+step << NightElf
     #sticky
     #label Relics
     .goto 1439,42.670,57.390,0
@@ -1125,7 +1125,7 @@ step
     >>Kill |cRXP_ENEMY_Jai'vhanel|r. Loot it for the |cRXP_LOOT_Feather of Jai'vhanel|r
     .complete 98025,1 --|1/1 Feather of Jai'vhanel
     .mob Jai'vhanel
-step
+step << NightElf
     #optional
     #requires Relics
 step
@@ -1144,7 +1144,7 @@ step
     >>|cRXP_WARN_Be careful as they|r |T132307:0|t[Flee] |cRXP_WARN_at <30% health|r
     .collect 5469,5,2178,1 -- Strider Meat (5)
     .mob Foreststrider Fledgling
-step
+step << NightElf
     #optional
     #completewith FurbolgGrind
     >>Kill |cRXP_ENEMY_Moonstalker Runts|r and |cRXP_ENEMY_Moonstalkers|r. Loot them for their |cRXP_LOOT_Moonstalker Fangs|r
@@ -1191,7 +1191,7 @@ step
     .collect 5469,5,2178,1 -- Strider Meat (5)
     .mob Foreststrider Fledgling
     .isQuestAvailable 2178
-step
+step << NightElf
     #optional
     #completewith FurbolgGrindEnd
     >>Kill |cRXP_ENEMY_Moonstalker Runts|r. Loot them for their |cRXP_LOOT_Moonstalker Fangs|r
@@ -1357,7 +1357,7 @@ step
     #label TOTH
     .goto 1439,37.394,40.128
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thundris Windweaver|r
-    .turnin 958 >> Turn in Tools of the Highborne
+    .turnin 958 >> Turn in Tools of the Highborne << NightElf
     .accept 97914 >>Accept Expanding Horizons << NightElf
     .target Thundris Windweaver
     .isQuestComplete 958
@@ -1506,7 +1506,7 @@ step
     .accept 4723 >> Accept Beached Sea Creature
     .isOnQuest 982
 
-step
+step << NightElf
     #optional
     #completewith BoatSeaCreature
     .goto 1439,44.190,33.697,0
@@ -1570,7 +1570,7 @@ step
     .collect 5469,5,2178,1 -- Strider Meat (5)
     .mob Foreststrider Fledgling
     .mob Foreststrider
-step
+step << NightElf
     #optional
     #completewith CrabTurtle
     >>Kill |cRXP_ENEMY_Moonstalker Runts|r and |cRXP_ENEMY_Moonstalkers|r. Loot them for their |cRXP_LOOT_Moonstalker Fangs|r
@@ -1612,14 +1612,14 @@ step
     .goto 1439,51.118,23.670,20,0
     .goto 1439,51.288,24.554,12 >>Travel up the ramp toward the |cRXP_PICK_Buzzbox 323|r
     .isQuestComplete 1002
-step
+step << NightElf
     #optional
     .goto 1439,51.288,24.554
     >>Click the |cRXP_PICK_Buzzbox 323|r on the ground
     .turnin 1002 >> Turn in Buzzbox 323
     .accept 1003 >> Accept Buzzbox 525
     .isQuestComplete 1002
-step
+step << NightElf
     .goto 1439,51.288,24.554
     >>Click the |cRXP_PICK_Buzzbox 323|r on the ground
     .accept 1003 >> Accept Buzzbox 525
@@ -1638,7 +1638,7 @@ step << Hunter/Druid
     >>Kill |cRXP_ENEMY_Foreststriders|r. Loot them for their |cRXP_LOOT_Strider Meat|r
     .collect 5469,5,2178,1 -- Strider Meat (5)
     .mob Foreststrider
-step << Hunter/Druid
+step << Hunter/Druid NightElf
     #optional
     #completewith Tower1
     >>Kill |cRXP_ENEMY_Moonstalkers|r. Loot them for their |cRXP_LOOT_Moonstalker Fangs|r
@@ -1715,7 +1715,7 @@ step
     >>|cRXP_WARN_Be careful as they cast|r |T135914:0|t[Rabies] |cRXP_WARN_if you dont kill them fast enough (Instant Melee: Reduces ALL health regen by 50% for 10 Minutes)|r
     .complete 2138,1 -- Rabid Thistle Bear slain (20)
     .mob Rabid Thistle Bear
-step
+step << NightElf
     #optional
     #completewith CliffCave
     >>Kill |cRXP_ENEMY_Moonstalkers|r. Loot them for their |cRXP_LOOT_Moonstalker Fangs|r
@@ -1770,7 +1770,7 @@ step
     >>Kill |cRXP_ENEMY_Foreststriders|r. Loot them for their |cRXP_LOOT_Strider Meat|r
     .collect 5469,5,2178,1 -- Strider Meat (5)
     .mob Foreststrider
-step
+step << NightElf
     #optional
     .goto 1439,51.288,24.554
     >>Click the |cRXP_PICK_Buzzbox 323|r on the ground
@@ -1821,7 +1821,7 @@ step << !NightElf/Druid
     .collect 5469,5,2178,1 --Strider Meat (5)
     .mob Foreststrider Fledgling
     .isQuestAvailable 2178
-step << !NightElf/Druid
+step << !NightElf/Druid NightElf
     #completewith CavetoAuber
     >>Kill |cRXP_ENEMY_Moonstalker Runts|r and |cRXP_ENEMY_Moonstalkers|r. Loot them for their |cRXP_LOOT_Moonstalker Fangs|r
     .complete 1002,1 -- Moonstalker Fang (6)

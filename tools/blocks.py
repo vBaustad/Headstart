@@ -3,7 +3,9 @@ A block goes before or after the first step of the route that matches the patter
 tools/route_builder.py lines; "group:" makes a step the Duo and Trio versions' only (dungeons).
 
 Why dungeons for groups: on Forever, dungeon quests pay three to four times their Classic XP (our
-server scan), the dungeon mobs almost nothing. The quests in these blocks, at Forever XP:
+server scan, beta build of 30 Sep), the dungeon mobs almost nothing. The 2 Oct build halves the part
+above normal quest XP ("dungeon quests now reward 50% less extra experience"): about 2.4 times instead
+of 3.75, so the numbers below are about a third lower until the next scan. At Forever XP (30 Sep):
   Stockade: What Comes Around 6400, Crime and Punishment 6700, Quell the Uprising 8500,
             The Color of Blood 8500, The Stockade Riots 7500.
 """
@@ -83,32 +85,34 @@ LM_SOUTH = [
     "turnin 263",
 ]
 # The east, after Silver of the Waves: the Farstrider Lodge (Crocolisk Hunting 1050, Forever's
-# Twisting the Knife 1150, A Hunter's Boast 875), Ironband's Excavation (Ironband's Excavation 340,
-# Gathering Idols 1350, the Excavation Progress Report 270, and Forever's Excavation Tools 1350: six
-# tools lying round the same dig, the first one looted starts it), then north along the shore: Daggerfang
-# (63,50), the crocolisks, Bingles' four tools (Bingles' Missing Supplies 1050), back to the lodge,
-# and the hearth to Thelsamar for Report to Ironforge (550, handed in in Ironforge on the way out).
+# Twisting the Knife 1150, A Hunter's Boast 875), north along the shore (Daggerfang at 63,50, the
+# crocolisks, Bingles' four tools: Bingles' Missing Supplies 1050), back to the lodge, and on the way
+# west Ironband's Excavation last (Ironband's Excavation 340, Gathering Idols 1350, the Excavation
+# Progress Report 270, Forever's Excavation Tools 1350: six tools lying round the dig, the first one
+# looted starts it), then the hearth to Thelsamar for Report to Ironforge (550, handed in in Ironforge
+# on the way out). The dig is last because its quests are level 18 and its troggs 17-20 (about 16 by
+# then, tools/check_levels.py): the Geomancers and Diggers, not the Berserk Troggs (19-20).
 LM_EAST = [
     "accept 436",
     "accept 385 86758",
     "accept 257",
     "goto 1432 75.0 64.0 | raw >>Kill |cRXP_ENEMY_Mountain Buzzards|r south-west of the lodge, within 15 minutes | raw .complete 257,1 | raw .mob Mountain Buzzard",
     "turnin 257",
-    "turnin 436 | accept 297",
-    "accept 298",
-    "raw #sticky | raw #label ExcavationTools | goto 1432 69.5 64.5 | raw >>As you go round the dig: pick up the |cRXP_PICK_Excavation Tools|r lying on the ground (66-72, 59-68). The first one starts Excavation Tools: click it in your bags | raw .accept 86613 >> Accept Excavation Tools | raw .use 278049 | raw .complete 86613,1",
-    "goto 1432 70.0 63.5 | raw >>Kill |cRXP_ENEMY_Stonesplinter Geomancers|r, |cRXP_ENEMY_Diggers|r and |cRXP_ENEMY_Berserk Troggs|r in the excavation. Loot their |cRXP_LOOT_Carved Stone Idols|r | raw .complete 297,1 | raw .mob Stonesplinter Geomancer | raw .mob Stonesplinter Digger | raw .mob Berserk Trogg",
-    "turnin 297",
-    "goto 1432 65.8 65.5 | raw .turnin 86613 >> Turn in Excavation Tools | raw .target Prospector Ironband | raw .isQuestComplete 86613",
     "goto 1432 62.9 50.4 | raw >>Kill |cRXP_ENEMY_Daggerfang|r, the big crocolisk by the shore. Loot Marek's knife | raw .complete 86758,1 | raw .mob Daggerfang",
     "accept 2038",
-    "goto 1432 59.0 38.0 | raw >>Kill |cRXP_ENEMY_Loch Crocolisks|r along the north-east shore. Loot their meat and skins | raw .complete 385,1 | raw .complete 385,2 | raw .mob Loch Crocolisk | raw .mob Large Loch Crocolisk",
+    "goto 1432 59.0 38.0 | raw >>Kill |cRXP_ENEMY_Loch Crocolisks|r along the north-east shore (not the big Large Loch Crocolisks, level 22). Loot their meat and skins | raw .complete 385,1 | raw .complete 385,2 | raw .mob Loch Crocolisk",
     "goto 1432 54.0 27.0 | raw >>Pick up |cRXP_PICK_Bingles' Blastencapper|r | raw .complete 2038,4",
     "goto 1432 52.0 24.0 | raw >>Pick up |cRXP_PICK_Bingles' Hammer|r | raw .complete 2038,3",
     "goto 1432 48.0 20.0 | raw >>Pick up |cRXP_PICK_Bingles' Screwdriver|r | raw .complete 2038,2",
     "goto 1432 49.0 30.0 | raw >>Pick up |cRXP_PICK_Bingles' Wrench|r | raw .complete 2038,1",
     "turnin 2038",
     "turnin 385 86758",
+    "turnin 436 | accept 297",
+    "accept 298",
+    "raw #sticky | raw #label ExcavationTools | goto 1432 69.5 64.5 | raw >>As you go round the dig: pick up the |cRXP_PICK_Excavation Tools|r lying on the ground (66-72, 59-68). The first one starts Excavation Tools: click it in your bags | raw .accept 86613 >> Accept Excavation Tools | raw .use 278049 | raw .complete 86613,1",
+    "goto 1432 70.0 63.5 | raw >>Kill |cRXP_ENEMY_Stonesplinter Geomancers|r and |cRXP_ENEMY_Diggers|r in the excavation (leave the |cRXP_ENEMY_Berserk Troggs|r, level 19-20). Loot their |cRXP_LOOT_Carved Stone Idols|r | raw .complete 297,1 | raw .mob Stonesplinter Geomancer | raw .mob Stonesplinter Digger",
+    "turnin 297",
+    "goto 1432 65.8 65.5 | raw .turnin 86613 >> Turn in Excavation Tools | raw .target Prospector Ironband | raw .isQuestComplete 86613",
     "hs Thelsamar",
     "turnin 298 | accept 301",
 ]
@@ -211,9 +215,10 @@ DS_ONU = [
 
 # Ruins of Lordaeron (group, 2026-10-01): Forever's dungeon in the ruins above the Undercity, Tirisfal
 # (Horde land), for levels 15-20. At the start of 16-19 Darkshore (about 16, hearth in Auberdine):
-# its quests are above you then and pay in full (our server scan): Remember That I Love You, Crest of
-# Lordaeron and Bloodied Insignia 9750 each (quest level 22), Abominable Creatures 6200 (21), about
-# two levels, plus the mobs, which still give XP at 16 (at 27, where it first went, they wouldn't).
+# its quests are above you then and pay in full (our server scan, 30 Sep): Remember That I Love You,
+# Crest of Lordaeron and Bloodied Insignia 9750 each (quest level 22), Abominable Creatures 6200 (21);
+# after the 2 Oct build's cut about 6200 and 3900, some 22k in all, over a level at 16, plus the mobs,
+# which still give XP at 16 (at 27, where it first went, they wouldn't).
 #  - The way: the Menethil boat from Auberdine carries on to Southshore (stay on board); north past
 #    Hillsbrad Fields and round Dalaran, then swim north up Lordamere Lake into Tirisfal. Afterwards
 #    the hearth back to Auberdine, and the route carries on.
@@ -227,7 +232,7 @@ DS_ONU = [
 # Positions: Wowhead's Forever pages and comments, warcrafttavern.com, gamer-guides.com; Stormwind's
 # NPCs from our NPC data (Forever's Stormwind map; Lady Dena Kennedy converted from Wowhead's Classic one).
 RL_RUN = [
-    "group: goto 1439 32.4 43.7 | raw .zone Hillsbrad Foothills >> Ruins of Lordaeron with your group (about two levels of quest XP at 16): take the Menethil Harbor boat from Auberdine's dock and stay on board past Menethil until Southshore",
+    "group: goto 1439 32.4 43.7 | raw .zone Hillsbrad Foothills >> Ruins of Lordaeron with your group (over a level of quest XP at 16): take the Menethil Harbor boat from Auberdine's dock and stay on board past Menethil until Southshore",
     "group: raw .zone Tirisfal Glades >> From Southshore follow the road north past Hillsbrad Fields and round Dalaran, then swim north up Lordamere Lake into Tirisfal Glades. Horde land: keep off the roads",
     "group: goto 1420 61.9 70.5 : Enter the Ruins of Lordaeron: the ruined city above the Undercity, on the east side of the courtyard on the way to the elevators, up the stairs behind an iron portcullis",
     "group: raw .accept 95250 >> Accept Abominable Creatures | raw .target Captain Truman | raw >>|cRXP_FRIENDLY_Captain Truman|r is on your left as you zone in",
