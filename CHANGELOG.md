@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh, Father Gavin: the second Rime's Wrath (Avala's core) is only offered once you hand in the first (the ice elementals). The route asked for both at once, so that step couldn't finish; now it's taken when you hand in the first, and Avala comes after.
+
 - **No death skip from level 10.** On Forever the Spirit Healer gives 10 minutes of Resurrection Sickness (-75% stats and damage) as soon as you are 10, not from 11 at a minute a level as in Classic (an open Forever bug). Every death skip in the routes now goes away at 10: at 9 you still die and skip, at 10 the route has you walk or hearth instead.
 - Dun Morogh: sell your junk to Gretta Ganter (she's a vendor) right before you hand her Frosthowl.
 

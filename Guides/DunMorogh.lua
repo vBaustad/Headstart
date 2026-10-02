@@ -852,7 +852,6 @@ step << Hunter
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
     .turnin 99159 >> Turn in Finding Warmth
     .accept 99160 >> Accept Rime's Wrath
-    .accept 99161 >> Accept Rime's Wrath
     .accept 99162 >> Accept Treacherous Cold
     .target Father Gavin
 step << Hunter
@@ -862,12 +861,6 @@ step << Hunter
     .complete 99160,1 --Minor Ice Elemental slain (10)
     .mob Minor Ice Elemental
     .isOnQuest 99160
-step << Hunter
-    .goto 1426,57.6,42.8
-    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
-    .complete 99161,1 --Avala's Core (1)
-    .mob Avala
-    .isOnQuest 99161
 step << Hunter
     .goto 1426,52.0,44.0
     >>Loot the rifle by the fallen mountaineer under the tree lying across the frozen river
@@ -895,8 +888,15 @@ step << Hunter
     .goto 1426,57.5,44.8
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
     .turnin 99160 >> Turn in Rime's Wrath
+    .accept 99161 >> Accept Rime's Wrath
     .target Father Gavin
     .isQuestComplete 99160
+step << Hunter
+    .goto 1426,57.6,42.8
+    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
+    .complete 99161,1 --Avala's Core (1)
+    .mob Avala
+    .isOnQuest 99161
 step << Hunter
     .goto 1426,57.5,44.8
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
@@ -1293,7 +1293,6 @@ step << !Hunter
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
     .turnin 99159 >> Turn in Finding Warmth
     .accept 99160 >> Accept Rime's Wrath
-    .accept 99161 >> Accept Rime's Wrath
     .accept 99162 >> Accept Treacherous Cold
     .target Father Gavin
 step << !Hunter
@@ -1303,12 +1302,6 @@ step << !Hunter
     .complete 99160,1 --Minor Ice Elemental slain (10)
     .mob Minor Ice Elemental
     .isOnQuest 99160
-step << !Hunter
-    .goto 1426,57.6,42.8
-    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
-    .complete 99161,1 --Avala's Core (1)
-    .mob Avala
-    .isOnQuest 99161
 step << !Hunter
     .goto 1426,52.0,44.0
     >>Loot the rifle by the fallen mountaineer under the tree lying across the frozen river
@@ -1336,8 +1329,15 @@ step << !Hunter
     .goto 1426,57.5,44.8
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r
     .turnin 99160 >> Turn in Rime's Wrath
+    .accept 99161 >> Accept Rime's Wrath
     .target Father Gavin
     .isQuestComplete 99160
+step << !Hunter
+    .goto 1426,57.6,42.8
+    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
+    .complete 99161,1 --Avala's Core (1)
+    .mob Avala
+    .isOnQuest 99161
 step << !Hunter
     .goto 1426,57.5,44.8
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Father Gavin|r

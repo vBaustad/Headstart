@@ -370,6 +370,9 @@ guide = guide[:i] + COOK_AGAIN + guide[i:]
 # Forever pages (Gavin, the elementals, Avala) and their comments (the rifles' map, 52/44, 53/59,
 # 60/50; the firewood: white trunks on the ground by the trees, some give 2, sparse). In the order
 # west, south, then east toward the ranch, the Sunhammer rifle is on the way to Rudra.
+# Two quests are called Rime's Wrath: the ice elementals (99160), then Avala's core (99161), which
+# Father Gavin only offers once the first is handed in (seen in game, 2026-10-02: the step asked for
+# both at once and could not finish). Avala stands just north of him.
 def gavin(cls):
     head = "step << " + cls
     talk = ("    .goto 1426,57.5,44.8\n"
@@ -386,7 +389,6 @@ def gavin(cls):
 {head}
 {talk}    .turnin 99159 >> Turn in Finding Warmth
     .accept 99160 >> Accept Rime's Wrath
-    .accept 99161 >> Accept Rime's Wrath
     .accept 99162 >> Accept Treacherous Cold
     .target Father Gavin
 {head}
@@ -396,12 +398,6 @@ def gavin(cls):
     .complete 99160,1 --Minor Ice Elemental slain (10)
     .mob Minor Ice Elemental
     .isOnQuest 99160
-{head}
-    .goto 1426,57.6,42.8
-    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
-    .complete 99161,1 --Avala's Core (1)
-    .mob Avala
-    .isOnQuest 99161
 {head}
     .goto 1426,52.0,44.0
     >>Loot the rifle by the fallen mountaineer under the tree lying across the frozen river
@@ -427,8 +423,15 @@ def gavin(cls):
     .isOnQuest 99160
 {head}
 {talk}    .turnin 99160 >> Turn in Rime's Wrath
+    .accept 99161 >> Accept Rime's Wrath
     .target Father Gavin
     .isQuestComplete 99160
+{head}
+    .goto 1426,57.6,42.8
+    >>Kill |cRXP_ENEMY_Avala|r, the big ice elemental just north of Father Gavin. Loot its core
+    .complete 99161,1 --Avala's Core (1)
+    .mob Avala
+    .isOnQuest 99161
 {head}
 {talk}    .turnin 99161 >> Turn in Rime's Wrath
     .target Father Gavin
