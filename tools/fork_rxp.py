@@ -14,7 +14,7 @@ import os
 import re
 import sys
 
-from clean_guide import clean, no_sick_deathskips
+from clean_guide import clean, no_passing_pins, no_sick_deathskips
 from share_split import mark
 
 RXP = "S:/forever-data/external/rxp/Guides/"
@@ -124,7 +124,7 @@ def build(file, home, name, ours):
         n = text.count(old)
         assert n == 1, f"{name}: expected one match upstream, found {n}: {old[:70]!r} ({why})"
         text = text.replace(old, new)
-    text = no_sick_deathskips(clean(text))
+    text = no_passing_pins(no_sick_deathskips(clean(text)))
     text = map_ids(text)       # after cleaning: TBC/Wrath lines name maps Forever doesn't have
     text = forever_maps(text)  # Stormwind and Redridge are drawn differently on Forever
     text = insert_blocks(name, text)

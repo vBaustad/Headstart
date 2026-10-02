@@ -221,3 +221,18 @@ def no_sick_deathskips(text):
                               lambda m: f"{m.group(1)}{m.group(2)}\n{m.group(1)}.xp {SICK_FROM},1 -- none from level {SICK_FROM}: 10 min sickness on Forever",
                               step, count=1, flags=re.M)
     return "\n".join(parts)
+
+
+def no_passing_pins(text):
+    """Kill-as-you-pass steps (#optional and #completewith, loot from mobs, every .goto with radius 0:
+    boar meat for Cooking and the like) lose their .goto lines. Each one was a pin with the step
+    number on the map, six or more a step, for something you never walk to (the user, 2026-10-02:
+    "too much map clutter for the boar meat step"). The step and its loot count stay."""
+    parts = re.split(r"\n(?=[ \t]*step\b)", text)   # upstream has a " step" here and there
+    for k, step in enumerate(parts):
+        gotos = re.findall(r"^\s*\.goto [^\n]*$", step, re.M)
+        if (gotos and all(re.search(r",0\s*(--.*)?$", g) for g in gotos)
+                and re.search(r"^\s*#optional\b", step, re.M) and re.search(r"^\s*#completewith\b", step, re.M)
+                and re.search(r"^\s*\.collect\b", step, re.M) and re.search(r"^\s*\.mob\b", step, re.M)):
+            parts[k] = re.sub(r"\n[ \t]*\.goto [^\n]*", "", step)
+    return "\n".join(parts)

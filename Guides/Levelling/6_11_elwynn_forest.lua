@@ -334,12 +334,6 @@ step
     #requires BoarMeatQuest
     #label BoarMeatCooking1
     #completewith Pie
-    .goto 1429/0,406.84,-9917.23,0
-    .goto 1429/0,456.65,-9825.69,0
-    .goto 1429/0,279.60,-9971.76,0
-    .goto 1429/0,86.93,-9952.95,0
-    .goto 1429/0,225.49,-9751.09,0
-    .goto 1429/0,92.38,-9548.20,0
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_later|r
     >>|cRXP_WARN_You need 10|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Auberdine later|r
@@ -350,12 +344,6 @@ step
     #optional
     #requires BoarMeatCooking1
     #completewith Pie
-    .goto 1429/0,406.84,-9917.23,0
-    .goto 1429/0,456.65,-9825.69,0
-    .goto 1429/0,279.60,-9971.76,0
-    .goto 1429/0,86.93,-9952.95,0
-    .goto 1429/0,225.49,-9751.09,0
-    .goto 1429/0,92.38,-9548.20,0
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_later|r
     >>|cRXP_WARN_You need 50|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Darkshire later.|r
@@ -688,12 +676,6 @@ step
     #optional
     #label BoarMeatCooking2
     #completewith Exchange
-    .goto 1429/0,406.84,-9917.23,0
-    .goto 1429/0,456.65,-9825.69,0
-    .goto 1429/0,279.60,-9971.76,0
-    .goto 1429/0,86.93,-9952.95,0
-    .goto 1429/0,225.49,-9751.09,0
-    .goto 1429/0,92.38,-9548.20,0
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
     .mob Stonetusk Boar
@@ -703,12 +685,6 @@ step
     #optional
     #requires BoarMeatCooking2
     #completewith Exchange
-    .goto 1429/0,406.84,-9917.23,0
-    .goto 1429/0,456.65,-9825.69,0
-    .goto 1429/0,279.60,-9971.76,0
-    .goto 1429/0,86.93,-9952.95,0
-    .goto 1429/0,225.49,-9751.09,0
-    .goto 1429/0,92.38,-9548.20,0
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
@@ -895,10 +871,6 @@ step
     #optional
     #label WolfMeatCooking1
     #completewith Jasperlode
-    .goto 1429,52.242,62.919,0
-    .goto 1429,53.837,60.950,0
-    .goto 1429,56.793,60.340,0
-    .goto 1429,59.033,60.673,0
     >>Kill |cRXP_ENEMY_Mangy Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Mangy Wolf
@@ -908,10 +880,6 @@ step
     #optional
     #requires WolfMeatCooking1
     #completewith Jasperlode
-    .goto 1429,52.242,62.919,0
-    .goto 1429,53.837,60.950,0
-    .goto 1429,56.793,60.340,0
-    .goto 1429,59.033,60.673,0
     >>Kill |cRXP_ENEMY_Mangy Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -1151,9 +1119,6 @@ step
     #requires ExitJasperlode
     #label WolfMeatCooking2
     #completewith Find
-    .goto 1429,69.348,67.452,0
-    .goto 1429,67.244,63.880,0
-    .goto 1429,63.748,64.710,0
     >>Kill |cRXP_ENEMY_Gray Forest Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Gray Forest Wolf
@@ -1162,9 +1127,6 @@ step
     #optional
     #requires WolfMeatCooking2
     #completewith Find
-    .goto 1429,69.348,67.452,0
-    .goto 1429,67.244,63.880,0
-    .goto 1429,63.748,64.710,0
     >>Kill |cRXP_ENEMY_Gray Forest Wolves|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -1198,9 +1160,6 @@ step
     #optional
     #label WolfMeatCooking3
     #completewith LostGuards
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Gray Forest Wolves|r and |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Gray Forest Wolf
@@ -1210,9 +1169,6 @@ step
     #optional
     #requires WolfMeatCooking3
     #completewith LostGuards
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Gray Forest Wolves|r and |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -1229,9 +1185,6 @@ step
     #optional
     #label WolfMeatCooking4
     #completewith AcceptBundle
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Prowler
@@ -1241,9 +1194,6 @@ step
     #optional
     #requires WolfMeatCooking4
     #completewith AcceptBundle
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -1267,9 +1217,6 @@ step
     #optional
     #label WolfMeatCooking5
     #completewith Prowlers
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
@@ -1280,9 +1227,6 @@ step
     #optional
     #requires WolfMeatCooking5
     #completewith Prowlers
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -1328,9 +1272,6 @@ step
     #optional
     #label WolfMeatCooking6
     #completewith BundleOT
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Prowler
@@ -1339,9 +1280,6 @@ step
     #optional
     #requires WolfMeatCooking6
     #completewith BundleOT
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -1396,9 +1334,6 @@ step
     #optional
     #label WolfMeatCooking7
     #completewith DeliverStart
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Prowler
@@ -1407,9 +1342,6 @@ step
     #optional
     #requires WolfMeatCooking7
     #completewith DeliverStart
-    .goto 1429,73.679,67.978,0
-    .goto 1429,72.275,65.278,0
-    .goto 1429,71.605,61.294,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -1578,10 +1510,6 @@ step << !Warlock
     #label WolfMeatCooking8
     #requires EVDeathskip
     #completewith RedridgeS
-    .goto 1429,84.448,72.486,0
-    .goto 1429,88.611,71.379,0
-    .goto 1429,89.657,75.373,0
-    .goto 1429,87.250,75.853,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Prowler
@@ -1590,10 +1518,6 @@ step << !Warlock
     #optional
     #requires WolfMeatCooking8
     #completewith RedridgeS
-    .goto 1429,84.448,72.486,0
-    .goto 1429,88.611,71.379,0
-    .goto 1429,89.657,75.373,0
-    .goto 1429,87.250,75.853,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -1858,12 +1782,6 @@ step
     #optional
     #label BoarMeatCooking3
     #completewith Garrison
-    .goto 1429/0,406.84,-9917.23,0
-    .goto 1429/0,456.65,-9825.69,0
-    .goto 1429/0,279.60,-9971.76,0
-    .goto 1429/0,86.93,-9952.95,0
-    .goto 1429/0,225.49,-9751.09,0
-    .goto 1429/0,92.38,-9548.20,0
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
     .mob Stonetusk Boar
@@ -1872,12 +1790,6 @@ step
     #optional
     #requires BoarMeatCooking3
     #completewith Garrison
-    .goto 1429/0,406.84,-9917.23,0
-    .goto 1429/0,456.65,-9825.69,0
-    .goto 1429/0,279.60,-9971.76,0
-    .goto 1429/0,86.93,-9952.95,0
-    .goto 1429/0,225.49,-9751.09,0
-    .goto 1429/0,92.38,-9548.20,0
     >>Kill |cRXP_ENEMY_Stonetusk Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
@@ -2271,11 +2183,6 @@ step << Warlock
     #optional
     #label BoarMeatCooking4
     #completewith SChoker
-    .goto 1429,49.917,72.959,0
-    .goto 1429,54.444,75.879,0
-    .goto 1429,57.620,76.213,0
-    .goto 1429,61.911,78.274,0
-    .goto 1429,65.619,78.388,0
     >>Kill |cRXP_ENEMY_Rockhide Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
     .mob Rockhide Boar
@@ -2285,11 +2192,6 @@ step << Warlock
     #optional
     #requires BoarMeatCooking4
     #completewith SChoker
-    .goto 1429,49.917,72.959,0
-    .goto 1429,54.444,75.879,0
-    .goto 1429,57.620,76.213,0
-    .goto 1429,61.911,78.274,0
-    .goto 1429,65.619,78.388,0
     >>Kill |cRXP_ENEMY_Rockhide Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)
@@ -2335,10 +2237,6 @@ step << Warlock
     #optional
     #label WolfMeatCooking9
     #completewith WlockRedridge
-    .goto 1429,84.448,72.486,0
-    .goto 1429,88.611,71.379,0
-    .goto 1429,89.657,75.373,0
-    .goto 1429,87.250,75.853,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     .collect 2672,10,2178,1,0x20,cooking --Stringy Wolf Meat (1-10)
     .mob Prowler
@@ -2347,10 +2245,6 @@ step << Warlock
     #optional
     #requires WolfMeatCooking8
     #completewith WlockRedridge
-    .goto 1429,84.448,72.486,0
-    .goto 1429,88.611,71.379,0
-    .goto 1429,89.657,75.373,0
-    .goto 1429,87.250,75.853,0
     >>Kill |cRXP_ENEMY_Prowlers|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Stringy Wolf Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the wolves you're passing by|r
     .collect 2672,50,2178,1,0x20,cooking --Stringy Wolf Meat (10-50)
@@ -2752,7 +2646,6 @@ step
     #optional
     #label BoarMeatDunMorogh1
     #completewith Dirt
-    .goto 1426,57.936,50.787,0
     >>Kill |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_later|r
     >>|cRXP_WARN_You need 10|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Auberdine later|r
@@ -2763,7 +2656,6 @@ step
     #optional
     #requires BoarMeatDunMorogh1
     #completewith Dirt
-    .goto 1426,57.936,50.787,0
     >>Kill |cRXP_ENEMY_Elder Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     >>|cRXP_WARN_This will be used to level your|r |T133971:0|t[Cooking] |cRXP_WARN_later|r
     >>|cRXP_WARN_You need 50|r |T133971:0|t[Cooking] |cRXP_WARN_for a quest in Darkshire later|r
@@ -2819,7 +2711,6 @@ step
     #optional
     #label BoarMeatDunMorogh2
     #completewith QuarryStart
-    .goto 1426,66.356,51.02,0
     >>Kill |cRXP_ENEMY_Large Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     .collect 769,10,2178,1,0x20,cooking --Chunk of Boar Meat (1-10)
     .mob Large Crag Boar
@@ -2829,7 +2720,6 @@ step
     #optional
     #requires BoarMeatDunMorogh2
     #completewith QuarryStart
-    .goto 1426,66.356,51.02,0
     >>Kill |cRXP_ENEMY_Large Crag Boars|r. Loot them for their |T133970:0|t|cRXP_LOOT_[Chunks of Boar Meat]|r
     >>|cRXP_WARN_Don't go out of your way to farm this now. Simply kill and loot all the boars you're passing by|r
     .collect 769,50,2178,1,0x20,cooking --Chunk of Boar Meat (10-50)

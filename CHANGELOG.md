@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- No map pins for the kill-as-you-pass loot steps (boar, wolf and strider meat for Cooking, and the like): six or more numbered pins a step, all over the map, for things you only pick up on the way. The step and its count stay in the guide window.
+
 - Dun Morogh: Frosthowl after Shimmer Ridge, not before. He's at the back of the Grizzled Den right under the ridge, and the cave's way out faces south: first meant out of the cave and back north up the slope (~3.5 min in a logged run); now the way out leads on to MacGrann's meat locker and Tundra.
 
 - Dun Morogh: a second chance at Frostmane Hold just before the hold. If you don't have it (the pick-up in Kharanos went by), the route sends you back to Senir first; with the quest the step never shows. A run got to the hold without it and killed headhunters for nothing.
