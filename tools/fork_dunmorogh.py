@@ -232,10 +232,13 @@ guide = guide.replace(old, """    .accept 314 >> Accept Protecting the Herd
     .accept 95212 >> Accept Never Saddle on Quality
     .target Rudra Amberstill
 """)
+# Optional (the user, 2026-10-03: skipped in a run, the leopards were few and the pelts didn't drop):
+# while you're at the quarry only, gone at the Rudra hand-in point (which only shows with all six).
 PELTS = """step
-    #sticky
+    #completewith RudraSaddle
     #label LeopardPelts
-    >>Kill |cRXP_ENEMY_Elder Snow Leopards|r around the quarry and east of it. Loot them for |cRXP_LOOT_Pristine Leopard Pelts|r
+    >>Kill |cRXP_ENEMY_Elder Snow Leopards|r you meet around the quarry. Loot them for |cRXP_LOOT_Pristine Leopard Pelts|r
+    >>|cRXP_WARN_Optional: don't go looking for them. Only handed in if you have all six by the time you leave the quarry|r
     .complete 95212,1 --Pristine Leopard Pelt (6)
     .mob Elder Snow Leopard
     .isOnQuest 95212
@@ -244,6 +247,7 @@ i = guide.index(">>Kill |cRXP_ENEMY_Rockjaw Skullthumpers|r in or outside the mi
 i = guide.rindex("\nstep", 0, i) + 1
 guide = guide[:i] + PELTS + guide[i:]
 RUDRA = """step
+    #label RudraSaddle
     .goto 1426/0,-1304.71,-5513.86
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rudra Amberstill|r at the ranch
     .turnin 95212 >> Turn in Never Saddle on Quality

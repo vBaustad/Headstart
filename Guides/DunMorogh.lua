@@ -1466,9 +1466,10 @@ step
     .goto 1426/0,-1600.30,-5726.590
     .target +Foreman Stonebrow
 step
-    #sticky
+    #completewith RudraSaddle
     #label LeopardPelts
-    >>Kill |cRXP_ENEMY_Elder Snow Leopards|r around the quarry and east of it. Loot them for |cRXP_LOOT_Pristine Leopard Pelts|r
+    >>Kill |cRXP_ENEMY_Elder Snow Leopards|r you meet around the quarry. Loot them for |cRXP_LOOT_Pristine Leopard Pelts|r
+    >>|cRXP_WARN_Optional: don't go looking for them. Only handed in if you have all six by the time you leave the quarry|r
     .complete 95212,1 --Pristine Leopard Pelt (6)
     .mob Elder Snow Leopard
     .isOnQuest 95212
@@ -1581,6 +1582,7 @@ step
     .turnin 95214 >> Turn in Stolen Blasting Powder
     .target Quarrymaster Thesten
 step
+    #label RudraSaddle
     .goto 1426/0,-1304.71,-5513.86
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Rudra Amberstill|r at the ranch
     .turnin 95212 >> Turn in Never Saddle on Quality
