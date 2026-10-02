@@ -16,6 +16,7 @@ Data\QuestIDs.lua
 Core.lua
 Scan.lua
 Needs.lua
+Shopping.lua
 Log.lua
 DeathSkip.lua
 Flight.lua

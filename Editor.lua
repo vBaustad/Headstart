@@ -1197,6 +1197,10 @@ local function BuildRouteSettings(page)
     Row("Keep what the route needs", S.Switch(c, Opt("sellGuard"), SetOpt("sellGuard")),
         "Items a route quest still needs (like the boar meat for Stocking Jetsteam) say so on their tooltip, and"
         .. " selling one to a vendor warns you, so you can buy it back from the Buyback tab")
+    Row("Buy later what I couldn't afford", S.Switch(c, Opt("buyLater"), SetOpt("buyLater")),
+        "A buy the route skipped because you were short (the weapons in Kharanos) comes back: once you have"
+        .. " the money, don't have it yet and it still beats your weapon, chat says what and where, and at a"
+        .. " vendor who sells it you're asked whether to buy it (hold Shift as you open the vendor to skip)")
     Row("Release at death skips", S.Switch(c, Opt("deathSkipRelease"), SetOpt("deathSkipRelease")),
         "When the route step you are on says to die and respawn at the Spirit Healer, your spirit is released"
         .. " at once, and RestedXP accepts the Spirit Healer for you. Any other death is left to you")

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Buy later:** a buy the route skipped because you were short (the weapons in Kharanos: Wooden Mallet, Large Axe, Gladius, Stiletto) comes back. Once you have the money, don't have it yet and it still beats your weapon, chat says what, how much and where; at any vendor who sells it, you're asked whether to buy it (hold Shift as you open the vendor to skip). Settings, Route: Buy later what I couldn't afford.
+
 - **Auto trainer** (Settings, Trainer): when you open your class trainer, your spells are learned at once. For every spell of your class (all its ranks) choose Always, If I can afford it, or Never, and set how much gold to keep: "If I can afford it" spells are only learned while you'd keep at least that much. Always spells go first, then the rest from the lowest level up; what had to wait is named in chat. Hold Shift as you open the trainer to train yourself. RestedXP's own trainer automation is switched off while this is on (and back on if you turn this off).
 
 - **Cleanup by level.** Every route is now checked for every race and class: the level you are at each step (from the quests you hand in and the kills they need), every quest's colour when you hand it in, and every mob you are sent to kill. No grey quest is handed in anywhere (green at worst), and no step outside a dungeon sends you at red mobs.

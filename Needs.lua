@@ -37,6 +37,8 @@ local function Shows(filter)
     return false
 end
 
+YR.Shows = Shows
+
 local function Build()
     needs, titles = {}, {}
     -- only the routes this character can follow (from its race's starting route on)
