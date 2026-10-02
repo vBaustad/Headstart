@@ -19,6 +19,7 @@ Needs.lua
 Shopping.lua
 Log.lua
 DeathSkip.lua
+CampingReminder.lua
 Flight.lua
 Rewards.lua
 Trainer.lua

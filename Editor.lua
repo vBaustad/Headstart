@@ -1201,6 +1201,10 @@ local function BuildRouteSettings(page)
         "A buy the route skipped because you were short (the weapons in Kharanos) comes back: once you have"
         .. " the money, don't have it yet and it still beats your weapon, chat says what and where, and at a"
         .. " vendor who sells it you're asked whether to buy it (hold Shift as you open the vendor to skip)")
+    Row("Tell me when I can finish Camping 101", S.Switch(c, Opt("campReminder"), SetOpt("campReminder")),
+        "Dun Morogh: when your bags hold the ore and stone to take Blacksmithing to 20 for Camping 101, or Mining is done,"
+        .. " chat and the middle of the screen say so, and where (the Kharanos forge, Yarr Hammerstone). Again each time you"
+        .. " come into Kharanos with it still to do")
     Row("Release at death skips", S.Switch(c, Opt("deathSkipRelease"), SetOpt("deathSkipRelease")),
         "When the route step you are on says to die and respawn at the Spirit Healer, your spirit is released"
         .. " at once, and RestedXP accepts the Spirit Healer for you. Any other death is left to you")

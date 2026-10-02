@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Camping 101 reminder** (Dun Morogh, Warriors, Paladins and Rogues): when your bags hold the ore and stone to take Blacksmithing to 20 (from wherever your skill is: Copper Rods to 10, Rough Weightstones to 15, Copper Bracers to 20), chat and the middle of the screen say so and where (the forge by Tognus in Kharanos; train Blacksmithing first if you haven't); when Camping 101: Mining is done, where to hand it in (Yarr Hammerstone). Again each time you come into Kharanos with it still to do. On autopilot the forge stop went by: in run 10 both quests were left undone (540 XP).
+
 - The splits sit on the lowest layer, like RestedXP's guide window: bags, maps and other windows open over them.
 
 - Dun Morogh, Father Gavin: the second Rime's Wrath (Avala's core) is only offered once you hand in the first (the ice elementals). The route asked for both at once, so that step couldn't finish; now it's taken when you hand in the first, and Avala comes after.
