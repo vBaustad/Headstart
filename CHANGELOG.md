@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Cleanup by level.** Every route is now checked for every race and class: the level you are at each step (from the quests you hand in and the kills they need), every quest's colour when you hand it in, and every mob you are sent to kill. No grey quest is handed in anywhere (green at worst), and no step outside a dungeon sends you at red mobs.
+  - Our Loch Modan now takes Dwarves and Gnomes to about 16, so some of RestedXP's later quests had gone grey for them: Messenger to Stormwind, A Free Lunch and its two follow-ups, and Hilary's Necklace are out of Redridge; the late copy of Encroaching Gnolls is out of Duskwood; Westfall Stew is no longer done by Dwarves and Gnomes, Fishin' Time not by Warlocks; the Buzzboxes and Tools of the Highborne in Darkshore are for Night Elves only now.
+  - Loch Modan's east: Ironband's dig (level 18 quests, troggs 17-20) comes last, after the lodge, the shore and Bingles' tools, at about 16; the step says to leave the Berserk Troggs (19-20) and the Large Loch Crocolisks (22) alone.
+  - Kept although grey for Paladins: The Test of Righteousness (for Verigan's Fist) and the Tome of Divinity (for Redemption).
+- The 2 Oct beta build halves dungeon quests' extra XP, so the dungeon steps' "levels of XP" are smaller now (the Ruins of Lordaeron: over a level at 16, not two). A new server scan (/headstart scan) will give the exact numbers.
+
 - No grey quest is handed in anywhere on the route, for any race and class (checked on every build; the Paladin's Tome of Divinity, which teaches Redemption, is the one exception). New steps go where their quests are yellow or orange, green at worst.
 
 - Wetlands: A Lack of Virtue is out again. It's a level 21 quest you'd hand in at 29-30, for 44 XP.
