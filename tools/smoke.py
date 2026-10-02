@@ -784,6 +784,42 @@ check(not reds, "no red mobs to kill outside dungeons" + "".join(
 import smoke_flight
 bad += smoke_flight.run()
 
+# Buy later: the Paladin's Wooden Mallet (6s31 in Kharanos, skipped if you're short) comes back
+lua.execute("""
+C_Timer.After = function(_, fn) fn() end
+EQUIPPED_LINK, BAGS, MERCHANT, BOUGHT_AT, POPUP = nil, {}, {}, nil, nil
+function GetInventoryItemLink() return EQUIPPED_LINK end
+C_Item = C_Item or {}
+C_Item.GetItemCount = function(id) return BAGS[id] or 0 end
+C_Item.GetItemStats = function() return { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 2.0 } end
+function IsEquippedItem() return false end
+function GetMerchantNumItems() return #MERCHANT end
+function GetMerchantItemID(i) return MERCHANT[i] end
+function GetMerchantItemInfo(i) return "x", nil, 631 end
+function BuyMerchantItem(i) BOUGHT_AT = i end
+function IsShiftKeyDown() return false end
+YippSetupCharDB = YippSetupCharDB or {}
+YippSetupCharDB.toldBuy = nil
+""")
+shop = YR.ShoppingList()
+mallet = [shop[i] for i in range(1, len(shop) + 1) if shop[i].item == 2493]
+check(len(mallet) == 1 and mallet[0].price == 631 and mallet[0].npc == "Grawn Thromwyn",
+      f"buy later reads the Wooden Mallet from the route: {[(e.name, e.price, e.npc) for e in mallet]}")
+n_prints = len(g.PRINTS)
+lua.execute("MONEY = 500; Fire('PLAYER_MONEY')")
+check(len(g.PRINTS) == n_prints, "short of 6s31: nothing said")
+lua.execute("MONEY = 700; Fire('PLAYER_MONEY')")
+said = [str(g.PRINTS[i]) for i in range(n_prints + 1, len(g.PRINTS) + 1)]
+check(any("Wooden Mallet" in x and "afford" in x for x in said), f"with 7s: told once where to buy it: {said}")
+lua.execute("Fire('PLAYER_MONEY')")
+check(len(g.PRINTS) == n_prints + 1, "told only once")
+lua.execute("MERCHANT = { 2901, 2493 }; Fire('MERCHANT_SHOW')")
+check(g.POPUP == "HEADSTART_BUY_LATER", "at a vendor who sells it: asked whether to buy it")
+lua.execute("POPUP = nil; BAGS[2493] = 1; Fire('MERCHANT_SHOW')")
+check(g.POPUP is None, "already have one: not asked")
+lua.execute("BAGS[2493] = nil; EQUIPPED_LINK = 'x'; C_Item.GetItemStats = function() return { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 9.0 } end; Fire('MERCHANT_SHOW')")
+check(g.POPUP is None, "your weapon is already better: not asked")
+
 # The auto trainer (its own fake API)
 import smoke_trainer
 bad += smoke_trainer.run()
