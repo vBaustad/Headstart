@@ -1458,11 +1458,61 @@ local function RefreshSetup()
 end
 
 -- ---------------------------------------------------------------------------
--- Settings: two tabs, Route and Character, over one footer
+-- Settings, Trainer: the auto trainer (Trainer.lua) and, for this character's class, what it learns
+-- ---------------------------------------------------------------------------
+local trainer = { controls = {} }
+local TRAIN_TO = 30          -- the spells listed: up to Forever's level cap
+
+local function ChoiceLabel(v)
+    for _, c in ipairs(YR.TRAINER_CHOICES) do if c[1] == v then return c[2] end end
+end
+
+local function BuildTrainer(page)
+    local L = RowPage(page, trainer.controls, 64)
+    local c = L.c
+    local Section, Row = L.Section, L.Row
+    Section("Class trainer")
+    Row("Learn my spells at the trainer", S.Switch(c, function() return YR.Option("autoTrain") end,
+        function(on) YippRouteDB.autoTrain = on YR:SyncRxpTrainer() end),
+        "When you open your class trainer, the spells below are learned at once, as you chose for each."
+        .. " Hold Shift as you open it to train yourself. RestedXP's own trainer automation is switched off"
+        .. " while this is on")
+    local reserve = S.Stepper(c, function() return math.floor((YR.TrainerData().reserve or 0) / 10000) end,
+        function(v) YR.TrainerData().reserve = v * 10000 end, 0, 1000, 1, 110)
+    Row("Keep at least (gold)", reserve, "Spells set to \"If I can afford it\" are only learned while you"
+        .. " would keep at least this much. \"Always\" spells are learned whenever you have the gold")
+    local _, class = UnitClass("player")
+    local levels = (YR.Setup and YR.Setup.SPELL_LEVELS or {})[class] or {}
+    local list = {}
+    for name, lvl in pairs(levels) do
+        if lvl > 1 and lvl <= TRAIN_TO and not name:find("%(Passive") then list[#list + 1] = { name, lvl } end
+    end
+    table.sort(list, function(a, b) if a[2] ~= b[2] then return a[2] < b[2] end return a[1] < b[1] end)
+    Section(("Spells: %s"):format(UnitClass("player") or class), "every rank of each; first learned at the level shown")
+    for _, e in ipairs(list) do
+        local name, lvl = e[1], e[2]
+        local dd = S.Dropdown(c, 150, YR.TRAINER_CHOICES, function(v)
+            YR.SetTrainerChoice(name, v)
+            trainer.refresh()
+        end)
+        function dd:Refresh() self:SetValue(ChoiceLabel(YR.TrainerChoice(name))) end
+        Row(("%d  %s"):format(lvl, name), dd)
+    end
+    L.Break()
+    c:SetHeight(-L.y + 40)
+end
+
+function trainer.refresh()
+    for _, ctl in ipairs(trainer.controls) do if ctl.Refresh then ctl:Refresh() end end
+end
+
+-- ---------------------------------------------------------------------------
+-- Settings: three tabs, Route, Character and Trainer, over one footer
 -- ---------------------------------------------------------------------------
 local TABS = {
     { key = "route", label = "Route", build = BuildRouteSettings, refresh = RefreshRouteSettings },
     { key = "character", label = "Character", build = BuildSetup, refresh = RefreshSetup },
+    { key = "trainer", label = "Trainer", build = BuildTrainer, refresh = function() trainer.refresh() end },
 }
 
 local function ShowTab(key)

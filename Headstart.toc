@@ -20,6 +20,7 @@ Log.lua
 DeathSkip.lua
 Flight.lua
 Rewards.lua
+Trainer.lua
 Splits.lua
 Options.lua
 Guides.lua
