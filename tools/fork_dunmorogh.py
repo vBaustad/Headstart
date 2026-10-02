@@ -465,6 +465,41 @@ i = guide.index("    #completewith Headhunters")
 i = guide.rindex("\nstep", 0, i) + 1
 guide = guide[:i] + SENIR_AGAIN + guide[i:]
 
+# Train at 10 in Kharanos: a logged run (2026-10-02) dinged 10 at Brewnall and learned nothing from 9
+# until it stopped at 13, about 1.5 hours of play without Seal of Righteousness 2 and the rest. The
+# route's next stop, Bellowfiz at Steelgrill's Depot, is ~150 yards from the Thunderbrew trainers:
+# each class's Kharanos trainer step again, after Bellowfiz, only from level 10.
+TRAIN10, seen = [], set()
+for s in re.split(r"\n(?=step\b)", guide):
+    m = re.match(r"step << (\w+)\n", s)
+    cls = m and m.group(1)
+    s = s.rstrip("\n") + "\n"
+    if not cls or cls in seen or ".trainer >> Train your class spells" not in s or "1426/0" not in s:
+        continue
+    seen.add(cls)
+    s = re.sub(r"\n[ \t]*\.(accept|turnin)[^\n]*", "", s)
+    s = s.replace("    .trainer >> Train your class spells\n",
+                  "    >>|cRXP_WARN_You're 10: train now. The next trainer on the route is in Ironforge at 12-13|r\n"
+                  "    .trainer >> Train your class spells\n") + "    .xp <10,1\n"
+    TRAIN10.append(s)
+assert {"Paladin", "Warrior", "Rogue", "Priest", "Mage"} <= seen, seen
+i = guide.index("    .turnin 320 >> Turn in Return to Bellowfiz")
+i = guide.index("\nstep", i) + 1
+guide = guide[:i] + "".join(TRAIN10) + guide[i:]
+
+# And Paladins at 12+ on the way through Ironforge (Golnir, the Senator, Gryth): Brandur in the Mystic
+# Ward, ~200 yards off; the next route starts with him too, but only after the Stormwind trip.
+BRANDUR = """step << Dwarf Paladin
+    .goto 1455/0,-896.47,-4601.65
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Brandur Ironhammer|r in the Mystic Ward
+    .trainer >> Train your class spells
+    .target Brandur Ironhammer
+    .xp <12,1
+"""
+i = guide.index("    .turnin 6391 >> Turn in Ride to Ironforge")
+i = guide.index("\nstep", i) + 1
+guide = guide[:i] + BRANDUR + guide[i:]
+
 # First Aid: no route trained it (the user, 2026-10-02: "we are also missing step to learn first aid").
 # Thamner Pol is in the Thunderbrew Distillery with the class trainers: the second visit there (about
 # level 8, after Frostmane Hold), when there's a little money; Linen Bandages from the cloth you loot.
@@ -476,7 +511,7 @@ FIRST_AID = """step
     .target Thamner Pol
 """
 at = [m.start() for m in re.finditer(r"\n    \.target Granis Swiftaxe\n", guide)]
-assert len(at) == 2, len(at)
+assert len(at) == 3, len(at)   # the two visits, and the level-10 one (above) after them
 i = guide.index("\nstep", at[1] + 1) + 1
 guide = guide[:i] + FIRST_AID + guide[i:]
 

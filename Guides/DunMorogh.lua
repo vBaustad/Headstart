@@ -1136,6 +1136,55 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Pilot Bellowfiz|r
     .turnin 320 >> Turn in Return to Bellowfiz
     .target Pilot Bellowfiz
+step << Warlock
+    .goto 1426/0,-528.87,-5640.00
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gimrizz Shadowcog|r
+    >>|cRXP_WARN_You're 10: train now. The next trainer on the route is in Ironforge at 12-13|r
+    .trainer >> Train your class spells
+    .target Gimrizz Shadowcog
+    .xp <10,1
+step << Priest
+    .goto 1426/0,-529.51,-5590.660
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Maxan Anvol|r inside
+    >>|cRXP_WARN_You're 10: train now. The next trainer on the route is in Ironforge at 12-13|r
+    .trainer >> Train your class spells
+    .target Maxan Anvol
+    .xp <10,1
+step << Mage
+    .goto 1426/0,-537.200,-5587.000
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Magis Sparkmantle|r inside upstairs
+    >>|cRXP_WARN_You're 10: train now. The next trainer on the route is in Ironforge at 12-13|r
+    .trainer >> Train your class spells
+    .target Magis Sparkmantle
+    .xp <10,1
+step << Paladin
+    .goto 1426/0,-542.100,-5586.800
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Azar Stronghammer|r inside upstairs
+    >>|cRXP_WARN_You're 10: train now. The next trainer on the route is in Ironforge at 12-13|r
+    .trainer >> Train your class spells
+    .target Azar Stronghammer
+    .xp <10,1
+step << Shaman
+    .goto 1426/0,-541.500,-5582.900
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Ingrid Dunwald|r inside upstairs
+    >>|cRXP_WARN_You're 10: train now. The next trainer on the route is in Ironforge at 12-13|r
+    .trainer >> Train your class spells
+    .target Ingrid Dunwald
+    .xp <10,1
+step << Rogue
+    .goto 1426/0,-540.39,-5604.38
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Hogral Bakkan|r inside in the backroom
+    >>|cRXP_WARN_You're 10: train now. The next trainer on the route is in Ironforge at 12-13|r
+    .trainer >> Train your class spells
+    .target Hogral Bakkan
+    .xp <10,1
+step << Warrior
+    .goto 1426/0,-530.40,-5605.63--c:Dun Morogh,47.360,52.646
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Granis Swiftaxe|r inside
+    >>|cRXP_WARN_You're 10: train now. The next trainer on the route is in Ironforge at 12-13|r
+    .trainer >> Train your class spells
+    .target Granis Swiftaxe
+    .xp <10,1
 step << Warrior/Paladin/Rogue
     .goto 1426/0,-660.91,-5528.93
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Yarr Hammerstone|r inside downstairs
@@ -1777,6 +1826,12 @@ step << Dwarf/Gnome
     .turnin 6391 >> Turn in Ride to Ironforge
     .accept 6388 >> Accept Gryth Thurden
     .target Golnir Bouldertoe
+step << Dwarf Paladin
+    .goto 1455/0,-896.47,-4601.65
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Brandur Ironhammer|r in the Mystic Ward
+    .trainer >> Train your class spells
+    .target Brandur Ironhammer
+    .xp <12,1
 step << Shaman
     .goto 1455/0,-1086.500,-4642.400
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Eldrun Stormbreaker::258098|r 
