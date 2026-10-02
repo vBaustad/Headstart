@@ -24,7 +24,7 @@ end
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("PLAYER_DEAD")
 frame:SetScript("OnEvent", function()
-    if not YR.Option("deathSkipRelease") or not YR.OnDeathSkip() then return end
+    if not YR.RoutesOn() or not YR.Option("deathSkipRelease") or not YR.OnDeathSkip() then return end
     -- a moment for the death popup to appear first, so releasing also closes it
     C_Timer.After(0.3, function()
         if UnitIsDead("player") and not UnitIsGhost("player") then RepopMe() end

@@ -75,7 +75,7 @@ end
 
 local told = {}            -- key -> true until it stops being true
 local function Check(arriving)
-    if not YR.Option("campReminder") then return end
+    if (YR.RoutesOn and not YR.RoutesOn()) or not YR.Option("campReminder") then return end
     local now = {}
     for _, e in ipairs(YR.CampingNow()) do
         now[e[1]] = true
