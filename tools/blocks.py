@@ -5,7 +5,8 @@ tools/route_builder.py lines; "group:" makes a step the Duo and Trio versions' o
 Why dungeons for groups: on Forever, dungeon quests pay three to four times their Classic XP (our
 server scan, beta build of 30 Sep), the dungeon mobs almost nothing. The 2 Oct build halves the part
 above normal quest XP ("dungeon quests now reward 50% less extra experience"): about 2.4 times instead
-of 3.75, so the numbers below are about a third lower until the next scan. At Forever XP (30 Sep):
+of 3.75. Measured (level-1 scan of build 70170, 2 Oct): dungeon quests at about 0.63 of the numbers
+below, Baron Marinous 1650, The Treaty of Understanding 2550. At Forever XP (30 Sep):
   Stockade: What Comes Around 6400, Crime and Punishment 6700, Quell the Uprising 8500,
             The Color of Blood 8500, The Stockade Riots 7500.
 """
