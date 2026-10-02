@@ -20,6 +20,7 @@ Shopping.lua
 Log.lua
 DeathSkip.lua
 CampingReminder.lua
+MailStep.lua
 Flight.lua
 Rewards.lua
 Trainer.lua

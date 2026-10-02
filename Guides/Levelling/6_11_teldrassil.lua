@@ -179,6 +179,11 @@ step
     .turnin 2159 >> Turn in Dolanaar Delivery << !Hunter
     .vendor >>|cRXP_BUY_Buy 10 |T132815:0|t|cRXP_LOOT_Ice Cold Milk|r or as much as you can afford << Priest
     .home >> Set your Hearthstone to Dolanaar
+step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step << Hunter
     .goto 1438/1,928.83,9812.34
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Dazalar|r

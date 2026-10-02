@@ -187,6 +187,11 @@ step
     .target Innkeeper Farley
 
 step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
+step
     .goto 1429/0,-5.63,-9467.21
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tomas|r
     >>|cRXP_WARN_Skip this step if you don't have 1 silver, or if you wish to do it later|r
@@ -2108,6 +2113,11 @@ step
     .home >> Set your Hearthstone to Stormwind City
     .target Innkeeper Allison
     .bindlocation 16509
+step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step << Hunter
     .goto 1453/0,702.700,-8791.800
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Lina Stover|r

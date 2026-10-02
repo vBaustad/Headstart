@@ -184,6 +184,11 @@ step
     .target Innkeeper Belm
     .bindlocation 2102
 step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
+step
     .goto 1426/0,-464.45,-5573.78
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tharek Blackstone|r
     .accept 400 >> Accept Tools for Steelgrill
@@ -1671,6 +1676,11 @@ step
     .target Innkeeper Hearthstove
 step
     #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
+step
+    #optional
     #completewith next
     .goto 1432,35.273,47.750,10 >> Exit the Stoutlager Inn
 step << Hunter
@@ -2003,6 +2013,11 @@ step << Dwarf Paladin
     .home >> Set your Hearthstone to Ironforge
     .target Innkeeper Firebrew
     .bindlocation 1537
+step << Dwarf Paladin
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step << Hunter
     .hs >> Hearth to Thelsamar
     >>|cRXP_BUY_Buy food/water if needed|r << !Warrior !Rogue

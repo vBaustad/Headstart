@@ -170,6 +170,11 @@ step
 step << !Rogue
     .goto 1431,73.9,44.5
     .home >> Set your Hearthstone to Darkshire
+step << !Rogue
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step
     .goto 1431,73.6,46.8
 .target Commander Althea Ebonlocke

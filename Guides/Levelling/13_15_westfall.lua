@@ -23,6 +23,11 @@ step
     .target Innkeeper Allison
     .bindlocation 16509
 step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
+step
     #label NEWestfallStart --hidden step for #include
 step
     .goto 1453/0,660.28,-8814.55

@@ -460,6 +460,11 @@ step << !Dwarf/!Hunter
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Innkeeper Kimlya|r
     .home >> Set your Hearthstone to Astranaar
     .target Innkeeper Kimlya
+step << !Dwarf/!Hunter
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step
     #label HCHunterNoHSStart --hidden step for #include
 step

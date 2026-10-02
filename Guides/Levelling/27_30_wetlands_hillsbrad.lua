@@ -87,6 +87,11 @@ step
 	>> Restock on food/water if needed.
 .home >> Set your Hearthstone to Deepwater Tavern
 step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
+step
     .goto 1437,10.9,55.9
 .target Harlo Barnaby
 >>Talk to |cRXP_FRIENDLY_Harlo Barnaby|r

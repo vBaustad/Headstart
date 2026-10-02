@@ -168,6 +168,11 @@ step
     .home >> Set your Hearthstone to Thelsamar
     .target Innkeeper Hearthstove
 step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
+step
     .goto 1432/0,-3003.30,-5376.02
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Grenhild Darktalon|r
     .accept 86667 >> Accept Snowbound

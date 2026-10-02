@@ -642,6 +642,11 @@ step << !Warlock
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Innkeeper Kimlya|r
     .home 415 >> Set your Hearthstone to Astranaar
     .target Innkeeper Kimlya
+step << !Warlock
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step
     #xprate <1.59
     .goto 1440/1,-454.43,2682.24

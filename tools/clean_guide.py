@@ -236,3 +236,28 @@ def no_passing_pins(text):
                 and re.search(r"^\s*\.collect\b", step, re.M) and re.search(r"^\s*\.mob\b", step, re.M)):
             parts[k] = re.sub(r"\n[ \t]*\.goto [^\n]*", "", step)
     return "\n".join(parts)
+
+
+MAIL_FROM = 10
+MAIL_STEP = """step{cond}
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <{lvl},1"""
+
+
+def mail_stops(text):
+    """A mailbox stop (.mailalt, MailStep.lua) after every hearthstone stop: the inn nearly always has
+    a mailbox outside, and the route comes back to that town. From level 10 (bags fill with mats by
+    then, and postage no longer competes with training); it skips itself with no alt set or nothing
+    to send (the user, 2026-10-02: "in guide we can have steps to mail out some items so we clear space")."""
+    parts = re.split(r"\n(?=step\b)", text)
+    out = []
+    for step in parts:
+        out.append(step)
+        if (re.match(r"step\b", step) and re.search(r"^\s*\.home\b", step, re.M) and ".mailalt" not in step
+                and not re.search(r"^\s*#completewith\s+next\b", step, re.M)):   # "next" would become the mail stop
+            first = step.split("\n", 1)[0]
+            cond = first[len("step"):] if first.startswith("step <<") or first.startswith("step  <<") else ""
+            out.append(MAIL_STEP.format(cond=cond.rstrip(), lvl=MAIL_FROM))
+    return "\n".join(out)

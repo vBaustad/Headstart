@@ -192,8 +192,18 @@ step
     .accept 159 >> Accept Juice Delivery
 step << !NightElf
     .home >> Set your Hearthstone to Darkshire
+step << !NightElf
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step << Shaman
     .home >> Set your Hearthstone to Darkshire
+step << Shaman
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step
     .goto 1431,73.7,46.8
 >>Talk to |cRXP_FRIENDLY_Commander Althea Ebonlocke|r
@@ -621,6 +631,11 @@ step << NightElf
     #sticky
     .goto 1453,60.384,75.281
     .home >> Set your hearthstone in Stormwind
+step << NightElf
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step
     .goto 1453,50.550,87.345
 .target Archmage Malin
@@ -698,6 +713,11 @@ step << Hunter/Warrior/Paladin/Shaman/Rogue
 step
     .goto 1455,18.5,51.6
     .home >>Set your hearthstone to Ironforge
+step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step << Dwarf Paladin
     .goto 1455,23.131,6.143
 .target Brandur Ironhammer

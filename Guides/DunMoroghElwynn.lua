@@ -156,6 +156,11 @@ step << Warrior
     .trainer >> Train your class spells
     .target Granis Swiftaxe
 step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
+step
     .goto 1426/0,-464.45,-5573.78
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Tharek Blackstone|r
     .accept 400 >> Accept Tools for Steelgrill

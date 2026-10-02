@@ -125,6 +125,11 @@ step
 
 step
     #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
+step
+    #optional
     .xp 6 >> Grind to 6
 step << Rogue
     .goto 1429/0,9.64,-9465.36
@@ -2005,6 +2010,11 @@ step
     .home >> Set your Hearthstone to Stormwind City
     .target Innkeeper Allison
     .bindlocation 16509
+step
+    #optional
+    >>|cRXP_WARN_At the mailbox by the inn: send your alt the mats and recipes Headstart picks, to clear bag space. Shows only when you have set an alt (Settings, QoL) and there's something to send|r
+    .mailalt
+    .xp <10,1
 step << Hunter
     .goto 1453/0,702.700,-8791.800
 	>>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Lina Stover|r

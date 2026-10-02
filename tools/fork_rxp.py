@@ -14,7 +14,7 @@ import os
 import re
 import sys
 
-from clean_guide import clean, no_passing_pins, no_sick_deathskips
+from clean_guide import clean, mail_stops, no_passing_pins, no_sick_deathskips
 from share_split import mark
 
 RXP = "S:/forever-data/external/rxp/Guides/"
@@ -148,6 +148,7 @@ def build(file, home, name, ours):
     text, greyed = drop_grey(name, text)
     for d in dropped + [f"grey: {g}" for g in greyed]:
         print(f"    {name}: {d}")
+    text = mail_stops(text)   # last: our own blocks set the hearth too
     text, shared = mark(text)
     return text, shared
 
