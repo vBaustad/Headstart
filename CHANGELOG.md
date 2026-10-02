@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- No more "kill boars/wolves for meat to level Cooking" steps: they sat in the window across whole zones, two or three at once (to 10, then to 50), for meat you loot anyway. Quest meat (Stocking Jetsteam) stays, and the cooking itself is the Thelsamar stop and the campfire on the boat.
+
 - Less text in the kill-as-you-pass steps (boar and wolf meat, Thelsamar Blood Sausages and the like): just the kill line and the count. The orange advice under them ("This will be used to level your Cooking later", "You need 50 Cooking for...", "Don't go out of your way...") is gone; warnings about the mobs stay.
 
 - Dun Morogh, arriving in Thelsamar: Honor Students from Brock and the hand-in at Thorgrum, the flight master a few yards on, come first now, with the Thelsamar flight path. RestedXP left the hand-in for the end, just before the flight out; easy to forget, and the flight path with it.
