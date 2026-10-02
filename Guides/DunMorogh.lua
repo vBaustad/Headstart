@@ -986,13 +986,6 @@ step << Hunter
     .goto 1426/0,-455.83,-5497.90
     .accept 412 >> Accept Operation Recombobulation
 step
-    .goto 1426,41.9,49.5,20,0
-    .goto 1426,39.5,48.8
-    >>Into the |cRXP_PICK_Grizzled Den|r: kill |cRXP_ENEMY_Frosthowl|r at the back. Loot him for the |cRXP_LOOT_Sack of Fish|r
-    .complete 98326,1 --Sack of Fish (1)
-    .mob Frosthowl
-    .isOnQuest 98326
-step
     .isOnQuest 315
     #completewith ShimmerweedCollect
     #optional
@@ -1013,6 +1006,14 @@ step
     >>Open the |cRXP_PICK_Shimmerweed Baskets|r on the ground. Loot them for their |cRXP_LOOT_Shimmerweed|r
     .complete 315,1 --Collect Shimmerweed (x6)
     .mob Frostmane Seer
+step
+    .goto 1426,42.3,54.0,20,0
+    .goto 1426,41.9,49.5,20,0
+    .goto 1426,39.5,48.8
+    >>Down from the ridge to the |cRXP_PICK_Grizzled Den|r (its entrance is south, about 42,54) and in: kill |cRXP_ENEMY_Frosthowl|r at the back. Loot him for the |cRXP_LOOT_Sack of Fish|r
+    .complete 98326,1 --Sack of Fish (1)
+    .mob Frosthowl
+    .isOnQuest 98326
 step << !Mage !Warlock
     .goto 1426/0,-94.88,-5647.69
     >>Open |cRXP_PICK_MacGrann's Meat Locker|r. Loot it for |cRXP_LOOT_MacGrann's Dried Meats|r

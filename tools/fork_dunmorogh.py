@@ -276,10 +276,15 @@ FROSTHOWL_ACCEPT = """step
     .accept 98326 >> Accept Frosthowl
     .target Gretta Ganter
 """
+# After Shimmer Ridge, not before: Frosthowl is at the back of the Grizzled Den, right under the ridge,
+# and the cave's way out faces south. Before the ridge (as it was) meant out of the cave and back north
+# up the slope (a logged run, 2026-10-02: ~3.5 min); after it, the way out leads on to MacGrann's
+# meat locker and Tundra, south-west.
 FROSTHOWL_KILL = """step
+    .goto 1426,42.3,54.0,20,0
     .goto 1426,41.9,49.5,20,0
     .goto 1426,39.5,48.8
-    >>Into the |cRXP_PICK_Grizzled Den|r: kill |cRXP_ENEMY_Frosthowl|r at the back. Loot him for the |cRXP_LOOT_Sack of Fish|r
+    >>Down from the ridge to the |cRXP_PICK_Grizzled Den|r (its entrance is south, about 42,54) and in: kill |cRXP_ENEMY_Frosthowl|r at the back. Loot him for the |cRXP_LOOT_Sack of Fish|r
     .complete 98326,1 --Sack of Fish (1)
     .mob Frosthowl
     .isOnQuest 98326
@@ -296,8 +301,8 @@ FROSTHOWL_TURNIN = """step
 i = guide.index("    #label BrewnallVillage")
 i = guide.index("\nstep", i) + 1
 guide = guide[:i] + FROSTHOWL_ACCEPT + guide[i:]
-i = guide.index("    .goto 1426,42.254,45.301,15 >> Travel up the mountain slope to Shimmer Ridge")
-i = guide.rindex("\nstep", 0, i) + 1
+i = guide.index("    #label ShimmerweedCollect")
+i = guide.index("\nstep", i) + 1
 guide = guide[:i] + FROSTHOWL_KILL + guide[i:]
 i = guide.index("    .turnin 311 >> Turn in Return to Marleth")
 i = guide.index("\nstep", i) + 1
