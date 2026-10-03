@@ -2520,12 +2520,6 @@ step << Warrior/Paladin/Rogue
     >>|cRXP_WARN_If you don't want to do this, skip this step|r
     .target Dank Drizzlecut
     .train 2018,3 --Blacksmithing
-step << Warrior/Paladin/Rogue
-    #optional
-    #completewith QuarryEnd
-    .cast 2580 >> |cRXP_WARN_Cast|r |T136025:0|t[Find Minerals]
-    .usespell 2580
-    .train 2575,3 --Mining Trained
 step
     .goto 1426/0,-1679.89,-5728.88,40,0
     .goto 1426/0,-1675.95,-5597.22,25,0

@@ -334,3 +334,22 @@ def short_ah(text):
             body.insert(1, "    #optional")
         out.append("\n".join(body))
     return "\n".join(out)
+
+
+TRACKING = {2580, 2383, 2481}      # Find Minerals, Find Herbs, Find Treasure
+
+
+def no_tracking_casts(text):
+    """Steps that only say to cast a tracking spell (Find Minerals and the like) go: a buff/tracking
+    addon keeps them up (the user, 2026-10-03: "dont recommend 'cast find minerals' i already have a
+    buff addon"). A step that does anything else stays."""
+    parts = re.split(r"\n(?=[ \t]*step\b)", text)
+    out = [parts[0]]
+    for step in parts[1:]:
+        casts = {int(c) for c in re.findall(r"^\s*\.(?:cast|usespell)\s+(\d+)", step, re.M)}
+        doing = re.search(r"^\s*\.(accept|turnin|complete|collect|goto|train \d+ >>|trainer|vendor|home|fp|fly)\b",
+                          step, re.M)
+        if casts and casts <= TRACKING and not doing:
+            continue
+        out.append(step)
+    return "\n".join(out)

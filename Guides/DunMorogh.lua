@@ -302,12 +302,6 @@ step << Warrior/Paladin/Rogue
     .train 2575 >>Train |T134708:0|t[Mining]
     .target Yarr Hammerstone
     .train 2018,3 --Blacksmithing
-step << Warrior/Paladin/Rogue
-    #optional
-    #completewith RumbleshotAmmo
-    .cast 2580 >> |cRXP_WARN_Cast|r |T136025:0|t[Find Minerals]
-    .usespell 2580
-    .train 2575,3 --Mining
 step
     #completewith RumbleshotAmmo
     >>Kill |cRXP_ENEMY_Young Black Bears|r. Loot them for their |cRXP_LOOT_Thick Bear Fur|r

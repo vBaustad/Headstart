@@ -14,7 +14,7 @@ Changes, each asserted so an upstream edit that moves them fails loudly instead 
 import os
 import re
 
-from clean_guide import clean, mail_stops, no_cooking_meat, no_passing_pins, no_sick_deathskips, short_ah
+from clean_guide import clean, mail_stops, no_cooking_meat, no_passing_pins, no_sick_deathskips, no_tracking_casts, short_ah
 from share_split import mark
 
 SRC = "S:/forever-data/external/rxp/Guides/Forever/Alliance-1-14_DwarfGnome.lua"
@@ -549,7 +549,7 @@ i = guide.index("    .home >> Set your Hearthstone to Thelsamar")
 i = guide.index("\nstep", i) + 1
 guide = guide[:i] + build_steps("", LM_CRAFT).strip("\n") + "\n" + guide[i:]
 
-guide = mail_stops(short_ah(no_cooking_meat(no_passing_pins(no_sick_deathskips(clean(guide))))))   # mailbox stops after the hearth ones; short auction house steps; without the SoD, hardcore and self-found steps; no death skip from 10; no map pins for kill-as-you-pass loot
+guide = mail_stops(no_tracking_casts(short_ah(no_cooking_meat(no_passing_pins(no_sick_deathskips(clean(guide)))))))   # mailbox stops after the hearth ones; short auction house steps; without the SoD, hardcore and self-found steps; no death skip from 10; no map pins for kill-as-you-pass loot
 guide, shared = mark(guide)   # pick-ups a duo or trio splits (Duo/Trio versions of the route)
 for line in shared:
     print("   ", line)

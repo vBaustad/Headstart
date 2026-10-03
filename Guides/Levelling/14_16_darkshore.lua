@@ -441,12 +441,6 @@ step << NightElf Warrior/NightElf Rogue
     .target Elisa Steelhand
     .collect 2901,1 -- Mining Pick (1)
     .train 2575,3 --Mining Trained
-step << NightElf Warrior/NightElf Rogue
-    #optional
-    #completewith Bashal1
-    .cast 2580 >> |cRXP_WARN_Cast|r |T136025:0|t[Find Minerals]
-    .usespell 2580
-    .train 2575,3 --Mining Trained
 step << !NightElf/!Warrior !Rogue
     .goto 1439,38.107,41.165
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gorbold Steelhand|r
