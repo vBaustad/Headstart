@@ -434,6 +434,11 @@ check(not YR.RoutesOn(), "turned off stays off")
 YR.SetRoutesOn(True)
 check(YR.RoutesOn(), "turned on: on for every character of the account")
 lua.execute("YippRouteDB = SAVED_ROUTES_DB")
+lua.execute("SAVED_RXP2 = RXP; RXP = { icons = { goto = 'smudge', explore = 'smudge', home = 'house' } }")
+YR.RxpIcons()
+check("Headstart" in str(g.RXP.icons["goto"]) and "pin:0:0" in str(g.RXP.icons["goto"]) and "pin" in str(g.RXP.icons["explore"]) and g.RXP.icons["home"] == "house",
+      "RestedXP's go-to icon is our map pin (and nothing else is touched)")
+lua.execute("RXP = SAVED_RXP2")
 check(not dwarf["dunmorogh_elwynn"] and not dwarf["6_11_elwynn_dwarf_gnome"],
       "Coldridge's second way on (Elwynn at 6) is an option: not a Dwarf's route until RestedXP has it loaded")
 lua.execute('SAVED_RXP = RXP; RXP = { currentGuide = { name = "6-11 Elwynn (Dwarf/Gnome)" } }')

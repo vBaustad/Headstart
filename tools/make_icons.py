@@ -112,3 +112,13 @@ rounded("roundline", True)
 img, d = canvas()
 d.ellipse((2, 2, S - 3, S - 3), fill=(255, 255, 255, 255))
 save(img, "circle")
+
+
+# A map pin: RestedXP's "go to" icon in our routes (a crop of the minimap sheet that shows as a smudge
+# on Forever; Guides.lua swaps it in, tinted grey like RestedXP's own talk bubble). A round head with a
+# hole and a point, filling the height so it reads at line size.
+img, d = canvas()
+d.ellipse((58, 14, 198, 154), fill=(255, 255, 255, 255))
+d.polygon([(66, 116), (190, 116), (128, 246)], fill=(255, 255, 255, 255))
+d.ellipse((100, 56, 156, 112), fill=(255, 255, 255, 0))
+save(img, "pin")

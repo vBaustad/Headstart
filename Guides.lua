@@ -88,8 +88,19 @@ function YR.SetRoutesOn(on)
     end
 end
 
+-- RestedXP's "go to" icon (in front of every ".goto ... >> text" line) is a crop of the minimap POI
+-- sheet that comes out as a red smudge on Forever (the user, 2026-10-03: "the icon is just so ugly").
+-- Ours instead while the routes are on: a map pin (art/pin.tga), grey like RestedXP's talk bubble.
+-- RestedXP reads the icon each time it draws the window, so setting it before its guides load is enough.
+local PIN = "|TInterface\\AddOns\\Headstart\\art\\pin:0:0:0:0:64:64:0:64:0:64:210:210:210|t"
+function YR.RxpIcons()
+    if type(RXP) ~= "table" or type(RXP.icons) ~= "table" then return end
+    for _, tag in ipairs({ "goto", "groundgoto", "flygoto", "explore" }) do RXP.icons[tag] = PIN end
+end
+
 function YR:RegisterGuides()
     if not YR.RoutesOn() then return end
+    YR.RxpIcons()
     for key, c in pairs(Custom()) do
         c.text = Renamed(c.text)
         -- edited before routes remembered their base: take today's shipped route as it

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- RestedXP's "go to" icon (the red smudge in front of travel lines) is a clean grey map pin while the routes are on. And no more "Cast Find Minerals" steps (or other tracking spells): a buff addon keeps those up.
+
 - Dun Morogh, Never Saddle on Quality: the leopard pelts are marked optional (kill the Elder Snow Leopards you meet at the quarry, don't go looking), and the step goes away at the point where you'd go back to Rudra instead of staying in the window into Loch Modan. The trip back to Rudra still only shows with all six pelts.
 
 - Dun Morogh, Father Gavin: the "kill Minor Ice Elementals as you go" step now gives way to "finish them on the way back" instead of both showing the same count at once.
