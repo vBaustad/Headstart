@@ -817,6 +817,18 @@ step
     .train 3273 >> Train |T135966:0|t[First Aid]
     .target Thamner Pol
 step
+    .goto 1426/0,-498.400,-5648.400
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Eric Brighthammer::265813|r at the campfire, a few yards out
+    .accept 96047 >> Accept Camping 101: First Aid
+    .target Eric Brighthammer::265813
+    .skill firstaid,<1,1
+step
+    #completewith FirstAidTurnin
+    >>Make |T133685:0|t[Linen Bandages] from your |cRXP_LOOT_Linen Cloth|r as you go: a point each, First Aid 20 for Camping 101 (about 19 cloth, from the troggs and trolls)
+    .skill firstaid,20
+    .usespell 3273
+    .isOnQuest 96047
+step
     .goto 1426/0,-504.05,-5596.27
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Ragnar Thunderbrew|r outside
     .turnin 384 >> Turn in Beer Basted Boar Ribs
@@ -1119,7 +1131,7 @@ step << !Hunter
     .waypoint 1426,31.767,49.790,60,0
     .waypoint 1426,33.832,48.153,60,0
     .waypoint 1426,31.691,46.837,60,0
-    .xp 9 >> Grind to level 9
+    .xp 9+5800 >> Grind to 5800+/6500xp: Bellowfiz's 875 after the death skip then makes 10
 step
     #completewith next
     .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r
@@ -1185,6 +1197,13 @@ step << Warrior
     .trainer >> Train your class spells
     .target Granis Swiftaxe
     .xp <10,1
+step
+    #label FirstAidTurnin
+    .goto 1426,47.18,52.61
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thamner Pol|r in the Thunderbrew Distillery
+    .turnin 96047 >> Turn in Camping 101: First Aid
+    .target Thamner Pol
+    .isQuestComplete 96047
 step << Warrior/Paladin/Rogue
     .goto 1426/0,-660.91,-5528.93
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Yarr Hammerstone|r inside downstairs

@@ -527,7 +527,40 @@ FIRST_AID = """step
 at = [m.start() for m in re.finditer(r"\n    \.target Granis Swiftaxe\n", guide)]
 assert len(at) == 3, len(at)   # the two visits, and the level-10 one (above) after them
 i = guide.index("\nstep", at[1] + 1) + 1
+# Camping 101: First Aid (270 XP): Eric at the campfire offers it once you know First Aid (a logged run
+# took it there, 2026-10-03); Linen Bandages to First Aid 20, a point each (19 Linen Cloth from the
+# troggs and trolls); handed in to Thamner Pol, at the level-10 visit to the Distillery (below).
+FIRST_AID += """step
+    .goto 1426/0,-498.400,-5648.400
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Eric Brighthammer::265813|r at the campfire, a few yards out
+    .accept 96047 >> Accept Camping 101: First Aid
+    .target Eric Brighthammer::265813
+    .skill firstaid,<1,1
+step
+    #completewith FirstAidTurnin
+    >>Make |T133685:0|t[Linen Bandages] from your |cRXP_LOOT_Linen Cloth|r as you go: a point each, First Aid 20 for Camping 101 (about 19 cloth, from the troggs and trolls)
+    .skill firstaid,20
+    .usespell 3273
+    .isOnQuest 96047
+"""
 guide = guide[:i] + FIRST_AID + guide[i:]
+FIRST_AID_TURNIN = """step
+    #label FirstAidTurnin
+    .goto 1426,47.18,52.61
+    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Thamner Pol|r in the Thunderbrew Distillery
+    .turnin 96047 >> Turn in Camping 101: First Aid
+    .target Thamner Pol
+    .isQuestComplete 96047
+"""
+i = guide.index(TRAIN10[-1]) + len(TRAIN10[-1])
+guide = guide[:i] + FIRST_AID_TURNIN + guide[i:]
+
+# The grind before the death skip at Brewnall was RestedXP's "to level 9", done the moment you are 9;
+# a run (2026-10-03) died at 5574/6500 and came out of Bellowfiz's 875 51 XP short of 10. The target is
+# what makes Bellowfiz the ding (5625), with a kill or two to spare.
+old = "    .xp 9 >> Grind to level 9\n"
+assert guide.count(old) == 1
+guide = guide.replace(old, "    .xp 9+5800 >> Grind to 5800+/6500xp: Bellowfiz's 875 after the death skip then makes 10\n")
 
 # Arriving in Thelsamar: Honor Students from Brock and straight on to Thorgrum at the flight master, a few
 # yards on, for the hand-in (Ride to Ironforge) and the flight path, before the inn (the user, 2026-10-02:
