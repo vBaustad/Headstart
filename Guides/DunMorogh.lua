@@ -1131,6 +1131,11 @@ step
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Pilot Bellowfiz|r
     .turnin 320 >> Turn in Return to Bellowfiz
     .target Pilot Bellowfiz
+step
+    #optional
+    >>Kill a mob or two on the way to the Thunderbrew Distillery: you're a hair from 10, and your trainer there has the level 10 spells
+    .xp 10 >> Reach level 10
+    .xp <9+6200,1
 step << Warlock
     .goto 1426/0,-528.87,-5640.00
     >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_Gimrizz Shadowcog|r

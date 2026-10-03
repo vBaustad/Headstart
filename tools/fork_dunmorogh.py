@@ -488,9 +488,18 @@ for s in re.split(r"\n(?=step\b)", guide):
                   "    .trainer >> Train your class spells\n") + "    .xp <10,1\n"
     TRAIN10.append(s)
 assert {"Paladin", "Warrior", "Rogue", "Priest", "Mage"} <= seen, seen
+# Bellowfiz's 875 usually makes 10, but a run (2026-10-03) came out of it 51 XP short: the trainer steps,
+# which only show from 10, skipped themselves. So when you're within 300 XP of 10 there, first a kill
+# or two on the way to the Distillery.
+DING10 = """step
+    #optional
+    >>Kill a mob or two on the way to the Thunderbrew Distillery: you're a hair from 10, and your trainer there has the level 10 spells
+    .xp 10 >> Reach level 10
+    .xp <9+6200,1
+"""
 i = guide.index("    .turnin 320 >> Turn in Return to Bellowfiz")
 i = guide.index("\nstep", i) + 1
-guide = guide[:i] + "".join(TRAIN10) + guide[i:]
+guide = guide[:i] + DING10 + "".join(TRAIN10) + guide[i:]
 
 # And Paladins at 12+ on the way through Ironforge (Golnir, the Senator, Gryth): Brandur in the Mystic
 # Ward, ~200 yards off; the next route starts with him too, but only after the Stormwind trip.
