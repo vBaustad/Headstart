@@ -852,4 +852,6 @@ import smoke_trainer
 bad += smoke_trainer.run()
 import smoke_mailstep
 bad += smoke_mailstep.run()
+import smoke_stepkeeper
+bad += smoke_stepkeeper.run()
 sys.exit(1 if bad else 0)
