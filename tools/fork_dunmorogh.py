@@ -345,10 +345,11 @@ guide = guide[:i] + COOK_AGAIN + guide[i:]
 # Father Gavin's chain (new in Forever, 4 x 700 XP at level 8): he is the Dawn in the Mountains hand-in,
 # just before Vagash, so the chain is the XP for level 10 before him. Finding Warmth first (the other
 # three open after it), then Rime's Wrath (10 Minor Ice Elementals, around him), Rime's Wrath (Avala,
-# just north of him) and Treacherous Cold (three rifles by fallen mountaineers). Positions: Wowhead's
-# Forever pages (Gavin, the elementals, Avala) and their comments (the rifles' map, 52/44, 53/59,
-# 60/50; the firewood: white trunks on the ground by the trees, some give 2, sparse). In the order
-# west, south, then east toward the ranch, the Sunhammer rifle is on the way to Rudra.
+# just north of him). Positions: Wowhead's Forever pages (Gavin, the elementals, Avala) and their
+# comments (the firewood: white trunks on the ground by the trees, some give 2, sparse).
+# Not Treacherous Cold (700 XP, three rifles by fallen mountaineers at 52/44, 53/59 and 60/50): two
+# of them are off the way, ~1350 yards and ~4 minutes for what ~2.5 minutes of grinding at 10 gives;
+# no logged run handed it in (the user, 2026-10-03: remove it).
 # Two quests are called Rime's Wrath: the ice elementals (99160), then Avala's core (99161), which
 # Father Gavin only offers once the first is handed in (seen in game, 2026-10-02: the step asked for
 # both at once and could not finish). Avala stands just north of him.
@@ -368,36 +369,12 @@ def gavin(cls):
 {head}
 {talk}    .turnin 99159 >> Turn in Finding Warmth
     .accept 99160 >> Accept Rime's Wrath
-    .accept 99162 >> Accept Treacherous Cold
     .target Father Gavin
 {head}
-    #completewith IceFinish
     #label IceElementals
-    >>Kill |cRXP_ENEMY_Minor Ice Elementals|r as you go: they are all around Father Gavin's
-    .complete 99160,1 --Minor Ice Elemental slain (10)
-    .mob Minor Ice Elemental
-    .isOnQuest 99160
-{head}
-    .goto 1426,52.0,44.0
-    >>Loot the rifle by the fallen mountaineer under the tree lying across the frozen river
-    .collect 286358,1,99162 --Coalbeard's Rifle
-    .isOnQuest 99162
-{head}
-    .goto 1426,53.0,59.0
-    >>Loot the rifle by the fallen mountaineer next to a cart, in the valley to the south
-    .collect 286360,1,99162 --Stoneanvil's Rifle
-    .isOnQuest 99162
-{head}
-    .goto 1426,60.0,50.0
-    >>Loot the rifle by the fallen mountaineer next to a cart, on the small path up to Vagash's cave
-    >>|cRXP_WARN_A player reported it wouldn't loot: if so, skip this step|r
-    .collect 286359,1,99162 --Sunhammer's Rifle
-    .isOnQuest 99162
-{head}
-    #label IceFinish
     .goto 1426,55.0,46.0,60,0
     .goto 1426,57.0,48.0
-    >>Finish the |cRXP_ENEMY_Minor Ice Elementals|r on the way back to Father Gavin
+    >>Kill |cRXP_ENEMY_Minor Ice Elementals|r: they are all around Father Gavin's
     .complete 99160,1 --Minor Ice Elemental slain (10)
     .mob Minor Ice Elemental
     .isOnQuest 99160
@@ -416,10 +393,6 @@ def gavin(cls):
 {talk}    .turnin 99161 >> Turn in Rime's Wrath
     .target Father Gavin
     .isQuestComplete 99161
-{head}
-{talk}    .turnin 99162 >> Turn in Treacherous Cold
-    .target Father Gavin
-    .isQuestComplete 99162
 """
 
 

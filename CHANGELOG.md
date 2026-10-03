@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh, Father Gavin: no Treacherous Cold any more. Two of its three rifles are well off the way (about 4 minutes of walking for 700 XP, 2.5 minutes of grinding at 10), and no logged run handed it in. The ice elementals are now one step around Gavin's.
+
 - Dun Morogh: **Camping 101: First Aid** (270 XP): taken from Eric at the campfire right after training First Aid, Linen Bandages to 20 as you go, handed in to Thamner Pol at the level-10 visit to the Distillery. And the grind before the death skip at Brewnall now aims at 5800/6500 XP (Bellowfiz's 875 then makes 10) instead of just "level 9", which let a run come out of Bellowfiz 51 XP short.
 
 - Dun Morogh: when Bellowfiz leaves you just short of 10 (within 300 XP), a step says to kill a mob or two on the way to the Thunderbrew Distillery first, so the level-10 training steps don't skip themselves. A run came out of Bellowfiz 51 XP short.
