@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh: when Bellowfiz leaves you just short of 10 (within 300 XP), a step says to kill a mob or two on the way to the Thunderbrew Distillery first, so the level-10 training steps don't skip themselves. A run came out of Bellowfiz 51 XP short.
+
 - RestedXP's "go to" icon (the red smudge in front of travel lines) is a clean grey map pin while the routes are on. And no more "Cast Find Minerals" steps (or other tracking spells): a buff addon keeps those up.
 
 - Dun Morogh, Never Saddle on Quality: the leopard pelts are marked optional (kill the Elder Snow Leopards you meet at the quarry, don't go looking), and the step goes away at the point where you'd go back to Rudra instead of staying in the window into Loch Modan. The trip back to Rudra still only shows with all six pelts.
