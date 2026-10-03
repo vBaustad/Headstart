@@ -99,6 +99,7 @@ function YR.RxpIcons()
 end
 
 function YR:RegisterGuides()
+    if YR.ShipMyRoutes then YR.ShipMyRoutes() end       -- routes saved from a run (MyRoutes.lua), like ours
     if not YR.RoutesOn() then return end
     YR.RxpIcons()
     for key, c in pairs(Custom()) do
@@ -280,6 +281,10 @@ function YR:RoutesFor(race)
             end
             if on then for key in pairs(own) do set[key] = true end end
         end
+    end
+    -- and your own routes, saved from a run
+    for _, g in ipairs(YR.shipped) do
+        if YR.IsMyRoute and YR.IsMyRoute(g.key) then set[g.key] = true end
     end
     return set
 end

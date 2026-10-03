@@ -984,6 +984,13 @@ local function BuildRun(page)
     run.counts:SetWidth(150)
     run.counts:SetPoint("RIGHT", run.stop, "LEFT", -20, -3)
     run.counts.tip = "Off: other characters' splits don't compare against this run (a missed quest, a test)"
+    -- This character's whole run as a route of its own (MyRoutes.lua): every stop a step, to reorder and
+    -- edit in Routes and to play in RestedXP. Saving again replaces it.
+    run.save = S.Button(page, "Save as route", function() YR.AskSaveRunAsRoute() end, "primary", 130)
+    run.save:SetPoint("RIGHT", run.counts, "LEFT", -20, 3)
+    run.save.tip = "Your run as your own route: every quest stop, trainer, vendor, flight, death skip and grind"
+        .. " a step, in the order you played. Edit and reorder it in Routes; RestedXP lists it under My routes."
+        .. " Saving again replaces it. Our routes stay as they are"
 end
 
 local function RefreshRun()

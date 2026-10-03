@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Save your run as your own route.** This run has a "Save as route" button: the whole recorded run becomes a route of yours, a step for every stop in the order you played (quests taken and handed in at each NPC, objectives finished, trainers with what you learned, vendors with what you bought, flights, the hearthstone, death skips, grinds to the XP you reached). It shows in the Routes list, where you can drag steps around, edit every line and delete, like our routes; RestedXP lists it under Headstart Launch, My routes. One per character: saving again replaces it, your edits too. Our routes stay as they are.
+
 - **Your place in a route survives an update.** RestedXP remembers the step you're on by its number, so when a Headstart update adds or removes steps before it, a /reload puts you somewhere else (a run was moved past the trogg hand-ins, the Dark Iron spies and Farsen straight to the walk to Loch Modan). Headstart now remembers the step itself and puts you back on it, and says so in chat.
 
 - Dun Morogh, Father Gavin: no Treacherous Cold any more. Two of its three rifles are well off the way (about 4 minutes of walking for 700 XP, 2.5 minutes of grinding at 10), and no logged run handed it in. The ice elementals are now one step around Gavin's.
