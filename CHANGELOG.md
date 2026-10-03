@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dun Morogh: **Camping 101: First Aid** (270 XP): taken from Eric at the campfire right after training First Aid, Linen Bandages to 20 as you go, handed in to Thamner Pol at the level-10 visit to the Distillery. And the grind before the death skip at Brewnall now aims at 5800/6500 XP (Bellowfiz's 875 then makes 10) instead of just "level 9", which let a run come out of Bellowfiz 51 XP short.
+
 - Dun Morogh: when Bellowfiz leaves you just short of 10 (within 300 XP), a step says to kill a mob or two on the way to the Thunderbrew Distillery first, so the level-10 training steps don't skip themselves. A run came out of Bellowfiz 51 XP short.
 
 - RestedXP's "go to" icon (the red smudge in front of travel lines) is a clean grey map pin while the routes are on. And no more "Cast Find Minerals" steps (or other tracking spells): a buff addon keeps those up.
