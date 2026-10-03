@@ -21,6 +21,7 @@ Log.lua
 DeathSkip.lua
 CampingReminder.lua
 MailStep.lua
+StepKeeper.lua
 Flight.lua
 Rewards.lua
 Trainer.lua

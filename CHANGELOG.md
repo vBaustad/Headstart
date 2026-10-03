@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Your place in a route survives an update.** RestedXP remembers the step you're on by its number, so when a Headstart update adds or removes steps before it, a /reload puts you somewhere else (a run was moved past the trogg hand-ins, the Dark Iron spies and Farsen straight to the walk to Loch Modan). Headstart now remembers the step itself and puts you back on it, and says so in chat.
+
 - Dun Morogh, Father Gavin: no Treacherous Cold any more. Two of its three rifles are well off the way (about 4 minutes of walking for 700 XP, 2.5 minutes of grinding at 10), and no logged run handed it in. The ice elementals are now one step around Gavin's.
 
 - Dun Morogh: **Camping 101: First Aid** (270 XP): taken from Eric at the campfire right after training First Aid, Linen Bandages to 20 as you go, handed in to Thamner Pol at the level-10 visit to the Distillery. And the grind before the death skip at Brewnall now aims at 5800/6500 XP (Bellowfiz's 875 then makes 10) instead of just "level 9", which let a run come out of Bellowfiz 51 XP short.
