@@ -11,9 +11,11 @@
 --   * Gear sets: the game's own equipment sets, on keys (Key Bindings > AddOns > Headstart) and on
 --     /headstart gear <name or number>.
 -- Trinkets and armor can't be changed in a fight (only weapons can): a swap asked for in one happens
--- the moment it ends.
+-- the moment it ends. The swaps it makes by itself are off until you turn them on, and pause while
+-- you're flagged for PvP: on a PvP realm a swap at the wrong moment (still on the Carrot when someone
+-- jumps you) costs a fight, so by default every change is yours.
 --   Account options (YippRouteDB, Settings, QoL, Trinkets & sets): trinketBar, trinketBarLocked,
---   trinketAuto, trinketMount (all on unless turned off), trinketSwim (off unless turned on),
+--   trinketPvpPause (on unless turned off); trinketAuto, trinketMount, trinketSwim (off unless turned on),
 --   trinketMountItem / trinketSwimItem (item IDs; nil = Carrot on a Stick / none), trinketMountSlot
 --   (13 or 14, nil = 14), trinketBarPos. Per character (YippSetupCharDB.trinkets): order (item IDs,
 --   first = most wanted), auto[13] / auto[14] (false = that slot is left alone), before (what the swap
@@ -29,6 +31,14 @@ local EQUIP_SLOT = { INVTYPE_HEAD = 1, INVTYPE_NECK = 2, INVTYPE_SHOULDER = 3, I
     INVTYPE_HAND = 10, INVTYPE_CLOAK = 15, INVTYPE_TRINKET = 14 }
 
 local pending = {}             -- [slot] = item ID to put on when the fight ends
+
+--- The swaps it makes by itself: this one turned on, and not while you're flagged for PvP (unless allowed).
+local function AutoOn(key)
+    if YippRouteDB[key] ~= true then return false end
+    if YR.Option("trinketPvpPause") and UnitIsPVP and UnitIsPVP("player") then return false end
+    return true
+end
+YR.TrinketAutoOn = AutoOn
 local held = {}                -- [slot] = "mount" / "swim": the swap-when has it, auto stays out
 
 local function CharDB()
@@ -118,7 +128,7 @@ end
 -- ---------------------------------------------------------------------------
 --- One pass: at most one swap (the bags move under a swap). Returns the item it put on, and the slot.
 function YR.TrinketAuto()
-    if not YR.Option("trinketAuto") or Busy() then return nil end
+    if not AutoOn("trinketAuto") or Busy() then return nil end
     local db = CharDB()
     local order = db.order
     if #order == 0 then return nil end
@@ -172,7 +182,7 @@ local WHEN = {
       item = function() return YippRouteDB.trinketMountItem or CARROT end,
       slot = function() return YippRouteDB.trinketMountSlot or 14 end },
     { key = "swim", test = function() return IsSwimming and IsSwimming() end,
-      on = function() return YippRouteDB.trinketSwim == true end,
+      option = "trinketSwim",
       item = function() return YippRouteDB.trinketSwimItem end,
       slot = function(id)
           local _, _, _, loc = C_Item.GetItemInfoInstant(id)
@@ -184,7 +194,7 @@ function YR.TrinketWhen()
     local db = CharDB()
     db.before = db.before or {}
     for _, w in ipairs(WHEN) do
-        local on = w.on and w.on() or (w.option and YR.Option(w.option))
+        local on = AutoOn(w.option)
         local id = on and w.item()
         local slot = id and w.slot(id)
         local was = db.before[w.key]
@@ -272,7 +282,7 @@ local function Paint()
         end
         -- a small mark while "swap trinkets for me" looks after this slot
         local id, db = Worn(s), CharDB()
-        local auto = YR.Option("trinketAuto") and db.auto[s] ~= false and #db.order > 0
+        local auto = AutoOn("trinketAuto") and db.auto[s] ~= false and #db.order > 0
         local listed = not id
         for _, v in ipairs(db.order) do if v == id then listed = true end end
         b.auto:SetShown(auto and listed)

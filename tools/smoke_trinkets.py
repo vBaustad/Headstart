@@ -45,6 +45,8 @@ function UnitChannelInfo() return nil end
 function GetCursorInfo() return nil end
 function IsMounted() return MOUNTED end
 function IsSwimming() return SWIMMING end
+PVP = false
+function UnitIsPVP() return PVP end
 NUM_BAG_SLOTS = 0
 -- items: [id] = { equipLoc, on-use }
 ITEMS = { [1] = { "INVTYPE_TRINKET", true }, [2] = { "INVTYPE_TRINKET", true }, [3] = { "INVTYPE_TRINKET", false },
@@ -98,6 +100,23 @@ C_EquipmentSet = {
 
     def worn():
         return (g.WORN[13], g.WORN[14])
+
+    # off until turned on: a used trinket stays when you haven't asked for swaps
+    lua.execute("WORN[13] = 1 WORN[14] = 2 BAG[1] = 3 BAG[2] = 4 CD[1] = { NOW, 120 }")
+    YR.TrinketDB().order[1] = 1
+    YR.TrinketDB().order[2] = 3
+    lua.execute("Tick()")
+    check(g.WORN[13] == 1 and g.EQUIPS == 0, "swaps are off until you turn them on: nothing changes")
+    lua.execute("MOUNTED = true BAG[3] = 11122 Tick() MOUNTED = false BAG[3] = nil CD[1] = nil")
+    check(g.WORN[14] == 2, "no Carrot either until you turn it on")
+    g.YippRouteDB.trinketAuto = True
+    g.YippRouteDB.trinketMount = True
+    # flagged for PvP: paused
+    lua.execute("PVP = true CD[1] = { NOW, 120 } Tick()")
+    check(g.WORN[13] == 1, "flagged for PvP: no swap by itself")
+    lua.execute("PVP = false CD[1] = nil")
+    for k in list(YR.TrinketDB().order.keys()):
+        YR.TrinketDB().order[k] = None
 
     # your order: 1 (best), 2, then 3 (no use: always ready). Wearing 1 and 2, 3 in the bag.
     lua.execute("WORN[13] = 1 WORN[14] = 2 BAG[1] = 3 BAG[2] = 4")

@@ -2128,7 +2128,8 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
             "Unlocked, drag the buttons where you want them")
 
         Section("Swap trinkets for me", "your trinkets in the order below", { icon = 133437,
-            master = { Opt("trinketAuto"), function(on) YippRouteDB.trinketAuto = on if YR.TrinketPaint then YR.TrinketPaint() end end } })
+            master = { function() return YippRouteDB.trinketAuto == true end,
+                function(on) YippRouteDB.trinketAuto = on if YR.TrinketPaint then YR.TrinketPaint() end end } })
         Row("How it swaps", S.Text(c, 12, S.C.muted),
             "When the trinket you wear has been used, the first ready one in your order goes in instead, and a"
             .. " higher one goes back as soon as it's ready again. A trinket you put on yourself that isn't in the"
@@ -2140,10 +2141,14 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
         end
         Row("The top trinket slot", SlotSwitch(13))
         Row("The bottom trinket slot", SlotSwitch(14), "Off: that slot keeps what you put in it")
+        Row("Not while I'm flagged for PvP", S.Switch(c, Opt("trinketPvpPause"), function(on) YippRouteDB.trinketPvpPause = on end),
+            "On a PvP realm a swap at the wrong moment costs a fight: while you're flagged, nothing here or under"
+            .. " Swap when changes your gear by itself. Your own clicks and gear-set keys always work")
 
-        Section("Swap when...", "and back after", { icon = 132239 })
+        Section("Swap when...", "off until you turn one on; and back after", { icon = 132239 })
         local carrot = C_Item.GetItemNameByID and C_Item.GetItemNameByID(11122) or "Carrot on a Stick"
-        Row("Mounted: " .. carrot, S.Switch(c, Opt("trinketMount"), function(on) YippRouteDB.trinketMount = on end),
+        Row("Mounted: " .. carrot, S.Switch(c, function() return YippRouteDB.trinketMount == true end,
+            function(on) YippRouteDB.trinketMount = on end),
             "While you ride, Carrot on a Stick (faster mount) goes in a trinket slot, and the trinket you wore goes"
             .. " back when you get off. Only if you carry one")
         local SLOT_CHOICE = { { 13, "Top trinket slot" }, { 14, "Bottom trinket slot" } }
@@ -2251,7 +2256,7 @@ local CATEGORIES = {
       status = function() return YR.Option("simTooltip") or YR.Option("upgrades") end, scope = "Every character; quest rewards per class",
       desc = "Better gear in your bags pointed out, and quest rewards picked for you." },
     { key = "trinkets", label = "Trinkets & sets", build = BuildTrinkets, refresh = QoLRefresh("trinkets", RefreshTrinkets),
-      icon = 133434, status = function() return YR.Option("trinketBar") or YR.Option("trinketAuto") end,
+      icon = 133434, status = function() return YR.Option("trinketBar") or YippRouteDB.trinketAuto == true end,
       scope = "Every character; the swap order per character",
       desc = "Trinket buttons with your others a click away, trinkets swapped as they're used, and keys for your gear sets." },
     { group = "Character" },
