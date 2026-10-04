@@ -181,9 +181,13 @@ local function ShowNext()
     win.link = u.link
     win.icon:SetTexture(C_Item.GetItemIconByID and C_Item.GetItemIconByID(u.link) or select(5, C_Item.GetItemInfoInstant(u.link)))
     win.text:SetText(("%s\n|cff99ff99%s|r\nover %s"):format(u.link, u.how or "better", u.old or "an empty slot"))
+    -- the icon framed in the item's quality colour
+    local q = C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(u.link)
+    local qc = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
+    if qc and win.ring and win.ring.Color then win.ring:Color({ qc.r, qc.g, qc.b, 1 }) end
     -- as tall as the text (a long "with ..." line wraps), with the buttons in their own row below it
-    local h = tonumber(win.text.GetStringHeight and win.text:GetStringHeight()) or 36
-    win:SetHeight(math.max(36, h) + 12 + 10 + 20 + 10)
+    local h = tonumber(win.text.GetStringHeight and win.text:GetStringHeight()) or 40
+    win:SetHeight(30 + math.max(40, h) + 12 + 28 + 12)
     win:Show()
 end
 
@@ -226,41 +230,55 @@ local function Equip(u)
 end
 YR.UpgradeEquip = Equip         -- for tests
 
+-- The window, in Headstart's own look (Style.lua): a dark card, the item's icon framed in its quality
+-- colour, and Equip as the main button. Drag it where you want it; it stays there.
 local function Window()
     if win then return win end
-    win = CreateFrame("Frame", "HeadstartUpgradeFrame", UIParent, "BackdropTemplate")
-    win:SetSize(320, 90)
-    win:SetPoint("TOP", UIParent, "TOP", 0, -180)
+    local S = YR.Style
+    win = CreateFrame("Frame", "HeadstartUpgradeFrame", UIParent)
+    win:SetSize(340, 110)
+    local pos = YippRouteDB.upgradePos
+    if pos then win:SetPoint("TOPLEFT", UIParent, "TOPLEFT", pos[1], pos[2])
+    else win:SetPoint("TOP", UIParent, "TOP", 0, -180) end
     win:SetFrameStrata("DIALOG")
-    if win.SetBackdrop then
-        win:SetBackdrop({ bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
-            insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-        win:SetBackdropColor(0, 0, 0, 0.85)
-    end
-    win.icon = win:CreateTexture(nil, "ARTWORK")
-    win.icon:SetSize(36, 36)
-    win.icon:SetPoint("TOPLEFT", 12, -12)
-    win.text = win:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    win.text:SetPoint("TOPLEFT", win.icon, "TOPRIGHT", 8, 0)
-    win.text:SetPoint("RIGHT", -12, 0)
+    win:SetClampedToScreen(true)
+    win:SetMovable(true)
+    win:EnableMouse(true)
+    win:RegisterForDrag("LeftButton")
+    win:SetScript("OnDragStart", win.StartMoving)
+    win:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        YippRouteDB.upgradePos = { math.floor(self:GetLeft() + 0.5), math.floor(self:GetTop() - UIParent:GetTop() + 0.5) }
+    end)
+    S.Fill(win, S.C.window)
+    S.Border(win, S.C.lineHi)
+    local head = S.Text(win, 11, S.C.accent)
+    head:SetPoint("TOPLEFT", 14, -10)
+    head:SetText("BETTER GEAR")
+    local close = S.IconButton and S.IconButton(win, "close", function() win:Hide() end, nil, S.C.muted, 18)
+    if close then close:SetPoint("TOPRIGHT", -8, -6) end
+    local frame = CreateFrame("Frame", nil, win)
+    frame:SetSize(40, 40)
+    frame:SetPoint("TOPLEFT", 14, -30)
+    win.ring = S.Border(frame, S.C.lineHi)
+    win.icon = frame:CreateTexture(nil, "ARTWORK")
+    win.icon:SetPoint("TOPLEFT", 1, -1)
+    win.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    win.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    win.text = S.Text(win, 13)
+    win.text:SetPoint("TOPLEFT", frame, "TOPRIGHT", 10, 0)
+    win.text:SetPoint("RIGHT", -14, 0)
     win.text:SetJustifyH("LEFT")
     win.text:SetJustifyV("TOP")
     win.text:SetWordWrap(true)
-    local equip = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-    equip:SetSize(80, 20)
-    equip:SetPoint("BOTTOMRIGHT", -96, 8)
-    equip:SetText("Equip")
-    equip:SetScript("OnClick", function()
+    local later = S.Button(win, "Not now", function() win:Hide() end, nil, 90)
+    later:SetPoint("BOTTOMRIGHT", -12, 12)
+    local equip = S.Button(win, "Equip", function()
         local u = win.u
         win:Hide()
         if u then Equip(u) end
-    end)
-    local later = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-    later:SetSize(80, 20)
-    later:SetPoint("BOTTOMRIGHT", -12, 8)
-    later:SetText("Not now")
-    later:SetScript("OnClick", function() win:Hide() end)
+    end, "primary", 90)
+    equip:SetPoint("RIGHT", later, "LEFT", -8, 0)
     win:SetScript("OnHide", function() C_Timer.After(0.5, ShowNext) end)      -- your armor settles first
     win:SetScript("OnEnter", function(self)
         if not self.link then return end

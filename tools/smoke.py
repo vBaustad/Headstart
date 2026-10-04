@@ -447,6 +447,8 @@ check("Level 3" in row(1)[0], f"live row: {row(1)}")
 check(row(2)[0] == "|cff66ccffLevel 2|r" and row(2)[1] == "|cff40ff400:50|r" and row(2)[2] == "|cff40ff400:50|r"
       and row(2)[3] == "|cff40ff40-0:50|r", f"level 2 row, green: {row(2)}")
 check(f.time.text.startswith("|cff66ccffTime:|r "), f"total time: {f.time.text}")
+check(f.rows[2][5].text == "|cff40ff40-0:50|r", f"± level: level 2 alone was 50 s faster than A's: {f.rows[2][5].text}")
+check(f.rows[0][5].text == "|cff999999± level|r", f"and its heading: {f.rows[0][5].text}")
 xp_now = lua.eval("UnitXP('player')")
 check(f.xph.text.endswith(f"   {xp_now}|cff999999 / 400|r"), f"XP/hr line ends with this level's XP of what it takes: {f.xph.text}")
 lua.execute('''GUID = "Player-C"; XP = 900; LVL = 12''')
@@ -631,6 +633,9 @@ bad_import = YR.ImportGuide(YR, "hello")
 check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a guide is refused, with the reason")
 YR.RevertGuide(YR, "coldridge")
 YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
+check(len(g.SEEN_ICONS) == 0, "Settings builds a page the first time it's opened: the trainer's isn't yet")
+for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "character", "trainer", "route"):
+    YR.ShowSettingsTab(YR, key)        # every page builds, and fills, without an error
 icons = [g.SEEN_ICONS[i] for i in range(1, len(g.SEEN_ICONS) + 1)]
 check(any("Seal of" in t or "Holy Light" in t for t in icons), f"trainer rows carry the spell's icon: {icons[:2]}")
 check(True, "settings page with reward settings opens")
@@ -968,7 +973,8 @@ C_Item.GetItemStats = function() return { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 2.0
 function IsEquippedItem() return false end
 function GetMerchantNumItems() return #MERCHANT end
 function GetMerchantItemID(i) return MERCHANT[i] end
-function GetMerchantItemInfo(i) return "x", nil, 631 end
+-- Forever has C_MerchantFrame.GetItemInfo only (the global GetMerchantItemInfo is Vanilla UI, not there)
+C_MerchantFrame = { GetItemInfo = function(i) return { name = "x", price = 631, stackCount = 1, numAvailable = -1, isUsable = true, hasExtendedCost = false } end }
 function BuyMerchantItem(i) BOUGHT_AT = i end
 function IsShiftKeyDown() return false end
 YippSetupCharDB = YippSetupCharDB or {}

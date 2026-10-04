@@ -113,7 +113,7 @@ local function AtVendor()
         local id = GetMerchantItemID(i)
         for _, e in ipairs(YR.ShoppingList()) do
             if id == e.item and YR.ShoppingWanted(e) then
-                local cost = select(3, GetMerchantItemInfo(i)) or e.price
+                local cost = YR.MerchantInfo(i) or e.price      -- Restock.lua: C_MerchantFrame on Forever
                 if money >= cost then
                     local popup = StaticPopup_Show("HEADSTART_BUY_LATER", e.name, Coins(cost))
                     if popup then popup.data = { index = i, item = e.item } end

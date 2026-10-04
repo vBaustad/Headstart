@@ -81,7 +81,8 @@ C_Item = {
 VENDOR, BOUGHT = {}, {}
 function GetMerchantNumItems() return #VENDOR end
 function GetMerchantItemID(i) return VENDOR[i][1] end
-function GetMerchantItemInfo(i) local v = VENDOR[i] return "x", 1, v[2], v[3], -1, true, v[4] ~= false, false end
+-- Forever has C_MerchantFrame.GetItemInfo only (the global GetMerchantItemInfo is Vanilla UI, not there)
+C_MerchantFrame = { GetItemInfo = function(i) local v = VENDOR[i] return { name = "x", texture = 1, price = v[2], stackCount = v[3], numAvailable = -1, isPurchasable = true, isUsable = v[4] ~= false, hasExtendedCost = false } end }
 function GetMerchantItemMaxStack() return 200 end
 function BuyMerchantItem(i, n) table.insert(BOUGHT, { VENDOR[i][1], n }) COUNT[VENDOR[i][1]] = (COUNT[VENDOR[i][1]] or 0) + n end
 -- equipment: [slot] = link; durability [slot] = { cur, max }
@@ -182,7 +183,7 @@ def run():
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
     lua.execute(FAKE)
     YR = lua.table()
-    for f in ("Core.lua", "Data/Restock.lua", "Restock.lua", "Data/TrainerSpells.lua", "Reminders.lua",
+    for f in ("Core.lua", "Style.lua", "Data/Restock.lua", "Restock.lua", "Data/TrainerSpells.lua", "Reminders.lua",
               "Sim.lua", "Upgrades.lua", "PartyQuests.lua", "Data/Consumables.lua", "CraftRemind.lua", "QuickGroup.lua"):
         chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
@@ -273,6 +274,22 @@ def run():
         COUNT[2512] = 300''')
     YR.Restock(False)
     check(bought() == [(2515, 700)], f"bow: Sharp Arrows (usable, best) up to 1000 counting the rough ones: {bought()}")
+    # a warrior shoots too: 200 to begin with, and a number of its own
+    lua.execute("CLASS = 'WARRIOR' BOUGHT = {} COUNT = { [2512] = 50 }")
+    YR.Restock(False)
+    check(bought() == [(2515, 150)], f"a warrior with a bow: up to 200, not a hunter's 1000: {bought()}")
+    YR.SetRestockAmmo(100)
+    check(YR.RestockAmmo("WARRIOR") == 100 and YR.RestockAmmo("HUNTER") == 1000, "each class keeps its own ammo number")
+    check(not YR.RestockShoots("MAGE") and YR.RestockShoots("ROGUE"), "the ammo row: classes that shoot only")
+    # a throwing weapon: more of the same one, counting the stack in your hand
+    lua.execute('''CLASS = 'ROGUE' BOUGHT = {} COUNT = { [2947] = 20 }
+        ITEMS[2947] = { 2, 16, "INVTYPE_THROWN", 1, {} }
+        WORN = { [18] = "|Hitem:2947|h" }
+        function GetInventoryItemCount(_, s) return s == 18 and 30 or 0 end
+        VENDOR = { { 2947, 5, 1 }, { 2512, 10, 200 } }''')
+    YR.Restock(False)
+    check(bought() == [(2947, 150)], f"a rogue with throwing knives: the same knives up to 200, counting the 30 held: {bought()}")
+    lua.execute("GetInventoryItemCount = nil WORN = {}")
 
     # ---- Reminders ---------------------------------------------------------------------------
     lua.execute("CLASS = 'PALADIN' KNOWN = {} PRINTS = {}")

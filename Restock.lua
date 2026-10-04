@@ -4,20 +4,26 @@
 --   Class reagents come from the game's own spell data (Data/Restock.lua): an item is wanted while
 --   you know a spell that takes it, and of the ranks of one spell (Rebirth's seeds, Gift of the
 --   Wild's berries) only the top rank you know - nobody wants Maple Seeds once they cast rank 5.
---   Ammo (hunters): the best arrows or bullets this vendor sells that fit your ranged weapon and
---   that you can use - the most expensive usable one, which is the best one on a vanilla vendor.
+--   Ammo (hunters, warriors and rogues): the best arrows or bullets this vendor sells that fit your
+--   ranged weapon and that you can use - the most expensive usable one, which is the best one on a
+--   vanilla vendor. With a throwing weapon in the ranged slot: more of that same throwing weapon.
 --
 --   Account options in YippRouteDB (Settings, QoL):
 --     restock          on unless turned off
 --     restockCounts    [itemID] = how many to keep, for the class reagents; nil = the default
 --     restockCustom    [itemID] = how many to keep, for items you added yourself
---     restockAmmo      how much ammo to keep (nil = 1000, 0 = none)
+--     restockAmmoBy    [CLASS] = how much ammo (or throwing weapons) to keep; nil = the class default
+--                      (hunter 1000, warrior and rogue 200, 0 = none). restockAmmo: the old one, a hunter's
 --     restockReserve   gold to keep: nothing is bought that would take you under it
 local ADDON, YR = ...
 
-local AMMO_DEFAULT = 1000
+-- The classes that shoot: a hunter lives on it, a warrior or rogue pulls with it.
+local AMMO_DEFAULT = { HUNTER = 1000, WARRIOR = 200, ROGUE = 200 }
 local AMMO_FOR = { [2] = 2, [18] = 2, [3] = 3 }   -- bow and crossbow take arrows, guns bullets
 local AMMO_CLASS = 6
+local THROWN = 16                                  -- a throwing weapon: the stack is the weapon itself
+
+local function MyClass() local _, c = UnitClass("player") return c end
 
 local function DB()
     YippRouteDB.restockCounts = YippRouteDB.restockCounts or {}
@@ -36,11 +42,24 @@ function YR.SetRestockCount(item, n)
     DB().restockCounts[item] = math.max(0, math.floor(n or 0))
 end
 
-function YR.RestockAmmo()
-    local v = DB().restockAmmo
-    if v == nil then return AMMO_DEFAULT end
+--- How much ammo (or how many throwing weapons) to keep, for a class (yours by default).
+function YR.RestockAmmo(class)
+    class = class or MyClass()
+    local by = DB().restockAmmoBy
+    local v = by and by[class]
+    if v == nil and class == "HUNTER" then v = DB().restockAmmo end      -- from before it was per class
+    if v == nil then v = AMMO_DEFAULT[class] or 0 end
     return v
 end
+
+function YR.SetRestockAmmo(v, class)
+    local db = DB()
+    db.restockAmmoBy = db.restockAmmoBy or {}
+    db.restockAmmoBy[class or MyClass()] = v
+end
+
+--- Does this class shoot (the settings show the ammo row only for them)?
+function YR.RestockShoots(class) return AMMO_DEFAULT[class or MyClass()] ~= nil end
 
 --- This class's reagents from the data, with whether you can use any of them yet:
 --- { { item, default, spells, wanted = bool, why = "Rebirth" }, ... }
@@ -72,17 +91,16 @@ end
 -- ---------------------------------------------------------------------------
 -- At the vendor
 -- ---------------------------------------------------------------------------
+--- A vendor's item: price, stack, how many are left (-1 no limit), usable, extended cost. Forever has
+--- only C_MerchantFrame.GetItemInfo (the global GetMerchantItemInfo is in the Vanilla UI, not loaded
+--- here). Nothing from the game yet: no price, and "extended cost" so nothing buys it.
 local function ItemInfo(i)
-    if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
-        local info = C_MerchantFrame.GetItemInfo(i)
-        if type(info) == "table" then
-            return info.price or 0, math.max(1, info.stackCount or 1), info.numAvailable or -1,
-                info.isUsable, info.hasExtendedCost
-        end
-    end
-    local _, _, price, stack, avail, _, usable, extended = GetMerchantItemInfo(i)
-    return price or 0, math.max(1, stack or 1), avail or -1, usable, extended and true or false
+    local info = C_MerchantFrame and C_MerchantFrame.GetItemInfo and C_MerchantFrame.GetItemInfo(i)
+    if type(info) ~= "table" then return nil, 1, -1, false, true end
+    return info.price or 0, math.max(1, info.stackCount or 1), info.numAvailable or -1,
+        info.isUsable, info.hasExtendedCost
 end
+YR.MerchantInfo = ItemInfo
 
 local function Count(item) return C_Item.GetItemCount(item) or 0 end
 
@@ -109,6 +127,11 @@ local function Ammo(offer)
     local ranged = GetInventoryItemID("player", 18)
     if not ranged then return nil end
     local _, _, _, _, _, class, subclass = C_Item.GetItemInfoInstant(ranged)
+    if class == 2 and subclass == THROWN then
+        -- the same throwing weapon again, counting the stack you hold and the ones in your bags
+        if not offer[ranged] then return nil end
+        return ranged, target, Count(ranged) + (GetInventoryItemCount("player", 18) or 0)
+    end
     local kind = class == 2 and AMMO_FOR[subclass]
     if not kind then return nil end
     local best, have = nil, 0

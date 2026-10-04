@@ -8,6 +8,14 @@
 
 - Thelsamar crafting stop: says the Camping 101: Blacksmithing hand-in in Kharanos isn't worth a trip back. A run that hearthed back for both Camping 101 hand-ins spent about 10 minutes on 540 XP.
 
+- **Buy later and vendor restock no longer error at a vendor.** Both asked the game for an item's price in a way only the old Vanilla interface has, which Forever doesn't load ("Shopping.lua:116: attempt to call a nil value" at a vendor selling a weapon you were saving for).
+
+- **Restock: ammo for warriors and rogues too, and throwing weapons.** The ammo row shows for every class that shoots, and each keeps its own number (a hunter 1000, a warrior or rogue 200 to begin with); before, a warrior with a bow bought a hunter's 1000 arrows with no way to change it. With a throwing weapon in the ranged slot, more of the same one is bought.
+
+- **The Headstart window opens on QoL & settings while the routes are off** (on Routes while they're on), its Settings pages are built the first time you open each one so the window opens at once, and the better-gear window has Headstart's own look, its icon framed in the item's quality colour, and stays where you drag it.
+
+- **Level splits: a "± level" column.** How much each level alone won or lost against the best run's same level, "-0:40" in green for 40 seconds faster, beside the level's own time. The live row shows it too. Its own switch under Level splits.
+
 - Save as route: a death skip says exactly where you died, "Die right here (28.8, 83.3)", with a pin on that spot, and which Spirit Healer that brought you back at. Where you die decides which healer you come back at, so our general wording ("in the cave") isn't enough there. It is the death you made for that step, even if you did the next stop first.
 
 ## 0.10.0-beta1

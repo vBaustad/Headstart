@@ -8,9 +8,10 @@
 --   XP/hr: 15.5k   1.2k / 2.8k        over the last 10 minutes of play; this level's XP of what it takes
 --   Ding: 4 min                       at that rate
 --   Time: 58:06                       total play time, green while the next level can still beat the best run
---               level   total  vs best
---   Level 8 ..   9:21   58:06   -1:12   the level in progress, live
---   Level 7     17:37   48:45   +0:20   each level reached: its own time, time from level 1, difference
+--               level  ± level   total  vs best
+--   Level 8 ..   9:21    -0:40   58:06   -1:12   the level in progress, live
+--   Level 7     17:37    +0:20   48:45   -0:32   each level reached: its own time, what that level won or
+--                                                lost against the best run's, time from level 1, difference
 -- Outlined text straight on the screen by default; size, lines shown, background and position are
 -- settings (YippRouteDB.splitsStyle, YippRouteDB.splitsPos) changed from the Headstart window.
 local _, YR = ...
@@ -27,7 +28,7 @@ local rate = {}                  -- { play seconds, XP since level 1 } every few
 local GREEN, RED, WHITE, GREY, BLUE = "|cff40ff40", "|cffff5050", "|cffffffff", "|cff999999", "|cff66ccff"
 
 local STYLE_DEFAULT = { size = 14, lock = false, rate = true, ding = true, vs = true, rows = 20, bg = 0,
-    clock = "full", levelCol = true, totalCol = true }
+    clock = "full", levelCol = true, totalCol = true, levelVs = true }
 
 function YR:SplitsStyle()
     local st = YippRouteDB.splitsStyle
@@ -119,7 +120,7 @@ local function Row(i)
     local r = frame.rows[i]
     if r then return r end
     r = {}
-    for c = 1, 4 do
+    for c = 1, 5 do
         local fs = Text(i == 0 and "head" or "row")
         if c > 1 then fs:SetJustifyH("RIGHT") end
         r[c] = fs
@@ -128,15 +129,18 @@ local function Row(i)
     return r
 end
 
--- Which columns show: 1 the level, 2 its own time, 3 the time from level 1, 4 against the best run.
+-- Which columns show: 1 the level, 2 its own time, 3 the time from level 1, 4 against the best run,
+-- 5 what this level alone won or lost against the best run's. Left to right: 1, 2, 5, 3, 4.
+local ORDER = { 1, 2, 5, 3, 4 }
 local function Shown(c)
     local st = YR:SplitsStyle()
     return c == 1 or (c == 2 and st.levelCol) or (c == 3 and st.totalCol) or (c == 4 and st.vs)
+        or (c == 5 and st.levelVs)
 end
 
-local function SetRow(i, a, b, c, d)
+local function SetRow(i, a, b, c, d, e)
     local r = Row(i)
-    r[1]:SetText(a) r[2]:SetText(b) r[3]:SetText(c) r[4]:SetText(d)
+    r[1]:SetText(a) r[2]:SetText(b) r[3]:SetText(c) r[4]:SetText(d) r[5]:SetText(e or "")
     for col, fs in ipairs(r) do fs:SetShown(Shown(col)) end
 end
 
@@ -147,7 +151,7 @@ local widths = {}
 local function Arrange(n)
     local k = YR:SplitsStyle().size / 14
     local gap = 12 * k
-    for c = 1, 4 do
+    for c = 1, 5 do
         local w = widths[c] or 0
         for i = 0, n do
             local fs = frame.rows[i] and frame.rows[i][c]
@@ -156,7 +160,7 @@ local function Arrange(n)
         widths[c] = w
     end
     local right = 0
-    for c = 1, 4 do
+    for _, c in ipairs(ORDER) do
         if Shown(c) then right = right + (c > 1 and gap or 0) + widths[c] end
         for i = 0, n do
             local fs = frame.rows[i] and frame.rows[i][c]
@@ -190,7 +194,7 @@ local function Layout()
     widths = {}
     frame.bg:SetColorTexture(0, 0, 0, st.bg / 100)
     frame:EnableMouse(not st.lock)
-    SetRow(0, "", GREY .. "level|r", GREY .. "total|r", GREY .. "vs best|r")
+    SetRow(0, "", GREY .. "level|r", GREY .. "total|r", GREY .. "vs best|r", GREY .. "± level|r")
 end
 
 local function Refresh()
@@ -221,7 +225,8 @@ local function Refresh()
         local seg = pb and pb.levels[level + 1] and pb.levels[level] and pb.levels[level + 1] - pb.levels[level]
         n = n + 1
         SetRow(n, BLUE .. ("Level %d|r"):format(level + 1) .. GREY .. " ..|r", Vs(run.elapsed - since, seg),
-            Vs(run.elapsed, theirsNow), Delta(theirsNow and run.elapsed - theirsNow))
+            Vs(run.elapsed, theirsNow), Delta(theirsNow and run.elapsed - theirsNow),
+            Delta(seg and run.levels[level] and run.elapsed - since - seg))
     else
         frame.xph:SetText(BLUE .. "Best run|r")
         frame.ding:SetText(GREY .. "new characters are timed from level 1|r")
@@ -240,7 +245,7 @@ local function Refresh()
                 local theirSeg = theirs and pb.levels[lvl - 1] and theirs - pb.levels[lvl - 1]
                 n = n + 1
                 SetRow(n, BLUE .. ("Level %d|r"):format(lvl), before and Vs(at - before, theirSeg) or GREY .. "-|r",
-                    Vs(at, theirs), Delta(theirs and at - theirs))
+                    Vs(at, theirs), Delta(theirs and at - theirs), Delta(before and theirSeg and at - before - theirSeg))
             end
         end
     end

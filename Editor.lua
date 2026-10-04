@@ -1298,7 +1298,10 @@ local function BuildRouteSettings(page)
         "How long each level took on its own")
     Row("Show the total column", S.Switch(c, function() return st().totalCol end, Style("totalCol")),
         "Your play time from level 1 when you reached each level")
-    Row("Show the vs best column", S.Switch(c, function() return st().vs end, Style("vs")))
+    Row("Show the vs best column", S.Switch(c, function() return st().vs end, Style("vs")),
+        "Your total against the best run's at each level: ahead (green, -) or behind (red, +)")
+    Row("Show the ± level column", S.Switch(c, function() return st().levelVs end, Style("levelVs")),
+        "What each level alone won or lost against the best run's same level: -0:40 is 40 seconds faster")
     Row("Background", S.Slider(c, 0, 100, 5, function() return st().bg end, Style("bg")),
         "How dark the box behind the splits is, in percent. 0 is none")
     Row("From the left (pixels)", S.Slider(c, 0, 3000, 1, function() return YR:SplitsPosition()[1] end,
@@ -1818,11 +1821,12 @@ local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
         Row("Keep at least (gold)", S.Stepper(c, function() return YippRouteDB.restockReserve or 0 end,
             function(v) YippRouteDB.restockReserve = v end, 0, 1000, 1, 110),
             "Nothing is bought that would take you under this")
-        local _, myClass = UnitClass("player")
-        if myClass == "HUNTER" then
+        if YR.RestockShoots() then
             Row("Ammo to keep", S.Stepper(c, function() return YR.RestockAmmo() end,
-                function(v) YippRouteDB.restockAmmo = v end, 0, 4000, 200, 110),
-                "The best arrows or bullets the vendor sells for your ranged weapon that you can use. 0: none")
+                function(v) YR.SetRestockAmmo(v) end, 0, 4000, 100, 110),
+                "The best arrows or bullets the vendor sells for your bow, crossbow or gun that you can use - or,"
+                .. " with a throwing weapon, more of the same one. Each class keeps its own number (a hunter 1000,"
+                .. " a warrior or rogue 200 to begin with). 0: none")
         end
         for _, r in ipairs(YR.RestockReagents()) do
             local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(r.item)
@@ -2092,8 +2096,8 @@ local function BuildSettings(page)
             local f = CreateFrame("Frame", nil, page)
             f:SetPoint("TOPLEFT", NAV_W, -TITLE_H)
             f:SetPoint("BOTTOMRIGHT")
-            t.build(f)
-            t.frame = f
+            f:Hide()
+            t.frame = f          -- built the first time it's shown (RefreshSettings): a fast first open
         end
     end
     local reload = S.Button(page, "Reload UI", function() ReloadUI() end, nil, 110)
@@ -2110,6 +2114,7 @@ local function RefreshSettings()
             t.frame:SetShown(t.key == settings.tab)
             t.button:Select(t.key == settings.tab)
             if t.key == settings.tab then
+                if not t.built then t.build(t.frame) t.built = true end
                 settings.title:SetText(t.label)
                 settings.desc:SetText(t.desc or "")
                 t.refresh()
@@ -2425,7 +2430,8 @@ function YR:ToggleWindow(page)
     if not win then Build() end
     if win:IsShown() and not page then win:Hide() return end
     win:Show()
-    Show(page or current or "routes")
+    -- first open: the routes when they're on, else the QoL & settings page (Headstart as the QoL addon)
+    Show(page or current or (YR.RoutesOn() and "routes" or "settings"))
 end
 
 function Headstart_OnAddonCompartmentClick()
