@@ -79,7 +79,9 @@ function UnitRace() return RACE, RACE end
     check(".accept 182" in hand, "a quest taken right after a hand-in, no NPC noted: the same stop")
     check(any(".trainer >> Train: Judgement\n" in s + "\n" and s.count("Judgement") == 1 for s in steps),
           "a trainer: what you learned, once")
-    check(any(".deathskip" in s for s in steps), "a death you came back from elsewhere: a death skip")
+    ds = next((s for s in steps if ".deathskip" in s), "")
+    check("Die right here (30.2, 79.8)" in ds and "Spirit Healer at 47.1, 55.0" in ds and ".goto 1426,30.20,79.80,5" in ds,
+          "a death skip says exactly where you died, and which Spirit Healer that brought you to")
     check(any(".fly Ironforge" in s for s in steps), "a flight: to where you landed")
     check(".zone " not in text.split(".fly")[0], "no travel step inside one zone")
 

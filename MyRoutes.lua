@@ -92,6 +92,40 @@ local function Near(a, b, pct)
     return a[6] and a[6] == b[6] and a[7] and b[7] and math.abs(a[7] - b[7]) <= pct and math.abs(a[8] - b[8]) <= pct
 end
 
+-- The death skips in a log: a death you came back from soon after somewhere else (the Spirit Healer),
+-- { death = event, alive = event, zone = the zone you came back in }. Where you die decides which healer
+-- you come back at, so a step says the exact spot you died at (the user, 2026-10-04: "say exactly
+-- where to die, it's the only way to reach the right Spirit Healer").
+local function DeathSkips(ev)
+    local out, zone = {}, nil
+    for i, e in ipairs(ev) do
+        if e[2] == "zone" and e.zone and e.zone ~= "" then zone = e.zone end
+        if e[2] == "death" then
+            for j = i + 1, math.min(#ev, i + 12) do
+                local a = ev[j]
+                if a[2] == "zone" and a.zone and a.zone ~= "" then zone = a.zone end
+                if a[2] == "alive" then
+                    -- back alive where you died is a corpse run (~50 yards; the Grizzled Den's healer
+                    -- in Kharanos is only ~250 away)
+                    if a[1] - e[1] <= 90 and a[6] == e[6] and not (a[7] and e[7] and math.abs(a[7] - e[7]) <= 1
+                            and math.abs(a[8] - e[8]) <= 1) then
+                        out[#out + 1] = { death = e, alive = a, zone = zone }
+                    end
+                    break
+                end
+            end
+        end
+    end
+    return out
+end
+
+local function DeathLines(d)
+    local e, a = d.death, d.alive
+    return ("\n    .goto %d,%.2f,%.2f,5"):format(e[6], e[7], e[8])
+        .. ("\n    >>|cRXP_WARN_Die right here (%.1f, %.1f): dying here brought you back at the Spirit Healer at %.1f, %.1f%s|r")
+            :format(e[7], e[8], a[7], a[8], d.zone and (" in " .. d.zone) or "")
+end
+
 local function Talk(npc)
     return npc and ("\n    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_%s|r"):format(npc) or ""
 end
@@ -266,10 +300,10 @@ function YR.RunToSteps(char)
             for j = i + 1, math.min(#ev, i + 12) do
                 local a = ev[j]
                 if a[2] == "alive" then
-                    if a[1] - e[1] <= 90 and not Near(a, e, 8) then
+                    if a[1] - e[1] <= 90 and not Near(a, e, 1) then
                         Grind()
                         Flush()
-                        Push("step\n    #completewith next" .. At(e)
+                        Push("step\n    #completewith next" .. DeathLines({ death = e, alive = a, zone = zoneOf[a] })
                             .. "\n    .deathskip >> Die and respawn at the |cRXP_FRIENDLY_Spirit Healer|r", e)
                     end
                     break
@@ -377,6 +411,38 @@ function YR.RunToRouteSteps(char)
         local new = #qs > 0
         for _, a in ipairs(qs) do if covered[a[2]] then new = false end end
         if new then kept[#kept + 1] = { text = s.text, t = s.t, ord = 0 } end
+    end
+    table.sort(kept, function(a, b)
+        if a.t ~= b.t then return a.t < b.t end
+        return a.ord < b.ord
+    end)
+    -- each of our death-skip steps gets the spot you actually died at for it: the first death skip in the
+    -- log from a little before the step until the next death-skip step (you may have done the next stop
+    -- first, as at Mountaineer Cornelius before the Grizzled Den's skip). Our own wording is general ("in
+    -- the cave"); yours is exact, and the step moves to when you died.
+    local deaths, used, skips = DeathSkips(ev), {}, {}
+    for n, k in ipairs(kept) do
+        if k.text:find("\n%s*%.deathskip") then skips[#skips + 1] = n end
+    end
+    for s, n in ipairs(skips) do
+        local k = kept[n]
+        local before = skips[s + 1] and kept[skips[s + 1]].t or math.huge
+        local d
+        for m, x in ipairs(deaths) do
+            if not used[m] and x.death[1] >= k.t - 300 and x.death[1] <= before + 30 then
+                used[m] = true
+                d = x
+                break
+            end
+        end
+        if d and d.death[7] and d.alive[7] then
+            local body = k.text:gsub("\n[ \t]*%.goto[^\n]*", ""):gsub("\n[ \t]*>>|cRXP_WARN_[^\n]*", "")
+            -- after "step" and its # lines
+            local head, rest = body:match("^(step[^\n]*\n?[ \t]*#[^\n]*)(.*)$")
+            if not head then head, rest = body:match("^(step[^\n]*)(.*)$") end
+            k.text = head .. DeathLines(d) .. rest
+            k.t = d.death[1]
+        end
     end
     table.sort(kept, function(a, b)
         if a.t ~= b.t then return a.t < b.t end
