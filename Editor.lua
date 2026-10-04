@@ -1111,34 +1111,88 @@ end
 local KIND_LABEL = {}
 for _, k in ipairs(YR.REWARD_KINDS) do KIND_LABEL[k.key] = k.label end
 
--- A scrolling page of sections, each a grid of two-column rows: the label on the left and its control
--- (switch, slider, dropdown, input, button) on the right. controls collects them for Refresh.
--- One setting per line (cols 2 puts two side by side, which only fits where every control is small:
--- beside the settings menu the columns got too narrow for a slider and its label).
-local function RowPage(page, controls, bottom, cols)
+-- A scrolling page of cards. Section starts a card: an icon, its title and a note in a header strip,
+-- and - for a feature with one switch - that switch in the header (a master: the rows under it dim
+-- while it's off). Each Row is a line in the card: the label, its control on the right, and under the
+-- label the first sentence of its details, so what a setting does can be read without pointing at
+-- anything; the (i) after the label still shows the whole text. Every row goes into settings.index for
+-- the search box. controls collects the controls (and the masters' dimmers) for Refresh.
+local ROW_H, ROW_TIP_H, CARD_HEAD = 34, 48, 40
+
+--- The first sentence of a row's details (the line under its label).
+local function FirstSentence(tip)
+    return tip:match("^(.-[%.!?])%s+%S") or tip
+end
+
+local function RowPage(page, controls, bottom)
     local area = S.ScrollArea(page, CW - 24, CH - (bottom or 64))
     area:SetPoint("TOPLEFT", 16, -4)
     local c = area.content
     c:SetWidth(CW - 40)
-    local one = cols ~= 2
-    local L = { c = c, colW = one and math.min(CW - 40, 680) or (CW - 52) / 2, y = -6, col = 0, rowIndex = 0 }
-    function L.Break()
-        if L.col == 1 then L.y = L.y - 36 L.col = 0 end
+    local L = { c = c, colW = math.min(CW - 40, 680), y = -6, col = 0, rowIndex = 0, area = area }
+    local card       -- the card rows go into now: { frame, top, rows }
+
+    local function EndCard()
+        if not card then return end
+        card.frame:SetHeight(card.top - L.y + 6)
+        L.y = L.y - 6 - 14
+        card = nil
     end
-    function L.Section(title, note)
-        L.Break()
-        L.y = L.y - 12
-        local t = S.Text(c, 12, S.C.accent)
-        t:SetPoint("TOPLEFT", 4, L.y)
-        t:SetText(title:upper())
+    function L.Break() EndCard() end
+
+    --- Start a card. opts: icon (a texture or file ID), master = { get, set } for its one switch.
+    function L.Section(title, note, opts)
+        EndCard()
+        opts = opts or {}
+        local f = CreateFrame("Frame", nil, c)
+        f:SetPoint("TOPLEFT", 0, L.y)
+        f:SetWidth(L.colW)
+        f:SetHeight(CARD_HEAD)
+        S.Fill(f, S.C.card)
+        S.Border(f, S.C.line)
+        local strip = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+        strip:SetPoint("TOPLEFT", 1, -1)
+        strip:SetPoint("TOPRIGHT", -1, -1)
+        strip:SetHeight(CARD_HEAD - 1)
+        S.Set(strip, ZEBRA)
+        local x = 14
+        if opts.icon then
+            local ic = f:CreateTexture(nil, "ARTWORK")
+            ic:SetSize(22, 22)
+            ic:SetPoint("TOPLEFT", 12, -9)
+            ic:SetTexture(opts.icon)
+            ic:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            x = 44
+        end
+        local t = S.Text(f, 14)
+        t:SetPoint("TOPLEFT", x, -12)
+        t:SetText(title)
         if note then
-            local n = S.Text(c, 11, S.C.muted)
-            n:SetPoint("LEFT", t, "RIGHT", 12, 0)
+            local n = S.Text(f, 11, S.C.muted)
+            n:SetPoint("LEFT", t, "RIGHT", 10, 0)
+            n:SetPoint("RIGHT", f, "RIGHT", opts.master and -60 or -14, 0)
+            n:SetJustifyH("LEFT")
+            n:SetWordWrap(false)
             n:SetText(note)
         end
-        L.y = L.y - 20
+        local rowsHere = {}
+        card = { frame = f, top = L.y, rows = rowsHere }
+        if opts.master then
+            local get, set = opts.master[1], opts.master[2]
+            local function Dim()
+                local on = get() and true or false
+                for _, r in ipairs(rowsHere) do r:SetAlpha(on and 1 or 0.45) end
+            end
+            local sw = S.Switch(f, get, function(on) set(on) Dim() end)
+            sw:SetPoint("TOPRIGHT", -14, -11)
+            controls[#controls + 1] = sw
+            controls[#controls + 1] = { Refresh = Dim }
+        end
+        L.y = L.y - CARD_HEAD
         L.rowIndex = 0
+        return f
     end
+
     -- The whole row lights up under the mouse, the control included. A row with details has an (i)
     -- after its name: pointing at the (i) shows them, and a click on it keeps them open.
     local rows, hot = {}, nil
@@ -1172,14 +1226,28 @@ local function RowPage(page, controls, bottom, cols)
         for _, r in ipairs(rows) do Paint(r) end
     end)
     function L.Row(label, control, tip)
+        local h = tip and ROW_TIP_H or ROW_H
+        local inset = card and 1 or 0
         local r = CreateFrame("Frame", nil, c)
-        r:SetSize(L.colW, 34)
-        r:SetPoint("TOPLEFT", L.col * (L.colW + 12), L.y)
-        S.Fill(r, (math.floor(L.rowIndex / (one and 1 or 2)) % 2 == 0) and S.C.card or ZEBRA)
+        r:SetSize(L.colW - 2 * inset, h)
+        r:SetPoint("TOPLEFT", inset, L.y)
+        if card then
+            r:SetFrameLevel(card.frame:GetFrameLevel() + 2)
+            local line = r:CreateTexture(nil, "BORDER")
+            line:SetPoint("TOPLEFT", 12, 0)
+            line:SetPoint("TOPRIGHT", -12, 0)
+            line:SetHeight(1)
+            S.Set(line, S.C.line)
+            card.rows[#card.rows + 1] = r
+        else
+            S.Fill(r, (L.rowIndex % 2 == 0) and S.C.card or ZEBRA)
+        end
         r.hl = S.Fill(r, S.C.hover, "BACKGROUND", 1)
         r.hl:Hide()
+        r.flash = S.Fill(r, S.C.accentD, "BACKGROUND", 2)
+        r.flash:Hide()
         local l = S.Text(r, 13)
-        l:SetPoint("LEFT", 12, 0)
+        if tip then l:SetPoint("TOPLEFT", 14, -9) else l:SetPoint("LEFT", 14, 0) end
         l:SetText(label)
         r.control, r.infoBtn = control, false
         if tip then
@@ -1202,10 +1270,10 @@ local function RowPage(page, controls, bottom, cols)
         Paint(r)
         control:SetParent(r)
         control:ClearAllPoints()
-        control:SetPoint("RIGHT", -12, 0)
+        control:SetPoint("RIGHT", -14, 0)
         -- The label never runs under its control: it gets the room left of it (minus the (i)), and is
         -- cut short with an ellipsis if it needs more. The (i) sits right after the text it explains.
-        local room = L.colW - 24 - (control:GetWidth() or 0) - (tip and 30 or 8)
+        local room = L.colW - 28 - (control:GetWidth() or 0) - (tip and 30 or 8)
         l:SetWidth(math.max(40, room))
         l:SetJustifyH("LEFT")
         l:SetWordWrap(false)
@@ -1213,9 +1281,21 @@ local function RowPage(page, controls, bottom, cols)
             r.infoBtn:ClearAllPoints()
             r.infoBtn:SetPoint("LEFT", l, "LEFT", math.min(l:GetStringWidth() or 0, math.max(40, room)) + 4, 0)
         end
+        if tip then
+            local d = S.Text(r, 11, S.C.muted)
+            d:SetPoint("TOPLEFT", 14, -28)
+            d:SetWidth(math.max(40, room + 24))
+            d:SetJustifyH("LEFT")
+            d:SetWordWrap(false)
+            d:SetText(FirstSentence(tip))
+        end
         controls[#controls + 1] = control
+        if settings.index then
+            settings.index[#settings.index + 1] = { key = settings.building, label = label, tip = tip,
+                row = r, area = area, y = L.y }
+        end
         L.rowIndex = L.rowIndex + 1
-        if one then L.y = L.y - 36 elseif L.col == 0 then L.col = 1 else L.col = 0 L.y = L.y - 36 end
+        L.y = L.y - h - (card and 0 or 2)
         return r
     end
     return L
@@ -1230,14 +1310,14 @@ local function BuildRouteSettings(page)
     local st = function() return YR:SplitsStyle() end
     local function Style(field) return function(v) st()[field] = v YR:ApplySplitsStyle() end end
 
-    Section("Headstart routes", "off by default: Headstart can be just the QoL addon")
+    Section("Headstart routes", "off by default: Headstart can be just the QoL addon", { icon = 134269 })
     Row("Headstart routes in RestedXP (all characters on this account)", S.Switch(c, function() return YR.RoutesOn() end,
         function(on) YR.SetRoutesOn(on) YR:RefreshWindow() end),
         "On: Headstart's launch routes (and any you imported or edited) are loaded into RestedXP, and what they"
         .. " need is kept in your bags and bought for you. Off: none of that, and the options below wait until"
         .. " it's on. One switch for the whole account; takes a /reload (/headstart routes on|off)")
 
-    Section("General")
+    Section("General", nil, { icon = 134063 })
     Row("Minimap button", S.Switch(c, Opt("minimapButton"), SetOpt("minimapButton", function(on) YR:ShowMinimapButton(on) end)))
     -- Everything after this is about the routes: dimmed while they're off (RefreshRouteSettings).
     settings.routeRows = {}
@@ -1264,7 +1344,7 @@ local function BuildRouteSettings(page)
         "When the route step you are on says to die and respawn at the Spirit Healer, your spirit is released"
         .. " at once, and RestedXP accepts the Spirit Healer for you. Any other death is left to you")
 
-    Section("Group play", "a duo or trio sharing quests")
+    Section("Group play", "a duo or trio sharing quests", { icon = 134149 })
     local role = S.Dropdown(c, 190, YR.ROLES, function(v) YR:SetRole(v) YR:RefreshWindow() end)
     function role:Refresh()
         for _, r in ipairs(YR.ROLES) do if r[1] == YR:Role() then self:SetValue(r[2]) end end
@@ -1278,7 +1358,7 @@ local function BuildRouteSettings(page)
     Row("Show my party's steps", S.Switch(c, Opt("groupPanel"), SetOpt("groupPanel", function() YR:RefreshParty() end)),
         "A small list under the splits: each Headstart in your party, its role and the route step it is on")
 
-    Section("Level splits")
+    Section("Level splits", nil, { icon = 236562 })
     Row("Show level splits", S.Switch(c, Opt("showSplits"), SetOpt("showSplits", function(on) YR:ShowSplits(on) end)))
     Row("Lock in place", S.Switch(c, function() return st().lock end, Style("lock")),
         "Locked, it can't be dragged and clicks go through it")
@@ -1310,7 +1390,7 @@ local function BuildRouteSettings(page)
         function(v) YR:SetSplitsPosition(nil, v) end, 280))
 
     -- The logs take room whether the routes are on or not, so these rows are never dimmed.
-    Section("Run logs", "every character's, in the account's saved file")
+    Section("Run logs", "every character's, in the account's saved file", { icon = 134328 })
     local function Ago(t)
         local d = math.floor((time() - t) / 86400)
         return d < 1 and "today" or d == 1 and "yesterday" or (d .. " days ago")
@@ -1362,7 +1442,7 @@ local rew = {}
 local function BuildRewards(L)
     local c, colW = L.c, L.colW
     local Section, Row = L.Section, L.Row
-    Section("Quest rewards", "each class has its own; saved as you change it")
+    Section("Quest rewards", "each class has its own", { icon = 134939 })
     Row("Settings for", ClassPicker(c), "Every class keeps its own reward choices: a warrior's list isn't a mage's")
     Row("Pick quest rewards", S.Switch(c, function() return YR:RewardSettings(ViewClass()).on end,
         function(on) YR:RewardSettings(ViewClass()).on = on end),
@@ -1522,14 +1602,14 @@ local function BuildSetup(page)
     local function Recount() if need then need:Refresh() end end
     local function Sw(key) local b = S.Switch(L.c, function() return o()[key] end, function(on) o()[key] = on Recount() end) return b end
 
-    Section("Class", "each class has its own layout and choices; saved as you change them")
+    Section("Class", "each class has its own layout and choices", { icon = 134166 })
     Row("Settings for", ClassPicker(L.c), "Every class keeps its own saved layout and its own choices below")
     local planBtn = S.Button(L.c, "Plan bars...", function() YR.OpenPlanner() end, nil, 120)
     Row("Plan the bars here", planBtn, "No main to copy from? Drag every spell your class will ever have onto your"
         .. " bars, at any level, and save it as this class's layout. It opens on your current class")
     L.Break()
 
-    Section("Spells")
+    Section("Spells", nil, { icon = 133742 })
     Row("Class spells", Sw("classSpells"))
     Row("Class spells up to level", S.Slider(L.c, 1, 60, 1, function() return o().maxLevel end,
         function(v) o().maxLevel = v Recount() end), "Spells your main has on its bars that are learned at this level or lower")
@@ -1568,18 +1648,18 @@ local function BuildSetup(page)
     function mo:Refresh() if not self:HasFocus() then self:SetValue(o().mouseover) end end
     Row("Mouseover macros for", mo, "These spells become /cast [@mouseover] macros: on who you point at, else yourself. Separate with commas")
 
-    Section("Macros and items")
+    Section("Macros and items", nil, { icon = 134394 })
     Row("Your own macros", Sw("macros"))
     Row("AutoFeed's macros", Sw("autofeed"), "The AutoFeed macros on your main's bars. AutoFeed makes them on this"
         .. " character if it hasn't yet, and keeps them filled with your best food, water and potions."
         .. (YR.Setup:AutoFeedLoaded() and "" or "\n\nAutoFeed isn't loaded right now, so these slots stay empty."))
     Row("Items (Hearthstone, food, potions)", Sw("items"), "Items your main has on its bars. Copy this layout again if your saved copy is older than this option")
 
-    Section("Before setting up")
+    Section("Before setting up", nil, { icon = 134520 })
     Row("Clear all action bars first", Sw("clearBars"), "Off: the saved buttons go over what is there; empty saved slots leave yours alone")
     Row("Remove this character's old macros", Sw("clearMacros"), "Character macros only; account macros and AutoFeed's are never touched")
 
-    Section("Interface")
+    Section("Interface", nil, { icon = 134063 })
     Row("Game settings", Sw("settings"), "Auto loot, interact on click, nameplates, raid frames, map coordinates,"
         .. " camera distance and the rest of the list")
     Row("Edit Mode layout", Sw("editMode"), "Left alone anyway when a UI suite like ElvUI or EllesmereUI is loaded")
@@ -1589,7 +1669,7 @@ local function BuildSetup(page)
     Row("Pick the RestedXP route for my race", Sw("guide"))
     Row("Stop Blizzard placing new spells", Sw("noAutoPush"), "Blizzard drops every new spell on the first empty slot; with a set-up layout that only makes duplicates")
 
-    Section("While levelling")
+    Section("While levelling", nil, { icon = 132307 })
     Row("Put spells on the bars as I learn them", Sw("swap"), "A placeholder becomes the real spell, or an empty saved slot gets it")
     Row("Put new ranks on the bars", Sw("rankUp"), "A new rank from the trainer replaces the old one in your main's slots. A spell your main keeps at a lower rank stays at that rank")
     Row("Show the setup window on new characters", Sw("popup"))
@@ -1632,7 +1712,7 @@ local function BuildTrainer(page)
     local L = RowPage(page, trainer.controls, 64)
     local c = L.c
     local Section, Row = L.Section, L.Row
-    Section("Class trainer", ("for every %s on this account; saved as you change it"):format(UnitClass("player") or "character"))
+    Section("Class trainer", "learned as the trainer opens", { icon = 133741 })
     Row("Learn my spells at the trainer", S.Switch(c, function() return YR.Option("autoTrain") end,
         function(on) YippRouteDB.autoTrain = on YR:SyncRxpTrainer() end),
         "When you open your class trainer, the spells below are learned at once, as you chose for each."
@@ -1652,7 +1732,7 @@ local function BuildTrainer(page)
     table.sort(list, function(a, b) if a[2] ~= b[2] then return a[2] < b[2] end return a[1] < b[1] end)
     for _, e in ipairs(list) do names[#names + 1] = e[1] end
 
-    Section("Set many at once")
+    Section("Set many at once", nil, { icon = 134327 })
     trainer.upTo = trainer.upTo or 10
     local upTo = S.Stepper(c, function() return trainer.upTo end, function(v) trainer.upTo = v end, 2, TRAIN_TO, 1, 110)
     Row("Always, up to level", upTo, "The level for the button below: every spell first learned at this level"
@@ -1667,7 +1747,8 @@ local function BuildTrainer(page)
         trainer.refresh()
     end, nil, 170)
     Row("Every spell", afford, "Back to the default for the whole list: learned when you'd keep your reserve")
-    Section(("Spells: %s"):format(UnitClass("player") or class), "every rank of each; first learned at the level shown")
+    Section(("Spells: %s"):format(UnitClass("player") or class), "every rank of each; first learned at the level shown",
+        { icon = 133742 })
     local icons = (YR.PlannerSpells or {})[class] or {}
     for _, e in ipairs(list) do
         local name, lvl = e[1], e[2]
@@ -1712,12 +1793,7 @@ local function QoLPage(key, build)
 end
 
 local BuildCamps = QoLPage("camps", function(L, c, Section, Row, Opt)
-        Section("Camps", "reads your own buffs")
-        Row("Show the campfire icon", S.Switch(c, Opt("camp"), YR.SetCampIcon),
-            "A campfire on screen: grey with no camp benefit, glowing while a camp is within about 100 yards,"
-            .. " and once you have Camp Benefits it burns down over the hour with the time left. The game doesn't"
-            .. " tell addons where a camp is, only that one is near, so there's no arrow and no distance. With the"
-            .. " Campfire addon showing its own campfire, this one stays hidden")
+        Section("Campfire icon", "reads your own buffs", { icon = 135805, master = { Opt("camp"), YR.SetCampIcon } })
         Row("List what the camp gives you", S.Switch(c, Opt("campList"), YR.SetCampList),
             "Under the fire: the stat it gives (\"Strength +6\") and the camp's shorter buffs with their time."
             .. " Buffs can't be read in combat, so in a fight it dims to show what it last saw")
@@ -1726,15 +1802,16 @@ local BuildCamps = QoLPage("camps", function(L, c, Section, Row, Opt)
         Row("Lock in place", S.Switch(c, Opt("campLocked"), YR.SetCampLocked),
             "Off: a preview with a blue edge shows wherever you are, to drag where you want it (/headstart camp unlock)")
 
-        Section("Flying")
-        Row("Flight timer", S.Switch(c, Opt("flightTimer"), function(on) YippRouteDB.flightTimer = on YR:SetFlightTimer(on) end),
+        Section("Flight timer", "a bar while you fly", { icon = 132239,
+            master = { Opt("flightTimer"), function(on) YippRouteDB.flightTimer = on YR:SetFlightTimer(on) end } })
+        Row("How it times a flight", S.Text(c, 12, S.C.muted),
             "A bar while you fly: where from, where to and the time left. Each flight is timed the first time you"
             .. " take it; until then RestedXP's time for it, an estimate from the flight's length, or it counts up. Drag the bar to move it"
             .. " (/headstart flight shows a sample)")
 end)
 
 local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
-        Section("Bank", "hold Shift as you open the bank to keep everything")
+        Section("Bank", "hold Shift as you open the bank to keep everything", { icon = 133639 })
         Row("Bank when I open the bank", S.Switch(c, Opt("bankAuto"), function(on) YippRouteDB.bankAuto = on end),
             "What you choose below goes from your bags to the bank as it opens, one stack at a time, and chat"
             .. " says what went. Quest items, anything the route still needs and AutoFeed's food and water"
@@ -1754,7 +1831,7 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
         Row("Button on the bank window", S.Switch(c, Opt("bankButton"), YR.SetBankButton),
             "\"Bank mats\" under the bank window does the same whenever you click it (also /headstart bank)")
 
-        Section("Mail to my alt", "for bag space: what the bank would take, to another character")
+        Section("Mail to my alt", "for bag space: what the bank would take", { icon = 133471 })
         local alt = CreateFrame("Frame", nil, c)
         alt:SetSize(190, 24)
         alt.input = S.Input(alt, { width = 190, placeholder = "Your alt's name", onCommit = function(t)
@@ -1814,10 +1891,8 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
 end)
 
 local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
-        Section("Vendor restock", "hold Shift as you open a vendor to buy nothing")
-        Row("Restock at vendors", S.Switch(c, Opt("restock"), function(on) YippRouteDB.restock = on end),
-            "At a vendor who sells them, your class reagents, your ammo and your own list below are bought back"
-            .. " up to the number you keep. Chat says what was bought and for how much")
+        Section("Vendor restock", "Shift as you open a vendor buys nothing", { icon = 133785,
+            master = { Opt("restock"), function(on) YippRouteDB.restock = on end } })
         Row("Keep at least (gold)", S.Stepper(c, function() return YippRouteDB.restockReserve or 0 end,
             function(v) YippRouteDB.restockReserve = v end, 0, 1000, 1, 110),
             "Nothing is bought that would take you under this")
@@ -1872,7 +1947,7 @@ local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
 end)
 
 local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
-        Section("Party quests", "on Forever a quest can be shared from any distance")
+        Section("Party quests", "on Forever a quest can be shared from any distance", { icon = 134327 })
         Row("Share every quest I take", S.Switch(c, function() return YR.ShareAll() end,
             function(on) YippRouteDB.shareAll = on end),
             "Each quest you take from an NPC is shared with your party at once. Off: only the route's quests"
@@ -1887,7 +1962,7 @@ local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
             .. " you. Hold Shift as the quest opens to be asked. Leatrix Plus's \"Block shared quests\" would"
             .. " decline them before Headstart sees them")
 
-        Section("Quick group", "into a group for a kill and out again")
+        Section("Quick group", "into a group for a kill and out again", { icon = 134149 })
         Row("Invite and Leave buttons", S.Switch(c, Opt("groupBar"), YR.SetGroupBar),
             "A small bar: Invite asks your target into your group, Leave group leaves it. Both also have key"
             .. " bindings (Key Bindings, AddOns, Headstart) and /headstart inv, /headstart leave")
@@ -1915,7 +1990,7 @@ local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
 end)
 
 local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
-        Section("Reminders")
+        Section("Reminders", "one quiet line when there's something to do", { icon = 134376 })
         Row("New spells at the trainer", S.Switch(c, Opt("remindTrainer"), function(on) YippRouteDB.remindTrainer = on end),
             "At a ding (and at login): what your class trainer has for you now, and about what it costs. Prices"
             .. " are remembered from your trainer visits (/headstart trainer)")
@@ -1928,7 +2003,9 @@ local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
             function(v) YippRouteDB.durWarn = v end, 5, 95, 5, 110))
         Row("In town, remind at (percent)", S.Stepper(c, function() return YippRouteDB.durTown or 50 end,
             function(v) YippRouteDB.durTown = v end, 5, 100, 5, 110))
-        Row("Things I can make myself", S.Switch(c, Opt("craftRemind"), function(on) YippRouteDB.craftRemind = on end),
+        Section("Things I can make myself", "you have the recipe and the mats", { icon = 133685,
+            master = { Opt("craftRemind"), function(on) YippRouteDB.craftRemind = on end } })
+        Row("What it watches", S.Text(c, 12, S.C.muted),
             "You know the recipe and carry the mats, but have none in your bags: chat says what you can make and how"
             .. " many. Once, and again after you have run out")
         Row("  Sharpening stones and weightstones", S.Switch(c, Opt("craftStones"), function(on) YippRouteDB.craftStones = on end),
@@ -1937,13 +2014,15 @@ local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
         Row("  Bandages", S.Switch(c, Opt("craftBandages"), function(on) YippRouteDB.craftBandages = on end), "First Aid")
         Row("  Remind when I have fewer than", S.Stepper(c, function() return YippRouteDB.craftBelow or 1 end,
             function(v) YippRouteDB.craftBelow = v end, 1, 100, 1, 110), "1: only when you have none at all")
+        Section("At every ding", nil, { icon = 134441 })
         Row("Screenshot at every ding", S.Switch(c, Opt("levelShot"), function(on) YippRouteDB.levelShot = on end),
             "Saved in your Screenshots folder, a moment after the ding so the animation is in it")
 end)
 
 local BuildGear = QoLPage("gear", function(L, c, Section, Row, Opt)
-        Section("Better gear", "what you pick up, against what you wear")
-        Row("Show it in item tooltips", S.Switch(c, Opt("simTooltip"), function(on) YippRouteDB.simTooltip = on end),
+        Section("Gear sim", "what an item would do for you", { icon = 132739,
+            master = { Opt("simTooltip"), function(on) YippRouteDB.simTooltip = on end } })
+        Row("In item tooltips", S.Text(c, 12, S.C.muted),
             "Every piece of gear you point at gets a line: what wearing it would do for you - \"+4.2% DPS,"
             .. " +1.0% toughness\" - from your own attack power, crit, spell power, health and armor, with the item"
             .. " swapped in for what it replaces. A levelling estimate: set bonuses, on-hit effects and trinkets"
@@ -1962,7 +2041,9 @@ local BuildGear = QoLPage("gear", function(L, c, Section, Row, Opt)
         end
         Row("Weigh it for", roleDrop, "Guess: the talent tree with the most points (Retribution is melee, Holy"
             .. " healing, Protection tanking ...), or what your class levels as before you have any")
-        Row("Tell me about upgrades", S.Switch(c, Opt("upgrades"), function(on) YippRouteDB.upgrades = on end),
+        Section("Better gear", "what you pick up, against what you wear", { icon = 133071,
+            master = { Opt("upgrades"), function(on) YippRouteDB.upgrades = on end } })
+        Row("What counts", S.Text(c, 12, S.C.muted),
             "An item in your bags the gear sim says is better for you (your role, see Weigh it for) than what"
             .. " you wear in that slot: at least the % below, or any gain that costs you nothing, or anything for"
             .. " an empty slot. Only what you can wear - the game's red text says no. Once per item (again after"
@@ -1996,25 +2077,34 @@ end
 
 local CATEGORIES = {
     { group = "Quality of life" },
-    { key = "camps", label = "Camps & travel", build = BuildCamps, refresh = QoLRefresh("camps"),
+    { key = "camps", label = "Camps & travel", build = BuildCamps, refresh = QoLRefresh("camps"), icon = 135805,
+      status = function() return YR.Option("camp") or YR.Option("flightTimer") end, scope = "Every character on this account",
       desc = "The campfire on screen while a camp is near or its buff runs, and the bar while you fly." },
-    { key = "bags", label = "Bags", build = BuildBags, refresh = QoLRefresh("bags"),
+    { key = "bags", label = "Bags", build = BuildBags, refresh = QoLRefresh("bags"), icon = 133633,
+      status = function() return YR.Option("bankAuto") or YR.Option("bankButton") or YR.Option("mailButton") end, scope = "Every character on this account",
       desc = "Crafting mats and recipes you can't use yet: into the bank, or in the mail to your alt." },
-    { key = "vendors", label = "Vendors", build = BuildVendors, refresh = QoLRefresh("vendors"),
+    { key = "vendors", label = "Vendors", build = BuildVendors, refresh = QoLRefresh("vendors"), icon = 133784,
+      status = function() return YR.Option("restock") end, scope = "Every character on this account",
       desc = "Your reagents, ammo and own list bought back up to what you keep, at any vendor who sells them." },
-    { key = "group", label = "Group", build = BuildGroup, refresh = QoLRefresh("group"),
+    { key = "group", label = "Group", build = BuildGroup, refresh = QoLRefresh("group"), icon = 134149,
+      status = function() return YR.Option("groupBar") end, scope = "Every character on this account",
       desc = "Into a group for a kill and out again, and quests shared and accepted without the clicking." },
-    { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"),
+    { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134327,
+      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") end, scope = "Every character on this account",
       desc = "One quiet line when there is something to do: the trainer, talents, repairs, things to make." },
-    { key = "gear", label = "Gear & rewards", build = BuildGear, refresh = QoLRefresh("gear", RefreshRewards),
+    { key = "gear", label = "Gear & rewards", build = BuildGear, refresh = QoLRefresh("gear", RefreshRewards), icon = 132739,
+      status = function() return YR.Option("simTooltip") or YR.Option("upgrades") end, scope = "Every character; quest rewards per class",
       desc = "Better gear in your bags pointed out, and quest rewards picked for you." },
     { group = "Character" },
-    { key = "character", label = "Character setup", build = BuildSetup, refresh = RefreshSetup,
+    { key = "character", label = "Character setup", build = BuildSetup, refresh = RefreshSetup, icon = 134166,
+      scope = function() return "Every " .. (CLASS_NAME[ViewClass()] or "character") .. "; chat and Edit Mode for all" end,
       desc = "Your main's bars, macros and settings on a new character - or plan the bars here." },
-    { key = "trainer", label = "Trainer", build = BuildTrainer, refresh = function() trainer.refresh() end,
+    { key = "trainer", label = "Trainer", build = BuildTrainer, refresh = function() trainer.refresh() end, icon = 133741,
+      status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
       desc = "Your class spells learned as the trainer opens, the ones you choose, as your gold allows." },
     { group = "Route" },
-    { key = "route", label = "Route settings", build = BuildRouteSettings, refresh = RefreshRouteSettings,
+    { key = "route", label = "Route settings", build = BuildRouteSettings, refresh = RefreshRouteSettings, icon = 134269,
+      status = function() return YR.RoutesOn() end, scope = "Every character on this account",
       desc = "Recording runs, death skips, group play and the level splits." },
 }
 -- Older names for a page (Setup asks for "character"; "qol" was the one long page).
@@ -2027,17 +2117,32 @@ local function ShowTab(key)
         if t.key then
             t.frame:SetShown(t.key == key)
             t.button:Select(t.key == key)
-            if t.key == key then
-                settings.title:SetText(t.label)
-                settings.desc:SetText(t.desc or "")
-            end
+            if t.key == key then settings.Header(t) end
         end
     end
     S.CloseMenu()
     YR:RefreshWindow()
 end
 
+--- Build every page not built yet (the search looks through all of them).
+local function BuildAllSettings()
+    for _, t in ipairs(CATEGORIES) do
+        if t.key and not t.built then
+            settings.building = t.key
+            t.build(t.frame)
+            t.built = true
+        end
+    end
+    settings.building = nil
+end
+
+local function LabelOf(key)
+    for _, t in ipairs(CATEGORIES) do if t.key == key then return t.label end end
+    return key
+end
+
 local function BuildSettings(page)
+    settings.index = {}
     local nav = CreateFrame("Frame", nil, page)
     nav:SetPoint("TOPLEFT")
     nav:SetPoint("BOTTOMLEFT")
@@ -2046,45 +2151,149 @@ local function BuildSettings(page)
     local rule = nav:CreateTexture(nil, "BORDER")
     rule:SetPoint("TOPRIGHT") rule:SetPoint("BOTTOMRIGHT") rule:SetWidth(1)
     S.Set(rule, S.C.line)
-    local y = -14
+
+    -- Find a setting: every row's name and details, on every page.
+    local results = CreateFrame("Frame", nil, page)
+    results:SetPoint("TOPLEFT", NAV_W, 0)
+    results:SetPoint("BOTTOMRIGHT")
+    results:SetFrameLevel(page:GetFrameLevel() + 40)
+    S.Fill(results, S.C.window)
+    results:EnableMouse(true)
+    results:Hide()
+    results.head = S.Text(results, 13, S.C.sub)
+    results.head:SetPoint("TOPLEFT", 22, -18)
+    results.items = {}
+    local search
+    local function Go(e)
+        search:SetValue("")
+        results:Hide()
+        ShowTab(e.key)
+        local range = e.area.GetVerticalScrollRange and e.area:GetVerticalScrollRange() or 0
+        if e.area.SetVerticalScroll then e.area:SetVerticalScroll(math.max(0, math.min(range, -e.y - 60))) end
+        e.row.flash:Show()
+        C_Timer.After(1.6, function() e.row.flash:Hide() end)
+    end
+    local function Search(text)
+        text = strtrim(text or ""):lower()
+        if text == "" then results:Hide() return end
+        BuildAllSettings()
+        local found = {}
+        for _, e in ipairs(settings.index) do
+            local hay = (e.label .. " " .. (e.tip or "") .. " " .. LabelOf(e.key)):lower()
+            if hay:find(text, 1, true) then found[#found + 1] = e end
+        end
+        results.head:SetText(#found == 0 and ("Nothing matches \"" .. text .. "\"")
+            or ("%d setting%s"):format(#found, #found == 1 and "" or "s"))
+        for i = 1, math.min(#found, 12) do
+            local b = results.items[i]
+            if not b then
+                b = CreateFrame("Button", nil, results)
+                b:SetSize(CW - 44, 40)
+                b:SetPoint("TOPLEFT", 16, -44 - (i - 1) * 42)
+                b.hl = S.Fill(b, S.C.hover)
+                b.hl:Hide()
+                b.name = S.Text(b, 13)
+                b.name:SetPoint("TOPLEFT", 10, -5)
+                b.where = S.Text(b, 11, S.C.muted)
+                b.where:SetPoint("TOPLEFT", 10, -22)
+                b.where:SetPoint("RIGHT", -10, 0)
+                b.where:SetJustifyH("LEFT")
+                b.where:SetWordWrap(false)
+                b:SetScript("OnEnter", function(self) self.hl:Show() end)
+                b:SetScript("OnLeave", function(self) self.hl:Hide() end)
+                b:SetScript("OnClick", function(self) Go(self.e) end)
+                results.items[i] = b
+            end
+            local e = found[i]
+            b.e = e
+            b.name:SetText(strtrim(e.label))
+            b.where:SetText(LabelOf(e.key) .. (e.tip and ("  ·  " .. FirstSentence(e.tip)) or ""))
+            b:Show()
+        end
+        for i = math.min(#found, 12) + 1, #results.items do results.items[i]:Hide() end
+        results:Show()
+        return found
+    end
+    search = S.Input(nav, { width = NAV_W - 24, placeholder = "Find a setting", onChange = Search })
+    search:SetPoint("TOPLEFT", 12, -12)
+    YR.SettingsSearch, YR.SettingsGo = Search, Go      -- for tests
+
+    local y = -48
     for _, t in ipairs(CATEGORIES) do
         if t.group then
             local g = S.Text(nav, 11, S.C.muted)
-            g:SetPoint("TOPLEFT", 18, y - (y < -14 and 10 or 0))
+            g:SetPoint("TOPLEFT", 18, y - 8)
             g:SetText(t.group:upper())
-            y = y - (y < -14 and 32 or 22)
+            y = y - 30
         else
             local b = CreateFrame("Button", nil, nav)
-            b:SetSize(NAV_W - 16, 28)
+            b:SetSize(NAV_W - 16, 30)
             b:SetPoint("TOPLEFT", 8, y)
             b.bg = S.Fill(b, { 0, 0, 0, 0 })
             b.bar = b:CreateTexture(nil, "ARTWORK")
             b.bar:SetPoint("TOPLEFT") b.bar:SetPoint("BOTTOMLEFT") b.bar:SetWidth(2)
             S.Set(b.bar, S.C.accent)
             b.bar:Hide()
+            b.icon = b:CreateTexture(nil, "ARTWORK")
+            b.icon:SetSize(20, 20)
+            b.icon:SetPoint("LEFT", 10, 0)
+            b.icon:SetTexture(t.icon)
+            b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             b.text = S.Text(b, 13, S.C.sub)
-            b.text:SetPoint("LEFT", 14, 0)
+            b.text:SetPoint("LEFT", 38, 0)
             b.text:SetText(t.label)
+            -- on or off at a glance: green while something on the page is switched on
+            b.dot = b:CreateTexture(nil, "OVERLAY")
+            b.dot:SetSize(7, 7)
+            b.dot:SetPoint("RIGHT", -10, 0)
+            S.ArtTexture(b.dot, "dot")
             function b:Select(on)
                 self.selected = on
                 self.bg:SetColorTexture(unpack(on and S.C.accentD or { 0, 0, 0, 0 }))
                 self.bar:SetShown(on)
                 self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
+                self.icon:SetDesaturated(not on)
+                self.icon:SetAlpha(on and 1 or 0.8)
+                if t.status then
+                    self.dot:Show()
+                    self.dot:SetVertexColor(unpack(t.status() and S.C.green or S.C.muted))
+                else
+                    self.dot:Hide()
+                end
             end
             b:SetScript("OnEnter", function(self) if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end end)
             b:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end end)
-            b:SetScript("OnClick", function() ShowTab(t.key) end)
+            b:SetScript("OnClick", function() search:SetValue("") results:Hide() ShowTab(t.key) end)
             t.button = b
-            y = y - 30
+            y = y - 32
         end
     end
 
+    -- The page's header: its icon, name and what it's for, and who the settings on it are for.
+    local frame = CreateFrame("Frame", nil, page)
+    frame:SetSize(42, 42)
+    frame:SetPoint("TOPLEFT", NAV_W + 20, -11)
+    S.Border(frame, S.C.lineHi)
+    settings.icon = frame:CreateTexture(nil, "ARTWORK")
+    settings.icon:SetPoint("TOPLEFT", 1, -1)
+    settings.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    settings.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     settings.title = S.Text(page, 17)
-    settings.title:SetPoint("TOPLEFT", NAV_W + 22, -16)
+    settings.title:SetPoint("TOPLEFT", frame, "TOPRIGHT", 12, -2)
+    settings.scope = S.Text(page, 11, S.C.muted)
+    settings.scope:SetPoint("TOPRIGHT", page, "TOPRIGHT", -20, -14)
+    settings.scope:SetJustifyH("RIGHT")
     settings.desc = S.Text(page, 12, S.C.muted)
-    settings.desc:SetPoint("TOPLEFT", settings.title, "BOTTOMLEFT", 0, -6)
+    settings.desc:SetPoint("TOPLEFT", settings.title, "BOTTOMLEFT", 0, -5)
     settings.desc:SetPoint("RIGHT", page, "RIGHT", -20, 0)
     settings.desc:SetJustifyH("LEFT")
+    function settings.Header(t)
+        settings.icon:SetTexture(t.icon)
+        settings.title:SetText(t.label)
+        settings.desc:SetText(t.desc or "")
+        local scope = type(t.scope) == "function" and t.scope() or t.scope
+        settings.scope:SetText(scope and ("Saved as you change it\n" .. scope) or "Saved as you change it")
+    end
     local strip = page:CreateTexture(nil, "BORDER")
     strip:SetPoint("TOPLEFT", NAV_W + 16, -TITLE_H + 4)
     strip:SetPoint("TOPRIGHT", -16, -TITLE_H + 4)
@@ -2112,11 +2321,15 @@ local function RefreshSettings()
     for _, t in ipairs(CATEGORIES) do
         if t.key then
             t.frame:SetShown(t.key == settings.tab)
-            t.button:Select(t.key == settings.tab)
+            t.button:Select(t.key == settings.tab)     -- and its on/off dot, as the settings are now
             if t.key == settings.tab then
-                if not t.built then t.build(t.frame) t.built = true end
-                settings.title:SetText(t.label)
-                settings.desc:SetText(t.desc or "")
+                if not t.built then
+                    settings.building = t.key
+                    t.build(t.frame)
+                    t.built = true
+                    settings.building = nil
+                end
+                settings.Header(t)
                 t.refresh()
             end
         end

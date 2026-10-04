@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Settings, redesigned.** Each page opens with its icon, what it's for, and who the settings on it are for ("Every character on this account", "Every Paladin"), saved as you change them. The menu has an icon per page and a dot that is green while something on that page is on. Settings come in cards with an icon; a feature with one switch has it in the card's header, and the rows under it dim while it's off. Under every setting is the first line of what it does, so you can read the page without pointing at anything (the (i) still has the whole text). "Find a setting" at the top of the menu searches every page by name and description, and picking a result opens its page with the setting lit up.
+
 - Dun Morogh: the bears for **Thick Bear Fur** (Stocking Jetsteam) are now east of Kharanos, on the way to Steelgrill's Depot, where all ten furs in five logged runs dropped. RestedXP's loop south of Kharanos never gave one, and a run lost about 10 minutes looking.
 
 - **Treacherous Cold is dropped when another addon accepts it.** The route skips it, but Leatrix Plus's quest automation (and the like) takes every quest Father Gavin offers. Headstart drops it once, and says so; take it again and it stays. A quest you read and accept by hand is left alone.

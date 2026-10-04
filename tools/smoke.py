@@ -638,6 +638,25 @@ for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "character
     YR.ShowSettingsTab(YR, key)        # every page builds, and fills, without an error
 icons = [g.SEEN_ICONS[i] for i in range(1, len(g.SEEN_ICONS) + 1)]
 check(any("Seal of" in t or "Holy Light" in t for t in icons), f"trainer rows carry the spell's icon: {icons[:2]}")
+# Find a setting: by a word in its name or details, on any page; picking one opens its page
+found = YR.SettingsSearch("durability")
+labels = [found[i].label for i in range(1, len(found) + 1)] if found else []
+check(any("Durability" in l for l in labels) and all(found[i].key for i in range(1, len(found) + 1)),
+      f"the search finds Durability warning, and knows its page: {labels}")
+YR.SettingsGo(found[1])
+check(g.YippRouteDB is not None and lua.eval("true"), "picking a result opens its page without an error")
+check(YR.SettingsSearch("") is None, "an empty search shows the page again")
+check(len(YR.SettingsSearch("zzqqxx") or []) == 0, "nothing matches: an empty list, no error")
+# A card's master switch: the rows under it dim while it's off
+lua.execute("""local F = getmetatable(CreateFrame()) F.SetAlpha = function(self, a) self.alpha = a end""")
+g.YippRouteDB.restock = False
+YR.ShowSettingsTab(YR, "vendors")
+dimmed = lua.eval("""(function()
+    local n = 0
+    for _, f in ipairs(FRAMES) do if f.alpha == 0.45 then n = n + 1 end end
+    return n end)()""")
+check(dimmed > 0, f"Vendor restock off: its rows are dimmed ({dimmed})")
+g.YippRouteDB.restock = None
 check(True, "settings page with reward settings opens")
 YR.ShowSettingsTab(YR, "trainer")        # the Trainer tab: the class's spells with a choice each
 check(True, "settings Trainer tab opens")
