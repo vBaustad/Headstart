@@ -137,6 +137,9 @@ function YR.CheckUpgrade(bag, slot)
     -- an armor-only piece for an empty slot still counts for something.
     local c = YR.SimCompare and YR.SimCompare(link)
     if c then
+        -- Your role's number never goes down for armor: a one-hander and a shield in place of your
+        -- two-hander is less DPS, however much toughness the shield adds (for a tank it's the other way).
+        if c.role ~= "tank" and c.pct < -0.05 then return nil end
         local gain = c.role == "tank" and c.tough or (c.pct + c.tough / 4)
         -- an empty slot: anything that gives something is worth wearing while levelling
         local fills = not c.old and (c.pct > 0 or c.tough > 0)

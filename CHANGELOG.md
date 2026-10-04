@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Better gear never offers less damage for more armor.** A one-hander was offered over your two-hander: paired with a shield from your bags it lost DPS, but the shield's armor counted for enough to pass. Now nothing that lowers your role's number (DPS, healing or spell damage) is offered, however much toughness it adds; a tank is weighed on toughness as before. The tooltip still says what it would do.
+
 - **The Camping 101 reminder says it once.** "Mining is done: hand it in to Yarr Hammerstone" came again at every loot: the quest log answers "not complete" for a moment while it updates, and that made the reminder forget it had said it. Now it's said once, and again on coming into Kharanos at most every two minutes.
 
 - **Bank mats works again.** A check added in this release stopped it at the first stack with "the bank closed before the rest went" while the bank was open: it asked the game whether you were at a banker, and on Forever the bank opens without saying so. It now looks at the bank window itself.

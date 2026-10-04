@@ -406,6 +406,7 @@ def run():
     end""")
     check(sim(YR, 0, 0.7) is not None, "+0.0% DPS, +0.7% toughness: offered, nothing gets worse")
     check(sim(YR, -1, 3) is None, "-1% DPS for +3% toughness: under the 2%, not offered")
+    check(sim(YR, -8, 40) is None, "a one-hander and shield for your two-hander: -8% DPS, +40% toughness - not offered")
     check(sim(YR, 0, 0) is None, "no change at all: not offered")
     # a shield where you wield a two-hander: never offered, however the sim scores it
     lua.execute('''WORN = { [16] = "|Hitem:105|h" } BAGS = { [1] = { "|Hitem:107|h[Buckler]|h" } }''')
