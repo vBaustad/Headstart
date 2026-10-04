@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Death skips: Headstart now accepts the resurrection at the Spirit Healer itself when the death was a death skip. RestedXP only does it while its death-skip step is still the active one, and several end as soon as you arrive (the Kharanos ones end on entering Kharanos, where the healer stands), so sometimes nothing happened. Any other death is still left to you.
+
 - Save as route: now one part per zone you levelled in, chained so RestedXP moves on by itself, and named by levels, zone and race ("1-6 My route: Dun Morogh (Dwarf/Gnome)"), never by character. One set per race (Dwarves and Gnomes share one): saving again from any character of that race replaces that set; your other races' sets stay. A city or a short visit to another zone stays in the part around it.
 
 - **Save your run as your own route.** This run has a "Save as route" button: the whole recorded run becomes a route of yours, a step for every stop in the order you played (quests taken and handed in at each NPC, objectives finished, trainers with what you learned, vendors with what you bought, flights, the hearthstone, death skips, grinds to the XP you reached). It shows in the Routes list, where you can drag steps around, edit every line and delete, like our routes; RestedXP lists it under Headstart Launch, My routes. One per character: saving again replaces it, your edits too. Our routes stay as they are.

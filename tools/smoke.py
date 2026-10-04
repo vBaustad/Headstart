@@ -236,6 +236,26 @@ g.Fire("PLAYER_DEAD")
 lua.execute("SKIP.completed = nil; YippRouteDB.deathSkipRelease = false")
 g.Fire("PLAYER_DEAD")
 check(g.REPOPS == 1, "... not once that step is done, nor with the option off")
+# ... and at the Spirit Healer, Headstart accepts the resurrection of a death skip even when RestedXP's
+# step has already gone (it ends itself on entering Kharanos, where the healer is); never another death's
+lua.execute('''
+YippRouteDB.deathSkipRelease = nil
+GHOST, ACCEPTS = false, 0
+function UnitIsGhost() return GHOST end
+function AcceptXPLoss() ACCEPTS = ACCEPTS + 1 end
+RXP.currentGuide.steps = { { active = true, elements = { { tag = "goto" }, SKIP } } }
+''')
+g.Fire("PLAYER_DEAD")
+lua.execute('GHOST = true; RXP.currentGuide.steps = { { active = true, elements = { { tag = "goto" } } } }')
+g.Fire("CONFIRM_XP_LOSS")
+check(g.ACCEPTS == 1, "a death skip whose step has gone: accepted at the Spirit Healer all the same")
+lua.execute('GHOST = false')
+g.Fire("PLAYER_UNGHOST")
+g.Fire("PLAYER_DEAD")
+lua.execute('GHOST = true')
+g.Fire("CONFIRM_XP_LOSS")
+check(g.ACCEPTS == 1, "any other death: left to you at the healer")
+lua.execute('GHOST = false; function UnitIsGhost() return false end')
 lua.execute("YippRouteDB.deathSkipRelease = nil; DEAD = false; RXP.currentGuide.steps = nil")
 
 # Reward choices (a paladin's default order: two-hander, mail, shield, water, food): the first kind on
