@@ -1500,7 +1500,8 @@ local function BuildSetup(page)
     apply.tip = "Put the saved layout on this character, with the choices below"
     local copy = S.Button(card, "Copy this layout", function() YS:Copy() YR:RefreshWindow() end)
     copy:SetPoint("RIGHT", apply, "LEFT", -8, 0)
-    copy.tip = "Save this character's bars, macros, items, Edit Mode layout and game settings"
+    copy.tip = "Save this character's bars, macros and items for its class, and its chat, Edit Mode, game settings,"
+        .. " raid frames and camera for every class"
     setup.apply, setup.copy = apply, copy
     setup.saved:SetPoint("RIGHT", copy, "LEFT", -16, 0)
     setup.saved:SetJustifyH("LEFT")
@@ -1576,7 +1577,8 @@ local function BuildSetup(page)
     Row("Remove this character's old macros", Sw("clearMacros"), "Character macros only; account macros and AutoFeed's are never touched")
 
     Section("Interface")
-    Row("Game settings", Sw("settings"), "Auto loot, interact on click, nameplates, camera distance and the rest of the list")
+    Row("Game settings", Sw("settings"), "Auto loot, interact on click, nameplates, raid frames, map coordinates,"
+        .. " camera distance and the rest of the list")
     Row("Edit Mode layout", Sw("editMode"), "Left alone anyway when a UI suite like ElvUI or EllesmereUI is loaded")
     Row("Which action bars are shown", Sw("barVisibility"), "Left alone anyway when a bar addon like Bartender or Dominos is loaded")
     Row("Chat windows", Sw("chat"), "Your main's chat tabs: names, what each shows (channels and messages), font size, colour, transparency, docked or where they float")
@@ -1607,7 +1609,8 @@ local function RefreshSetup()
     setup.apply.tip = view ~= class and ("This character isn't a " .. name .. ": pick its own class above")
         or "Put the saved layout on this character, with the choices below"
     setup.copy.tip = view ~= class and ("This character isn't a " .. name .. ": pick its own class above")
-        or "Save this character's bars, macros, items, Edit Mode layout and game settings"
+        or "Save this character's bars, macros and items for its class, and its chat, Edit Mode, game settings,"
+        .. " raid frames and camera for every class"
 
     for _, ctl in ipairs(setup.controls) do if ctl.Refresh then ctl:Refresh() end end
 end
@@ -1723,7 +1726,7 @@ local BuildCamps = QoLPage("camps", function(L, c, Section, Row, Opt)
         Section("Flying")
         Row("Flight timer", S.Switch(c, Opt("flightTimer"), function(on) YippRouteDB.flightTimer = on YR:SetFlightTimer(on) end),
             "A bar while you fly: where from, where to and the time left. Each flight is timed the first time you"
-            .. " take it; until then the time is estimated from the route's length. Drag the bar to move it"
+            .. " take it; until then RestedXP's time for it, an estimate from the flight's length, or it counts up. Drag the bar to move it"
             .. " (/headstart flight shows a sample)")
 end)
 
@@ -1869,7 +1872,7 @@ local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
         Row("Share every quest I take", S.Switch(c, function() return YR.ShareAll() end,
             function(on) YippRouteDB.shareAll = on end),
             "Each quest you take from an NPC is shared with your party at once. Off: only the route's quests"
-            .. " (Route tab, Group play)")
+            .. " (Route settings, Group play)")
         local FROM = { { "friends", "Guildies and friends" }, { "party", "Anyone in my party" }, { "off", "Nobody" } }
         local from
         from = S.Dropdown(c, 190, FROM, function(v) YippRouteDB.acceptFrom = v from:Refresh() end)
@@ -1956,9 +1959,10 @@ local BuildGear = QoLPage("gear", function(L, c, Section, Row, Opt)
         Row("Weigh it for", roleDrop, "Guess: the talent tree with the most points (Retribution is melee, Holy"
             .. " healing, Protection tanking ...), or what your class levels as before you have any")
         Row("Tell me about upgrades", S.Switch(c, Opt("upgrades"), function(on) YippRouteDB.upgrades = on end),
-            "An item in your bags that scores higher for your class than what you wear in that slot: its stats,"
-            .. " armor and, for weapons, damage per second. Only what you can wear - the game's red text says"
-            .. " no. Once per item (again after a ding). /headstart upgrades looks now")
+            "An item in your bags the gear sim says is better for you (your role, see Weigh it for) than what"
+            .. " you wear in that slot: at least the % below, or any gain that costs you nothing, or anything for"
+            .. " an empty slot. Only what you can wear - the game's red text says no. Once per item (again after"
+            .. " a ding). /headstart upgrades looks now")
         local QUAL = { { 1, "Grey and white" }, { 2, "Up to green" }, { 3, "Up to blue" }, { 5, "Everything" } }
         local qual
         qual = S.Dropdown(c, 170, QUAL, function(v) YippRouteDB.upgradeQuality = v YR.UpgradesForget() qual:Refresh() end)
@@ -1967,7 +1971,9 @@ local BuildGear = QoLPage("gear", function(L, c, Section, Row, Opt)
         end
         Row("Items up to", qual, "Blues and better are usually worth reading yourself")
         Row("At least this much better (%)", S.Stepper(c, function() return YippRouteDB.upgradeMin or 2 end,
-            function(v) YippRouteDB.upgradeMin = v YR.UpgradesForget() end, 0, 100, 1, 110))
+            function(v) YippRouteDB.upgradeMin = v YR.UpgradesForget() end, 0, 100, 1, 110),
+            "Only for a trade, like less DPS for more armor. A piece that is better and takes nothing from you,"
+            .. " or goes in an empty slot, is mentioned whatever the gain")
         Row("A window with an Equip button", S.Switch(c, Opt("upgradeButton"), function(on) YippRouteDB.upgradeButton = on end),
             "Off: the chat line only")
 

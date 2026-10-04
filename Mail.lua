@@ -156,7 +156,7 @@ function YR.MailToAlt(loud)
     if InCombatLockdown() then if loud then YR.Print("not in combat.") end return end
     local to = YR.MailRecipient()
     if not to then
-        if loud then YR.Print("name the alt to mail in Settings, QoL (Mail to my alt).") end
+        if loud then YR.Print("name the alt to mail in Settings, QoL, Bags (Mail to my alt).") end
         return
     end
     if not ToOther(to) then
@@ -188,8 +188,8 @@ local function Button()
         GameTooltip:AddLine(m == "all" and "Crafting mats: all of them." or m == "mine"
             and "Crafting mats no profession of yours crafts with." or "Crafting mats: off.", 1, 1, 1, true)
         GameTooltip:AddLine(YR.Option("mailRecipes") and "Recipes you can't learn yet." or "Recipes: off.", 1, 1, 1, true)
-        GameTooltip:AddLine("And your list. Never soulbound or quest items, what the route needs or AutoFeed's food."
-            .. " 30 copper a stack in postage. Settings, QoL.", 0.6, 0.6, 0.6, true)
+        GameTooltip:AddLine("And your list, as you made it. Never soulbound or quest items; of the mats, nothing the route needs or AutoFeed's food."
+            .. " 30 copper a stack in postage. Settings, QoL, Bags.", 0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)

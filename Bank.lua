@@ -232,7 +232,7 @@ local function Button()
         GameTooltip:AddLine(mats == "all" and "Crafting mats: all of them." or mats == "mine"
             and "Crafting mats no profession of yours crafts with." or "Crafting mats: off.", 1, 1, 1, true)
         GameTooltip:AddLine(YR.Option("bankRecipes") and "Recipes you can't learn yet." or "Recipes: off.", 1, 1, 1, true)
-        GameTooltip:AddLine("Quest items, what the route still needs and AutoFeed's food stay. Settings, QoL.",
+        GameTooltip:AddLine("Quest items, what the route still needs and AutoFeed's food stay. Settings, QoL, Bags.",
             0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)

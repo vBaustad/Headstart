@@ -198,7 +198,7 @@ function YS:Scan()
     ClassData(class).profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots }
     YS:SaveSharedUI()
     Print(("saved %s: %d spells, %d profession spells, %d macros and %d items. What goes onto a new character is"
-        .. " chosen in Settings, Character tab."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item))
+        .. " chosen in Settings, Character setup."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item))
 end
 
 --------------------------------------------------------------------------------
@@ -465,7 +465,7 @@ function YS:Apply(force)
     -- force: another class's layout (the last one saved before layouts were per class)
     local p = YS:Profile() or (force and YippSetupDB.profile)
     if not p then
-        Print(("no layout saved for %s yet. On your %s main, click Copy this layout (Settings, Character tab)."
+        Print(("no layout saved for %s yet. On your %s main, click Copy this layout (Settings, Character setup)."
             .. " /ysetup apply force uses another class's."):format(class:lower(), class:lower()))
         return
     end
@@ -531,7 +531,7 @@ function YS:Apply(force)
         end
     end
     YippSetupCharDB.applied = p.scanned
-    Print(("placed %d buttons from %s (%d new macros for spells not trained yet or your own, %d %s removed).")
+    Print(("placed %d buttons from %s (%d new macros, %d %s removed).")
         :format(placed, p.from, made, removed, again and "unused question-mark macros" or "old character macros"))
     if full then
         Print(("stopped at '%s': your character macro slots are full (%d)."):format(full, Constants.MacroConsts.MAX_CHARACTER_MACROS))

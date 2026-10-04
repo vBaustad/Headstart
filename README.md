@@ -1,6 +1,6 @@
 # Headstart
 
-A launch-day levelling kit for **WoW: Forever**: crowd-aware starting-zone routes for RestedXP, an in-game route editor, level splits, a quest reward picker, a run log, and one-click setup of a new character from your main.
+A launch-day levelling kit for **WoW: Forever**: crowd-aware starting-zone routes for RestedXP, an in-game route editor, level splits, a quest reward picker, a run log, and one-click setup of a new character from your main. It is also the YippYapp quality-of-life addon: the QoL features below work on any character, with the routes switched off too.
 
 Built for the first hours of a fresh realm, when every starting zone has hundreds of players in it: the routes go to the edges of the zone first, skip the camped opening quests, and group up at the single-spawn kills.
 
@@ -17,11 +17,20 @@ Built for the first hours of a fresh realm, when every starting zone has hundred
 - **Quest rewards picked for you** up to a level you choose, from a priority list per class. It remembers what you picked by hand last time. Hold Shift to choose yourself. A choice that isn't gear (a profession to learn) is always yours. Each class has its own settings.
 - **Run log.** Position, quests, kills, deaths, vendors, trainers, sales, loot and money of each run, to see where the time went. Click an action for its details. Stop a run when it's done.
 - **Keep what the route needs.** Items a route quest still needs say so on their tooltip, and selling one warns you straight away.
-- **Character setup.** Copy your main's action bars, macros and settings once per class; set up every new character of that class, after seeing exactly what carries over: class spells up to a level, racials, professions, mouseover macros, your own macros, items, game settings, Edit Mode, bar visibility. Works alongside ElvUI, EllesmereUI, Bartender, Dominos and other UI addons: it leaves their layouts alone.
+- **Character setup.** Copy your main's action bars, macros and settings once per class; set up every new character of that class, after seeing exactly what carries over: class spells up to a level, racials, professions, mouseover macros, your own macros, items, game settings, Edit Mode, bar visibility. Works alongside ElvUI, EllesmereUI, Bartender, Dominos and other UI addons: it leaves their layouts alone. Chat, Edit Mode and game settings are the account's, so a new class gets them without copying anything; no main to copy from? Plan the whole class's bars on a level-1 character, on your real action bars.
+
+## Quality of life
+
+- **Camp HUD.** A campfire on screen when a camp is near, and once you have its benefit what it gives you, burning down with the hour.
+- **Bags.** Bank crafting mats and recipes you can't use yet in one click (or as the bank opens); send them to your alt from the mailbox.
+- **Vendors.** Restock your class reagents and ammo at the vendor; learn your spells at the trainer as you choose for each, keeping a reserve.
+- **Better gear.** Every item's tooltip says what it would do for you (+DPS, +toughness, from your own stats and role), and an upgrade in your bags gets an Equip button.
+- **Group.** Invite and leave buttons and key bindings, whisper "inv" to join, party quests shared and accepted for you.
+- **Reminders.** Trainer spells waiting, unspent talent points, low durability, stones, oils and bandages you could make, a screenshot at every ding. Flight timer.
 
 ## Use
 
-- `/headstart` (or the minimap button, or the addon compartment) opens the window: routes, this run, share, and settings (Route and Character tabs).
+- `/headstart` (or the minimap button, or the addon compartment) opens the window: routes, this run, share, and the QoL & settings page (Quality of life, Character, Route). `/hs` opens the settings.
 - RestedXP Guides is needed for the routes. Everything else works without it.
 
 ## Credits and licence
