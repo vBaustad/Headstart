@@ -6,12 +6,13 @@ Built for the first hours of a fresh realm, when every starting zone has hundred
 
 ## Features
 
-- **Launch routes for RestedXP.** Alliance starting zones for every class:
-  - Dwarf and Gnome: Coldridge Valley 1-5, then Dun Morogh 5-11 (Mining and Blacksmithing picked up on the way)
+- **Launch routes for RestedXP, to level 30.** Alliance starting zones for every class:
+  - Dwarf and Gnome: Coldridge Valley 1-5, then Dun Morogh 5-11 (Mining and Blacksmithing picked up on the way); or, as an option, Elwynn from 6
   - Human: Northshire 1-6
   - Night Elf: Shadowglen 1-6
 
-  They show up in RestedXP under **Headstart Launch (A)** and hand over to RestedXP's own guides where they end.
+  Then on to 30 through Elwynn or Teldrassil, Loch Modan, Westfall, Darkshore, Redridge, Ashenvale, the Wetlands, Duskwood and Hillsbrad: RestedXP's routes made fit for Forever, with Forever's new quests, no grey quest handed in, training and death skips where they pay, and Duo/Trio versions that run the dungeons. They show up in RestedXP under **Headstart Launch (A)** and hand over to RestedXP's own guides at 30. On a new install they are off: switch them on once (Settings, Route settings, or `/headstart routes on`) for every character of the account.
+- **Your own routes.** Save a run as a route (This run, Save as route): our steps as you played them, or made from your run log, one part per zone, one set per race. Edit it like ours, play it in RestedXP under My routes.
 - **Route editor.** Every step can be changed in game: drag steps around, add, merge, duplicate or delete them, edit each action with pickers for your position and target, or edit the raw text. Your changes are saved for you and can be exported and shared; "back to the shipped route" undoes them.
 - **Level splits.** Time per level and in total from the server's /played, against your best run, in green or red. XP per hour and time to ding. Movable, sizeable, lockable.
 - **Quest rewards picked for you** up to a level you choose, from a priority list per class. It remembers what you picked by hand last time. Hold Shift to choose yourself. A choice that isn't gear (a profession to learn) is always yours. Each class has its own settings.
