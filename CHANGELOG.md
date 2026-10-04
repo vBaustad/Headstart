@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Save as route: far fewer "Grind here" steps. Kills an objective then finishes are that quest's work, and killing your way along to the next stop is no step; a grind is only a stretch of at least 10 kills over 3 minutes in one small area right before your next stop.
+
 - Death skips: Headstart now accepts the resurrection at the Spirit Healer itself when the death was a death skip. RestedXP only does it while its death-skip step is still the active one, and several end as soon as you arrive (the Kharanos ones end on entering Kharanos, where the healer stands), so sometimes nothing happened. Any other death is still left to you.
 
 - Save as route: now one part per zone you levelled in, chained so RestedXP moves on by itself, and named by levels, zone and race ("1-6 My route: Dun Morogh (Dwarf/Gnome)"), never by character. One set per race (Dwarves and Gnomes share one): saving again from any character of that race replaces that set; your other races' sets stay. A city or a short visit to another zone stays in the part around it.

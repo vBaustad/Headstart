@@ -96,7 +96,10 @@ local function Talk(npc)
     return npc and ("\n    >>|Tinterface/worldmap/chatbubble_64grey.blp:20|tTalk to |cRXP_FRIENDLY_%s|r"):format(npc) or ""
 end
 
-local GRIND_KILLS, GRIND_SECONDS = 8, 150
+-- A grind: at least this many kills over this long, all in one small area (in map percent, ~250 x 165
+-- yards in Dun Morogh). Killing your way along to the next stop is no step (the user, 2026-10-04: most
+-- "grind here" steps were only the mobs on the way), nor are the kills an objective then finishes.
+local GRIND_KILLS, GRIND_SECONDS, GRIND_AREA = 10, 180, 5
 
 function YR.RunToSteps(char)
     local run = YippRouteDB.runs and YippRouteDB.runs[char or YR.CharKey()]
@@ -118,7 +121,7 @@ function YR.RunToSteps(char)
     end
 
     local steps, visit, lastMap, handedIn = {}, nil, nil, {}
-    local kills, killFrom, lastKill, killAt = 0, nil, nil, nil
+    local killList = {}                      -- the kills since the last stop
     local cur = { zone = nil, level = 1, t = 0 }
 
     local function Push(text, e)
@@ -169,23 +172,33 @@ function YR.RunToSteps(char)
         visit.last = e[1]
         return visit
     end
-    -- a stretch of killing with nothing else: a grind, to the XP you had after its last kill
+    -- a grind: the last kills before the next stop, gone back from it while they stay in one small area
+    -- (what came before them is killing on the way), enough of them over long enough; to the XP after
+    -- the last one, where the first of them was
     local function Grind()
-        if kills >= GRIND_KILLS and lastKill and lastKill[1] - killFrom >= GRIND_SECONDS and lastKill[4] then
+        local n = #killList
+        local last = killList[n]
+        local x0, x1, y0, y1, first
+        for k = n, 1, -1 do
+            local e = killList[k]
+            if not (e[6] and e[6] ~= 0 and e[7] and last[6] == e[6]) then break end
+            local nx0, nx1 = math.min(x0 or e[7], e[7]), math.max(x1 or e[7], e[7])
+            local ny0, ny1 = math.min(y0 or e[8], e[8]), math.max(y1 or e[8], e[8])
+            if nx1 - nx0 > GRIND_AREA or ny1 - ny0 > GRIND_AREA then break end
+            x0, x1, y0, y1, first = nx0, nx1, ny0, ny1, k
+        end
+        if first and n - first + 1 >= GRIND_KILLS and last[1] - killList[first][1] >= GRIND_SECONDS and last[4] then
             Flush()
             Push(("step%s\n    .xp %d+%d >> Grind here, to %d XP into level %d"):format(
-                At(killAt), lastKill[4], lastKill[5] or 0, lastKill[5] or 0, lastKill[4]), killAt)
+                At(killList[first]), last[4], last[5] or 0, last[5] or 0, last[4]), killList[first])
         end
-        kills, killFrom, lastKill, killAt = 0, nil, nil, nil
+        killList = {}
     end
 
     for i, e in ipairs(ev) do
         local kind = e[2]
         if kind == "kill" then
-            kills = kills + 1
-            killFrom = killFrom or e[1]
-            lastKill = e
-            killAt = killAt or e
+            killList[#killList + 1] = e
         elseif kind == "accept" or kind == "turnin" then
             Grind()
             local v = Visit(e, e.npc)
@@ -206,14 +219,15 @@ function YR.RunToSteps(char)
                 end
             end
             if not noise then
-                Grind()
+                -- the kills before an objective finishes were for it: no grind step for them
+                killList = {}
                 Flush()
                 local lines = {}
                 for k = 1, math.max(1, tonumber(objectives[e[3]]) or 1) do
                     lines[#lines + 1] = ("\n    .complete %d,%d"):format(e[3], k)
                 end
                 Push("step" .. At(e) .. ("\n    >>%s: finish it here"):format(Title(e[3])) .. table.concat(lines), e)
-                kills, killFrom, lastKill, killAt = 0, nil, nil, nil
+                killList = {}
             end
         elseif kind == "trainer" then
             Grind()

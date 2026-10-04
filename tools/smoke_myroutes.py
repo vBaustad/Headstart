@@ -21,19 +21,24 @@ EV = {
     E(0, "zone", nil, 1, 0, 30, 72, { zone = "Dun Morogh" }),
     E(10, "accept", 183, 1, 0, 22.7, 71.3, { npc = "Talin Keeneye", title = "The Boar Hunter", obj = 1 }),
 }
--- a long stretch of kills: a grind
+-- the boars for the quest, then its objective done: quest work, no grind
 for i = 1, 10 do EV[#EV + 1] = E(20 + i * 20, "kill", nil, 2, 100 + i * 50, 23, 70) end
 EV[#EV + 1] = E(240, "complete", 183, 2, 600, 22.6, 71.2)
 EV[#EV + 1] = E(300, "turnin", 183, 2, 600, 22.6, 71.3, { npc = "Talin Keeneye", xp = 250 })
 EV[#EV + 1] = E(301, "complete", 183, 2, 850, 22.6, 71.3)                       -- noted again: no step
 EV[#EV + 1] = E(302, "accept", 182, 2, 850, 22.6, 71.3, { title = "The Troll Cave", obj = 1 })   -- no npc noted
-EV[#EV + 1] = E(400, "trainer", nil, 2, 850, 28.9, 68.3, { npc = "Bromos Grummner" })
-EV[#EV + 1] = E(401, "learn", nil, 2, 850, 28.9, 68.3, { name = "Judgement" })
-EV[#EV + 1] = E(401, "learn", nil, 2, 850, 28.9, 68.3, { name = "Judgement" })
-EV[#EV + 1] = E(500, "death", nil, 3, 900, 30.2, 79.8)
-EV[#EV + 1] = E(510, "alive", nil, 3, 900, 47.1, 55.0)
-EV[#EV + 1] = E(600, "flight", nil, 3, 900, 33.9, 50.7, { npc = "Thorgrum Borrelson" })
-EV[#EV + 1] = E(640, "zone", nil, 3, 900, 0, 0, { zone = "Ironforge" })
+-- killing along the way to the trainer: no step
+for i = 1, 10 do EV[#EV + 1] = E(302 + i * 3, "kill", nil, 2, 850, 22 + i, 70 - i) end
+-- a long stretch of kills in one spot, nothing else: a grind
+for i = 1, 10 do EV[#EV + 1] = E(340 + i * 2, "kill", nil, 2, 850 + i * 10, 30, 70) end
+for i = 1, 10 do EV[#EV + 1] = E(360 + i * 20, "kill", nil, 2, 950 + i * 10, 30.5, 70.5) end
+EV[#EV + 1] = E(600, "trainer", nil, 2, 1050, 28.9, 68.3, { npc = "Bromos Grummner" })
+EV[#EV + 1] = E(601, "learn", nil, 2, 850, 28.9, 68.3, { name = "Judgement" })
+EV[#EV + 1] = E(601, "learn", nil, 2, 850, 28.9, 68.3, { name = "Judgement" })
+EV[#EV + 1] = E(700, "death", nil, 3, 900, 30.2, 79.8)
+EV[#EV + 1] = E(710, "alive", nil, 3, 900, 47.1, 55.0)
+EV[#EV + 1] = E(800, "flight", nil, 3, 900, 33.9, 50.7, { npc = "Thorgrum Borrelson" })
+EV[#EV + 1] = E(840, "zone", nil, 3, 900, 0, 0, { zone = "Ironforge" })
 '''
 
 
@@ -66,7 +71,9 @@ function UnitRace() return RACE, RACE end
     steps = [str(s.text) for s in YR.RunToSteps("Tester-Realm").values()]
     text = "\n".join(steps)
     check(steps[0].count(".accept 183") == 1 and "Talin Keeneye" in steps[0], "a quest taken: its step, at the NPC")
-    check(any(".xp 2+600 >> Grind here" in s for s in steps), "ten kills over three minutes: a grind step, to the XP after them")
+    grinds = [s for s in steps if "Grind here" in s]
+    check(len(grinds) == 1 and ".xp 2+1050" in grinds[0] and "30.00,70.00" in grinds[0],
+          f"only the stretch of kills in one spot is a grind (not the quest's boars, not those on the way): {grinds}")
     check(sum(".complete 183,1" in s for s in steps) == 1, "the objective finished once, not again after the hand-in")
     hand = next((s for s in steps if ".turnin 183" in s), "")
     check(".accept 182" in hand, "a quest taken right after a hand-in, no NPC noted: the same stop")
