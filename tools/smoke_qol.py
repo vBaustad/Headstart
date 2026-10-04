@@ -413,6 +413,9 @@ def run():
     check(sim(YR, 5, 10) is None and YR.CheckUpgrade(0, 1) is None, "a shield over the two-hander: not offered")
     lua.execute('''WORN = { [16] = "|Hitem:106|h" }''')
     check(sim(YR, 0, 3) is not None, "a shield beside a one-hander still is")
+    lua.execute('''WORN = { [16] = "|Hitem:105|h" } BAGS = { [1] = { "|Hitem:106|h[Sword]|h" } }''')
+    check(sim(YR, 5, 10) is None, "a one-hander over the two-hander you wield: not offered, however the sim scores it")
+    lua.execute('''WORN = { [16] = "|Hitem:106|h" } BAGS = { [1] = { "|Hitem:107|h[Buckler]|h" } }''')
     lua.execute('''WORN = { [5] = "|Hitem:100|h", [16] = "|Hitem:106|h", [17] = "|Hitem:107|h" }
         BAGS = { [1] = { "|Hitem:101|h[Green Vest]|h" } }''')
     # two pairs of boots from one quest: one window, for the better pair

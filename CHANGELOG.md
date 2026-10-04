@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Better gear never offers less damage for more armor.** A one-hander was offered over your two-hander: paired with a shield from your bags it lost DPS, but the shield's armor counted for enough to pass. Now nothing that lowers your role's number (DPS, healing or spell damage) is offered, however much toughness it adds; a tank is weighed on toughness as before. The tooltip still says what it would do.
+- **Better gear never offers less damage for more armor.** A one-hander was offered over your two-hander: paired with a shield from your bags it lost DPS, but the shield's armor counted for enough to pass. Now nothing that lowers your role's number (DPS, healing or spell damage) is offered, however much toughness it adds; a tank is weighed on toughness as before. The tooltip still says what it would do. And while you wield a two-hander, no one-hander is offered at all (nor a shield or off hand): the two-hander is your choice.
 
 - **The Camping 101 reminder says it once.** "Mining is done: hand it in to Yarr Hammerstone" came again at every loot: the quest log answers "not complete" for a moment while it updates, and that made the reminder forget it had said it. Now it's said once, and again on coming into Kharanos at most every two minutes.
 

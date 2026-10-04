@@ -124,10 +124,11 @@ function YR.CheckUpgrade(bag, slot)
     if not SLOTS[equipLoc] then return nil end
     local q = Quality(link)
     if not q or q > (YippRouteDB.upgradeQuality or 2) then return nil end
-    -- an off hand (a shield, a held item) where you wield a two-hander: never offered - the swap takes
-    -- the two-hander off. The tooltip still says what it would do.
+    -- You wield a two-hander: that's your choice of weapon, so nothing that takes it off is offered - no
+    -- one-hander, off-hand weapon, shield or held item. The tooltip still says what it would do.
     local mainHand = GetInventoryItemLink("player", 16)
-    if (equipLoc == "INVTYPE_SHIELD" or equipLoc == "INVTYPE_HOLDABLE" or equipLoc == "INVTYPE_WEAPONOFFHAND")
+    if (equipLoc == "INVTYPE_SHIELD" or equipLoc == "INVTYPE_HOLDABLE" or equipLoc == "INVTYPE_WEAPONOFFHAND"
+            or equipLoc == "INVTYPE_WEAPON" or equipLoc == "INVTYPE_WEAPONMAINHAND")
         and mainHand and select(4, C_Item.GetItemInfoInstant(mainHand)) == "INVTYPE_2HWEAPON" then
         return nil
     end
