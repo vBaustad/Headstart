@@ -284,7 +284,7 @@ function YR:RoutesFor(race)
     end
     -- and your own routes, saved from a run
     for _, g in ipairs(YR.shipped) do
-        if YR.IsMyRoute and YR.IsMyRoute(g.key) then set[g.key] = true end
+        if YR.MyRouteFor and YR.MyRouteFor(g.key, race) then set[g.key] = true end   -- this race's
     end
     return set
 end

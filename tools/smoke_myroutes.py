@@ -45,8 +45,11 @@ YippRouteDB = { runs = { ["Tester-Realm"] = { ev = EV } }, custom = {} }
 StaticPopupDialogs = {}
 SHIPPED = {}
 function UnitFactionGroup() return "Alliance" end
+RACE = "Dwarf"
+function UnitRace() return RACE, RACE end
 ''')
     YR = lua.table()
+    YR.shipped = lua.table()
     YR.CharKey = lua.eval("function() return 'Tester-Realm' end")
     YR.ShipGuide = lua.eval("function(self, key, text) table.insert(SHIPPED, key) end")
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
@@ -60,7 +63,7 @@ function UnitFactionGroup() return "Alliance" end
         print(("ok  " if ok else "FAIL"), what)
         bad += not ok
 
-    steps = [str(s) for s in YR.RunToSteps("Tester-Realm").values()]
+    steps = [str(s.text) for s in YR.RunToSteps("Tester-Realm").values()]
     text = "\n".join(steps)
     check(steps[0].count(".accept 183") == 1 and "Talin Keeneye" in steps[0], "a quest taken: its step, at the NPC")
     check(any(".xp 2+600 >> Grind here" in s for s in steps), "ten kills over three minutes: a grind step, to the XP after them")
@@ -73,16 +76,41 @@ function UnitFactionGroup() return "Alliance" end
     check(any(".fly Ironforge" in s for s in steps), "a flight: to where you landed")
     check(".zone " not in text.split(".fly")[0], "no travel step inside one zone")
 
-    n, name = YR.SaveRunAsRoute(None)
-    saved = g.YippRouteDB.myRoutes["Tester-Realm"]
-    check(n == len(steps) and "#subgroup My routes" in str(saved.text) and "My route (Tester)" in str(name),
-          f"saved as the character's own route: {name}, {n} steps")
-    check(list(g.SHIPPED.values()) == ["my_Tester-Realm"], "and handed on like our routes")
-    g.YippRouteDB.custom["my_Tester-Realm"] = lua.eval("{ text = 'edited' }")
+    n, parts, first, label = YR.SaveRunAsRoute(None)
+    saved = g.YippRouteDB.myRoutes["dwarfgnome"]
+    text = str(saved.parts[1].text)
+    check(n == len(steps) and parts == 1 and "#subgroup My routes" in text and "<< Alliance Dwarf/Gnome" in text
+          and "Tester" not in str(first) and "My route: Dun Morogh (Dwarf/Gnome)" in str(first),
+          f"saved for the race, not the character: {first}, {n} steps")
+    check(list(g.SHIPPED.values()) == ["my_dwarfgnome_1"], "and handed on like our routes")
+    g.YippRouteDB.custom["my_dwarfgnome_1"] = lua.eval("{ text = 'edited' }")
+    lua.execute('RACE = "Gnome"')
     YR.SaveRunAsRoute(None)
-    check(g.YippRouteDB.custom["my_Tester-Realm"] is None and len(g.SHIPPED) == 1,
-          "saving again replaces it and your edits to it (and it isn't listed twice)")
-    check(YR.IsMyRoute("my_Tester-Realm") and not YR.IsMyRoute("dunmorogh"), "own routes are told apart from ours")
+    check(g.YippRouteDB.custom["my_dwarfgnome_1"] is None and len(g.SHIPPED) == 1,
+          "a Gnome saving again replaces the Dwarf/Gnome set and your edits to it (not listed twice)")
+    lua.execute('RACE = "NightElf"')
+    YR.SaveRunAsRoute(None)
+    check(g.YippRouteDB.myRoutes["dwarfgnome"] is not None and g.YippRouteDB.myRoutes["nightelf"] is not None,
+          "a Night Elf gets its own set; the Dwarf/Gnome one stays")
+    check(YR.MyRouteFor("my_dwarfgnome_1", "Gnome") and not YR.MyRouteFor("my_nightelf_1", "Dwarf")
+          and not YR.MyRouteFor("dunmorogh", "Dwarf"), "each race sees its own set")
+
+    # one part per zone: a city on the way stays in the part around it, a short visit too
+    recs = lua.eval("""{
+        { zone = "Dun Morogh", t = 0, level = 1 }, { zone = "Dun Morogh", t = 100, level = 3 },
+        { zone = "Dun Morogh", t = 200, level = 5 }, { zone = "Dun Morogh", t = 300, level = 6 },
+        { zone = "Dun Morogh", t = 400, level = 7 }, { zone = "Dun Morogh", t = 500, level = 8 },
+        { zone = "Ironforge", t = 600, level = 11 }, { zone = "Ironforge", t = 660, level = 11 },
+        { zone = "Loch Modan", t = 900, level = 11 }, { zone = "Loch Modan", t = 1000, level = 12 },
+        { zone = "Loch Modan", t = 1100, level = 12 }, { zone = "Loch Modan", t = 1200, level = 13 },
+        { zone = "Loch Modan", t = 1300, level = 13 }, { zone = "Loch Modan", t = 1400, level = 14 },
+        { zone = "Dun Morogh", t = 1500, level = 14 }, { zone = "Dun Morogh", t = 1520, level = 14 },
+        { zone = "Loch Modan", t = 1600, level = 14 },
+    }""")
+    split = YR.SplitByZone(recs)
+    zones = [(str(p.zone), len(p.steps)) for p in split.values()]
+    check(zones == [("Dun Morogh", 8), ("Loch Modan", 9)],
+          f"Dun Morogh (Ironforge in it), then Loch Modan (a short way back through Dun Morogh in it): {zones}")
     return bad
 
 

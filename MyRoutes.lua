@@ -1,46 +1,87 @@
 -- Your own route from what you played (the user, 2026-10-04): "Save as route" on This run turns this
--- character's recorded run into a route like ours, step by step, and it is yours to change in the
--- Routes page (drag to reorder, edit any line, delete) and to play in RestedXP (Headstart Launch, My
--- routes). One per character: saving again replaces it, your edits to it too. The routes we ship stay
--- as they are.
+-- character's recorded run into routes like ours, step by step, yours to change in the Routes page
+-- (drag to reorder, edit any line, delete) and to play in RestedXP (Headstart Launch, My routes).
+--
+-- One part per zone you levelled in, chained like ours (#next), named by levels, zone and race
+-- ("1-6 My route: Dun Morogh (Dwarf/Gnome)"), never by character: a route doesn't depend on who saved
+-- it. A short visit somewhere else (a city, a few steps in a zone on the way) stays in the part around
+-- it. One set per race, Dwarves and Gnomes sharing (they start in the same place): saving again from
+-- any character of that race replaces the set, your edits to it too; other races' sets and the routes
+-- we ship stay as they are.
 --
 -- A step is a stop: the quests taken and handed in at one NPC; an objective finished; a trainer (and
 -- what you learned); a vendor (and what you bought); a flight; the hearthstone; a death skip (a death
 -- you came back from somewhere else); a longer stretch of killing with no quest progress (a grind, to
--- the XP you had at its end); a new zone. YippRouteDB.myRoutes[character] = { name = ..., text = ... }.
+-- the XP you had at its end); a new zone.
+-- YippRouteDB.myRoutes[race group] = { parts = { { key, name, text } } }. (A first version kept one
+-- route per character, { name, text } under the character's name: those still load as they were.)
 local _, YR = ...
 
 local KEY = "my_"
+-- race -> the set it shares, and how RestedXP and people write it
+local GROUP = {
+    Dwarf = { slug = "dwarfgnome", label = "Dwarf/Gnome", filter = "Dwarf/Gnome" },
+    Gnome = { slug = "dwarfgnome", label = "Dwarf/Gnome", filter = "Dwarf/Gnome" },
+    Human = { slug = "human", label = "Human", filter = "Human" },
+    NightElf = { slug = "nightelf", label = "Night Elf", filter = "NightElf" },
+    Orc = { slug = "orctroll", label = "Orc/Troll", filter = "Orc/Troll" },
+    Troll = { slug = "orctroll", label = "Orc/Troll", filter = "Orc/Troll" },
+    Tauren = { slug = "tauren", label = "Tauren", filter = "Tauren" },
+    Scourge = { slug = "undead", label = "Undead", filter = "Undead" },
+}
+-- never a part of their own: passed through on the way somewhere
+local CITY = { ["Ironforge"] = true, ["Stormwind City"] = true, ["Darnassus"] = true, ["Deeprun Tram"] = true,
+    ["Orgrimmar"] = true, ["Thunder Bluff"] = true, ["Undercity"] = true }
+local MIN_STEPS, MIN_SECONDS = 6, 600      -- less than this in a zone is a visit, not a part
 
 local function Mine()
     YippRouteDB.myRoutes = YippRouteDB.myRoutes or {}
     return YippRouteDB.myRoutes
 end
 
-function YR.MyRouteKey(char) return KEY .. (char or YR.CharKey()) end
+local function Group(race)
+    if not race then
+        local _
+        _, race = UnitRace("player")
+    end
+    return GROUP[race] or { slug = (race or "unknown"):lower(), label = race or "?", filter = race }
+end
+
 function YR.IsMyRoute(key) return type(key) == "string" and key:sub(1, #KEY) == KEY end
 
+-- Is this own route one for this race? (A first-version one is the character's own.)
+function YR.MyRouteFor(key, race)
+    if not YR.IsMyRoute(key) then return false end
+    local g = Group(race)
+    return key:sub(1, #KEY + #g.slug + 1) == KEY .. g.slug .. "_" or key == KEY .. YR.CharKey()
+end
+
 -- Every saved own route becomes a route like ours (YR.shipped) before routes are handed to RestedXP,
--- so the editor, export and RestedXP treat it the same. Called by YR:RegisterGuides.
+-- so the editor, export and RestedXP treat it the same. Called by YR:RegisterGuides, and after a save
+-- (the editor sees it at once, RestedXP after a reload).
 local shipped = {}
+local function Ship(key, text)
+    if not shipped[key] then
+        shipped[key] = true
+        YR:ShipGuide(key, text)
+    end
+    for _, g in ipairs(YR.shipped or {}) do
+        if g.key == key then g.text = text end
+    end
+end
+
 function YR.ShipMyRoutes()
-    for char, r in pairs(Mine()) do
-        local key = YR.MyRouteKey(char)
-        if type(r) == "table" and type(r.text) == "string" then
-            if not shipped[key] then
-                shipped[key] = true
-                YR:ShipGuide(key, r.text)
-            end
-            -- saved again this session: the editor shows the new one at once (RestedXP after a reload)
-            for _, g in ipairs(YR.shipped or {}) do
-                if g.key == key then g.text = r.text end
-            end
+    for owner, r in pairs(Mine()) do
+        if type(r) == "table" and type(r.parts) == "table" then
+            for _, p in ipairs(r.parts) do Ship(p.key, p.text) end
+        elseif type(r) == "table" and type(r.text) == "string" then
+            Ship(KEY .. owner, r.text)
         end
     end
 end
 
 -- ---------------------------------------------------------------------------
--- The run -> steps
+-- The run -> steps: { { text, zone, level, t } }
 -- ---------------------------------------------------------------------------
 local function At(e)
     if not e[6] or e[6] == 0 or not e[7] then return "" end
@@ -78,13 +119,20 @@ function YR.RunToSteps(char)
 
     local steps, visit, lastMap, handedIn = {}, nil, nil, {}
     local kills, killFrom, lastKill, killAt = 0, nil, nil, nil
+    local cur = { zone = nil, level = 1, t = 0 }
 
     local function Push(text, e)
+        if e then
+            cur.zone = zoneOf[e] or cur.zone
+            cur.level = e[4] or cur.level
+            cur.t = e[1] or cur.t
+        end
         if e and e[6] and e[6] ~= 0 and lastMap and e[6] ~= lastMap and zoneOf[e] then
-            steps[#steps + 1] = ("step\n    .zone %s >> Travel to %s"):format(zoneOf[e], zoneOf[e])
+            steps[#steps + 1] = { text = ("step\n    .zone %s >> Travel to %s"):format(zoneOf[e], zoneOf[e]),
+                zone = cur.zone, level = cur.level, t = cur.t }
         end
         if e and e[6] and e[6] ~= 0 then lastMap = e[6] end
-        steps[#steps + 1] = text
+        steps[#steps + 1] = { text = text, zone = cur.zone, level = cur.level, t = cur.t }
     end
     -- a stop at one NPC: its lines gathered, written when the next thing happens elsewhere
     local function Flush()
@@ -104,7 +152,7 @@ function YR.RunToSteps(char)
             lines[#lines + 1] = "\n    .vendor >> Sell your junk"
         end
         if #lines == 0 then return end
-        Push("step" .. (v.optional and "\n    #optional" or "") .. At(v.e) .. Talk(v.npc) .. table.concat(lines)
+        Push("step" .. At(v.e) .. Talk(v.npc) .. table.concat(lines)
             .. (v.npc and ("\n    .target " .. v.npc) or ""), v.e)
     end
     -- the same stop: the same NPC (or none noted: the log doesn't always have it for a pick-up), close
@@ -220,48 +268,101 @@ function YR.RunToSteps(char)
 end
 
 -- ---------------------------------------------------------------------------
--- Saving
+-- Steps -> one part per zone
 -- ---------------------------------------------------------------------------
-local function Levels(char)
-    local run = YippRouteDB.runs and YippRouteDB.runs[char]
-    local lo, hi
-    for _, e in ipairs(run and run.ev or {}) do
-        if e[4] then lo = math.min(lo or e[4], e[4]) hi = math.max(hi or e[4], e[4]) end
+-- { { zone, steps = { step records } } }: runs of steps in one zone; a city, an unknown zone or a short
+-- run (fewer than MIN_STEPS steps and under MIN_SECONDS) joins the part before it (the first: the next).
+function YR.SplitByZone(steps)
+    local runs = {}
+    for _, s in ipairs(steps) do
+        local last = runs[#runs]
+        if last and last.zone == s.zone then
+            last.steps[#last.steps + 1] = s
+        else
+            runs[#runs + 1] = { zone = s.zone, steps = { s } }
+        end
     end
-    return lo or 1, hi or 1
+    local function Visit(r)
+        return not r.zone or CITY[r.zone]
+            or (#r.steps < MIN_STEPS and (r.steps[#r.steps].t or 0) - (r.steps[1].t or 0) < MIN_SECONDS)
+    end
+    local parts = {}
+    for _, r in ipairs(runs) do
+        local last = parts[#parts]
+        if last and (Visit(r) or last.zone == r.zone) then
+            for _, s in ipairs(r.steps) do last.steps[#last.steps + 1] = s end
+        elseif not last and Visit(r) then
+            parts[1] = { zone = nil, steps = r.steps, pending = true }
+        elseif last and last.pending then
+            -- what came before the first real part belongs to it
+            for _, s in ipairs(r.steps) do last.steps[#last.steps + 1] = s end
+            last.zone, last.pending = r.zone, nil
+        else
+            parts[#parts + 1] = { zone = r.zone, steps = r.steps }
+        end
+    end
+    return parts
 end
 
-function YR.MyRouteName(char)
-    char = char or YR.CharKey()
-    local lo, hi = Levels(char)
-    return ("%d-%d My route (%s)"):format(lo, hi, (char:match("^[^-]+")) or char)
-end
+function YR.HasMyRoute(race) return Mine()[Group(race).slug] ~= nil end
 
-function YR.HasMyRoute(char) return Mine()[char or YR.CharKey()] ~= nil end
-
--- This character's run as its route: replaces the one saved before, and any edits to it. Returns the
--- number of steps, or nil and why not.
-function YR.SaveRunAsRoute(char)
+-- This character's run as its race's routes: replaces that race's set saved before, and any edits to
+-- it. Returns the number of steps and of parts, or nil and why not.
+function YR.SaveRunAsRoute(char, race)
     char = char or YR.CharKey()
+    local g = Group(race)
     local steps = YR.RunToSteps(char)
     if #steps == 0 then return nil, "nothing recorded for this character yet" end
-    local name = YR.MyRouteName(char)
-    local header = table.concat({ "#forever", "#version 1", "<< " .. (UnitFactionGroup("player") or "Alliance"),
-        "#group Headstart Launch (A)", "#subgroup My routes", "#name " .. name }, "\n")
-    Mine()[char] = { name = name, text = header .. "\n" .. table.concat(steps, "\n") .. "\n" }
-    if YippRouteDB.custom then YippRouteDB.custom[YR.MyRouteKey(char)] = nil end
+    local parts = YR.SplitByZone(steps)
+    local faction = UnitFactionGroup("player") or "Alliance"
+    local groupName = faction == "Horde" and "Headstart Launch (H)" or "Headstart Launch (A)"
+    -- names: levels, zone, race; the same twice gets a number
+    local names, used = {}, {}
+    for i, p in ipairs(parts) do
+        local lo, hi = p.steps[1].level or 1, p.steps[#p.steps].level or 1
+        local name = ("%d-%d My route: %s (%s)"):format(lo, hi, p.zone or "the start", g.label)
+        if used[name] then name = name .. " " .. (used[name] + 1) end
+        used[name] = (used[name] or 0) + 1
+        names[i] = name
+    end
+    local saved = {}
+    for i, p in ipairs(parts) do
+        local lines = {}
+        for _, s in ipairs(p.steps) do lines[#lines + 1] = s.text end
+        local header = { "#forever", "#version 1", "<< " .. faction .. " " .. g.filter, "#group " .. groupName,
+            "#subgroup My routes", "#name " .. names[i] }
+        if names[i + 1] then header[#header + 1] = "#next " .. names[i + 1] end
+        saved[i] = { key = ("%s%s_%d"):format(KEY, g.slug, i), name = names[i],
+            text = table.concat(header, "\n") .. "\n" .. table.concat(lines, "\n") .. "\n" }
+    end
+    -- the old set and its edits go; parts it had beyond the new ones leave the editor's list too
+    local keep = {}
+    for _, p in ipairs(saved) do keep[p.key] = true end
+    local prefix = KEY .. g.slug .. "_"
+    for key in pairs(YippRouteDB.custom or {}) do
+        if key:sub(1, #prefix) == prefix then YippRouteDB.custom[key] = nil end
+    end
+    for i = #(YR.shipped or {}), 1, -1 do
+        local k = YR.shipped[i].key
+        if k:sub(1, #prefix) == prefix and not keep[k] then
+            table.remove(YR.shipped, i)
+            shipped[k] = nil
+        end
+    end
+    Mine()[g.slug] = { parts = saved }
     YR.ShipMyRoutes()
-    return #steps, name
+    return #steps, #saved, names[1], g.label
 end
 
 StaticPopupDialogs["HEADSTART_SAVE_RUN_ROUTE"] = {
-    text = "Headstart: save this run as your route?%s",
+    text = "Headstart: save this run as your %s route?%s",
     button1 = "Save",
     button2 = "Cancel",
     OnAccept = function()
-        local n, name = YR.SaveRunAsRoute()
-        if not n then YR.Print("couldn't save the route: " .. tostring(name)) return end
-        YR.Print(("saved %s: %d steps. Reload to play it in RestedXP (Headstart Launch, My routes); edit it in Routes."):format(name, n))
+        local n, parts, first, label = YR.SaveRunAsRoute()
+        if not n then YR.Print("couldn't save the route: " .. tostring(parts)) return end
+        YR.Print(("saved your %s route: %d steps in %d part%s, from %s. Reload to play it in RestedXP"
+            .. " (Headstart Launch, My routes); edit it in Routes."):format(label, n, parts, parts == 1 and "" or "s", first))
         StaticPopup_Show("HEADSTART_RELOAD")
     end,
     timeout = 0,
@@ -270,6 +371,7 @@ StaticPopupDialogs["HEADSTART_SAVE_RUN_ROUTE"] = {
 }
 
 function YR.AskSaveRunAsRoute()
-    StaticPopup_Show("HEADSTART_SAVE_RUN_ROUTE",
-        YR.HasMyRoute() and "\n\nIt replaces the route you saved from this character before, and your edits to it." or "")
+    local g = Group()
+    StaticPopup_Show("HEADSTART_SAVE_RUN_ROUTE", g.label,
+        YR.HasMyRoute() and ("\n\nIt replaces the %s route you saved before, and your edits to it."):format(g.label) or "")
 end
