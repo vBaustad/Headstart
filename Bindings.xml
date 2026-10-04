@@ -5,4 +5,19 @@
 	<Binding name="HEADSTART_LEAVE" category="ADDONS">
 		Headstart_LeaveGroup()
 	</Binding>
+	<Binding name="HEADSTART_GEARSET1" category="ADDONS">
+		Headstart_GearSet(1)
+	</Binding>
+	<Binding name="HEADSTART_GEARSET2" category="ADDONS">
+		Headstart_GearSet(2)
+	</Binding>
+	<Binding name="HEADSTART_GEARSET3" category="ADDONS">
+		Headstart_GearSet(3)
+	</Binding>
+	<Binding name="HEADSTART_GEARSET4" category="ADDONS">
+		Headstart_GearSet(4)
+	</Binding>
+	<Binding name="HEADSTART_GEARSET5" category="ADDONS">
+		Headstart_GearSet(5)
+	</Binding>
 </Bindings>

@@ -36,6 +36,7 @@ Data\TrainerSpells.lua
 Reminders.lua
 Sim.lua
 Upgrades.lua
+Trinkets.lua
 PartyQuests.lua
 QuickGroup.lua
 Data\Consumables.lua

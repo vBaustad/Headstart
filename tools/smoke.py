@@ -88,7 +88,8 @@ GameTooltip = setmetatable({}, { __index = function() return function() end end 
 function hooksecurefunc(a, b, c) if c then HOOKS[b] = c else HOOKS[a] = b end end
 -- bags (BAGS[bag * 100 + slot] = { itemID, stackCount }) and a vendor window
 BAGS = {}
-C_Container = { UseContainerItem = function() end, GetContainerNumSlots = function() return 16 end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end }
+C_Container = { UseContainerItem = function() end, GetContainerNumSlots = function() return 16 end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end,
+    GetContainerItemID = function(bag, slot) local i = BAGS[bag * 100 + slot] return i and i.itemID end }
 MerchantFrame = { shown = false, IsShown = function(self) return self.shown end }
 DONE = {}
 -- the party: SENT collects addon messages; IN_GROUP / PARTY_NAMES say who is in it
@@ -644,7 +645,7 @@ check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a 
 YR.RevertGuide(YR, "coldridge")
 YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
 check(len(g.SEEN_ICONS) == 0, "Settings builds a page the first time it's opened: the trainer's isn't yet")
-for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "character", "trainer", "route"):
+for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "trinkets", "character", "trainer", "route"):
     YR.ShowSettingsTab(YR, key)        # every page builds, and fills, without an error
 icons = [g.SEEN_ICONS[i] for i in range(1, len(g.SEEN_ICONS) + 1)]
 check(any("Seal of" in t or "Holy Light" in t for t in icons), f"trainer rows carry the spell's icon: {icons[:2]}")
@@ -1037,6 +1038,8 @@ import smoke_stepkeeper
 bad += smoke_stepkeeper.run()
 import smoke_myroutes
 bad += smoke_myroutes.run()
+import smoke_trinkets
+bad += smoke_trinkets.run()
 import smoke_skipquests
 bad += smoke_skipquests.run()
 sys.exit(1 if bad else 0)

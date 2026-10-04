@@ -61,6 +61,11 @@ SlashCmdList.HEADSTART = function(msg)
         YR.OpenPlanner()
     elseif cmd == "inv" or cmd == "invite" then
         YR.InviteTarget()
+    elseif cmd == "gear" then
+        YR.UseGearSet(arg)
+    elseif cmd == "trinkets" then
+        YippRouteDB.trinketBar = not YR.Option("trinketBar")
+        YR.ShowTrinketBar(YR.Option("trinketBar"))
     elseif cmd == "leave" then
         YR.LeaveGroup()
     elseif cmd == "mail" then
@@ -120,6 +125,7 @@ f:SetScript("OnEvent", function(self, _, name)
     YR.StartReminders()
     YR.StartSim()
     YR.StartUpgrades()
+    YR.StartTrinkets()
     YR.StartCraftRemind()
     YR.StartQuickGroup()
     YR:BuildMinimapButton()

@@ -1785,7 +1785,7 @@ local function QoLPage(key, build)
         local Section, Row = L.Section, L.Row
         local function Opt(k) return function() return YR.Option(k) end end
         build(L, c, Section, Row, Opt)
-        if key ~= "gear" then
+        if key ~= "gear" and key ~= "trinkets" then     -- those two end with a list of their own
             L.Break()
             c:SetHeight(-L.y + 40)
         end
@@ -2068,6 +2068,161 @@ end)
 -- ---------------------------------------------------------------------------
 -- Settings: a menu down the left, grouped, and one page at a time beside it under its own heading
 -- ---------------------------------------------------------------------------
+-- Trinkets & sets: the buttons, swap trinkets for me with its order, the swaps when mounted or
+-- swimming, and the keys for the game's equipment sets. The order is a list of its own after the cards.
+local trink = {}
+local MAX_TRINKETS = 14
+
+local function TrinketsHave()
+    -- the order first (numbered), then the other trinkets you wear or carry
+    local db, out, seen = YR.TrinketDB(), {}, {}
+    for _, id in ipairs(db.order) do out[#out + 1] = { id = id, listed = true } seen[id] = true end
+    local function Add(id)
+        if id and not seen[id] then
+            local _, _, _, loc = C_Item.GetItemInfoInstant(id)
+            if loc == "INVTYPE_TRINKET" then out[#out + 1] = { id = id } seen[id] = true end
+        end
+    end
+    Add(GetInventoryItemID("player", 13))
+    Add(GetInventoryItemID("player", 14))
+    for bag = 0, NUM_BAG_SLOTS or 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do Add(C_Container.GetContainerItemID(bag, slot)) end
+    end
+    return out
+end
+
+local function RefreshTrinkets()
+    if not trink.rows then return end
+    local have = TrinketsHave()
+    local n = 0
+    for i, e in ipairs(have) do
+        if i > MAX_TRINKETS then break end
+        n = i
+        local r = trink.rows[i]
+        r.id = e.id
+        r.num:SetText(e.listed and tostring(i) or "")
+        r.icon:SetTexture(C_Item.GetItemIconByID and C_Item.GetItemIconByID(e.id))
+        local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(e.id)
+        if not name and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(e.id) end
+        r.name:SetText(name or ("item " .. e.id))
+        r.name:SetTextColor(unpack(e.listed and S.C.text or S.C.muted))
+        r.up:SetShown(e.listed and i > 1)
+        r.down:SetShown(e.listed and have[i + 1] ~= nil and have[i + 1].listed == true)
+        r.toggle.text:SetText(e.listed and "Take off the list" or "Add to the list")
+        r:Show()
+    end
+    for i = n + 1, #trink.rows do trink.rows[i]:Hide() end
+    trink.none:SetShown(n == 0)
+    if YR.TrinketPaint then YR.TrinketPaint() end
+end
+
+local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
+        Section("Trinket buttons", "click one for your other trinkets", { icon = 133434,
+            master = { Opt("trinketBar"), function(on) YippRouteDB.trinketBar = on YR.ShowTrinketBar(on) end } })
+        Row("How they work", S.Text(c, 12, S.C.muted),
+            "Two buttons on screen, one per trinket slot, with its cooldown. Click one: the trinkets in your bags,"
+            .. " and a click on one of those puts it in that slot (in a fight: as soon as it ends). Right-click a"
+            .. " button to use the trinket in it. A right-click in the list puts a trinket in your swap order or"
+            .. " takes it out. Nothing opens when the mouse only goes past")
+        Row("Lock in place", S.Switch(c, Opt("trinketBarLocked"), function(on) YippRouteDB.trinketBarLocked = on end),
+            "Unlocked, drag the buttons where you want them")
+
+        Section("Swap trinkets for me", "your trinkets in the order below", { icon = 133437,
+            master = { Opt("trinketAuto"), function(on) YippRouteDB.trinketAuto = on if YR.TrinketPaint then YR.TrinketPaint() end end } })
+        Row("How it swaps", S.Text(c, 12, S.C.muted),
+            "When the trinket you wear has been used, the first ready one in your order goes in instead, and a"
+            .. " higher one goes back as soon as it's ready again. A trinket you put on yourself that isn't in the"
+            .. " order is left alone, so a swap by hand stays. Trinkets can't be changed in a fight: a swap waits"
+            .. " for it to end. A green dot on a button: it looks after that slot")
+        local function SlotSwitch(slot)
+            return S.Switch(c, function() return YR.TrinketDB().auto[slot] ~= false end,
+                function(on) YR.TrinketDB().auto[slot] = on and nil or false if YR.TrinketPaint then YR.TrinketPaint() end end)
+        end
+        Row("The top trinket slot", SlotSwitch(13))
+        Row("The bottom trinket slot", SlotSwitch(14), "Off: that slot keeps what you put in it")
+
+        Section("Swap when...", "and back after", { icon = 132239 })
+        local carrot = C_Item.GetItemNameByID and C_Item.GetItemNameByID(11122) or "Carrot on a Stick"
+        Row("Mounted: " .. carrot, S.Switch(c, Opt("trinketMount"), function(on) YippRouteDB.trinketMount = on end),
+            "While you ride, Carrot on a Stick (faster mount) goes in a trinket slot, and the trinket you wore goes"
+            .. " back when you get off. Only if you carry one")
+        local SLOT_CHOICE = { { 13, "Top trinket slot" }, { 14, "Bottom trinket slot" } }
+        local slotDrop
+        slotDrop = S.Dropdown(c, 170, SLOT_CHOICE, function(v) YippRouteDB.trinketMountSlot = v slotDrop:Refresh() end)
+        function slotDrop:Refresh()
+            for _, o in ipairs(SLOT_CHOICE) do if o[1] == (YippRouteDB.trinketMountSlot or 14) then self:SetValue(o[2]) end end
+        end
+        Row("Into", slotDrop)
+        Row("Swimming", S.Switch(c, function() return YippRouteDB.trinketSwim == true end,
+            function(on) YippRouteDB.trinketSwim = on end), "An item of your choice while you swim (a trinket, boots, a helm"
+            .. " ...), and what you wore goes back when you're out of the water")
+        local swim = S.Input(c, { width = 200, placeholder = "Shift-click the item", onCommit = function(t)
+            YippRouteDB.trinketSwimItem = YR.ItemFromText(t)
+            YR:RefreshWindow()
+        end })
+        function swim:Refresh()
+            if self:HasFocus() then return end
+            local id = YippRouteDB.trinketSwimItem
+            self:SetValue(id and (C_Item.GetItemNameByID and C_Item.GetItemNameByID(id) or ("item " .. id)) or "")
+        end
+        hooksecurefunc("HandleModifiedItemClick", function(link)
+            if swim:HasFocus() and IsShiftKeyDown() and link then swim:SetValue(link) end
+        end)
+        Row("Item to swim in", swim)
+
+        Section("Equipment sets", "the game's own, on keys", { icon = 132739 })
+        local sets = S.Text(c, 12)
+        sets:SetJustifyH("RIGHT")
+        sets:SetWidth(320)
+        function sets:Refresh()
+            local list = YR.GearSets()
+            local parts = {}
+            for i, s in ipairs(list) do if i <= 5 then parts[#parts + 1] = i .. ": " .. s.name end end
+            self:SetText(#parts > 0 and table.concat(parts, "   ") or "none yet")
+        end
+        Row("Your sets", sets, "Make sets in the character window's equipment manager. The first five get keys:"
+            .. " Esc > Options > Key Bindings > AddOns > Headstart, \"Equipment set 1\" to 5. Or /headstart gear and the"
+            .. " set's name or number. In a fight it goes on as soon as the fight ends")
+
+        L.Break()
+        local y = L.y - 6
+        local head = S.Text(c, 14)
+        head:SetPoint("TOPLEFT", 4, y)
+        head:SetText("Your swap order")
+        local sub = S.Text(c, 11, S.C.muted)
+        sub:SetPoint("LEFT", head, "RIGHT", 10, 0)
+        sub:SetText("numbered: in the order, first is most wanted. Grey: not in it")
+        y = y - 26
+        trink.rows = {}
+        for i = 1, MAX_TRINKETS do
+            local r = CreateFrame("Frame", nil, c)
+            r:SetSize(L.colW, 32)
+            r:SetPoint("TOPLEFT", 0, y - (i - 1) * 34)
+            S.Fill(r, i % 2 == 1 and S.C.card or ZEBRA)
+            r.num = S.Text(r, 13, S.C.accent)
+            r.num:SetPoint("LEFT", 12, 0)
+            r.icon = r:CreateTexture(nil, "ARTWORK")
+            r.icon:SetSize(24, 24)
+            r.icon:SetPoint("LEFT", 34, 0)
+            r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            r.name = S.Text(r, 13)
+            r.name:SetPoint("LEFT", r.icon, "RIGHT", 10, 0)
+            r.toggle = S.Button(r, "Add to the list", function()
+                YR.TrinketToggleList(r.id) RefreshTrinkets() end, nil, 140)
+            r.toggle:SetPoint("RIGHT", -10, 0)
+            r.down = S.IconButton(r, "down", function() YR.TrinketMove(r.id, 1) RefreshTrinkets() end, "Lower", S.C.text, 24)
+            r.down:SetPoint("RIGHT", r.toggle, "LEFT", -6, 0)
+            r.up = S.IconButton(r, "up", function() YR.TrinketMove(r.id, -1) RefreshTrinkets() end, "Higher", S.C.text, 24)
+            r.up:SetPoint("RIGHT", r.down, "LEFT", -2, 0)
+            r:Hide()
+            trink.rows[i] = r
+        end
+        trink.none = S.Text(c, 12, S.C.muted)
+        trink.none:SetPoint("TOPLEFT", 12, y - 8)
+        trink.none:SetText("No trinkets on you or in your bags yet.")
+        c:SetHeight(-y + MAX_TRINKETS * 34 + 40)
+end)
+
 local function QoLRefresh(key, extra)
     return function()
         for _, ctl in ipairs(qolPages[key].controls) do if ctl.Refresh then ctl:Refresh() end end
@@ -2095,6 +2250,10 @@ local CATEGORIES = {
     { key = "gear", label = "Gear & rewards", build = BuildGear, refresh = QoLRefresh("gear", RefreshRewards), icon = 132739,
       status = function() return YR.Option("simTooltip") or YR.Option("upgrades") end, scope = "Every character; quest rewards per class",
       desc = "Better gear in your bags pointed out, and quest rewards picked for you." },
+    { key = "trinkets", label = "Trinkets & sets", build = BuildTrinkets, refresh = QoLRefresh("trinkets", RefreshTrinkets),
+      icon = 133434, status = function() return YR.Option("trinketBar") or YR.Option("trinketAuto") end,
+      scope = "Every character; the swap order per character",
+      desc = "Trinket buttons with your others a click away, trinkets swapped as they're used, and keys for your gear sets." },
     { group = "Character" },
     { key = "character", label = "Character setup", build = BuildSetup, refresh = RefreshSetup, icon = 134166,
       scope = function() return "Every " .. (CLASS_NAME[ViewClass()] or "character") .. "; chat and Edit Mode for all" end,
