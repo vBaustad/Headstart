@@ -118,6 +118,39 @@ function UnitRace() return RACE, RACE end
     zones = [(str(p.zone), len(p.steps)) for p in split.values()]
     check(zones == [("Dun Morogh", 8), ("Loch Modan", 9)],
           f"Dun Morogh (Ironforge in it), then Loch Modan (a short way back through Dun Morogh in it): {zones}")
+    # a run that followed one of our routes: our steps as written, in the order played, without the
+    # ones skipped; what our route doesn't have, made from the log
+    lua.execute(r"""
+ROUTE = { "step\n    .goto 1426,22.6,71.3\n    .accept 183 >> Accept The Boar Hunter",
+          "step\n    #label Boars\n    .complete 183,1\n    .mob Small Crag Boar",
+          "step\n    .xp 2+500 >> Grind to 500 XP",
+          "step\n    #requires Gone\n    .accept 999 >> Accept something skipped",
+          "step\n    #completewith Gone\n    .turnin 183 >> Turn in The Boar Hunter" }
+YippRouteDB.runs["Follow-Realm"] = { ev = {
+    { 0, "zone", nil, 1, 0, 1426, 22, 71, zone = "Dun Morogh" },
+    { 1, "step", nil, 1, 0, 1426, 22, 71, guide = "01-05 Coldridge Valley (Launch)", step = 1 },
+    { 10, "accept", 183, 1, 0, 1426, 22.6, 71.3, npc = "Talin Keeneye", title = "The Boar Hunter", obj = 1 },
+    { 100, "step", nil, 2, 0, 1426, 23, 70, guide = "01-05 Coldridge Valley (Launch)", step = 5 },
+    { 200, "complete", 183, 2, 600, 1426, 22.6, 71.2 },
+    { 300, "turnin", 183, 2, 600, 1426, 22.6, 71.3, npc = "Talin Keeneye" },
+    { 400, "accept", 182, 2, 850, 1426, 25, 75, npc = "Grelin Whitebeard", title = "The Troll Cave", obj = 1 },
+} }
+""")
+    YR.shipped = lua.eval('{ { key = "coldridge", text = "" } }')
+    YR.GuideName = lua.eval('function(key) return "1-5 Coldridge Valley (Launch)" end')
+    YR.CharSteps = lua.eval('function(key) return ROUTE end')
+    routed = [str(r.text) for r in YR.RunToRouteSteps("Follow-Realm").values()]
+    check(len(routed) == 5 and routed[0] == str(g.ROUTE[1]) and routed[2] == str(g.ROUTE[3]),
+          f"our steps as written, in order: {len(routed)}")
+    check(not any("999" in t for t in routed), "a step whose quest you never did is left out")
+    check("#completewith next" in routed[3] and "#requires" not in "".join(routed),
+          "labels that point at a step left out: #completewith becomes next, #requires goes")
+    check(".accept 182" in routed[4] and "Grelin Whitebeard" in routed[4], "a quest our route hasn't: made from the log")
+
+    lua.execute('RACE = "Dwarf"')
+    gone = YR.DeleteMyRoutes(None)
+    check(gone == 1 and g.YippRouteDB.myRoutes["dwarfgnome"] is None and g.YippRouteDB.myRoutes["nightelf"] is not None,
+          "delete: this race's route goes, the others stay")
     return bad
 
 

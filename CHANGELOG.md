@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Save as route, made like ours:** a run that followed our routes becomes a route of our own steps, as we wrote them (level gates, conditions, waypoints, notes), in the order you played them; the steps you skipped are left out, and what you did that our route doesn't have gets a step of its own from the log. A run that didn't follow one of our routes is made from the log as before. And **Delete my route** on This run takes your saved route for this race away (asks first; your run log stays).
+
 - Save as route: far fewer "Grind here" steps. Kills an objective then finishes are that quest's work, and killing your way along to the next stop is no step; a grind is only a stretch of at least 10 kills over 3 minutes in one small area right before your next stop.
 
 - Death skips: Headstart now accepts the resurrection at the Spirit Healer itself when the death was a death skip. RestedXP only does it while its death-skip step is still the active one, and several end as soon as you arrive (the Kharanos ones end on entering Kharanos, where the healer stands), so sometimes nothing happened. Any other death is still left to you.

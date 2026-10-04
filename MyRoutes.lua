@@ -282,6 +282,120 @@ function YR.RunToSteps(char)
 end
 
 -- ---------------------------------------------------------------------------
+-- A run that followed one of our routes: its steps, as we wrote them
+-- ---------------------------------------------------------------------------
+-- The log notes the route step you were on ("step": route name and number). A run made on our routes
+-- becomes a route of our steps, as written (level gates, conditions, waypoints, notes), in the order
+-- you did them (the user, 2026-10-04: "as good as the one we made"):
+--   * a step with quests in it: kept when you took, finished or handed in one of them, at that moment;
+--   * a step without (travel, trainer, a grind to a level, a death skip): kept when it lies within the
+--     part of that route you played, after the step before it;
+--   * a quest you did that no kept step has: a step of its own, made from the log as for any run.
+-- Labels that point at a step that didn't make it: "#requires" goes, "#completewith" becomes "next".
+local function Plain(s)
+    s = s:gsub("%f[%d]0+(%d)", "%1")
+    return (s:gsub(" %((%a+) [ABC]%)$", ""))          -- a role version ("(Duo B)") is its route
+end
+
+local function QuestsOf(step)
+    local out = {}
+    for kind, q in step:gmatch("\n%s*%.(%a+)%s+(%d+)") do
+        if kind == "accept" or kind == "turnin" or kind == "complete" then out[#out + 1] = { kind, tonumber(q) } end
+    end
+    return out
+end
+
+function YR.RunToRouteSteps(char)
+    local run = YippRouteDB.runs and YippRouteDB.runs[char or YR.CharKey()]
+    local ev = run and run.ev or {}
+    if not YR.CharSteps then return nil end
+    local keyOf = {}
+    for _, g in ipairs(YR.shipped or {}) do
+        if not YR.IsMyRoute(g.key) then keyOf[YR.GuideName(g.key)] = g.key end
+    end
+    -- where you were on each route, and when you did what with each quest
+    local visited, order, did, zone, level = {}, {}, {}, nil, 1
+    local timeline = {}
+    for _, e in ipairs(ev) do
+        if e[2] == "zone" and e.zone and e.zone ~= "" then zone = e.zone end
+        level = e[4] or level
+        timeline[#timeline + 1] = { t = e[1], zone = zone, level = level }
+        if e[2] == "step" and type(e.guide) == "string" and tonumber(e.step) then
+            local key = keyOf[Plain(e.guide)]
+            if key then
+                if not visited[key] then visited[key] = {} order[#order + 1] = key end
+                local v = visited[key]
+                local n = tonumber(e.step)
+                v[n] = v[n] or e[1]
+                v.lo, v.hi = math.min(v.lo or n, n), math.max(v.hi or n, n)
+            end
+        elseif (e[2] == "accept" or e[2] == "turnin" or e[2] == "complete") and e[3] then
+            did[e[2] .. e[3]] = did[e[2] .. e[3]] or e[1]
+        end
+    end
+    if #order == 0 then return nil end
+    local function At(t)
+        local found = timeline[1] or { zone = nil, level = 1 }
+        for _, p in ipairs(timeline) do
+            if p.t > t then break end
+            found = p
+        end
+        return found.zone, found.level
+    end
+
+    local kept, covered, labels = {}, {}, {}
+    for r, key in ipairs(order) do
+        local v = visited[key]
+        local steps = YR.CharSteps(key)
+        local lastT = nil
+        for i = v.lo, math.min(v.hi, #steps) do
+            local text = steps[i]
+            local qs = QuestsOf("\n" .. text)
+            local t
+            if #qs > 0 then
+                for _, a in ipairs(qs) do
+                    local when = did[a[1] .. a[2]]
+                    if when and (not t or when < t) then t = when end
+                end
+            else
+                -- right after the step before it in the route (step numbers in an older log can be off
+                -- by a few after an update; the step before it is where it belongs either way)
+                t = lastT or v[v.lo]
+            end
+            if t then
+                -- tie-break in route order, and routes in the order you came to them
+                kept[#kept + 1] = { text = text, t = t, ord = r * 100000 + i }
+                for _, a in ipairs(qs) do covered[a[2]] = true end
+                for label in text:gmatch("#label%s+(%S+)") do labels[label] = true end
+                lastT = t
+            end
+        end
+    end
+    -- what you did that our steps don't have
+    for _, s in ipairs(YR.RunToSteps(char)) do
+        local qs = QuestsOf("\n" .. s.text)
+        local new = #qs > 0
+        for _, a in ipairs(qs) do if covered[a[2]] then new = false end end
+        if new then kept[#kept + 1] = { text = s.text, t = s.t, ord = 0 } end
+    end
+    table.sort(kept, function(a, b)
+        if a.t ~= b.t then return a.t < b.t end
+        return a.ord < b.ord
+    end)
+    local out = {}
+    for _, k in ipairs(kept) do
+        local text = k.text:gsub("\n[ \t]*#requires%s+(%S+)[^\n]*", function(l) return labels[l] and nil or "" end)
+        text = text:gsub("(#completewith%s+)(%S+)", function(pre, l)
+            if l == "next" or labels[l] then return nil end
+            return pre .. "next"
+        end)
+        local z, l = At(k.t)
+        out[#out + 1] = { text = text, zone = z, level = l, t = k.t }
+    end
+    return out
+end
+
+-- ---------------------------------------------------------------------------
 -- Steps -> one part per zone
 -- ---------------------------------------------------------------------------
 -- { { zone, steps = { step records } } }: runs of steps in one zone; a city, an unknown zone or a short
@@ -325,7 +439,9 @@ function YR.HasMyRoute(race) return Mine()[Group(race).slug] ~= nil end
 function YR.SaveRunAsRoute(char, race)
     char = char or YR.CharKey()
     local g = Group(race)
-    local steps = YR.RunToSteps(char)
+    -- our steps where you followed our routes; else made from the log
+    local steps = YR.RunToRouteSteps(char)
+    if not steps or #steps == 0 then steps = YR.RunToSteps(char) end
     if #steps == 0 then return nil, "nothing recorded for this character yet" end
     local parts = YR.SplitByZone(steps)
     local faction = UnitFactionGroup("player") or "Alliance"
@@ -366,6 +482,51 @@ function YR.SaveRunAsRoute(char, race)
     Mine()[g.slug] = { parts = saved }
     YR.ShipMyRoutes()
     return #steps, #saved, names[1], g.label
+end
+
+-- This race's own routes gone (and their edits); with a first-version one of this character's too.
+-- Takes a reload to leave RestedXP. Returns how many parts went.
+function YR.DeleteMyRoutes(race)
+    local g = Group(race)
+    local prefix = KEY .. g.slug .. "_"
+    local mine, gone = Mine(), 0
+    if mine[g.slug] and mine[g.slug].parts then gone = #mine[g.slug].parts end
+    mine[g.slug] = nil
+    if mine[YR.CharKey()] then mine[YR.CharKey()] = nil gone = gone + 1 end
+    local function Ours(k) return k:sub(1, #prefix) == prefix or k == KEY .. YR.CharKey() end
+    for key in pairs(YippRouteDB.custom or {}) do
+        if Ours(key) then YippRouteDB.custom[key] = nil end
+    end
+    for i = #(YR.shipped or {}), 1, -1 do
+        local k = YR.shipped[i].key
+        if Ours(k) then
+            table.remove(YR.shipped, i)
+            shipped[k] = nil
+        end
+    end
+    return gone
+end
+
+StaticPopupDialogs["HEADSTART_DELETE_MY_ROUTE"] = {
+    text = "Headstart: delete your %s route? This can't be undone (your run log stays: you can save it again).",
+    button1 = "Delete",
+    button2 = "Cancel",
+    OnAccept = function()
+        local n = YR.DeleteMyRoutes()
+        YR.Print(("deleted your route (%d part%s). Reload to take it out of RestedXP."):format(n, n == 1 and "" or "s"))
+        StaticPopup_Show("HEADSTART_RELOAD")
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+function YR.AskDeleteMyRoutes()
+    if not YR.HasMyRoute() and not Mine()[YR.CharKey()] then
+        YR.Print("you have no route of your own for this race yet.")
+        return
+    end
+    StaticPopup_Show("HEADSTART_DELETE_MY_ROUTE", Group().label)
 end
 
 StaticPopupDialogs["HEADSTART_SAVE_RUN_ROUTE"] = {

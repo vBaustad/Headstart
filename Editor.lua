@@ -991,6 +991,9 @@ local function BuildRun(page)
     run.save.tip = "Your run as your own route: every quest stop, trainer, vendor, flight, death skip and grind"
         .. " a step, in the order you played. Edit and reorder it in Routes; RestedXP lists it under My routes."
         .. " Saving again replaces it. Our routes stay as they are"
+    run.delete = S.Button(page, "Delete my route", function() YR.AskDeleteMyRoutes() end, nil, 130)
+    run.delete:SetPoint("RIGHT", run.save, "LEFT", -10, 0)
+    run.delete.tip = "Delete the route you saved for this race (asks first). Your run log stays, so you can save it again"
 end
 
 local function RefreshRun()
