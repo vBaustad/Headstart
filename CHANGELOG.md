@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0-beta1
 
 - **Save your run as your own route** (This run, Save as route). A run that followed our routes becomes a route of our own steps, as we wrote them (level gates, conditions, waypoints, notes), in the order you played them; steps you skipped are left out, and what you did that our route doesn't have gets a step of its own from the log (a quest stop at each NPC, objectives finished, trainers with what you learned, vendors with what you bought, flights, the hearthstone, death skips, and grinds: at least 10 kills over 3 minutes in one spot right before your next stop). It is split into one part per zone you levelled in, chained so RestedXP moves on by itself, and named by levels, zone and race ("1-6 My route: Dun Morogh (Dwarf/Gnome)"), never by character. One set per race, Dwarves and Gnomes sharing: saving again from any character of that race replaces that set and your edits to it; other races' sets and our routes stay. Edit it in the Routes list like ours (drag steps, edit any line, delete); RestedXP lists it under Headstart Launch, My routes. **Delete my route** (This run) takes it away again; your run log stays.
 
