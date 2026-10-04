@@ -36,6 +36,8 @@ C_Item = { GetItemCount = function(i) return BAGS[i] or 0 end }
 function GetNumSkillLines() return #SKILLS end
 function GetSkillLineInfo(i) return SKILLS[i][1], false, false, SKILLS[i][2] end
 function GetSubZoneText() return SUBZONE end
+NOW = 1000
+function GetTime() return NOW end
 ''')
     YR = lua.table()
     for f in ("Core.lua", "CampingReminder.lua"):
@@ -66,8 +68,10 @@ function GetSubZoneText() return SUBZONE end
     lua.execute("Fire('BAG_UPDATE_DELAYED')")
     check(len(said()) == 1, "told once")
     lua.execute("SUBZONE = 'Kharanos'; Fire('ZONE_CHANGED')")
-    check(len(said()) == 2, "told again coming into Kharanos")
-    lua.execute("PRINTS = {}; SUBZONE = 'Thelsamar'; Fire('ZONE_CHANGED')")
+    check(len(said()) == 1, "coming into Kharanos right after: not again (no spam walking about Kharanos)")
+    lua.execute("NOW = NOW + 121; SUBZONE = 'Kharanos'; Fire('ZONE_CHANGED')")
+    check(len(said()) == 2, "told again coming into Kharanos two minutes on")
+    lua.execute("NOW = NOW + 121; PRINTS = {}; SUBZONE = 'Thelsamar'; Fire('ZONE_CHANGED')")
     check(len(said()) == 1 and "by the inn" in said()[0] and "Tognus Flintfire in Kharanos" in said()[0],
           f"in Thelsamar: the forge there, the hand-in in Kharanos: {said()}")
     lua.execute("SUBZONE = 'Kharanos'")
@@ -75,6 +79,10 @@ function GetSubZoneText() return SUBZONE end
     check("train Blacksmithing" in YR.CampingNow()[1][2], "not trained yet: says to train it first")
     lua.execute("ONQUEST[96044] = false; ONQUEST[96046] = true; COMPLETE[96046] = true; PRINTS = {}; Fire('QUEST_LOG_UPDATE')")
     check(any("Yarr Hammerstone" in x for x in said()), f"Mining done: told where to hand it in: {said()}")
+    # the quest log says "not complete" for a moment mid-update, then complete again: not said again
+    lua.execute("PRINTS = {}; SUBZONE = 'Coldridge Pass'; COMPLETE[96046] = false; Fire('QUEST_LOG_UPDATE');"
+                " COMPLETE[96046] = true; Fire('BAG_UPDATE_DELAYED'); Fire('BAG_UPDATE_DELAYED')")
+    check(len(said()) == 0, f"a moment's 'not complete' and every loot after: said once, not again: {said()}")
     lua.execute("YippRouteDB.campReminder = false; PRINTS = {}; SUBZONE = 'Kharanos'; Fire('ZONE_CHANGED')")
     check(len(said()) == 0, "turned off: nothing")
     return bad

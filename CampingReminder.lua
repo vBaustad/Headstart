@@ -6,7 +6,9 @@
 --     (1 stone), Copper Bracers to 20 (2 bars); orange all the way on Forever, a point a craft. Where:
 --     the forge and anvil by Tognus Flintfire in Kharanos. Not trained yet: train it from him first.
 --   * Mining: Camping 101: Mining is complete: hand it in to Yarr Hammerstone in Kharanos.
--- Said once when it becomes true, and again each time you come into Kharanos with it still to do.
+-- Said once when it becomes true, and again when you come into Kharanos with it still to do - at most
+-- every two minutes. Once said it stays said for the session: the quest log answers "not complete" for
+-- a moment during its own updates, and forgetting on that said it again at every loot.
 -- Thelsamar too (the user, 2026-10-02: Loch Modan is a crafting stop): its forge and anvil by the inn
 -- do for the crafting; the hand-ins stay in Kharanos, so there only the Blacksmithing line, saying so.
 -- Account option campReminder (Settings, Route).
@@ -73,17 +75,19 @@ function YR.CampingNow()
     return out
 end
 
-local told = {}            -- key -> true until it stops being true
+local AGAIN = 120          -- seconds before coming into Kharanos says it again
+local told = {}            -- key -> GetTime() it was last said, this session
 local function Check(arriving)
     if (YR.RoutesOn and not YR.RoutesOn()) or not YR.Option("campReminder") then return end
-    local now = {}
     for _, e in ipairs(YR.CampingNow()) do
-        now[e[1]] = true
-        if not told[e[1]] or arriving then Say(e[2]) end
-        told[e[1]] = true
+        local last = told[e[1]]
+        if not last or (arriving and GetTime() - last >= AGAIN) then
+            Say(e[2])
+            told[e[1]] = GetTime()
+        end
     end
-    for k in pairs(told) do if not now[k] then told[k] = nil end end
 end
+YR.CampingCheck = Check   -- for tests
 
 local pending = false
 local f = CreateFrame("Frame")

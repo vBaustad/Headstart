@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The Camping 101 reminder says it once.** "Mining is done: hand it in to Yarr Hammerstone" came again at every loot: the quest log answers "not complete" for a moment while it updates, and that made the reminder forget it had said it. Now it's said once, and again on coming into Kharanos at most every two minutes.
+
 - **Bank mats works again.** A check added in this release stopped it at the first stack with "the bank closed before the rest went" while the bank was open: it asked the game whether you were at a banker, and on Forever the bank opens without saying so. It now looks at the bank window itself.
 
 - **The new character window closes once you click Apply to this character** (it stays, and says why, if you're in a fight).
