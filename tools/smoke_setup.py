@@ -256,6 +256,16 @@ events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
 shown = g.YippSetupFrame.IsShown(g.YippSetupFrame)
 print(("ok  " if shown else "FAIL"), "popup on a new character whose old saved variables say seen")
 bad += not shown
+# Apply to this character: the window goes once it's applied; in a fight it stays (nothing can be placed)
+w = g.YippSetupFrame
+lua.execute("COMBAT = true")
+w.setup._OnClick(w.setup)
+ok = w.IsShown(w)
+lua.execute("COMBAT = false")
+w.setup._OnClick(w.setup)
+ok = ok and not w.IsShown(w)
+print(("ok  " if ok else "FAIL"), "Apply: the window stays in a fight, and goes once the layout is applied")
+bad += not ok
 # A character where AutoFeed hasn't made its macro yet: AutoFeed is asked to make it (so it owns and
 # fills it), and it goes in its slot. Nothing is copied from the main.
 lua.execute(r'''MACROS = {}; AutoFeedCharDB = { owned = {} }''')

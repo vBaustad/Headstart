@@ -235,6 +235,21 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     lua.execute("Tick(20)")
     check(len(banked()) == n and n >= 1, "nothing is clicked once the bank has closed")
 
+    # Forever's bank (the Vanilla BankFrame) isn't a "Banker" to the interaction manager: moves still go
+    lua.execute("C_PlayerInteractionManager = { IsInteractingWithNpcOfType = function() return false end } Enum = Enum or {} Enum.PlayerInteractionType = { Banker = 8 }")
+    fill()
+    lua.execute("BankFrame:Show() PRINTS = {}")
+    visit()
+    check(len(banked()) >= 1 and not any("closed before" in g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1)),
+          f"the interaction manager says no banker: the bank window is open, so it banks anyway ({len(banked())})")
+    # the bank window gone mid-way (closed before BANKFRAME_CLOSED reaches us): it stops at once
+    fill()
+    g.Fire("BANKFRAME_OPENED")
+    lua.execute("RunAfter() BankFrame:Hide() Tick(20)")
+    check(len(banked()) == 0, f"the bank window closed: nothing is clicked ({banked()})")
+    g.Fire("BANKFRAME_CLOSED")
+    lua.execute("BankFrame:Show() C_PlayerInteractionManager = nil")
+
     # the newer interaction event opens it too
     fill()
     g.Fire("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", 8)

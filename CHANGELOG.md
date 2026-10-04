@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Bank mats works again.** A check added in this release stopped it at the first stack with "the bank closed before the rest went" while the bank was open: it asked the game whether you were at a banker, and on Forever the bank opens without saying so. It now looks at the bank window itself.
+
+- **The new character window closes once you click Apply to this character** (it stays, and says why, if you're in a fight).
+
 - **Settings, redesigned.** Each page opens with its icon, what it's for, and who the settings on it are for ("Every character on this account", "Every Paladin"), saved as you change them. The menu has an icon per page and a dot that is green while something on that page is on. Settings come in cards with an icon; a feature with one switch has it in the card's header, and the rows under it dim while it's off. Under every setting is the first line of what it does, so you can read the page without pointing at anything (the (i) still has the whole text). "Find a setting" at the top of the menu searches every page by name and description, and picking a result opens its page with the setting lit up.
 
 - Dun Morogh: the bears for **Thick Bear Fur** (Stocking Jetsteam) are now east of Kharanos, on the way to Steelgrill's Depot, where all ten furs in five logged runs dropped. RestedXP's loop south of Kharanos never gave one, and a run lost about 10 minutes looking.

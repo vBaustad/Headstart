@@ -641,7 +641,14 @@ local function BuildWindow()
     local function Done() YippSetupCharDB.seen = CharacterID() or true end
     -- Set up is instant (a new character wants to get going); Copy first shows every choice of what
     -- carries over (Settings, Character tab), and is done from there
-    w.setup = S.Button(w, "Apply to this character", function() Done() YS:Apply() YS:Refresh() end, "primary")
+    -- applied: the window has done its job and goes. In a fight nothing can go on the bars yet, so it
+    -- stays (Apply says why) and the character isn't marked done.
+    w.setup = S.Button(w, "Apply to this character", function()
+        if InCombatLockdown() then YS:Apply() return end
+        Done()
+        YS:Apply()
+        w:Hide()
+    end, "primary")
     w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
     w.setup.tip = "On a new character: put the saved layout on this one, now"
     w.copy = S.Button(w, "Copy this layout...", function()

@@ -188,10 +188,10 @@ local function Step()
         if s.tries >= TRIES then return Finish("the bank is full") end
         return
     end
-    -- the game's own word that the banker is still open: with it gone, this click would use the item
-    local pim = C_PlayerInteractionManager
-    if pim and pim.IsInteractingWithNpcOfType and Enum.PlayerInteractionType and Enum.PlayerInteractionType.Banker
-        and not pim.IsInteractingWithNpcOfType(Enum.PlayerInteractionType.Banker) then
+    -- the bank window still open, looked at right before the click: with it gone, the click would use
+    -- the item. (Not the interaction manager's "Banker": on Forever the bank opens without it - seen in
+    -- game - and that check stopped every move.)
+    if BankFrame and BankFrame.IsShown and not BankFrame:IsShown() then
         return Finish("the bank closed before the rest went")
     end
     s.clicked = true
