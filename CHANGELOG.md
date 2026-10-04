@@ -22,6 +22,8 @@
 
 - **The Headstart window opens on QoL & settings while the routes are off** (on Routes while they're on), its Settings pages are built the first time you open each one so the window opens at once, and the better-gear window has Headstart's own look, its icon framed in the item's quality colour, and stays where you drag it.
 
+- **Level splits compare each level with the fastest anyone got there**, not with one "best run". The run that got furthest isn't the fastest at every level: one that stopped at 11 may have been six minutes quicker to 10, and against the furthest run the splits showed a lead that wasn't there. Now "vs best", the colours and the level-up line use the fastest time any of your other runs reached that level, "± level" the fastest anyone took over that one level, and Time stays green while you can still beat the fastest to your next level.
+
 - **Level splits: a "± level" column.** How much each level alone won or lost against the best run's same level, "-0:40" in green for 40 seconds faster, beside the level's own time. The live row shows it too. Its own switch under Level splits.
 
 - Save as route: a death skip says exactly where you died, "Die right here (28.8, 83.3)", with a pin on that spot, and which Spirit Healer that brought you back at. Where you die decides which healer you come back at, so our general wording ("in the cave") isn't enough there. It is the death you made for that step, even if you did the next stop first.

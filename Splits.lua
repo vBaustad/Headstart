@@ -106,6 +106,29 @@ local function Best()
 end
 YR.SplitsBest = Best   -- for the tests
 
+-- What to beat, level by level: the fastest any other run (not this one, not one marked "not a run to
+-- beat") reached each level, and the fastest any of them took over each single level (both ends timed).
+-- Not one "best run": the run that got furthest isn't the fastest at every level - one that stopped at
+-- 11 can have been six minutes quicker to 10 - and comparing with it showed a lead that wasn't there.
+-- { levels = { [N] = seconds to reach N }, segs = { [N] = seconds from N-1 to N } }, or nil.
+local function Fastest()
+    local levels, segs, any = {}, {}, false
+    for k, r in pairs(DB().runs) do
+        if k ~= key and not r.noBest and type(r.levels) == "table" then
+            for lvl, t in pairs(r.levels) do
+                if lvl > 1 then
+                    any = true
+                    if not levels[lvl] or t < levels[lvl] then levels[lvl] = t end
+                    local before = r.levels[lvl - 1]
+                    if before and (not segs[lvl] or t - before < segs[lvl]) then segs[lvl] = t - before end
+                end
+            end
+        end
+    end
+    return any and { levels = levels, segs = segs } or nil
+end
+YR.SplitsFastest = Fastest   -- for the tests
+
 local function XPRate()
     local a, b = rate[1], rate[#rate]
     if not (a and b) or b[1] - a[1] < 60 then return nil end
@@ -199,7 +222,7 @@ end
 
 local function Refresh()
     if not (frame and frame:IsShown()) then return end
-    local run, pb = rec, Best()
+    local run, pb = rec, Fastest()
     local n = 0
     if run and not synced then
         frame.xph:SetText("")
@@ -222,7 +245,7 @@ local function Refresh()
         frame.ding:SetText(BLUE .. "Ding:|r " .. (xph and xph > 0 and ("%d min"):format(math.ceil(left / xph * 60)) or "-"))
         -- the level in progress, live
         local since = run.levels[level] or 0
-        local seg = pb and pb.levels[level + 1] and pb.levels[level] and pb.levels[level + 1] - pb.levels[level]
+        local seg = pb and pb.segs[level + 1]
         n = n + 1
         SetRow(n, BLUE .. ("Level %d|r"):format(level + 1) .. GREY .. " ..|r", Vs(run.elapsed - since, seg),
             Vs(run.elapsed, theirsNow), Delta(theirsNow and run.elapsed - theirsNow),
@@ -230,8 +253,9 @@ local function Refresh()
     else
         frame.xph:SetText(BLUE .. "Best run|r")
         frame.ding:SetText(GREY .. "new characters are timed from level 1|r")
-        frame.time:SetText(BLUE .. "Time:|r " .. (pb and WHITE .. Clock(pb.levels[Top(pb)]) .. "|r" or "-"))
-        run, pb = pb, nil
+        local best = Best()                  -- no timed character here: show the best whole run
+        frame.time:SetText(BLUE .. "Time:|r " .. (best and WHITE .. Clock(best.levels[Top(best)]) .. "|r" or "-"))
+        run, pb = best, nil
     end
     -- every level reached, newest first, as many as the settings say
     if run then
@@ -242,7 +266,7 @@ local function Refresh()
                 listed = listed + 1
                 -- a level reached before the splits knew this character has a total but no own time
                 local theirs = pb and pb.levels[lvl]
-                local theirSeg = theirs and pb.levels[lvl - 1] and theirs - pb.levels[lvl - 1]
+                local theirSeg = pb and pb.segs[lvl]
                 n = n + 1
                 SetRow(n, BLUE .. ("Level %d|r"):format(lvl), before and Vs(at - before, theirSeg) or GREY .. "-|r",
                     Vs(at, theirs), Delta(theirs and at - theirs), Delta(before and theirSeg and at - before - theirSeg))
@@ -485,7 +509,7 @@ f:SetScript("OnEvent", function(_, event, level, atLevel)
     if rec and not rec.stopped then
         rec.levels[level] = rec.elapsed
         C_Timer.After(1, AskPlayed)          -- and check our count against the server's
-        local pb = Best()
+        local pb = Fastest()
         local theirs = pb and pb.levels[level]
         YR.Print(("level %d at %s%s"):format(level, Clock(rec.elapsed), theirs and ("  " .. Delta(rec.elapsed - theirs)) or ""))
     end

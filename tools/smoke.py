@@ -503,6 +503,16 @@ YippRouteDB.splits.runs = {
   short = { name = "Short-Realm", levels = { [1] = 0, [2] = 100, [3] = 400 } } }''')
 best = YR.SplitsBest()
 check(best is not None and best.name == "Full-Realm", f"best run is the fully timed one, not a faster partial one: {best and best.name}")
+# What to beat is the fastest at each level, not one run: a run that stopped at 11 was quicker to 10
+lua.execute('''YippRouteDB.splits.runs = {
+  far = { name = "Radaid", levels = { [1] = 0, [9] = 5000, [10] = 6137, [11] = 7000, [13] = 9000 } },
+  quick = { name = "Munix", levels = { [1] = 0, [9] = 4800, [10] = 5337, [11] = 6900 } },
+  skip = { name = "Missed a quest", noBest = true, levels = { [1] = 0, [10] = 100 } } }''')
+fast = YR.SplitsFastest()
+check(fast.levels[10] == 5337 and fast.levels[13] == 9000,
+      f"level 10 against Munix's 5337, not the furthest run's 6137; 13 still Radaid's: {fast.levels[10]}, {fast.levels[13]}")
+check(fast.segs[10] == 537 and fast.segs[11] == 863,
+      f"± level: the fastest single level 9-10 (537) and 10-11 (Radaid's 863): {fast.segs[10]}, {fast.segs[11]}")
 lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 
 # Shipped guides: both handed to RestedXP at login; a guide splits into steps and joins back unchanged;
