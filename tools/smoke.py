@@ -1002,4 +1002,6 @@ import smoke_stepkeeper
 bad += smoke_stepkeeper.run()
 import smoke_myroutes
 bad += smoke_myroutes.run()
+import smoke_skipquests
+bad += smoke_skipquests.run()
 sys.exit(1 if bad else 0)

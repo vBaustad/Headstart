@@ -19,6 +19,7 @@ Needs.lua
 Shopping.lua
 Log.lua
 DeathSkip.lua
+SkipQuests.lua
 CampingReminder.lua
 MailStep.lua
 StepKeeper.lua

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Dun Morogh: the bears for **Thick Bear Fur** (Stocking Jetsteam) are now east of Kharanos, on the way to Steelgrill's Depot, where all ten furs in five logged runs dropped. RestedXP's loop south of Kharanos never gave one, and a run lost about 10 minutes looking.
+
+- **Treacherous Cold is dropped when another addon accepts it.** The route skips it, but Leatrix Plus's quest automation (and the like) takes every quest Father Gavin offers. Headstart drops it once, and says so; take it again and it stays. A quest you read and accept by hand is left alone.
+
+- Thelsamar crafting stop: says the Camping 101: Blacksmithing hand-in in Kharanos isn't worth a trip back. A run that hearthed back for both Camping 101 hand-ins spent about 10 minutes on 540 XP.
+
 - Save as route: a death skip says exactly where you died, "Die right here (28.8, 83.3)", with a pin on that spot, and which Spirit Healer that brought you back at. Where you die decides which healer you come back at, so our general wording ("in the cave") isn't enough there. It is the death you made for that step, even if you did the next stop first.
 
 ## 0.10.0-beta1
