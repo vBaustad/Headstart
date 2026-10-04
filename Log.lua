@@ -10,9 +10,13 @@
 --            skill (a profession or Cooking went up: name and new rank; weapon skills are left out)
 --   track  a position sample every 2 seconds: { time, map, x, y, level, XP, flags }
 --          flags: 1 in combat, 2 dead or a ghost, 4 casting or channelling (eating, crafting, hearth)
+--          Standing still, the samples between the first and the last of the same are left out (with one
+--          kept at least every HEARTBEAT seconds, so a gap over a minute still means logged out): about
+--          half of all samples, measured on a real log. Moving samples stay 2 seconds apart.
 local _, YR = ...
 
 local SAMPLE = 2
+local HEARTBEAT = 30
 local HEARTHSTONE = 8690
 local run, ticker
 local complete = {}      -- questID -> true once its objectives were done (to log that moment once)
@@ -50,13 +54,58 @@ local function Flags()
     return f
 end
 
+-- The last sample seen, the last one written, and the one held back while nothing changes (written
+-- as soon as something does, so the move away from a spot starts 2 seconds after its last sample).
+local lastRow, lastKept, held
+local function Same(a, b)
+    for i = 2, 7 do if a[i] ~= b[i] then return false end end
+    return true
+end
+
+local function FlushHeld()
+    if held and run then run.track[#run.track + 1] = held end
+    held = nil
+end
+
 local function Sample()
     if run.stopped then return end
     local map, x, y = YR.Position()
     if map then
-        run.track[#run.track + 1] = { time(), map, x, y, UnitLevel("player"), UnitXP("player"), Flags() }
+        local row = { time(), map, x, y, UnitLevel("player"), UnitXP("player"), Flags() }
+        if lastRow and lastKept and Same(row, lastRow) and row[1] - lastKept[1] < HEARTBEAT then
+            held = row
+        else
+            if held and (not Same(row, held) or row[1] - held[1] > HEARTBEAT) then FlushHeld() end
+            held = nil
+            run.track[#run.track + 1] = row
+            lastKept = row
+        end
+        lastRow = row
     end
     WatchStep()
+end
+YR.LogSample = Sample           -- for tests
+
+--- The same thinning on a log written before it: once, for every character's track. Returns rows left out.
+function YR.SlimTrack(track)
+    local out, prev, kept, heldRow = {}, nil, nil, nil
+    for _, row in ipairs(track) do
+        if prev and kept and Same(row, prev) and row[1] - kept[1] < HEARTBEAT then
+            heldRow = row
+        else
+            -- written when something changed, or before a gap (a logout): the time up to it counts
+            if heldRow and (not Same(row, heldRow) or row[1] - heldRow[1] > HEARTBEAT) then out[#out + 1] = heldRow end
+            heldRow = nil
+            out[#out + 1] = row
+            kept = row
+        end
+        prev = row
+    end
+    if heldRow then out[#out + 1] = heldRow end       -- the end of the log: its last sample stays
+    local dropped = #track - #out
+    for i = 1, #out do track[i] = out[i] end
+    for i = #track, #out + 1, -1 do track[i] = nil end
+    return dropped
 end
 
 -- The NPC you are talking to while a quest window is open: the quest giver or the turn-in.
@@ -138,6 +187,7 @@ end
 
 events:SetScript("OnEvent", function(_, event, a, b, c)
     if not run or run.stopped then return end
+    if event == "PLAYER_LOGOUT" then FlushHeld() return end
     if event == "QUEST_ACCEPTED" then
         local objectives = C_QuestLog.GetQuestObjectives(a)
         Add("accept", a, { npc = Npc(), title = C_QuestLog.GetTitleForQuestID(a),
@@ -176,7 +226,8 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
     elseif event == "CHAT_MSG_LOOT" then
         if type(a) == "string" then Looted(a) end
     elseif event == "CHAT_MSG_SKILL" then
-        if SKILL_UP and type(a) == "string" then SkillUp(a) end
+        -- the text is secret in dungeons and raids: no skill-ups logged there
+        if SKILL_UP and type(a) == "string" and not (issecretvalue and issecretvalue(a)) then SkillUp(a) end
     elseif NPC_WINDOWS[event] then
         if event == "TRAINER_SHOW" then trainerOpen = true end
         Add(NPC_WINDOWS[event], nil, { npc = Npc() })
@@ -208,6 +259,7 @@ end)
 -- Stop run: this character's log ends here (the analysis cuts the run at it), until Resume.
 function YR:StopLog()
     if run and not run.stopped then
+        FlushHeld()
         Add("stop")
         run.stopped = time()
     end
@@ -216,25 +268,91 @@ end
 function YR:ResumeLog()
     if run and run.stopped then
         run.stopped = nil
+        lastRow, lastKept, held = nil, nil, nil
         Add("resume")
     end
 end
 -- the "spell learned" event has a different name in the modern and the Classic API: whichever exists
 local LEARNED = { "LEARNED_SPELL_IN_SKILL_LINE", "LEARNED_SPELL_IN_TAB" }
 
+-- ---------------------------------------------------------------------------
+-- Cleaning up: every character's log is in the account's saved file, loaded on every character.
+-- ---------------------------------------------------------------------------
+local function LastActive(r)
+    local t = r.started or 0
+    local tr, ev = r.track, r.ev
+    if type(tr) == "table" and tr[#tr] then t = math.max(t, tr[#tr][1] or 0) end
+    if type(ev) == "table" and ev[#ev] then t = math.max(t, ev[#ev][1] or 0) end
+    return t
+end
+
+--- Every character's log: { { key, samples, events, last (time), kb (about, in the saved file) } },
+--- the most recently played first.
+function YR.LogSummary()
+    local out = {}
+    for key, r in pairs(YippRouteDB.runs or {}) do
+        if type(r) == "table" then
+            local samples = type(r.track) == "table" and #r.track or 0
+            local events = type(r.ev) == "table" and #r.ev or 0
+            -- measured on a real saved file: about 60 bytes a sample, 100 an event
+            out[#out + 1] = { key = key, samples = samples, events = events, last = LastActive(r),
+                kb = math.floor((samples * 60 + events * 100) / 1024 + 0.5) }
+        end
+    end
+    table.sort(out, function(a, b) return a.last > b.last end)
+    return out
+end
+
+--- Delete one character's log. This character's starts again from now, so recording goes on.
+function YR.DeleteLog(key)
+    if not (YippRouteDB.runs and YippRouteDB.runs[key]) then return false end
+    YippRouteDB.runs[key] = nil
+    if run and key == YR.CharKey() then
+        run = { started = time(), ev = {}, track = {} }
+        YippRouteDB.runs[key] = run
+        lastRow, lastKept, held = nil, nil, nil
+    end
+    return true
+end
+
+--- Delete the logs of characters not played for this many days (never this character's). Returns how many.
+function YR.PruneLogs(days)
+    if not (days and days > 0) then return 0 end
+    local cut, me, n = time() - days * 86400, YR.CharKey(), 0
+    for key, r in pairs(YippRouteDB.runs or {}) do
+        if key ~= me and type(r) == "table" and LastActive(r) < cut then
+            YippRouteDB.runs[key] = nil
+            n = n + 1
+        end
+    end
+    return n
+end
+
 function YR:StartLog()
-    if not YippRouteDB.logging then return end
     -- a brand-new character is "Unknown" for its first moments: wait for the real name, or every new
-    -- character's run lands under the same key
+    -- character's run lands under the same key (and the clean-up below can't tell which log is yours)
     local name = UnitFullName("player")
     if not name or name == UNKNOWNOBJECT or name == "Unknown" then
         C_Timer.After(2, function() YR:StartLog() end)
         return
     end
+    -- old logs, recording on or not (a log kept from when it was on still takes the room)
+    local pruned = YR.PruneLogs(YippRouteDB.logKeepDays)
+    if pruned > 0 then
+        YR.Print(("deleted the run logs of %d character%s not played for %d days."):format(pruned,
+            pruned == 1 and "" or "s", YippRouteDB.logKeepDays))
+    end
+    if not YippRouteDB.trackSlimmed then
+        for _, r in pairs(YippRouteDB.runs) do if type(r.track) == "table" then YR.SlimTrack(r.track) end end
+        YippRouteDB.trackSlimmed = 1
+    end
+    if not YippRouteDB.logging then return end
     local key = YR.CharKey()
     YippRouteDB.runs[key] = YippRouteDB.runs[key] or { started = time(), ev = {}, track = {} }
     run = YippRouteDB.runs[key]
+    lastRow, lastKept, held = nil, nil, nil
     for _, e in ipairs(EVENTS) do events:RegisterEvent(e) end
+    events:RegisterEvent("PLAYER_LOGOUT")      -- the spot you logged out on: its last sample too
     for _, e in ipairs(LEARNED) do pcall(events.RegisterEvent, events, e) end
     events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     lastXP, lastMax, lastLevel = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")

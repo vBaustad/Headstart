@@ -171,6 +171,11 @@ BAR = { [1] = {kind="spell", id=635}, [12] = {kind="spell", id=635} }
 EditModeManagerFrame.layoutInfo.activeLayout = 1
 SETTINGS = { PROXY_SHOW_ACTIONBAR_2 = false, PROXY_SHOW_ACTIONBAR_3 = false, PROXY_SHOW_ACTIONBAR_4 = false }
 CVARS = { autoLootDefault = "0", showTutorials = "1", AutoPushSpellToActionBar = "1" }''')
+# A brand-new class gets Only spells; these first cases are the question-mark mode an existing setup has.
+ok = YS.SpellButtons(YS.Options(YS)) == "spells"
+print(("ok  " if ok else "FAIL"), "a class set up for the first time: Only spells by default")
+bad_default = not ok
+YS.Options(YS).spellButtons = "placeholder"
 YS.Apply(YS)
 ok = g.CVARS.AutoPushSpellToActionBar == "0"
 print(("ok  " if ok else "FAIL"), "Blizzard's auto-placing of new spells turned off")
@@ -204,7 +209,7 @@ expect = {
     12: None,                                                          # cleared, not in the layout
     13: ("spell", "Stoneform"),                                        # a racial: kept, known
 }
-bad = 1 if bad_autopush else 0
+bad = (1 if bad_autopush else 0) + (1 if bad_default else 0)
 for s, want in expect.items():
     got = slot(s)
     ok = got == want
@@ -218,6 +223,17 @@ lua.execute("YS_after = 0 for _ in pairs(MACROS) do YS_after = YS_after + 1 end"
 again = g.YS_after - g.YS_before
 print(("ok  " if again == 0 else "FAIL"), "applying twice creates", again, "new macros")
 bad += again != 0
+# Set up again later (the plan changed mid-levelling): a macro made on this character since stays;
+# a question-mark macro for a spell taken off the layout goes.
+lua.execute(r'''local last = 120 while MACROS[last + 1] do last = last + 1 end
+    MACROS[last + 1] = { "MyOwn", 132089, "/cast [stealth] Ambush" }
+    MACROS[last + 2] = { "Gone", 134400, "#showtooltip Retired Spell\n/cast Retired Spell" }''')
+YS.Apply(YS)
+left = [g.MACROS[k][1] for k in g.MACROS]
+ok = "MyOwn" in left and "Gone" not in left
+print(("ok  " if ok else "FAIL"), "set up again: your own macro stays, an unused question mark goes", left)
+bad += not ok
+lua.execute("for k = 200, 121, -1 do if MACROS[k] and MACROS[k][1] == 'MyOwn' then DeleteMacro(k) end end")
 names = [g.MACROS[k][1] for k in g.MACROS]
 for name, want in (("Old", 0), ("AutoFeed", 1)):
     n = names.count(name)
@@ -276,23 +292,63 @@ print(("ok  " if ok else "FAIL"), f"RestedXP guide loaded: {g.RXP.loaded}")
 bad += not ok
 # a layout the new character doesn't have (a character layout on the main) is imported as an account one
 lua.execute(r'''EditModeManagerFrame.layoutInfo.layouts[3].layoutName = "Other"
-YippSetupDB.classes.PALADIN.profile.ui.layout = { name = "MyChar", type = 2, export = "EXPORT:MyChar" }''')
-YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
+YippSetupDB.ui.layout = { name = "MyChar", type = 2, export = "EXPORT:MyChar" }''')
+YS.ApplyUI(YS, g.YippSetupDB.ui)
 ok = g.EDIT.made is not None and g.EDIT.made.kind == 1 and g.EDIT.made.name == "MyChar"
 print(("ok  " if ok else "FAIL"), "missing layout imported as an account layout")
 bad += not ok
 
 # A layout copied before bars and settings were saved: Set up layout still picks the guide, and
 # logging in on the main fills the missing part in.
-lua.execute(r'''YippSetupDB.classes.PALADIN.profile.ui = nil; RXP.loaded = nil''')
+lua.execute(r'''YippSetupDB.ui = nil; RXP.loaded = nil''')
 YS.Apply(YS)
 ok = g.RXP.loaded is not None
 print(("ok  " if ok else "FAIL"), "old layout without ui: RestedXP guide still loaded")
 bad += not ok
 lua.execute(r'''ME.name = "Main"; GUID = "Player-1-0000MAIN"''')
 events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
-ok = g.YippSetupDB.classes.PALADIN.profile.ui is not None and g.YippSetupDB.classes.PALADIN.profile.ui.cvars is not None
+ok = g.YippSetupDB.ui is not None and g.YippSetupDB.ui.cvars is not None
 print(("ok  " if ok else "FAIL"), "logging in on the main fills in the missing ui")
+bad += not ok
+
+# The interface is the account's: a rogue set up after the paladin main gets the same chat and Edit Mode,
+# without copying anything on a rogue; the bars stay per class.
+g.YR_SETUP = YS
+same = lua.eval("function(a, b) return rawequal(a, b) end")
+lua.execute("SHARED_UI = YippSetupDB.ui; ME.class = 'ROGUE'")
+ok = same(YS.SharedUI(YS), g.SHARED_UI) and YS.Profile(YS) is None
+print(("ok  " if ok else "FAIL"), "a rogue: the paladin main's interface, and no rogue bars until it has its own")
+bad += not ok
+lua.execute("ME.class = 'PALADIN'")
+# a plan saves bars only: the interface it was planned on (a level-1 character's defaults) never replaces it
+lua.execute("""SAVED_PROFILE = YippSetupDB.classes.PALADIN.profile
+    YR_SETUP:SetProfile({ from = "Alt (plan)", class = "PALADIN", slots = {}, planned = true })""")
+ok = same(g.YippSetupDB.ui, g.SHARED_UI)
+print(("ok  " if ok else "FAIL"), "a saved plan leaves the account's interface alone")
+bad += not ok
+lua.execute("YippSetupDB.classes.PALADIN.profile = SAVED_PROFILE")
+# from before: each class carried its own; the newest copied from a real character becomes the account's
+lua.execute("""SAVED_UI, SAVED_CLASSES = YippSetupDB.ui, YippSetupDB.classes
+    YippSetupDB.ui, YippSetupDB.uiMoved = nil, nil
+    YippSetupDB.classes = {
+        PALADIN = { options = {}, profile = { from = "Old", scanned = 10, slots = {}, ui = { camera = 10 } } },
+        ROGUE = { options = {}, profile = { from = "New", scanned = 20, slots = {}, ui = { camera = 20 } } },
+        MAGE = { options = {}, profile = { from = "Plan", scanned = 30, slots = {}, planned = true, ui = { camera = 30 } } },
+    }""")
+ui = YS.SharedUI(YS)
+ok = ui is not None and ui.camera == 20 and g.YippSetupDB.uiFrom == "New"
+print(("ok  " if ok else "FAIL"), "moved from before: the newest real copy (not a plan's) is the account's interface")
+bad += not ok
+lua.execute("YippSetupDB.ui, YippSetupDB.classes = SAVED_UI, SAVED_CLASSES")
+
+# Raid frames: class colours and power bars on the main come along to the new character.
+g.YR_SETUP = YS
+lua.execute(r'''CVARS.raidFramesDisplayClassColor = "1"; CVARS.raidFramesDisplayPowerBars = "1"
+RAID_UI = YR_SETUP:ScanUI()
+CVARS.raidFramesDisplayClassColor = "0"; CVARS.raidFramesDisplayPowerBars = "0"
+YR_SETUP:ApplyUI({ cvars = RAID_UI.cvars, bars = {} }, YR_SETUP:Options())''')
+ok = g.RAID_UI.cvars.raidFramesDisplayClassColor == "1" and g.CVARS.raidFramesDisplayClassColor == "1"     and g.CVARS.raidFramesDisplayPowerBars == "1"
+print(("ok  " if ok else "FAIL"), "raid frames: class colours and power bars copied from the main")
 bad += not ok
 
 # Training Seal of the Crusader swaps its placeholder macro for the spell and deletes the macro;
@@ -358,24 +414,24 @@ lua.execute("""KNOWN[639] = nil; NAMEID["Holy Light"] = 635""")   # back to Rank
 lua.execute('''LOADED = { "Bartender4" }; EDIT.selected = nil; EditModeManagerFrame.layoutInfo.activeLayout = 1
 SETTINGS = { PROXY_SHOW_ACTIONBAR_2 = false, PROXY_SHOW_ACTIONBAR_3 = false, PROXY_SHOW_ACTIONBAR_4 = false }
 StaticPopup_Show = function(w) POPUP = w end; POPUP = nil''')
-YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui or lua.eval("nil"))
+YS.ApplyUI(YS, g.YippSetupDB.ui or lua.eval("nil"))
 ok = g.SETTINGS.PROXY_SHOW_ACTIONBAR_2 is False and g.EDIT.selected == 3
 check_ok = ok
 print(("ok  " if ok else "FAIL"), "Bartender4 loaded: Blizzard bars left alone, Edit Mode still set")
 bad += not ok
 # Without other UI addons: a reload is asked only when Edit Mode or the bars actually changed.
 lua.execute('''LOADED = {}; EditModeManagerFrame.layoutInfo.activeLayout = 1; POPUP = nil''')
-YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.ui)
 first = g.POPUP
 lua.execute("POPUP = nil")
-YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.ui)
 ok = first == "YIPPSETUP_RELOAD" and g.POPUP is None
 print(("ok  " if ok else "FAIL"), f"reload asked when the layout and bars changed ({first}), not when set up again with nothing to change ({g.POPUP})")
 bad += not ok
 lua.execute('''LOADED = { "ElvUI", "ElvUI_Options" }; EDIT.selected = nil; EditModeManagerFrame.layoutInfo.activeLayout = 1
 SETTINGS = { PROXY_SHOW_ACTIONBAR_2 = false, PROXY_SHOW_ACTIONBAR_3 = false, PROXY_SHOW_ACTIONBAR_4 = false }
 POPUP = nil''')
-YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.ui)
 ok = g.EDIT.selected is None and g.SETTINGS.PROXY_SHOW_ACTIONBAR_2 is False and g.POPUP is None
 print(("ok  " if ok else "FAIL"), "ElvUI loaded: Edit Mode and Blizzard bars left alone, no reload asked")
 bad += not ok
@@ -384,13 +440,13 @@ ok = "left to ElvUI" in said
 print(("ok  " if ok else "FAIL"), f"and it says so: {said}")
 bad += not ok
 lua.execute('''LOADED = { "EllesmereUI_ActionBars" }; EDIT.selected = nil; EditModeManagerFrame.layoutInfo.activeLayout = 1''')
-YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.ui)
 ok = g.EDIT.selected is None
 print(("ok  " if ok else "FAIL"), "an EllesmereUI module counts as EllesmereUI")
 bad += not ok
 # the guide follows the race
 lua.execute('''LOADED = {}; RACE = "Human"; RXP.loaded = nil''')
-YS.ApplyUI(YS, g.YippSetupDB.classes.PALADIN.profile.ui)
+YS.ApplyUI(YS, g.YippSetupDB.ui)
 ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Northshire (Launch)"
 print(("ok  " if ok else "FAIL"), f"a Human starts on the Northshire route: {g.RXP.loaded}")
 bad += not ok
@@ -407,8 +463,10 @@ end
 function Fresh(opts)
     ME.name = "Alt"; GUID = "Player-1-0000ALT"; RACE = "Dwarf"; LOADED = {}
     MACROS = {}; BAR = {}; KNOWN = { [635] = true, [20594] = true, [1152] = true }
-    YippSetupDB.classes[ME.class].options = {}
+    -- an existing setup's question marks, unless the case says otherwise
+    YippSetupDB.classes[ME.class].options = { placeholders = true }
     local o = YR_SETUP:Options()
+    if opts and (opts.spellButtons or opts.placeholders ~= nil) then o.spellButtons = nil end
     for k, v in pairs(opts or {}) do o[k] = v end
 end
 ''')
@@ -448,6 +506,62 @@ YS.Apply(YS)
 ok = g.BAR[20] is not None and g.BAR[20].id == 635
 print(("ok  " if ok else "FAIL"), "clear bars off: a button the saved layout doesn't use is kept")
 bad += not ok
+
+# Spell buttons: only spells, macros for every spell, and a downranked button's macro casting its rank.
+def chk(ok, what):
+    global bad
+    print(("ok  " if ok else "FAIL"), what)
+    bad += not ok
+
+
+lua.execute("Fresh({ spellButtons = 'spells' })")
+YS.Apply(YS)
+chk(g.BAR[4] is None and g.BAR[1] is not None and g.BAR[1].kind == "spell",
+    "only spells: an unlearned spell's slot stays empty, a known one is the spell")
+mo = g.BAR[5]
+chk(mo is not None and mo.kind == "macro" and "@mouseover" in g.MACROS[mo.id][3],
+    "only spells: a mouseover spell is still its macro (that is what makes it mouseover)")
+lua.execute("Fresh({ spellButtons = 'macros' })")
+YS.Apply(YS)
+b = g.BAR[1]
+m = b and b.kind == "macro" and g.MACROS[b.id]
+chk(m and m[3] == "#showtooltip Holy Light\n/cast Holy Light", f"macros for every spell: known Holy Light is a macro too ({m and m[3]!r})")
+lua.execute("KNOWN[21082] = true")
+events._OnEvent(events, "SPELLS_CHANGED")
+chk(g.BAR[4] is not None and g.BAR[4].kind == "macro", "... and a spell learned later stays its macro")
+lua.execute("""Fresh({ spellButtons = 'macros' })
+    local e = YippSetupDB.classes.PALADIN.profile.slots[1]
+    SAVED_SLOT1 = { down = e.down, id = e.id, rank = e.rank }
+    e.down, e.id, e.rank = true, 635, 1""")
+YS.Apply(YS)
+b = g.BAR[1]
+m = b and b.kind == "macro" and g.MACROS[b.id]
+chk(m and m[3] == "#showtooltip Holy Light(Rank 1)\n/cast Holy Light(Rank 1)",
+    f"a downranked button's macro casts that rank ({m and m[3]!r})")
+lua.execute("""YippSetupDB.classes.PALADIN.profile.slots[1].rank = nil
+    C_Spell.GetSpellSubtext = function(id) return id == 635 and "Rank 1" or nil end   -- the game's own rank text
+    Fresh({ spellButtons = 'macros' })""")
+YS.Apply(YS)
+b = g.BAR[1]
+m = b and b.kind == "macro" and g.MACROS[b.id]
+chk(m and "(Rank 1)" in m[3], f"saved before ranks were stored, it still gets its rank ({m and m[3]!r})")
+lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]
+    e.down, e.id, e.rank = SAVED_SLOT1.down, SAVED_SLOT1.id, SAVED_SLOT1.rank
+    Fresh({ placeholders = false })""")
+chk(YS.SpellButtons(YS.Options(YS)) == "spells", "an old 'placeholders off' reads as Only spells")
+lua.execute("Fresh({ spellButtons = 'spells' }); KNOWN[2580] = true")
+YS.Apply(YS)
+events._OnEvent(events, "SPELLS_CHANGED")
+chk(g.BAR[10] is not None and g.BAR[10].kind == "spell", "a profession spell goes on as the spell itself, never a macro")
+counts = {}
+for mode in ("spells", "placeholder", "macros"):
+    lua.execute(f"Fresh({{ spellButtons = '{mode}' }})")
+    n, limit = YS.MacrosNeeded(YS, None, YS.Options(YS))
+    counts[mode] = n
+chk(limit == 30 and 0 < counts["spells"] < counts["placeholder"] < counts["macros"],
+    f"macros the layout takes, of the game's 30: only spells {counts['spells']} < question marks"
+    f" {counts['placeholder']} < every spell {counts['macros']}")
+
 
 lua.execute("Fresh({ classSpells = false, racials = false })")
 YS.Apply(YS)
@@ -582,11 +696,12 @@ function ResetChats()
     for i = 1, 10 do Chat(i, i == 1 and "General" or i == 2 and "Combat Log" or "", i <= 2, i <= 2) end
 end
 ResetChats()
-function GetChatWindowInfo(i) local f = _G["ChatFrame" .. i] return f.name, f.size, 0, 0, 0, f.alpha, f.shown, false, f.isDocked end
+function GetChatWindowInfo(i) local f = _G["ChatFrame" .. i] return f.name, f.size, f.r or 0, f.g or 0, f.b or 0, f.alpha, f.shown, false, f.isDocked, f.noClick end
 GENERAL_CHAT_DOCK = {}
 function FCFDock_GetChatFrames() return {} end
 function FCF_SetWindowName(f, n) f.name = n end
-function FCF_SetWindowColor() end
+function FCF_SetWindowColor(f, r, g, b) f.r, f.g, f.b = r, g, b end
+function FCF_SetUninteractable(f, on) f.noClick = on end
 function FCF_SetWindowAlpha(f, a) f.alpha = a end
 function FCF_SetChatWindowFontSize(_, f, s) f.size = s end
 function FCF_SetLocked() end
@@ -601,6 +716,7 @@ end
 -- the main: General at 20% with Say and Guild, a docked "Loot" tab, a floating "Whispers"
 ChatFrame1.alpha = 0.2; ChatFrame1.messageTypeList = { "SAY", "GUILD" }
 FCF_OpenNewWindow("Loot"); ChatFrame3.messageTypeList = { "LOOT", "MONEY" }; ChatFrame3.alpha = 0.5
+ChatFrame3.r, ChatFrame3.g, ChatFrame3.b = 0.1, 0.3, 0.6; ChatFrame3.noClick = true
 FCF_OpenNewWindow("Whispers"); ChatFrame4.isDocked = false; ChatFrame4.messageTypeList = { "WHISPER" }; ChatFrame4.size = 16
 MAIN_CHAT = YR_SETUP.ScanChat()
 ResetChats()
@@ -616,6 +732,8 @@ loot = [f for f in frames if f.name == "Loot"][0]
 whis = [f for f in frames if f.name == "Whispers"][0]
 report(loot.alpha == 0.5 and loot.isDocked and list(loot.messageTypeList.values()) == ["LOOT", "MONEY"],
        "a docked tab: its transparency and messages")
+report(abs(loot.r - 0.1) < 1e-6 and abs(loot.b - 0.6) < 1e-6, f"a tab's background colour: {loot.r}, {loot.g}, {loot.b}")
+report(loot.noClick is True and not whis.noClick, "uninteractable where the main had it, and only there")
 report(not whis.isDocked and whis.size == 16 and whis.w == 400 and whis.point is not None,
        "a floating window: undocked, its font size, size and position")
 
@@ -623,9 +741,8 @@ report(not whis.isDocked and whis.size == 16 and whis.w == 400 and whis.point is
 # at SETTINGS_LOADED), so Set up layout has no bars left to change and asks for no reload.
 lua.execute('''TOGGLES = { false, false, false, false, false, false, false }
 LOADED = {}
-local p = YR_SETUP:Profile()
-p.ui = p.ui or {}
-p.ui.bars = { [2] = true, [3] = true, [4] = false }''')
+YippSetupDB.ui = YippSetupDB.ui or {}
+YippSetupDB.ui.bars = { [2] = true, [3] = true, [4] = false }''')
 n = YS.EarlyBars()
 report(n == 2 and g.TOGGLES[1] is True and g.TOGGLES[2] is True, f"first login: the main's bars set before Blizzard shows the bars ({n} changed)")
 lua.execute('''LOADED = { "Bartender4" }; TOGGLES = { false, false, false, false, false, false, false }''')

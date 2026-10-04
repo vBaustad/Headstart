@@ -90,6 +90,13 @@ function YR:StartScan()
     YR.Print(("scanning %d quests (quest XP is as seen at level %d)."):format(#queue, UnitLevel("player")))
 end
 
+--- Delete the scan's results (they stay in the saved file until then). Not while one is running.
+function YR.DeleteScan()
+    if ticker or not YippRouteDB.scan then return false end
+    YippRouteDB.scan = nil
+    return true
+end
+
 function YR:StopScan()
     if not ticker then return end
     ticker:Cancel()

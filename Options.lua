@@ -12,8 +12,8 @@ function YR:BuildOptions()
     local note = S.Text(panel, 13, S.C.muted)
     note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
     note:SetText("Routes, this run, sharing and settings are in Headstart's own window.")
+    -- Settings stays open (closing it from addon code is forbidden); our window sits above it
     local open = S.Button(panel, "Open Headstart", function()
-        if SettingsPanel then HideUIPanel(SettingsPanel) end
         YR:ToggleWindow("settings")
     end, "primary")
     open:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -14)

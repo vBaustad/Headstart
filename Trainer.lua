@@ -1,7 +1,11 @@
 -- Auto trainer: at your class trainer, the spells you chose are learned as the window opens.
 -- Per class (YippRouteDB.trainer[CLASS]): for each spell (all its ranks) Always, If I can afford it,
 -- or Never, and a reserve: "If I can afford it" spells are only bought while you'd keep at least that
--- much. Always first, then the rest, each lowest level first. Hold Shift as you open the trainer to do
+-- much; "Always" spells whenever the gold is there.
+-- Defaults (data version 2, 2026-10-02): "If I can afford it" and a 2 silver reserve, so a new
+-- character never trains itself down to nothing. A class's table from before keeps what it had -
+-- "Always" for every spell left alone, no reserve - because it was stored as "nothing chosen" and a
+-- player may have relied on it; the Trainer page has buttons to switch a whole class at once. Always first, then the rest, each lowest level first. Hold Shift as you open the trainer to do
 -- it yourself. Account option autoTrain (Settings, Trainer). RestedXP's own trainer automation (it
 -- buys everything on its list) is switched off while ours is on, and back on when ours goes off.
 local _, YR = ...
@@ -16,18 +20,33 @@ function YR.TrainerData(class)
     end
     local d = YippRouteDB.trainer[class]
     if not d then
-        d = { reserve = 0, spells = {} }
+        d = { reserve = 200, spells = {}, v = 2 }
         YippRouteDB.trainer[class] = d
     end
     return d
 end
 
+--- What a spell nobody chose for gets: "If I can afford it", or "Always" in a table from before v2.
+function YR.TrainerDefault(class)
+    return YR.TrainerData(class).v == 2 and "gold" or "always"
+end
+
 function YR.TrainerChoice(name, class)
-    return YR.TrainerData(class).spells[name] or "always"
+    return YR.TrainerData(class).spells[name] or YR.TrainerDefault(class)
 end
 
 function YR.SetTrainerChoice(name, choice, class)
-    YR.TrainerData(class).spells[name] = choice ~= "always" and choice or nil
+    YR.TrainerData(class).spells[name] = choice ~= YR.TrainerDefault(class) and choice or nil
+end
+
+--- One choice for many spells: every one in `names` (a list), or only those learned up to `maxLevel`
+--- when `levels` ([name] = level) is given.
+function YR.SetTrainerChoices(names, choice, class, levels, maxLevel)
+    for _, name in ipairs(names) do
+        if not (levels and maxLevel) or (levels[name] or 0) <= maxLevel then
+            YR.SetTrainerChoice(name, choice, class)
+        end
+    end
 end
 
 -- RestedXP's trainer automation: off while ours is on (remembering it was on), back when ours is off.
@@ -58,6 +77,7 @@ local function Service(i)
     if type(b) == "number" then return name, r, a end
     return name, a, b
 end
+YR.TrainerService = Service   -- the trainer reminder (Reminders.lua) reads the costs with it
 
 -- What to buy now, in order: [{ index, name, rank, cost }], and what was left for want of gold.
 function YR.TrainerPlan(money)

@@ -34,6 +34,7 @@ function Obj.RegisterEvent(self, e) rawset(self, "_ev", rawget(self, "_ev") or {
 function Obj.SetText(self, t) rawset(self, "_text", t) end
 function Obj.GetText(self) return rawget(self, "_text") or "" end
 function Obj.SetValue(self, v) rawset(self, "_value", v) end
+function Obj.SetWidth(self, w) rawset(self, "_w", w) rawset(self, "_wn", (rawget(self, "_wn") or 0) + 1) end
 function Obj.GetLeft() return 100 end
 function Obj.GetTop() return 600 end
 function CreateFrame(_, name) local f = setmetatable({}, Obj) table.insert(FRAMES, f) if name then _G[name] = f end return f end
@@ -105,6 +106,17 @@ strtrim = function(s) return s end
     texts, mid = fly(2, 60)
     check(texts[0] == "1:00" or texts[0] == "0:59", f"second time: counts down from the learned time: {texts[0]}")
     check(mid == "0:01", f"a second before landing: {mid}")
+
+    # the fill is drawn when it moves a whole pixel, not on every frame between
+    g.HOOKS.TakeTaxiNode(2)
+    lua.execute("Tick(0.5); ONTAXI = true; Tick(0.5); Tick(10)")
+    fill = g.HeadstartFlightFrame.fill
+    n0, w0 = fill._wn, fill._w
+    lua.execute("for i = 1, 20 do Tick(0.0005) end")
+    check(fill._wn == n0, f"twenty frames inside one pixel: the fill isn't touched ({fill._wn - n0} redraws)")
+    lua.execute("Tick(5)")
+    check(fill._wn == n0 + 1 and fill._w > w0, f"five seconds on: drawn again, further along ({w0} -> {fill._w})")
+    lua.execute("Tick(60); ONTAXI = false; Fire('PLAYER_CONTROL_GAINED')")
 
     # Menethil: never flown, two hops of 0.2 against Thelsamar's one of 0.1: four times the minute,
     # by way of Thandol Span, halfway

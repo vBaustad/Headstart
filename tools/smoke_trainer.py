@@ -71,6 +71,27 @@ RXP = { settings = { profile = { enableTrainerAutomation = true } } }
         { "Lay on Hands", "Rank 1", "used", 0, 10 },
     }''')
     lua.execute("Fire('PLAYER_LOGIN')")
+    # a new class table: "If I can afford it" for everything, and a 2 silver reserve
+    check(g.YRT.TrainerChoice("Holy Light") == "gold" and g.YRT.TrainerData().reserve == 200,
+          "new defaults: If I can afford it, keep 2 silver")
+    got = visit(1700)
+    check(got == ["Seal of the Crusader Rank 1", "Seal of Righteousness Rank 2"],
+          f"17s: the lower spells, then not under 2s (Holy Light would leave 1s): {got}")
+    # "first spells always": Always up to level 10, the rest stay If I can afford it
+    lua.execute("""YRT.SetTrainerChoices({ "Seal of the Crusader", "Seal of Righteousness", "Holy Light", "Hammer of Justice" },
+        "always", nil, { ["Seal of the Crusader"] = 6, ["Seal of Righteousness"] = 10, ["Holy Light"] = 12,
+        ["Hammer of Justice"] = 24 }, 10)""")
+    check(g.YRT.TrainerChoice("Seal of Righteousness") == "always" and g.YRT.TrainerChoice("Holy Light") == "gold",
+          "Always up to level 10: the level-10 seal yes, Holy Light (12) no")
+    got = visit(1200)
+    check(got == ["Seal of the Crusader Rank 1", "Seal of Righteousness Rank 2"],
+          f"12s: both Always spells, though that leaves 1s - under the reserve, which Always ignores: {got}")
+    lua.execute("""YRT.SetTrainerChoices({ "Seal of the Crusader", "Seal of Righteousness", "Holy Light" }, "gold")""")
+    check(g.YRT.TrainerChoice("Holy Light") == "gold" and g.YRT.TrainerData().spells["Holy Light"] is None,
+          "All: If I can afford it - back to the default, nothing stored")
+    # a table from before v2 keeps Always for what was left alone, and no reserve
+    lua.execute("YippRouteDB.trainer.PALADIN = { reserve = 0, spells = {} }")
+    check(g.YRT.TrainerChoice("Holy Light") == "always", "an older table: Always stays Always")
     check(g.RXP.settings.profile.enableTrainerAutomation is False and g.YippRouteDB.rxpTrainerWasOn,
           "RestedXP's trainer automation is off while ours is on")
     got = visit(10000)

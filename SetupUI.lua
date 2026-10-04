@@ -18,6 +18,22 @@ local CVARS = {
     "UnitNameOwn", "UnitNameNPC", "nameplateShowEnemies", "nameplateShowFriends", "statusText",
     "statusTextDisplay", "cameraDistanceMaxZoomFactor", "showTutorials", "enableFloatingCombatText",
     "chatStyle", "chatMouseScroll", "chatClassColorOverride", "whisperMode", "showTimestamps", "removeChatDelay",
+    -- Raid and party frames: every display option Blizzard's raid frames read (the CVar table in
+    -- Blizzard_CompactUnitFrameProfiles.lua) - class colours, power bars, buffs and debuffs, dispel
+    -- indicators, health text and colours, pets, main tanks. Their size, groups and sorting are Edit
+    -- Mode's, which is copied with the layout.
+    "raidFramesDisplayClassColor", "raidFramesDisplayPowerBars", "raidFramesDisplayOnlyHealerPowerBars",
+    "raidFramesDisplayIncomingHeals", "raidFramesDisplayAggroHighlight", "raidFramesHealthBarColor",
+    "raidFramesHealthBarColorBG", "raidFramesHealthText", "raidFramesDisplayBuffs", "raidFramesDisplayDebuffs",
+    "raidFramesDisplayOnlyDispellableDebuffs", "raidFramesDisplayLargerRoleSpecificDebuffs",
+    "raidFramesDispelIndicatorType", "raidFramesDispelIndicatorOverlay", "raidFramesDispelIndicatorOverlayAnimation",
+    "raidFramesDispelIndicatorAnimatedBorder", "raidFramesCenterBigDefensive", "raidOptionDisplayPets",
+    "raidOptionDisplayMainTankAndAssist", "raidOptionIsShown",
+    -- The same for battleground frames.
+    "pvpFramesDisplayClassColor", "pvpFramesDisplayPowerBars", "pvpFramesDisplayOnlyHealerPowerBars",
+    "pvpFramesHealthText", "pvpOptionDisplayPets",
+    -- Coordinates on the minimap and the world map (the same Interface settings page).
+    "minimapShowPlayerCoords", "worldMapShowPlayerCoords", "worldMapShowCursorCoords", "coordsByTenths",
 }
 
 -- The RestedXP guide a new character starts on: Headstart's launch opener for its starting zone.
@@ -80,7 +96,7 @@ function YS:ScanUI()
 end
 
 --------------------------------------------------------------------------------
--- Chat windows: name, font size, colour, transparency, locked, docked or where it floats, and what it
+-- Chat windows: name, font size, background colour, transparency, locked, uninteractable, docked or where it floats, and what it
 -- shows (message groups and channels). Window 2 is the Combat Log: its look and dock, not its filters.
 --------------------------------------------------------------------------------
 
@@ -98,10 +114,12 @@ end
 function YS.ScanChat()
     local chat = {}
     for i = 1, NUM_CHAT_WINDOWS or 10 do
-        local name, size, r, g, b, a, shown, locked, docked = ChatInfo(i)
+        local name, size, r, g, b, a, shown, locked, docked, uninteractable = ChatInfo(i)
         local frame = _G["ChatFrame" .. i]
         if frame and name and name ~= "" and (shown or docked or i == 1) then
+            -- r, g, b, a: the window's background (right-click its tab, Background), which the tab follows
             local w = { id = i, name = name, size = size, r = r, g = g, b = b, a = a, locked = locked and true or false,
+                uninteractable = uninteractable and true or false,
                 docked = (docked or i == 1) and true or false, groups = List(frame.messageTypeList),
                 channels = List(frame.channelList) }
             if i == 1 or not docked then
@@ -139,6 +157,7 @@ local function ApplyChatWindow(w)
     if w.a then FCF_SetWindowAlpha(frame, w.a) end
     if w.size and w.size > 0 then FCF_SetChatWindowFontSize(nil, frame, w.size) end
     if FCF_SetLocked then FCF_SetLocked(frame, w.locked) end
+    if FCF_SetUninteractable and w.uninteractable ~= nil then FCF_SetUninteractable(frame, w.uninteractable) end
     if w.id ~= 2 then
         AddAll(frame, w.groups, "AddMessageGroup", "RemoveAllMessageGroups")
         AddAll(frame, w.channels, "AddChannel", "RemoveAllChannels")
@@ -220,6 +239,13 @@ local function ApplyLayoutClean(layout)
         end
     end
     if layout.type == Enum.EditModeLayoutType.Preset then return "preset '" .. tostring(layout.name) .. "' not found", false end
+    -- what Blizzard's MakeNewLayout checks first: a name it takes, and room for one more account layout
+    if api.IsValidLayoutName and not api.IsValidLayoutName(layout.name) then
+        return "'" .. tostring(layout.name) .. "' isn't a name Edit Mode takes", false
+    end
+    if em.AreLayoutsOfTypeMaxed and em.numLayouts and em:AreLayoutsOfTypeMaxed(Enum.EditModeLayoutType.Account) then
+        return "no room for '" .. tostring(layout.name) .. "': this account's Edit Mode layouts are full", false
+    end
     local info = layout.export and api.ConvertStringToLayoutInfo(layout.export)
     if not info then return "couldn't import '" .. tostring(layout.name) .. "'", false end
     info.layoutType, info.layoutName = Enum.EditModeLayoutType.Account, layout.name
@@ -257,7 +283,14 @@ end
 -- A moment later: did the layout and the bars take? A layout that didn't gets the old way and a
 -- reload; a bar frame not yet shown as wanted shows after a reload.
 local function CheckLater(layout, want)
-    C_Timer.After(1.5, function()
+    local function Check()
+        -- the old way moves the action bars: never in a fight, so it waits for the fight to end
+        if InCombatLockdown() then
+            local wait = CreateFrame("Frame")
+            wait:RegisterEvent("PLAYER_REGEN_ENABLED")
+            wait:SetScript("OnEvent", function(self) self:UnregisterAllEvents() Check() end)
+            return
+        end
         local em = EditModeManagerFrame
         local active = em and em.GetActiveLayoutInfo and em:GetActiveLayoutInfo()
         local reload = false
@@ -274,7 +307,8 @@ local function CheckLater(layout, want)
             YS.Print("reload to finish: until then the action bars can be blocked in combat.")
             StaticPopup_Show("YIPPSETUP_RELOAD")
         end
-    end)
+    end
+    C_Timer.After(1.5, Check)
 end
 
 local function ApplyGuide()
@@ -356,8 +390,8 @@ end
 -- So on a new character's first login the main's bars are set while Headstart loads, before that:
 -- Blizzard then shows them itself, and Set up layout finds them right, with nothing to reload for.
 function YS.EarlyBars()
-    local p, o = YS:Profile(), YS:Options()
-    if not (p and p.ui and p.ui.bars and o.barVisibility) then return end
+    local ui, o = YS:SharedUI(), YS:Options()
+    if not (ui and ui.bars and o.barVisibility) then return end
     if FirstLoaded(UI_SUITES) or FirstLoaded(BAR_ADDONS) then return end
-    return ApplyBarsClean(p.ui.bars)
+    return ApplyBarsClean(ui.bars)
 end

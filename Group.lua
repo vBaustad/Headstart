@@ -146,8 +146,9 @@ function YR.RouteQuestTitle(title)
 end
 
 local function Share(questID)
-    if not YR.Option("groupShare") or not (IsInGroup and IsInGroup()) then return end
-    if sharedToMe[questID] or not YR.RouteQuest(questID) then return end
+    if not (IsInGroup and IsInGroup()) or sharedToMe[questID] then return end
+    -- The route's quests (groupShare), or every quest (shareAll, PartyQuests.lua).
+    if not ((YR.Option("groupShare") and YR.RouteQuest(questID)) or YR.ShareAll()) then return end
     if C_QuestLog.IsPushableQuest and not C_QuestLog.IsPushableQuest(questID) then return end
     pcall(C_QuestLog.SetSelectedQuest, questID)
     pcall(QuestLogPushQuest)
@@ -173,13 +174,15 @@ f:SetScript("OnEvent", function(_, event, a, b, c, d)
         local id = GetQuestID and GetQuestID()
         if id and FromPlayer() then
             sharedToMe[id] = true
-            if YR.Option("groupAccept") and YR.RouteQuest(id) and not IsShiftKeyDown() then
+            if (YR.Option("groupAccept") and YR.RouteQuest(id) and not IsShiftKeyDown())
+                or YR.AcceptSharedBy("npc") then
                 AcceptQuest()
             end
         end
     elseif event == "QUEST_ACCEPT_CONFIRM" then
         -- a party member started an escort: join it, if it's one of the route's
-        if YR.Option("groupAccept") and ConfirmAcceptQuest and YR.RouteQuestTitle(b) then
+        if ConfirmAcceptQuest and ((YR.Option("groupAccept") and YR.RouteQuestTitle(b))
+            or YR.AcceptSharedBy(nil, a)) then
             ConfirmAcceptQuest()
         end
     elseif event == "QUEST_ACCEPTED" then

@@ -319,6 +319,8 @@ function S.OpenMenu(anchor, options, onPick, width)
         catcher:SetAllPoints(UIParent)
         catcher:SetFrameStrata("FULLSCREEN")
         catcher:SetScript("OnClick", CloseMenu)
+        catcher:RegisterEvent("PLAYER_REGEN_DISABLED")
+        catcher:SetScript("OnEvent", CloseMenu)
         menu = CreateFrame("Frame", nil, UIParent)
         menu:SetFrameStrata("FULLSCREEN_DIALOG")
         S.Fill(menu, S.C.card)
@@ -326,12 +328,12 @@ function S.OpenMenu(anchor, options, onPick, width)
         menu.items = {}
         menu:EnableMouseWheel(true)
         menu:SetScript("OnMouseWheel", function(self, d)
-            self.offset = math.max(0, math.min(#self.options - #self.items, self.offset - d * 2))
+            self.offset = math.max(0, math.min(#self.options - self.count, self.offset - d * 2))
             self:Fill()
         end)
         function menu:Fill()
-            for i, item in ipairs(self.items) do
-                local o = self.options[i + self.offset]
+            for i = 1, self.count do
+                local item, o = self.items[i], self.options[i + self.offset]
                 if o then
                     item:Show()
                     item.value = o[1]
@@ -360,10 +362,9 @@ function S.OpenMenu(anchor, options, onPick, width)
         item:SetScript("OnClick", function(self) CloseMenu() menu.onPick(self.value) end)
         menu.items[i] = item
     end
+    -- rows past this menu's length stay in the pool, hidden, for the next long menu
     for i = shown + 1, #menu.items do menu.items[i]:Hide() end
-    local items = {}
-    for i = 1, shown do items[i] = menu.items[i] end
-    menu.items = items
+    menu.count = shown
     menu:SetSize(width or anchor:GetWidth(), shown * 22 + 2)
     menu:ClearAllPoints()
     menu:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -2)
@@ -463,34 +464,81 @@ function S.Card(parent, title, note)
 end
 
 -- A vertical scroll area for content taller than its box: put things on area.content.
+-- A scrolling area: the mouse wheel, and a bar down the right you can grab and drag, or click above or
+-- below the handle to move a page. (It used to be a 3-pixel line you could only look at.)
 function S.ScrollArea(parent, width, height)
     local sf = CreateFrame("ScrollFrame", nil, parent)
     sf:SetSize(width, height)
     local content = CreateFrame("Frame", nil, sf)
-    content:SetSize(width - 10, 10)
+    content:SetSize(width - 14, 10)
     sf:SetScrollChild(content)
     sf.content = content
-    local bar = sf:CreateTexture(nil, "OVERLAY")
-    bar:SetColorTexture(1, 1, 1, 0.16)
-    bar:SetWidth(3)
+
+    local track = CreateFrame("Button", nil, sf)
+    track:SetPoint("TOPRIGHT")
+    track:SetPoint("BOTTOMRIGHT")
+    track:SetWidth(10)
+    local groove = track:CreateTexture(nil, "BACKGROUND")
+    groove:SetPoint("TOP") groove:SetPoint("BOTTOM")
+    groove:SetWidth(4)
+    groove:SetColorTexture(1, 1, 1, 0.05)
+    local thumb = CreateFrame("Button", nil, track)
+    thumb:SetWidth(10)
+    thumb.tex = thumb:CreateTexture(nil, "OVERLAY")
+    thumb.tex:SetPoint("TOP") thumb.tex:SetPoint("BOTTOM")
+    thumb.tex:SetWidth(6)
+    thumb.tex:SetColorTexture(1, 1, 1, 0.22)
+    thumb:SetScript("OnEnter", function(self) self.tex:SetColorTexture(1, 1, 1, 0.4) end)
+    thumb:SetScript("OnLeave", function(self) if not self.dragging then self.tex:SetColorTexture(1, 1, 1, 0.22) end end)
+    sf.bar, sf.thumb = track, thumb
+
+    local function Range() return sf:GetVerticalScrollRange() or 0 end
+    local function ThumbH(range) return math.max(28, height * height / (height + range)) end
+    local function Scroll(to)
+        local range = Range()
+        sf:SetVerticalScroll(math.max(0, math.min(range, to)))
+        sf:UpdateBar()
+    end
     function sf:UpdateBar()
-        local range = self:GetVerticalScrollRange()
+        local range = Range()
         if range and range > 1 then
-            bar:Show()
-            local h = math.max(24, height * height / (height + range))
-            bar:SetHeight(h)
-            bar:ClearAllPoints()
-            bar:SetPoint("TOPRIGHT", 0, -(height - h) * self:GetVerticalScroll() / range)
+            track:Show()
+            local h = ThumbH(range)
+            thumb:SetHeight(h)
+            thumb:ClearAllPoints()
+            thumb:SetPoint("TOP", track, "TOP", 0, -(height - h) * self:GetVerticalScroll() / range)
         else
-            bar:Hide()
+            track:Hide()
         end
     end
-    sf:EnableMouseWheel(true)
-    sf:SetScript("OnMouseWheel", function(self, d)
-        local range = self:GetVerticalScrollRange() or 0
-        self:SetVerticalScroll(math.max(0, math.min(range, self:GetVerticalScroll() - d * 36)))
-        self:UpdateBar()
+    -- Dragging: where the handle was grabbed stays under the cursor.
+    local function CursorY()
+        local _, y = GetCursorPosition()
+        return y / (track:GetEffectiveScale() or 1)
+    end
+    thumb:RegisterForDrag("LeftButton")
+    thumb:SetScript("OnDragStart", function(self)
+        self.dragging = true
+        self.fromY, self.fromScroll = CursorY(), sf:GetVerticalScroll()
+        self:SetScript("OnUpdate", function()
+            local range = Range()
+            local room = height - ThumbH(range)
+            if room > 0 then Scroll(self.fromScroll + (self.fromY - CursorY()) * range / room) end
+        end)
     end)
+    thumb:SetScript("OnDragStop", function(self)
+        self.dragging = false
+        self:SetScript("OnUpdate", nil)
+        if not self:IsMouseOver() then self.tex:SetColorTexture(1, 1, 1, 0.22) end
+    end)
+    -- A click in the groove: a page towards where you clicked.
+    track:SetScript("OnClick", function()
+        local top = thumb:GetTop() or 0
+        Scroll(sf:GetVerticalScroll() + (CursorY() > top and -1 or 1) * (height - 24))
+    end)
+
+    sf:EnableMouseWheel(true)
+    sf:SetScript("OnMouseWheel", function(self, d) Scroll(self:GetVerticalScroll() - d * 36) end)
     sf:SetScript("OnScrollRangeChanged", function(self) self:UpdateBar() end)
     return sf
 end

@@ -5,7 +5,7 @@
 -- estimate: its length on the flight map (the hops it flies over) times the seconds per unit of length
 -- the timed flights on that map averaged (YippRouteDB.flightPace[taxi map]). With none of these, the
 -- bar counts up while it learns. RestedXP's own flight bar is hidden while ours shows.
--- Account option flightTimer (Settings, Route); the bar is dragged where you want it while it shows.
+-- Account option flightTimer (Settings, QoL); the bar is dragged where you want it while it shows.
 local _, YR = ...
 
 local frame
@@ -111,11 +111,13 @@ local function Circle(layer, sub, size, color)
 end
 
 -- The fill: amber at the left edge to the colour of how far you are at its right edge.
+local farColor
 local function Shade(tex, p)
     local r, g, b = Mix(FAR, NEAR, p)
     if tex.SetGradient and CreateColor then
+        farColor = farColor or CreateColor(FAR[1], FAR[2], FAR[3], 1)
         tex:SetColorTexture(1, 1, 1, 1)
-        tex:SetGradient("HORIZONTAL", CreateColor(FAR[1], FAR[2], FAR[3], 1), CreateColor(r, g, b, 1))
+        tex:SetGradient("HORIZONTAL", farColor, CreateColor(r, g, b, 1))
     else
         tex:SetColorTexture(r, g, b, 1)
     end
@@ -271,16 +273,17 @@ local function LayOut()
         end
     end
     for n = #points + 1, #frame.markers do frame.markers[n]:Show(false) frame.markers[n].at = nil end
-    frame.laid = flight
+    frame.laid, frame.drawn = flight, nil
 end
 
 function YR:AnimateFlight()
     if not (frame and flight) then return end
     if frame.laid ~= flight then LayOut() end
     local p = Progress()
-    local fillX
+    local fillX = p and Round(p * frame.len)
+    -- the fill only moves a whole pixel a few times a second: the frames between draw nothing
+    if p and frame.drawn == fillX then return end
     if p then
-        fillX = Round(p * frame.len)
         frame.fill:SetWidth(math.max(1, fillX))
         frame.fill:SetShown(fillX >= 1)
         Shade(frame.fill, p)
@@ -296,7 +299,9 @@ function YR:AnimateFlight()
         frame.sweep:ClearAllPoints()
         frame.sweep:SetPoint("LEFT", frame, "TOPLEFT", X0 + x, TRACK_Y)
         frame.sweep:Show()
+        if frame.drawn == false then return end      -- the nodes stay as they are while it's timed
     end
+    frame.drawn = fillX or false
     -- each node fills as the fill reaches it, in the fill's colour where it is (the start's is full
     -- from take-off: you are there)
     local cur = { Mix(FAR, NEAR, p or 0) }

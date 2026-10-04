@@ -5,7 +5,7 @@
 -- or a disconnect can't lose time. The server also says how long you have been at this level, which
 -- gives the level's start even on a character the splits never saw before.
 --
---   XP/hr: 15.5k                      over the last 10 minutes of play
+--   XP/hr: 15.5k   1.2k / 2.8k        over the last 10 minutes of play; this level's XP of what it takes
 --   Ding: 4 min                       at that rate
 --   Time: 58:06                       total play time, green while the next level can still beat the best run
 --               level   total  vs best
@@ -211,8 +211,10 @@ local function Refresh()
         -- green while you can still reach the next level before the best run did
         frame.time:SetText(BLUE .. "Time:|r " .. Vs(run.elapsed, theirsNow))
         local xph = XPRate()
-        local left = UnitXPMax("player") - UnitXP("player")
-        frame.xph:SetText(BLUE .. "XP/hr:|r " .. (xph and xph > 0 and Short(xph) or "-"))
+        local xp, max = UnitXP("player"), UnitXPMax("player")
+        local left = max - xp
+        frame.xph:SetText(BLUE .. "XP/hr:|r " .. (xph and xph > 0 and Short(xph) or "-")
+            .. (max > 0 and ("   " .. Short(xp) .. GREY .. " / " .. Short(max) .. "|r") or ""))
         frame.ding:SetText(BLUE .. "Ding:|r " .. (xph and xph > 0 and ("%d min"):format(math.ceil(left / xph * 60)) or "-"))
         -- the level in progress, live
         local since = run.levels[level] or 0

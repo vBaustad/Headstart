@@ -56,10 +56,56 @@ function YS:Profile(class)
     return YippSetupDB and ClassData(class or PlayerClass()).profile
 end
 
+-- The interface - chat windows and tabs, Edit Mode, game settings, raid frames, camera, which bars show -
+-- is the account's, not a class's: set it up once on any character and every class gets it. Copy this
+-- layout saves it here (the newest copy wins); the bars stay per class. Kept as YippSetupDB.ui, with
+-- who it came from. From before (2026-10-02) each class's layout carried its own: the newest one copied
+-- from a real character (not a plan, which only ever held a level-1 character's defaults) becomes the
+-- account's, once.
+function YS:SharedUI()
+    if not YippSetupDB then return nil end
+    if YippSetupDB.ui == nil and not YippSetupDB.uiMoved then
+        YippSetupDB.uiMoved = true
+        local best
+        for _, c in pairs(YippSetupDB.classes or {}) do
+            local p = c.profile
+            if p and p.ui and not p.planned and (not best or (p.scanned or 0) > (best.scanned or 0)) then best = p end
+        end
+        if best then YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned = best.ui, best.from, best.scanned end
+    end
+    return YippSetupDB.ui
+end
+
+function YS:SaveSharedUI()
+    YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned = YS:ScanUI(), YS.PlayerKey(), time()
+    YippSetupDB.uiMoved = true
+end
+
+-- Set the class's saved layout (the bar planner, Planner.lua).
+function YS:SetProfile(profile, class)
+    ClassData(class or PlayerClass()).profile = profile
+end
+
 function YS:Options(class)
     local o = ClassData(class or PlayerClass()).options
+    -- A class set up for the first time gets "Only spells": no macros, so no text on the buttons and no
+    -- macro limit to run into. One that already has options (the old placeholders switch was filled in
+    -- the first time they were read) keeps the question marks it has been getting.
+    if o.spellButtons == nil and o.placeholders == nil then o.spellButtons = "spells" end
     for k, v in pairs(OPTION_DEFAULTS) do if o[k] == nil then o[k] = v end end
     return o
+end
+
+-- What a class spell's button is (option spellButtons):
+--   "placeholder"  the spell once known; until then a question-mark macro in its slot (the default)
+--   "spells"       only the spell itself: the slot waits empty and the spell goes in when it is learned
+--   "macros"       a "#showtooltip /cast" macro for every class spell, known or not, never swapped -
+--                  one macro per button, so it runs into the character's macro limit sooner
+-- Options saved before this have only the placeholders switch, which decides between the first two.
+function YS.SpellButtons(o)
+    local v = o.spellButtons
+    if v == "placeholder" or v == "spells" or v == "macros" then return v end
+    return o.placeholders == false and "spells" or "placeholder"
 end
 local MACRO_NAME_MAX = 16
 
@@ -79,6 +125,7 @@ local function PlayerKey()
     local name, realm = UnitFullName("player")
     return (name or "?") .. "-" .. (realm or GetRealmName() or "?")
 end
+YS.PlayerKey = function() return PlayerKey() end
 
 --------------------------------------------------------------------------------
 -- Scan
@@ -93,6 +140,14 @@ local function ReadMacroSlot(slot, id)
     if not name then return nil end
     return { kind = "macro", name = name, icon = icon, body = body }
 end
+
+-- Attack and the weapon spells (Throw, Shoot, Shoot Bow ...) this class can have: on no class skill line,
+-- so they were dropped from a copied layout. From the game's data (Data/PlannerSpells.lua).
+local function General(name)
+    local _, class = UnitClass("player")
+    return name and ((YR.PlannerGeneral or {})[class] or {})[name] ~= nil
+end
+YS.General = General
 
 -- Class spells up to the level limit, racials (Stoneform: every character has them from level 1),
 -- profession spells (placed on the new character once learned) and your own macros (AutoFeed's
@@ -114,9 +169,14 @@ function YS:Scan()
                     entry = { kind = "spell", name = name, level = lvl, racial = YS.RACIALS[name] or nil }
                     -- a lower rank than the main's best, kept on purpose (downranking): that rank, by ID
                     local best = C_Spell.GetSpellInfo(name)
-                    if best and best.spellID ~= id then entry.id, entry.down = id, true end
+                    if best and best.spellID ~= id then
+                        entry.id, entry.down = id, true
+                        entry.rank = YS.RankNumber(entry)
+                    end
                 elseif lvl then
                     n.later = n.later + 1
+                elseif General(name) then
+                    entry = { kind = "spell", name = name, general = true }
                 elseif name and YS.PROFESSIONS[name] then
                     -- the exact spell and its icon: one name can be several spells (see ProfessionSpellID)
                     entry = { kind = "spell", name = name, prof = true, id = id, icon = C_Spell.GetSpellTexture(id) }
@@ -135,8 +195,8 @@ function YS:Scan()
             end
         end
     end
-    ClassData(class).profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots,
-        ui = YS:ScanUI() }
+    ClassData(class).profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots }
+    YS:SaveSharedUI()
     Print(("saved %s: %d spells, %d profession spells, %d macros and %d items. What goes onto a new character is"
         .. " chosen in Settings, Character tab."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item))
 end
@@ -167,11 +227,27 @@ local function ShortName(spell)
     return short:sub(1, MACRO_NAME_MAX)
 end
 
+--- The rank a downranked button is kept at (a number), or nil. Saved with it (e.rank); a button saved
+--- before that has only the rank's spell ID, which the planner's rank list turns back into a number.
+local function RankNumber(e)
+    if not (e.down and e.id) then return nil end
+    if e.rank then return e.rank end
+    for _, r in ipairs(YR.PlannerRanks and YR.PlannerRanks(e.name) or {}) do
+        if r.id == e.id then return r.rank end
+    end
+    local sub = C_Spell.GetSpellSubtext and C_Spell.GetSpellSubtext(e.id)
+    return tonumber(type(sub) == "string" and sub:match("(%d+)") or "")
+end
+YS.RankNumber = RankNumber
+
 local function MacroFor(e)
     if e.kind == "spell" then
         local spell = REPLACE[e.name] or e.name
-        local cast = MOUSEOVER_SET()[spell] and ("/cast [@mouseover,help,nodead][] " .. spell) or ("/cast " .. spell)
-        return ShortName(spell), DYNAMIC_ICON, "#showtooltip " .. spell .. "\n" .. cast
+        -- a downranked button casts that rank, as a macro too: "Holy Light(Rank 2)"
+        local rank = spell == e.name and RankNumber(e)
+        local what = rank and ("%s(Rank %d)"):format(spell, rank) or spell
+        local cast = MOUSEOVER_SET()[spell] and ("/cast [@mouseover,help,nodead][] " .. what) or ("/cast " .. what)
+        return ShortName(spell), DYNAMIC_ICON, "#showtooltip " .. what .. "\n" .. cast
     end
     -- your own macros: no "(Rank 3)", so a spell always casts its highest known rank
     local body = (e.body or ""):gsub("%s*%(Rank %d+%)", "")
@@ -215,6 +291,8 @@ local function RealSpell(e)
     if e.prof then return ProfessionSpellID(e) end
     local spell = REPLACE[e.name] or e.name
     if MOUSEOVER_SET()[spell] then return nil end
+    -- macros for everything: a class spell stays its macro, learned or not (racials and Attack too)
+    if YS.SpellButtons(YS:Options()) == "macros" then return nil end
     -- a downranked slot: the main's rank once known; until then this character's best, which is lower
     if e.down and spell == e.name and IsPlayerSpell(e.id) then return e.id end
     return KnownSpellID(spell)
@@ -226,6 +304,7 @@ local function Wanted(e, levels, autofeed, o)
     if not e then return false end
     if e.kind == "spell" then
         if e.prof then return o.professions end
+        if e.general or General(e.name) then return o.classSpells end
         if e.racial or YS.RACIALS[e.name] then return o.racials end
         local lvl = e.level or levels[e.name]
         return lvl ~= nil and o.classSpells and lvl <= o.maxLevel
@@ -298,17 +377,39 @@ local function ClearCharacterMacros(keep)
     return removed
 end
 
+-- On a character that was set up before (changing the plan mid-levelling, say), only Headstart's own
+-- question-mark macros go: "#showtooltip <spell>" + "/cast", with the question-mark icon - the ones still
+-- needed are made again below. Every macro you made yourself on this character stays.
+local function ClearPlaceholders()
+    local _, numChar = GetNumMacros()
+    local base = Constants.MacroConsts.MAX_ACCOUNT_MACROS
+    local removed = 0
+    for i = base + numChar, base + 1, -1 do
+        local name, icon, body = GetMacroInfo(i)
+        if name and icon == DYNAMIC_ICON and type(body) == "string" and body:match("^#showtooltip [^\n]+\n/cast ") then
+            DeleteMacro(i)
+            removed = removed + 1
+        end
+    end
+    return removed
+end
+
 -- An existing macro (account or character) with the same body is reused, so applying twice
 -- doesn't duplicate anything and your general macros aren't copied into character slots.
-local function FindMacro(body)
+--- Every macro's index by its body (an account macro wins over a character one), read in one pass.
+local function MacroIndex()
     local numAccount, numChar = GetNumMacros()
     local base = Constants.MacroConsts.MAX_ACCOUNT_MACROS
-    for i = 1, numAccount do
-        if select(3, GetMacroInfo(i)) == body then return i end
+    local index = {}
+    for i = base + numChar, base + 1, -1 do
+        local body = select(3, GetMacroInfo(i))
+        if body then index[body] = i end
     end
-    for i = base + 1, base + numChar do
-        if select(3, GetMacroInfo(i)) == body then return i end
+    for i = numAccount, 1, -1 do
+        local body = select(3, GetMacroInfo(i))
+        if body then index[body] = i end
     end
+    return index
 end
 
 -- Blizzard drops every newly learned spell onto the first empty bar slot; with the bars set up from the
@@ -318,6 +419,41 @@ local function NoAutoPush()
     if cur == nil then return false end
     if cur ~= "0" then C_CVar.SetCVar("AutoPushSpellToActionBar", "0") end
     return true
+end
+
+--- How many character macros a layout takes with these options, and the game's limit (30 a character on
+--- Forever, MacroConstants). Each different macro counts once: your own macros, mouseover spells, and the
+--- class spells your Spell buttons choice makes into macros (all of them, or only those not learned
+--- yet). One that an account macro already is costs nothing: Set up uses that one.
+function YS:MacrosNeeded(p, o, class)
+    class = class or select(2, UnitClass("player"))
+    p, o = p or YS:Profile(class), o or YS:Options(class)
+    local limit = Constants and Constants.MacroConsts and Constants.MacroConsts.MAX_CHARACTER_MACROS or 30
+    if not (p and p.slots) then return 0, limit end
+    local levels, autofeed = YS.SPELL_LEVELS[class] or {}, AutoFeedNames()
+    local mode = YS.SpellButtons(o)
+    local bodies = {}
+    for _, e in pairs(p.slots) do
+        if Wanted(e, levels, autofeed, o) then
+            local body
+            if e.kind == "macro" then
+                body = select(3, MacroFor(e))
+            elseif e.kind == "spell" and not e.prof then
+                local mouseover = MOUSEOVER_SET()[REPLACE[e.name] or e.name]
+                if mouseover or mode == "macros" or (mode == "placeholder" and not RealSpell(e)) then
+                    body = select(3, MacroFor(e))
+                end
+            end
+            if body then bodies[body] = true end
+        end
+    end
+    local n, accountMax = 0, Constants and Constants.MacroConsts and Constants.MacroConsts.MAX_ACCOUNT_MACROS or 120
+    local index = next(bodies) and MacroIndex() or {}
+    for body in pairs(bodies) do
+        local idx = index[body]
+        if not (idx and idx <= accountMax) then n = n + 1 end
+    end
+    return n, limit
 end
 
 function YS:Apply(force)
@@ -336,14 +472,17 @@ function YS:Apply(force)
     local o = YS:Options()
     if o.clearBars then ClearBars() end
     local autofeed = AutoFeedNames()
-    local removed = o.clearMacros and ClearCharacterMacros(AutoFeedOwned()) or 0
+    local again = YippSetupCharDB.applied ~= nil
+    local removed = 0
+    if o.clearMacros then removed = again and ClearPlaceholders() or ClearCharacterMacros(AutoFeedOwned()) end
     local levels = YS.SPELL_LEVELS[class] or {}
     local made, placed, full, noAutoFeed, askedAutoFeed = 0, 0, nil, nil, 0
+    local macros      -- MacroIndex(), read again after each macro made
     for slot = 1, MAX_SLOT do
         local e = p.slots[slot]
         if not Wanted(e, levels, autofeed, o) then e = nil end
         local idx
-        local spellID = e and (levels[e.name] or YS.RACIALS[e.name] or e.prof) and RealSpell(e)
+        local spellID = e and (levels[e.name] or YS.RACIALS[e.name] or e.prof or e.general) and RealSpell(e)
         if spellID then
             PlaceSpell(slot, spellID)
             placed = placed + 1
@@ -362,17 +501,22 @@ function YS:Apply(force)
                 local ok, res = false, nil
                 if create then ok, res = pcall(create, e.name) end
                 own = ok and res or nil
-                if own then askedAutoFeed = askedAutoFeed + 1 end
+                if own then askedAutoFeed, macros = askedAutoFeed + 1, nil end
             end
             if own and own > 0 then idx = own else noAutoFeed = e.name end
         -- a layout saved by an older version can still hold items and non-class spells
-        elseif e and (e.kind == "macro" or (o.placeholders and e.kind == "spell" and (levels[e.name] or YS.RACIALS[e.name]))) then
+        -- a spell's macro: in the two macro modes, and always for a mouseover spell (that IS a macro)
+        elseif e and (e.kind == "macro" or (e.kind == "spell" and not e.prof
+                and (YS.SpellButtons(o) ~= "spells" or MOUSEOVER_SET()[REPLACE[e.name] or e.name])
+                and (levels[e.name] or YS.RACIALS[e.name] or e.general))) then
             local name, icon, body = MacroFor(e)
-            idx = FindMacro(body)
+            macros = macros or MacroIndex()
+            idx = macros[body]
             if not idx then
                 local ok, res = pcall(CreateMacro, name, icon, body, true)   -- per-character
                 if ok and res then
                     idx, made = res, made + 1
+                    macros = nil      -- character macros are kept sorted: their indexes just moved
                 else
                     full = name
                     break
@@ -387,8 +531,8 @@ function YS:Apply(force)
         end
     end
     YippSetupCharDB.applied = p.scanned
-    Print(("placed %d buttons from %s (%d new macros for spells not trained yet or your own, %d old character macros removed).")
-        :format(placed, p.from, made, removed))
+    Print(("placed %d buttons from %s (%d new macros for spells not trained yet or your own, %d %s removed).")
+        :format(placed, p.from, made, removed, again and "unused question-mark macros" or "old character macros"))
     if full then
         Print(("stopped at '%s': your character macro slots are full (%d)."):format(full, Constants.MacroConsts.MAX_CHARACTER_MACROS))
     end
@@ -403,7 +547,7 @@ function YS:Apply(force)
     if o.noAutoPush and not NoAutoPush() then
         Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
     end
-    YS:ApplyUI(p.ui, o)
+    YS:ApplyUI(YS:SharedUI(), o)
 end
 
 -- A spell just learned: its placeholder macro is swapped for the spell itself and then deleted; a
@@ -419,13 +563,17 @@ function YS:Upgrade()
         waiting = true
         return
     end
+    if GetCursorInfo and GetCursorInfo() then
+        C_Timer.After(2, function() YS:Upgrade() end)
+        return
+    end
     waiting = false
     local swapped = {}
     local _, class = UnitClass("player")
     local levels, autofeed = YS.SPELL_LEVELS[class] or {}, AutoFeedNames()
     for slot, e in pairs(p.slots) do
         local id = Wanted(e, levels, autofeed, o) and RealSpell(e)
-        if id and (e.prof or not o.placeholders) and not HasAction(slot) then
+        if id and (e.prof or YS.SpellButtons(o) == "spells") and not HasAction(slot) then
             PlaceSpell(slot, id)      -- just learned, and no placeholder holds its slot: straight in
         elseif id and HasAction(slot) then
             local kind, actionID = GetActionInfo(slot)
@@ -479,12 +627,12 @@ local window
 
 -- The first-time window: two choices, in Headstart's own look.
 local function BuildWindow()
-    local w = S.Window("YippSetupFrame", 380, 146, "Set up this character")
+    local w = S.Window("YippSetupFrame", 560, 146, "Set up this character")
     w:ClearAllPoints()
     w:SetPoint("CENTER", 0, 120)
     w.info = S.Text(w, 13, S.C.sub)
     w.info:SetPoint("TOPLEFT", 20, -62)
-    w.info:SetWidth(340)
+    w.info:SetWidth(520)
     w.info:SetWordWrap(true)
     w.info:SetSpacing(3)
 
@@ -493,7 +641,7 @@ local function BuildWindow()
     local function Done() YippSetupCharDB.seen = CharacterID() or true end
     -- Set up is instant (a new character wants to get going); Copy first shows every choice of what
     -- carries over (Settings, Character tab), and is done from there
-    w.setup = S.Button(w, "Set up layout", function() Done() YS:Apply() YS:Refresh() end, "primary")
+    w.setup = S.Button(w, "Apply to this character", function() Done() YS:Apply() YS:Refresh() end, "primary")
     w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
     w.setup.tip = "On a new character: put the saved layout on this one, now"
     w.copy = S.Button(w, "Copy this layout...", function()
@@ -503,6 +651,14 @@ local function BuildWindow()
     end)
     w.copy:SetPoint("RIGHT", w.setup, "LEFT", -8, 0)
     w.copy.tip = "On your main: see what a new character will get, then copy this one's bars, macros and settings"
+    -- No main to copy from: build the bars here, with every spell of the class at any level.
+    w.plan = S.Button(w, "Plan my bars...", function()
+        Done()
+        w:Hide()
+        YR.OpenPlanner()
+    end)
+    w.plan:SetPoint("BOTTOMLEFT", 16, 16)
+    w.plan.tip = "Drag every spell your class will have onto your bars now, and save it as this class's layout"
     w.close:HookScript("OnClick", Done)
     return w
 end
@@ -512,12 +668,16 @@ function YS:Refresh()
     local p = YS:Profile()
     local class = PlayerClass():lower()
     if not p then
-        window.info:SetText(("No %s layout saved yet. On your %s main, click Copy this layout."):format(class, class))
+        window.info:SetText(("No %s layout saved yet. Plan one now with every %s spell, or on your %s main"
+            .. " click Copy this layout."):format(class, class, class))
     else
         window.info:SetText(("Saved %s layout: |cffffffff%s|r.%s"):format(class, YS:Describe(p) or p.from,
-            p.ui and "" or "\n|cffff8040No bars or settings saved: log in on " .. p.from .. " once.|r"))
+            YS:SharedUI() and "" or "\n|cffff8040No interface saved yet: Copy this layout on a character set up the"
+                .. " way you like it.|r"))
     end
     window.setup:SetEnabled(p ~= nil and p.from ~= PlayerKey())
+    -- The planner is the way in when there's nothing saved; with a layout it's in Settings, Character.
+    window.plan:SetShown(p == nil or p.planned == true)
 end
 
 -- "Duplo-Bonk, 30 Sep 21:14": who the saved layout is from and when it was copied.
@@ -566,7 +726,8 @@ local function FirstZoom()
     if InCinematic and InCinematic() then return end        -- after it ends (CINEMATIC_STOP)
     YippSetupCharDB.zoomed = true
     local p = YS:Profile()
-    C_Timer.After(1, function() YS.ApplyCamera(p and p.ui and p.ui.camera or 15) end)
+    local ui = YS:SharedUI()
+    C_Timer.After(1, function() YS.ApplyCamera(ui and ui.camera or 15) end)
 end
 YS.FirstZoom = FirstZoom
 
@@ -574,10 +735,10 @@ YS.FirstZoom = FirstZoom
 -- character it was copied from fills it in, so the bars aren't copied again just for that.
 local function FillInUI()
     local p = YS:Profile()
-    if p and not p.ui and p.from == PlayerKey() then
-        p.ui = YS:ScanUI()
+    if p and not YS:SharedUI() and p.from == PlayerKey() then
+        YS:SaveSharedUI()
         YS:Refresh()
-        Print("added this character's Edit Mode layout, action bars and game settings to the saved layout.")
+        Print("saved this character's Edit Mode layout, chat, action bars and game settings as the account's interface.")
     end
 end
 
@@ -600,8 +761,14 @@ end
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
-f:RegisterEvent("SPELLS_CHANGED")        -- a spell learned (it also fires for much else; Upgrade is cheap)
+f:RegisterEvent("SPELLS_CHANGED")        -- a spell learned (it also fires for much else, in bursts)
 f:RegisterEvent("PLAYER_REGEN_ENABLED")
+local upgradeSoon = false
+local function UpgradeSoon()
+    if upgradeSoon then return end
+    upgradeSoon = true          -- a burst (training five spells, a login) costs one pass
+    C_Timer.After(0.2, function() upgradeSoon = false if YippSetupCharDB then YS:Upgrade() end end)
+end
 f:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "ADDON_LOADED" and arg1 == ADDON then
         local fresh = YippSetupCharDB == nil       -- this character's first login with Headstart
@@ -620,7 +787,7 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
         C_Timer.After(3, FillInUI)
         if YippSetupCharDB.applied then NoAutoPush() end
     elseif event == "SPELLS_CHANGED" or (event == "PLAYER_REGEN_ENABLED" and waiting) then
-        if YippSetupCharDB then YS:Upgrade() end
+        UpgradeSoon()
     end
 end)
 

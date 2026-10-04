@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="HEADSTART_INVITE" header="HEADSTART" category="ADDONS">
+		Headstart_InviteTarget()
+	</Binding>
+	<Binding name="HEADSTART_LEAVE" category="ADDONS">
+		Headstart_LeaveGroup()
+	</Binding>
+</Bindings>

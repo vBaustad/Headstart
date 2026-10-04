@@ -43,11 +43,54 @@ SlashCmdList.HEADSTART = function(msg)
         if arg == "reset" then YR:ResetSplits() else YR:ShowSplits(arg ~= "off") end
     elseif cmd == "flight" then
         YR:PreviewFlight()
+    elseif cmd == "restock" then
+        if MerchantFrame and MerchantFrame:IsShown() then YR.Restock(true) else YR.Print("open a vendor first.") end
+    elseif cmd == "trainer" then
+        YR.Print(YR.TrainerLine() or "nothing new at your class trainer.")
+    elseif cmd == "upgrades" then
+        YR.ScanUpgrades()
+    elseif cmd == "routes" then
+        if arg == "on" or arg == "off" then
+            YR.SetRoutesOn(arg == "on")
+        else
+            YR.Print("Headstart routes are " .. (YR.RoutesOn() and "on" or "off")
+                .. " for this account: /headstart routes on|off (then /reload).")
+        end
+        YR:RefreshWindow()
+    elseif cmd == "plan" then
+        YR.OpenPlanner()
+    elseif cmd == "inv" or cmd == "invite" then
+        YR.InviteTarget()
+    elseif cmd == "leave" then
+        YR.LeaveGroup()
+    elseif cmd == "mail" then
+        if YR.MailIsOpen() then YR.MailToAlt(true) else YR.Print("open a mailbox first.") end
+    elseif cmd == "bank" then
+        YR.DepositToBank(true)
+        if not YR.BankIsOpen() then YR.Print("open the bank first.") end
+    elseif cmd == "camp" then
+        if arg == "lock" or arg == "unlock" then
+            YR.SetCampLocked(arg == "lock")
+            YR.Print(arg == "lock" and "the campfire icon is locked."
+                or "the campfire icon is unlocked - drag the preview where you want it, then /headstart camp lock.")
+        elseif arg == "always" then
+            YR.SetCampAlways(not YR.Option("campAlways"))
+            YR.Print("the resting campfire icon is " .. (YR.Option("campAlways") and "on." or "off."))
+        elseif arg == "debug" then
+            YR.CampDebug()
+        else
+            YR.SetCampIcon(not YR.Option("camp"))
+            YR.Print("the campfire icon is " .. (YR.Option("camp") and "on." or "off."))
+        end
     elseif cmd == "status" then
         YR:ScanStatus()
         YR:LogStatus()
         YR.Print("/headstart - the window; /hs - Settings; /headstart scan (stop) - ask the server about every known quest;"
-            .. " /headstart log on|off; /headstart splits on|off|reset; /headstart flight - a sample flight bar to move")
+            .. " /headstart log on|off; /headstart splits on|off|reset; /headstart flight - a sample flight bar to move;"
+            .. " /headstart camp (unlock|lock|always|debug) - the campfire icon; /headstart bank - bank mats now; /headstart mail - mail them to your alt;"
+            .. " /headstart routes on|off - Headstart routes in RestedXP; /headstart inv - invite your target; /headstart leave - leave the group; /headstart plan - plan your bars;"
+            .. " /headstart restock - buy what you keep at this vendor; /headstart trainer - what's new at the trainer;"
+            .. " /headstart upgrades - look through your bags for better gear")
     else
         YR:ToggleWindow()
     end
@@ -70,6 +113,15 @@ f:SetScript("OnEvent", function(self, _, name)
     YR:HookTooltips()
     YR:StartSplits()
     YR:StartGroup()
+    YR.StartCamp()
+    YR.StartBank()
+    YR.StartMail()
+    YR.StartRestock()
+    YR.StartReminders()
+    YR.StartSim()
+    YR.StartUpgrades()
+    YR.StartCraftRemind()
+    YR.StartQuickGroup()
     YR:BuildMinimapButton()
     YR:BuildOptions()   -- last: Blizzard's options API is the part most likely to differ on this client
 end)

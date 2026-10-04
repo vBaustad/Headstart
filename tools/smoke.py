@@ -38,6 +38,30 @@ C_Timer = { NewTicker = function(_, fn) local t = { fn = fn, Cancel = function(s
             After = function() end }   -- until the tests make it run at once (below)
 function RunTickers() for _, t in ipairs(TICKERS) do if not t.dead then t.fn() end end end
 function GetTime() return NOW end
+function InCombatLockdown() return false end
+C_UnitAuras = { GetAuraDataByIndex = function() return nil end }   -- no buffs: the camp HUD rests
+SHOTS = 0
+function Screenshot() SHOTS = SHOTS + 1 end   -- the QoL screenshot at a ding
+function GetInventoryItemDurability() return nil end
+function GetInventoryItemID() return nil end
+function UnitExists() return false end   -- Quick group's bar: no target
+function UnitIsGroupLeader() return false end
+function UnitIsGroupAssistant() return false end
+function GetInventoryItemLink() return nil end
+KNOWN_SPELLS = KNOWN_SPELLS or {}
+function IsPlayerSpell(id) return KNOWN_SPELLS[id] == true end
+-- WoW's bit library, which plain Lua 5.1 hasn't got
+bit = bit or {
+    lshift = function(a, n) return a * 2 ^ n end,
+    band = function(a, b)
+        local r, p = 0, 1
+        while a > 0 and b > 0 do
+            if a % 2 == 1 and b % 2 == 1 then r = r + p end
+            a, b, p = math.floor(a / 2), math.floor(b / 2), p * 2
+        end
+        return r
+    end,
+}
 function time() return CLOCK end
 function date() return "today" end
 function floor(x) return math.floor(x) end
@@ -64,7 +88,7 @@ GameTooltip = setmetatable({}, { __index = function() return function() end end 
 function hooksecurefunc(a, b, c) if c then HOOKS[b] = c else HOOKS[a] = b end end
 -- bags (BAGS[bag * 100 + slot] = { itemID, stackCount }) and a vendor window
 BAGS = {}
-C_Container = { UseContainerItem = function() end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end }
+C_Container = { UseContainerItem = function() end, GetContainerNumSlots = function() return 16 end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end }
 MerchantFrame = { shown = false, IsShown = function(self) return self.shown end }
 DONE = {}
 -- the party: SENT collects addon messages; IN_GROUP / PARTY_NAMES say who is in it
@@ -191,6 +215,33 @@ check(com[1] - acc[1] == 300 and tin[1] - com[1] == 40, "times: 5 min objective,
 check(tin.xp == 80 and tin.money == 35, "turn-in: XP and money received")
 check(len(run.track) >= 1, "position samples recorded")
 check(run.track[1][7] == 0, "position sample carries flags (not in combat)")
+
+# standing still: the samples in between are left out, one kept every 30 s; moving off writes the last
+# still one first, so the move starts 2 s after it
+n0, clock0 = len(run.track), g.CLOCK
+for _ in range(20):                      # 40 s on one spot, a sample every 2 s
+    g.CLOCK += 2
+    g.RunTickers()
+still = [run.track[i][1] for i in range(n0 + 1, len(run.track) + 1)]
+check(len(still) <= 2 and all(b - a <= 30 for a, b in zip([run.track[n0][1]] + still, still)),
+      f"40 s standing still: {len(still)} samples written, none more than 30 s apart ({still})")
+g.CLOCK += 2
+lua.execute("C_Map.GetPlayerMapPosition = function() return { GetXY = function() return 0.31, 0.712 end } end")
+g.RunTickers()
+last2 = [run.track[i] for i in (len(run.track) - 1, len(run.track))]
+check(last2[1][1] - last2[0][1] == 2 and last2[1][3] != last2[0][3],
+      f"moving off: the last still sample, then the move 2 s later ({last2[0][1]}, {last2[1][1]})")
+g.CLOCK += 2
+g.RunTickers()
+check(run.track[len(run.track)][1] - run.track[len(run.track) - 1][1] == 2, "moving: every sample kept")
+lua.execute("C_Map.GetPlayerMapPosition = function() return { GetXY = function() return 0.2993, 0.712 end } end")
+g.CLOCK = clock0                         # the tests below go on from the turn-in's second
+# a log from before: thinned once by the same rule, every move and every gap over 30 s kept
+old = lua.eval("""{ {0,1,5,5,1,0,0}, {2,1,5,5,1,0,0}, {4,1,5,5,1,0,0}, {6,1,5,5,1,0,0}, {8,1,6,5,1,0,0},
+    {10,1,7,5,1,0,0}, {12,1,7,5,1,0,0}, {500,1,7,5,1,0,0}, {502,1,7,5,1,0,0} }""")
+dropped = YR.SlimTrack(old)
+times = [old[i][1] for i in range(1, len(old) + 1)]
+check(times == [0, 6, 8, 10, 12, 500, 502], f"an old log thinned: {dropped} left out, kept {times}")
 
 # XP from the turn-in above is not a kill; XP after it, in a fight, is. RestedXP's step is logged when it changes.
 g.XP = 460; g.Fire("PLAYER_XP_UPDATE")          # the turn-in's 80 XP, same second as QUEST_TURNED_IN
@@ -384,7 +435,8 @@ for _ in range(5):
 lua.execute("LVL = 2"); g.Fire("PLAYER_LEVEL_UP", 2)
 b = splits.runs["Player-B"]
 check(abs(b.levels[2] - 50) < 1, f"B: level 2 at {b.levels[2]:.0f} s of play")
-said = g.PRINTS[len(g.PRINTS)]
+# the last few lines: the ding also brings the QoL reminders (trainer, talents) after this one
+said = " / ".join(g.PRINTS[i] for i in range(max(1, len(g.PRINTS) - 3), len(g.PRINTS) + 1))
 check("|cff40ff40-0:50" in said, f"B is told it is 50 s ahead of A: {said}")
 # the table: the live row for level 3 on top, then level 2 - its own time 0:50 and total 0:50, green against A's 1:40
 YR.ShowSplits(YR, True)
@@ -395,6 +447,8 @@ check("Level 3" in row(1)[0], f"live row: {row(1)}")
 check(row(2)[0] == "|cff66ccffLevel 2|r" and row(2)[1] == "|cff40ff400:50|r" and row(2)[2] == "|cff40ff400:50|r"
       and row(2)[3] == "|cff40ff40-0:50|r", f"level 2 row, green: {row(2)}")
 check(f.time.text.startswith("|cff66ccffTime:|r "), f"total time: {f.time.text}")
+xp_now = lua.eval("UnitXP('player')")
+check(f.xph.text.endswith(f"   {xp_now}|cff999999 / 400|r"), f"XP/hr line ends with this level's XP of what it takes: {f.xph.text}")
 lua.execute('''GUID = "Player-C"; XP = 900; LVL = 12''')
 YR.StartSplits(YR)
 g.Fire("TIME_PLAYED_MSG", 36000, 600)
@@ -415,6 +469,29 @@ YR.StartSplits(YR)
 old = [splits.runs[k] for k in splits.runs.keys() if str(k).startswith("log:Old-Realm")]
 ok = len(old) == 1 and old[0].levels[2] == 30 and old[0].levels[3] == 60 and old[0].levels[20] is None
 check(ok, "old run imported: level 2 at 0:30, 3 at 1:00 (an hour logged out skipped), the level-20 main not part of it")
+# Cleaning up the logs: a list by last played, one deleted (this character's starts again), old ones at login
+lua.execute('''YippRouteDB.runs["Gone-Realm"] = { started = 10, ev = { { 20 } }, track = { { 30, 1, 0, 0, 5, 0, 0 } } }''')
+summary = YR.LogSummary()
+keys = [summary[i].key for i in range(1, len(summary) + 1)]
+lasts = [summary[i].last for i in range(1, len(summary) + 1)]
+check(set(keys) == {"Tester-Realm", "Gone-Realm", "Old-Realm"} and lasts == sorted(lasts, reverse=True)
+      and keys[-1] == "Gone-Realm", f"every character's log, the one played last first: {keys}")
+check(YR.DeleteLog("Gone-Realm") and g.YippRouteDB.runs["Gone-Realm"] is None, "a character's log deleted")
+mine = g.YippRouteDB.runs["Tester-Realm"]
+check(YR.DeleteLog("Tester-Realm") and g.YippRouteDB.runs["Tester-Realm"] is not None
+      and len(g.YippRouteDB.runs["Tester-Realm"].track) == 0, "this character's: deleted, and a new log from now")
+g.RunTickers()
+check(len(g.YippRouteDB.runs["Tester-Realm"].track) == 1, "and recording goes on into the new one")
+new = g.YippRouteDB.runs["Tester-Realm"]
+new.ev, new.track = mine.ev, mine.track            # the tests below read this character's log
+lua.execute('''YippRouteDB.runs["Gone-Realm"] = { started = 10, ev = {}, track = {} }''')
+check(YR.PruneLogs(0) == 0 and g.YippRouteDB.runs["Gone-Realm"] is not None, "0 days: nothing deleted")
+g.CLOCK += 40 * 86400                    # forty days on
+n = YR.PruneLogs(30)
+g.CLOCK -= 40 * 86400
+check(g.YippRouteDB.runs["Gone-Realm"] is None and g.YippRouteDB.runs["Tester-Realm"] is not None,
+      f"30 days: the old logs go ({n}), never this character's")
+lua.execute('''YippRouteDB.runs["Old-Realm"] = { track = { {0,1,0,0,1,0} } }''')
 # The run to beat has a time for every level: a faster one first seen part-way (only a level-8 total)
 # would leave every "vs best" cell empty.
 lua.execute('''SAVED_RUNS = YippRouteDB.splits.runs
@@ -530,6 +607,13 @@ check(".accept 179 >>Accept Dwarven Outfitters" in steps_["Took Dwarven Outfitte
       and ".goto 1426,29.93,71.20" in steps_["Took Dwarven Outfitters"], "taking a quest becomes an accept step with its place")
 check(".collect 2901,1" in steps_["Bought Mining Pick"] and ".train 2575" in steps_["Learned Mining"], "buy and learn steps")
 # the window builds, and a recorded step can be put into the open route
+lua.execute("""SEEN_ICONS = {}
+local F = getmetatable(CreateFrame())
+local set = F.SetText
+F.SetText = function(self, t)
+    if type(t) == "string" and t:find("|T%d+:18") then SEEN_ICONS[#SEEN_ICONS + 1] = t end
+    set(self, t)
+end""")
 YR.ToggleWindow(YR)
 check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is False, "the window opens")
 header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
@@ -547,9 +631,35 @@ bad_import = YR.ImportGuide(YR, "hello")
 check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a guide is refused, with the reason")
 YR.RevertGuide(YR, "coldridge")
 YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
+icons = [g.SEEN_ICONS[i] for i in range(1, len(g.SEEN_ICONS) + 1)]
+check(any("Seal of" in t or "Holy Light" in t for t in icons), f"trainer rows carry the spell's icon: {icons[:2]}")
 check(True, "settings page with reward settings opens")
 YR.ShowSettingsTab(YR, "trainer")        # the Trainer tab: the class's spells with a choice each
 check(True, "settings Trainer tab opens")
+# the QoL tab: the campfire icon, the flight timer, and the reward picker with a hand-picked reward listed
+YR.RewardSettings(YR).chosen[123] = lua.eval('{ item = 1, name = "Sturdy Boots", title = "A Test Quest" }')
+YR.ShowSettingsTab(YR, "qol")
+check(True, "settings QoL tab opens with a hand-picked reward listed")
+YR.RewardSettings(YR).chosen[123] = None
+# the routes switch from chat and on the Route settings page (where the route options dim while it's off)
+was_routes = g.YippRouteDB.routes
+g.SlashCmdList.HEADSTART("routes off")
+check(g.YippRouteDB.routes is False, "/headstart routes off")
+YR.ShowSettingsTab(YR, "route")
+g.SlashCmdList.HEADSTART("routes on")
+check(g.YippRouteDB.routes is True, "/headstart routes on")
+g.YippRouteDB.routes = was_routes
+# every page of the settings menu opens and refreshes (an old tab name still finds its page)
+for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "character", "trainer", "route", "qol"):
+    YR.ShowSettingsTab(YR, key)
+check(True, "every settings page opens")
+# the bar planner builds with the real Setup and Style, and the first-time window shows its button
+YR.OpenPlanner()
+check(g.HeadstartPlanner is not None and g.HeadstartPlanner.hidden is False, "the bar planner opens")
+g.HeadstartPlanner.Hide(g.HeadstartPlanner)
+YR.Setup.Toggle(YR.Setup)
+check(g.YippSetupFrame is not None, "the first-time window builds with its Plan my bars button")
+YR.Setup.Toggle(YR.Setup)
 YR.ShowSettingsTab(YR, "route")
 # the minimap button exists and the settings switch hides it
 check(g.HeadstartMinimapButton is not None and g.HeadstartMinimapButton.hidden is not True, "minimap button shown")
@@ -830,6 +940,22 @@ check(not reds, "no red mobs to kill outside dungeons" + "".join(
 # The flight timer (its own fake API)
 import smoke_flight
 bad += smoke_flight.run()
+
+# The camp HUD (its own fake API)
+import smoke_camp
+bad += smoke_camp.run()
+
+# The bank deposit (its own fake API)
+import smoke_bank
+bad += smoke_bank.run()
+
+# Restock, reminders, upgrades and party quests (their own fake API)
+import smoke_qol
+bad += smoke_qol.run()
+
+# The bar planner (its own fake API)
+import smoke_planner
+bad += smoke_planner.run()
 
 # Buy later: the Paladin's Wooden Mallet (6s31 in Kharanos, skipped if you're short) comes back
 lua.execute("""
