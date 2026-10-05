@@ -1,19 +1,21 @@
--- The Headstart window. Opened from the minimap button or /yroute.
+-- The Headstart window. Opened from the minimap button or /yroute. Two tabs at the top, each with
+-- its own menu down the left:
 --
---   Routes     the steps of a route on the left; the selected step in full on the right, where every
---              line of it can be changed, added or removed: places (with "Here"), quests, targets,
---              levels to farm to, gold to farm, classes that see it. Save hands it to RestedXP.
---   This run   what this character did; "Add to route" makes any of it a step of the open route.
---   Share      the open route as text, or paste one in.
---   Settings   level splits, quest rewards, recording, the minimap button.
+--   Levelling  This run, Share and Route settings, then the routes. A route opens in the editor: the
+--              steps on the left; the selected step in full on the right, where every line of it can
+--              be changed, added or removed: places (with "Here"), quests, targets, levels to farm
+--              to, gold to farm, classes that see it. Save hands it to RestedXP.
+--              This run: what this character did; "Add to route" makes any of it a step of the open
+--              route. Share: the open route as text, or paste one in.
+--   QoL        the settings pages (Find a setting at the top), Instances among them.
 local _, YR = ...
 local S = YR.Style
 
 local W, H, SIDE, HEAD = 1140, 680, 180, 48
-local PW, PH = W - SIDE, H - HEAD          -- the page area
--- Settings has its own menu down the left; its pages are what is left beside it, under a heading.
+local PW, PH = W - SIDE, H - HEAD          -- a Levelling page: what is left beside its menu
+-- QoL's menu is wider; its pages are what is left beside it, under a heading (as Route settings).
 local NAV_W, TITLE_H = 210, 64
-local CW, CH = PW - NAV_W, PH - TITLE_H
+local CW, CH = W - NAV_W, PH - TITLE_H
 local LIST_W, ROW = 480, 24
 local win, pages, current
 local edit = { key = nil, header = nil, steps = nil, parsed = {}, dirty = false, sel = nil, line = nil, filter = "" }
@@ -1290,7 +1292,7 @@ local function RowPage(page, controls, bottom)
             d:SetText(FirstSentence(tip))
         end
         controls[#controls + 1] = control
-        if settings.index then
+        if settings.index and settings.building then      -- QoL pages only (Route settings is Levelling's)
             settings.index[#settings.index + 1] = { key = settings.building, label = label, tip = tip,
                 row = r, area = area, y = L.y }
         end
@@ -2364,6 +2366,118 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         end, nil, 90))
 end)
 
+-- ---------------------------------------------------------------------------
+-- Instances: the count against the limit, and the log (Instances.lua)
+-- ---------------------------------------------------------------------------
+local inst = {}
+
+local function Money(c)
+    c = math.floor(c or 0)
+    if c >= 10000 then return ("%dg %ds"):format(c / 10000, c % 10000 / 100) end
+    if c >= 100 then return ("%ds %dc"):format(c / 100, c % 100) end
+    return c .. "c"
+end
+
+local function InstanceRows()
+    local out = {}
+    local runs = YippRouteDB.instanceRuns or {}
+    for i = #runs, 1, -1 do
+        local r = runs[i]
+        if YippRouteDB.instanceAccount == true or r.char == YR.CharKey() then out[#out + 1] = r end
+    end
+    return out
+end
+
+local function Stat(page, x, y, label)
+    local box = CreateFrame("Frame", nil, page)
+    box:SetSize(220, 70)
+    box:SetPoint("TOPLEFT", x, y)
+    S.Fill(box, S.C.card)
+    S.Border(box, S.C.line)
+    box.label = S.Text(box, 11, S.C.muted)
+    box.label:SetPoint("TOPLEFT", 14, -12)
+    box.label:SetText(label:upper())
+    box.value = S.Text(box, 24)
+    box.value:SetPoint("TOPLEFT", 14, -30)
+    box.sub = S.Text(box, 11, S.C.sub)
+    box.sub:SetPoint("LEFT", box.value, "RIGHT", 10, -2)
+    return box
+end
+
+-- A QoL page, under its heading like the others: the hint, the three counts, the log.
+local function BuildInstances(page)
+    inst.hint = S.Text(page, 12, S.C.muted)
+    inst.hint:SetPoint("TOPLEFT", 16, -10)
+    inst.hour = Stat(page, 16, -34, "This hour")
+    inst.next = Stat(page, 248, -34, "Next free slot")
+    inst.day = Stat(page, 480, -34, "Today")
+    inst.list = List(page, CW - 32, math.floor((CH - 120 - 64) / 26), 26, function(r, i)
+        local e = inst.rows[i]
+        r:Select(false)
+        r.when:SetText(date("%a %H:%M", e.entered))
+        r.name:SetText((e.name or "?") .. ((YippRouteDB.instanceAccount == true) and ("  |cff999999" .. tostring(e.char):match("^[^%-]+") .. "|r") or ""))
+        local long = (e.left or (GetServerTime and GetServerTime() or time())) - e.entered
+        r.time:SetText(YR.InstanceClock(long) .. (e.left and "" or "  |cff66ccffnow|r"))
+        r.xp:SetText((e.xp or 0) > 0 and (BreakUpLargeNumbers and BreakUpLargeNumbers(e.xp) or tostring(e.xp)) .. " XP" or "")
+        r.gold:SetText((e.money or 0) > 0 and Money(e.money) or "")
+        r.flag:SetText(e.again and ("back in x" .. e.again) or "")
+    end, function() return inst.rows and #inst.rows or 0 end, function(r)
+        r.when = S.Text(r, 11, S.C.muted)
+        r.when:SetPoint("LEFT", 10, 0)
+        r.name = S.Text(r, 13)
+        r.name:SetPoint("LEFT", 100, 0)
+        r.name:SetWidth(300)
+        r.name:SetJustifyH("LEFT")
+        r.time = S.Text(r, 12, S.C.sub)
+        r.time:SetPoint("LEFT", 420, 0)
+        r.xp = S.Text(r, 12, S.C.sub)
+        r.xp:SetPoint("LEFT", 530, 0)
+        r.gold = S.Text(r, 12, S.C.gold or S.C.sub)
+        r.gold:SetPoint("LEFT", 650, 0)
+        r.flag = S.Text(r, 11, S.C.muted)
+        r.flag:SetPoint("RIGHT", -10, 0)
+    end)
+    inst.list:SetPoint("TOPLEFT", 16, -120)
+    local reset = S.Button(page, "A reset I missed", function() YR.InstanceResetSeen() YR:RefreshWindow() end, nil, 150)
+    reset:SetPoint("BOTTOMLEFT", 136, 14)           -- beside Reload UI
+    reset.tip = "The next time you go into any of these, it's a new instance (when the game's reset message didn't reach Headstart)"
+    local clear = S.Button(page, "Clear the log", function() YR.InstanceForget() YR:RefreshWindow() end, nil, 130)
+    clear:SetPoint("LEFT", reset, "RIGHT", 8, 0)
+    -- the countdown runs while the page shows
+    local wait = 0
+    page:SetScript("OnUpdate", function(_, elapsed)
+        wait = wait - elapsed
+        if wait > 0 then return end
+        wait = 1
+        if inst.Refresh then inst.Refresh() end
+    end)
+end
+
+function inst.Refresh()
+    if not inst.hour then return end
+    local hour, day, wait = YR.InstanceCounts()
+    local perHour, perDay = YR.InstanceLimits()
+    inst.hour.value:SetText(("%d / %d"):format(hour, perHour))
+    inst.hour.value:SetTextColor(unpack(hour >= perHour and S.C.danger or hour == perHour - 1 and S.C.gold or S.C.text))
+    inst.day.value:SetText(("%d / %d"):format(day, perDay))
+    inst.day.value:SetTextColor(unpack(day >= perDay and S.C.danger or S.C.text))
+    inst.next.value:SetText(wait and YR.InstanceClock(wait) or "now")
+    inst.next.value:SetTextColor(unpack(wait and S.C.danger or S.C.green))
+    inst.next.sub:SetText(wait and "until you can go in again" or "")
+    local locks = YippRouteDB.instanceLocks
+    local last = locks and locks[#locks]
+    inst.hint:SetText(("Each new dungeon or raid you go into counts for an hour and a day.%s"):format(last and
+        (" The game last said too many at %d this hour (%s)."):format(last.hour, date("%a %H:%M", last.at)) or
+        " Limits and how a return counts: the Group page."))
+    inst.rows = InstanceRows()
+    inst.list:Refresh()
+end
+
+local function RefreshInstances()
+    win.subtitle:SetText("")
+    inst.Refresh()
+end
+
 local function QoLRefresh(key, extra)
     return function()
         for _, ctl in ipairs(qolPages[key].controls) do if ctl.Refresh then ctl:Refresh() end end
@@ -2385,6 +2499,9 @@ local CATEGORIES = {
     { key = "group", label = "Group", build = BuildGroup, refresh = QoLRefresh("group"), icon = 134149,
       status = function() return YR.Option("groupBar") end, scope = "Every character on this account",
       desc = "Into a group for a kill and out again, and quests shared and accepted without the clicking." },
+    { key = "instances", label = "Instances", build = BuildInstances, refresh = RefreshInstances, icon = 134237,
+      scope = "Every character on this account",
+      desc = "The new dungeons and raids you went into this hour and today, against the limit, and the wait for a free slot." },
     { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134327,
       status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") end, scope = "Every character on this account",
       desc = "One quiet line when there is something to do: the trainer, talents, repairs, things to make." },
@@ -2405,10 +2522,6 @@ local CATEGORIES = {
     { key = "trainer", label = "Trainer", build = BuildTrainer, refresh = function() trainer.refresh() end, icon = 133741,
       status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
       desc = "Your class spells learned as the trainer opens, the ones you choose, as your gold allows." },
-    { group = "Route" },
-    { key = "route", label = "Route settings", build = BuildRouteSettings, refresh = RefreshRouteSettings, icon = 134269,
-      status = function() return YR.RoutesOn() end, scope = "Every character on this account",
-      desc = "Recording runs, death skips, group play and the level splits." },
 }
 -- Older names for a page (Setup asks for "character"; "qol" was the one long page).
 local CATEGORY_ALIAS = { qol = "camps" }
@@ -2444,20 +2557,48 @@ local function LabelOf(key)
     return key
 end
 
+-- A page's header: its icon, name and what it's for, and who the settings on it are for, over a rule.
+-- Returns the function that fills it in from a page's entry ({ icon, label, desc, scope }).
+local function PageHead(page)
+    local frame = CreateFrame("Frame", nil, page)
+    frame:SetSize(42, 42)
+    frame:SetPoint("TOPLEFT", 20, -11)
+    S.Border(frame, S.C.lineHi)
+    local icon = frame:CreateTexture(nil, "ARTWORK")
+    icon:SetPoint("TOPLEFT", 1, -1)
+    icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local title = S.Text(page, 17)
+    title:SetPoint("TOPLEFT", frame, "TOPRIGHT", 12, -2)
+    local scopeText = S.Text(page, 11, S.C.muted)
+    scopeText:SetPoint("TOPRIGHT", page, "TOPRIGHT", -20, -14)
+    scopeText:SetJustifyH("RIGHT")
+    local desc = S.Text(page, 12, S.C.muted)
+    desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
+    desc:SetPoint("RIGHT", page, "RIGHT", -20, 0)
+    desc:SetJustifyH("LEFT")
+    local strip = page:CreateTexture(nil, "BORDER")
+    strip:SetPoint("TOPLEFT", 16, -TITLE_H + 4)
+    strip:SetPoint("TOPRIGHT", -16, -TITLE_H + 4)
+    strip:SetHeight(1)
+    S.Set(strip, S.C.line)
+    return function(t)
+        icon:SetTexture(t.icon)
+        title:SetText(t.label)
+        desc:SetText(t.desc or "")
+        local scope = type(t.scope) == "function" and t.scope() or t.scope
+        scopeText:SetText(scope and ("Saved as you change it\n" .. scope) or "Saved as you change it")
+    end
+end
+
+-- QoL: its menu is the window's left side on that tab (ui.sideQ); the page is what is beside it.
 local function BuildSettings(page)
     settings.index = {}
-    local nav = CreateFrame("Frame", nil, page)
-    nav:SetPoint("TOPLEFT")
-    nav:SetPoint("BOTTOMLEFT")
-    nav:SetWidth(NAV_W)
-    S.Fill(nav, S.C.field)
-    local rule = nav:CreateTexture(nil, "BORDER")
-    rule:SetPoint("TOPRIGHT") rule:SetPoint("BOTTOMRIGHT") rule:SetWidth(1)
-    S.Set(rule, S.C.line)
+    local nav = ui.sideQ
 
     -- Find a setting: every row's name and details, on every page.
     local results = CreateFrame("Frame", nil, page)
-    results:SetPoint("TOPLEFT", NAV_W, 0)
+    results:SetPoint("TOPLEFT", 0, 0)
     results:SetPoint("BOTTOMRIGHT")
     results:SetFrameLevel(page:GetFrameLevel() + 40)
     S.Fill(results, S.C.window)
@@ -2572,48 +2713,19 @@ local function BuildSettings(page)
         end
     end
 
-    -- The page's header: its icon, name and what it's for, and who the settings on it are for.
-    local frame = CreateFrame("Frame", nil, page)
-    frame:SetSize(42, 42)
-    frame:SetPoint("TOPLEFT", NAV_W + 20, -11)
-    S.Border(frame, S.C.lineHi)
-    settings.icon = frame:CreateTexture(nil, "ARTWORK")
-    settings.icon:SetPoint("TOPLEFT", 1, -1)
-    settings.icon:SetPoint("BOTTOMRIGHT", -1, 1)
-    settings.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    settings.title = S.Text(page, 17)
-    settings.title:SetPoint("TOPLEFT", frame, "TOPRIGHT", 12, -2)
-    settings.scope = S.Text(page, 11, S.C.muted)
-    settings.scope:SetPoint("TOPRIGHT", page, "TOPRIGHT", -20, -14)
-    settings.scope:SetJustifyH("RIGHT")
-    settings.desc = S.Text(page, 12, S.C.muted)
-    settings.desc:SetPoint("TOPLEFT", settings.title, "BOTTOMLEFT", 0, -5)
-    settings.desc:SetPoint("RIGHT", page, "RIGHT", -20, 0)
-    settings.desc:SetJustifyH("LEFT")
-    function settings.Header(t)
-        settings.icon:SetTexture(t.icon)
-        settings.title:SetText(t.label)
-        settings.desc:SetText(t.desc or "")
-        local scope = type(t.scope) == "function" and t.scope() or t.scope
-        settings.scope:SetText(scope and ("Saved as you change it\n" .. scope) or "Saved as you change it")
-    end
-    local strip = page:CreateTexture(nil, "BORDER")
-    strip:SetPoint("TOPLEFT", NAV_W + 16, -TITLE_H + 4)
-    strip:SetPoint("TOPRIGHT", -16, -TITLE_H + 4)
-    strip:SetHeight(1)
-    S.Set(strip, S.C.line)
+    settings.Header = PageHead(page)
 
     for _, t in ipairs(CATEGORIES) do
         if t.key then
             local f = CreateFrame("Frame", nil, page)
-            f:SetPoint("TOPLEFT", NAV_W, -TITLE_H)
+            f:SetPoint("TOPLEFT", 0, -TITLE_H)
             f:SetPoint("BOTTOMRIGHT")
             f:Hide()
             t.frame = f          -- built the first time it's shown (RefreshSettings): a fast first open
         end
     end
     local reload = S.Button(page, "Reload UI", function() ReloadUI() end, nil, 110)
-    reload:SetPoint("BOTTOMLEFT", NAV_W + 16, 14)
+    reload:SetPoint("BOTTOMLEFT", 16, 14)
     local close = S.Button(page, "Close", function() win:Hide() end, nil, 110)
     close:SetPoint("BOTTOMRIGHT", -16, 14)
     settings.tab = "camps"
@@ -2639,148 +2751,93 @@ local function RefreshSettings()
     end
 end
 
--- Open Settings on one of its pages ("camps", "bags", ..., "character", "trainer", "route").
+-- ---------------------------------------------------------------------------
+-- Route settings: a Levelling page, under a heading like QoL's pages
+-- ---------------------------------------------------------------------------
+local ROUTE_PAGE = { icon = 134269, label = "Route settings", scope = "Every character on this account",
+    desc = "Headstart's routes on or off, recording runs, death skips, group play and the level splits." }
+
+local function BuildRoutePage(page)
+    PageHead(page)(ROUTE_PAGE)
+    local f = CreateFrame("Frame", nil, page)
+    f:SetPoint("TOPLEFT", 0, -TITLE_H)
+    f:SetPoint("BOTTOMRIGHT")
+    BuildRouteSettings(f)
+end
+
+local function RefreshRoutePage()
+    win.subtitle:SetText("")
+    RefreshRouteSettings()
+end
+
+-- ---------------------------------------------------------------------------
+-- The window: two tabs at the top, Levelling and QoL, each with its own menu down the left
+-- ---------------------------------------------------------------------------
+-- tab: which top tab a page is under. nav: shown in Levelling's menu (the routes page is opened from
+-- the route list under it instead).
+local PAGES = {
+    { key = "routes", tab = "levelling", build = BuildRoutes, refresh = RefreshRoutes },
+    { key = "run", tab = "levelling", nav = true, label = "This run", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01",
+      build = BuildRun, refresh = RefreshRun },
+    { key = "share", tab = "levelling", nav = true, label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,
+      refresh = function() win.subtitle:SetText("") end },
+    { key = "route", tab = "levelling", nav = true, label = "Route settings", icon = 134269, build = BuildRoutePage,
+      refresh = RefreshRoutePage },
+    { key = "settings", tab = "qol", build = BuildSettings, refresh = RefreshSettings },
+}
+local PAGE_TAB = {}
+for _, p in ipairs(PAGES) do PAGE_TAB[p.key] = p.tab end
+local lastLevelling          -- the Levelling page last shown, for coming back to that tab
+function YR.WindowTab() return PAGE_TAB[current] end      -- for the tests
+
+local function Show(key)
+    if not PAGE_TAB[key] then           -- a QoL page by its own name ("instances", "camps", ...)
+        ShowTab(key)
+        key = "settings"
+    end
+    current = key
+    local tab = PAGE_TAB[key]
+    if tab == "levelling" then lastLevelling = key end
+    S.CloseMenu()
+    ui.sideL:SetShown(tab == "levelling")
+    ui.sideQ:SetShown(tab == "qol")
+    for name, b in pairs(ui.topTabs) do b:Select(name == tab) end
+    for _, p in ipairs(PAGES) do
+        pages[p.key]:SetShown(p.key == key)
+        if p.button then p.button:Select(p.key == key) end
+    end
+    YR:RefreshWindow()
+end
+
+-- Open QoL on one of its pages ("camps", "bags", ..., "character", "trainer"), or Route settings ("route").
 function YR:ShowSettingsTab(key)
     settings.viewClass = nil          -- this character's class
+    if key == "route" then YR:ToggleWindow("route") return end
     YR:ToggleWindow("settings")
     ShowTab(key)
 end
 
--- ---------------------------------------------------------------------------
--- The window
--- ---------------------------------------------------------------------------
--- ---------------------------------------------------------------------------
--- Instances: the count against the limit, and the log (Instances.lua)
--- ---------------------------------------------------------------------------
-local inst = {}
-
-local function Money(c)
-    c = math.floor(c or 0)
-    if c >= 10000 then return ("%dg %ds"):format(c / 10000, c % 10000 / 100) end
-    if c >= 100 then return ("%ds %dc"):format(c / 100, c % 100) end
-    return c .. "c"
-end
-
-local function InstanceRows()
-    local out = {}
-    local runs = YippRouteDB.instanceRuns or {}
-    for i = #runs, 1, -1 do
-        local r = runs[i]
-        if YippRouteDB.instanceAccount == true or r.char == YR.CharKey() then out[#out + 1] = r end
+-- A tab in the title bar: its name, underlined while it's the one showing.
+local function TopTab(parent, label)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetHeight(HEAD)
+    b.text = S.Text(b, 14, S.C.sub)
+    b.text:SetPoint("CENTER", 0, -1)
+    b.text:SetText(label)
+    b:SetWidth(b.text:GetStringWidth() + 32)
+    b.line = b:CreateTexture(nil, "OVERLAY")
+    b.line:SetPoint("BOTTOMLEFT", 10, 0)
+    b.line:SetPoint("BOTTOMRIGHT", -10, 0)
+    b.line:SetHeight(2)
+    S.Set(b.line, S.C.accent)
+    function b:Select(on)
+        self.selected = on
+        self.line:SetShown(on)
+        self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
     end
-    return out
-end
-
-local function Stat(page, x, label)
-    local box = CreateFrame("Frame", nil, page)
-    box:SetSize(220, 70)
-    box:SetPoint("TOPLEFT", x, -70)
-    S.Fill(box, S.C.card)
-    S.Border(box, S.C.line)
-    box.label = S.Text(box, 11, S.C.muted)
-    box.label:SetPoint("TOPLEFT", 14, -12)
-    box.label:SetText(label:upper())
-    box.value = S.Text(box, 24)
-    box.value:SetPoint("TOPLEFT", 14, -30)
-    box.sub = S.Text(box, 11, S.C.sub)
-    box.sub:SetPoint("LEFT", box.value, "RIGHT", 10, -2)
-    return box
-end
-
-local function BuildInstances(page)
-    local title = S.Text(page, 17)
-    title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("Instances")
-    inst.hint = S.Text(page, 12, S.C.muted)
-    inst.hint:SetPoint("TOPLEFT", 16, -40)
-    inst.hour = Stat(page, 16, "This hour")
-    inst.next = Stat(page, 248, "Next free slot")
-    inst.day = Stat(page, 480, "Today")
-    inst.list = List(page, PW - 32, math.floor((PH - 230) / 26), 26, function(r, i)
-        local e = inst.rows[i]
-        r:Select(false)
-        r.when:SetText(date("%a %H:%M", e.entered))
-        r.name:SetText((e.name or "?") .. ((YippRouteDB.instanceAccount == true) and ("  |cff999999" .. tostring(e.char):match("^[^%-]+") .. "|r") or ""))
-        local long = (e.left or (GetServerTime and GetServerTime() or time())) - e.entered
-        r.time:SetText(YR.InstanceClock(long) .. (e.left and "" or "  |cff66ccffnow|r"))
-        r.xp:SetText((e.xp or 0) > 0 and (BreakUpLargeNumbers and BreakUpLargeNumbers(e.xp) or tostring(e.xp)) .. " XP" or "")
-        r.gold:SetText((e.money or 0) > 0 and Money(e.money) or "")
-        r.flag:SetText(e.again and ("back in x" .. e.again) or "")
-    end, function() return inst.rows and #inst.rows or 0 end, function(r)
-        r.when = S.Text(r, 11, S.C.muted)
-        r.when:SetPoint("LEFT", 10, 0)
-        r.name = S.Text(r, 13)
-        r.name:SetPoint("LEFT", 100, 0)
-        r.name:SetWidth(300)
-        r.name:SetJustifyH("LEFT")
-        r.time = S.Text(r, 12, S.C.sub)
-        r.time:SetPoint("LEFT", 420, 0)
-        r.xp = S.Text(r, 12, S.C.sub)
-        r.xp:SetPoint("LEFT", 530, 0)
-        r.gold = S.Text(r, 12, S.C.gold or S.C.sub)
-        r.gold:SetPoint("LEFT", 650, 0)
-        r.flag = S.Text(r, 11, S.C.muted)
-        r.flag:SetPoint("RIGHT", -10, 0)
-    end)
-    inst.list:SetPoint("TOPLEFT", 16, -160)
-    local reset = S.Button(page, "A reset I missed", function() YR.InstanceResetSeen() YR:RefreshWindow() end, nil, 150)
-    reset:SetPoint("BOTTOMLEFT", 16, 14)
-    reset.tip = "The next time you go into any of these, it's a new instance (when the game's reset message didn't reach Headstart)"
-    local clear = S.Button(page, "Clear the log", function() YR.InstanceForget() YR:RefreshWindow() end, nil, 130)
-    clear:SetPoint("LEFT", reset, "RIGHT", 8, 0)
-    -- the countdown runs while the page shows
-    local wait = 0
-    page:SetScript("OnUpdate", function(_, elapsed)
-        wait = wait - elapsed
-        if wait > 0 then return end
-        wait = 1
-        if inst.Refresh then inst.Refresh() end
-    end)
-end
-
-function inst.Refresh()
-    if not inst.hour then return end
-    local hour, day, wait = YR.InstanceCounts()
-    local perHour, perDay = YR.InstanceLimits()
-    inst.hour.value:SetText(("%d / %d"):format(hour, perHour))
-    inst.hour.value:SetTextColor(unpack(hour >= perHour and S.C.danger or hour == perHour - 1 and S.C.gold or S.C.text))
-    inst.day.value:SetText(("%d / %d"):format(day, perDay))
-    inst.day.value:SetTextColor(unpack(day >= perDay and S.C.danger or S.C.text))
-    inst.next.value:SetText(wait and YR.InstanceClock(wait) or "now")
-    inst.next.value:SetTextColor(unpack(wait and S.C.danger or S.C.green))
-    inst.next.sub:SetText(wait and "until you can go in again" or "")
-    local locks = YippRouteDB.instanceLocks
-    local last = locks and locks[#locks]
-    inst.hint:SetText(("Each new dungeon or raid you go into counts for an hour and a day.%s"):format(last and
-        (" The game last said too many at %d this hour (%s)."):format(last.hour, date("%a %H:%M", last.at)) or
-        " Limits and how a return counts: Settings, QoL, Group."))
-    inst.rows = InstanceRows()
-    inst.list:Refresh()
-end
-
-local function RefreshInstances()
-    win.subtitle:SetText("")
-    inst.Refresh()
-end
-
-local PAGES = {
-    { key = "settings", label = "QoL & settings", icon = "Interface\\Icons\\Trade_Engineering", build = BuildSettings,
-      refresh = RefreshSettings },
-    { key = "routes", label = "Routes", icon = "Interface\\Icons\\INV_Misc_Map_01", build = BuildRoutes, refresh = RefreshRoutes },
-    { key = "run", label = "This run", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", build = BuildRun, refresh = RefreshRun },
-    { key = "instances", label = "Instances", icon = 134237, build = BuildInstances, refresh = RefreshInstances },
-    { key = "share", label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,
-      refresh = function() win.subtitle:SetText("") end },
-}
-
-local function Show(key)
-    current = key
-    S.CloseMenu()
-    for _, p in ipairs(PAGES) do
-        pages[p.key]:SetShown(p.key == key)
-        p.tab:Select(p.key == key)
-    end
-    YR:RefreshWindow()
+    b:SetScript("OnEnter", function(self) if not self.selected then self.text:SetTextColor(unpack(S.C.text)) end end)
+    b:SetScript("OnLeave", function(self) if not self.selected then self.text:SetTextColor(unpack(S.C.sub)) end end)
+    return b
 end
 
 local function NavButton(parent, label, icon, y, indent)
@@ -2903,22 +2960,42 @@ end
 
 local function Build()
     win = S.Window("HeadstartWindow", W, H, "Headstart")
-    local side = CreateFrame("Frame", nil, win)
-    side:SetPoint("TOPLEFT", 1, -HEAD)
-    side:SetPoint("BOTTOMLEFT", 1, 1)
-    side:SetWidth(SIDE)
-    S.Fill(side, S.C.side)
-    local rule = side:CreateTexture(nil, "BORDER")
-    rule:SetPoint("TOPRIGHT") rule:SetPoint("BOTTOMRIGHT") rule:SetWidth(1)
-    S.Set(rule, S.C.line)
+    -- The tabs, after the title; what a page says about itself (win.subtitle) goes after them.
+    ui.topTabs = {}
+    local levelling = TopTab(win, "Levelling")
+    levelling:SetPoint("LEFT", win.title, "RIGHT", 18, 0)
+    levelling:SetScript("OnClick", function() Show(lastLevelling or (YR.RoutesOn() and "routes" or "route")) end)
+    local qol = TopTab(win, "QoL")
+    qol:SetPoint("LEFT", levelling, "RIGHT", 0, 0)
+    qol:SetScript("OnClick", function() Show("settings") end)
+    ui.topTabs.levelling, ui.topTabs.qol = levelling, qol
+    win.subtitle:ClearAllPoints()
+    win.subtitle:SetPoint("LEFT", qol, "RIGHT", 14, 0)
+    -- One menu down the left per tab: Levelling's (SIDE wide), QoL's (NAV_W wide, BuildSettings fills it).
+    local function Side(width, color)
+        local f = CreateFrame("Frame", nil, win)
+        f:SetPoint("TOPLEFT", 1, -HEAD)
+        f:SetPoint("BOTTOMLEFT", 1, 1)
+        f:SetWidth(width)
+        S.Fill(f, color)
+        local rule = f:CreateTexture(nil, "BORDER")
+        rule:SetPoint("TOPRIGHT") rule:SetPoint("BOTTOMRIGHT") rule:SetWidth(1)
+        S.Set(rule, S.C.line)
+        f:Hide()
+        return f
+    end
+    local side = Side(SIDE, S.C.side)
+    ui.sideL, ui.sideQ = side, Side(NAV_W, S.C.side)
     pages = {}
     ui.routeTabs = {}
-    -- the pages first, then every route in a list that scrolls (there are more routes than room)
+    -- Levelling's pages first, then every route in a list that scrolls (there are more routes than room)
     local y = -12
     for _, p in ipairs(PAGES) do
-        p.tab = NavButton(side, p.label, p.icon, y)
-        p.tab:SetScript("OnClick", function() Show(p.key) end)
-        y = y - 34
+        if p.nav then
+            p.button = NavButton(side, p.label, p.icon, y)
+            p.button:SetScript("OnClick", function() Show(p.key) end)
+            y = y - 34
+        end
     end
     local label = S.Text(side, 11, S.C.muted)
     label:SetPoint("TOPLEFT", 20, y - 8)
@@ -3014,13 +3091,13 @@ local function Build()
     ui.LayoutRoutes()
     for _, p in ipairs(PAGES) do
         local page = CreateFrame("Frame", nil, win)
-        page:SetPoint("TOPLEFT", SIDE, -HEAD)
+        page:SetPoint("TOPLEFT", p.tab == "qol" and NAV_W or SIDE, -HEAD)
         page:SetPoint("BOTTOMRIGHT")
         p.build(page)
         pages[p.key] = page
     end
-    local version = S.Text(side, 11, S.C.muted)
-    version:SetPoint("BOTTOMLEFT", 14, 12)
+    local version = S.Text(win, 11, S.C.muted)
+    version:SetPoint("RIGHT", win.close, "LEFT", -12, 0)
     local meta = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("Headstart", "Version")
     version:SetText(meta and ("v" .. meta) or "")
     -- open on the route this character is on: the one RestedXP has loaded if it's ours, else the

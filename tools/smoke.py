@@ -703,6 +703,15 @@ g.YippRouteDB.routes = was_routes
 for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "character", "trainer", "route", "qol"):
     YR.ShowSettingsTab(YR, key)
 check(True, "every settings page opens")
+# two tabs, each with its own menu: QoL's pages (Instances among them) and Levelling's (Route settings)
+YR.ToggleWindow(YR, "instances")
+check(YR.WindowTab() == "qol", f"Instances is on the QoL tab: {YR.WindowTab()}")
+YR.ShowSettingsTab(YR, "route")
+check(YR.WindowTab() == "levelling", f"Route settings is on the Levelling tab: {YR.WindowTab()}")
+YR.ToggleWindow(YR, "run")
+check(YR.WindowTab() == "levelling", "This run is on the Levelling tab")
+YR.ShowSettingsTab(YR, "trainer")
+check(YR.WindowTab() == "qol", "the Trainer page is on the QoL tab")
 # the bar planner builds with the real Setup and Style, and the first-time window shows its button
 YR.OpenPlanner()
 check(g.HeadstartPlanner is not None and g.HeadstartPlanner.hidden is False, "the bar planner opens")

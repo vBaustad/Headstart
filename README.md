@@ -11,7 +11,7 @@ Built for the first hours of a fresh realm, when every starting zone has hundred
   - Human: Northshire 1-6
   - Night Elf: Shadowglen 1-6
 
-  Then on to 30 through Elwynn or Teldrassil, Loch Modan, Westfall, Darkshore, Redridge, Ashenvale, the Wetlands, Duskwood and Hillsbrad: RestedXP's routes made fit for Forever, with Forever's new quests, no grey quest handed in, training and death skips where they pay, and Duo/Trio versions that run the dungeons. They show up in RestedXP under **Headstart Launch (A)** and hand over to RestedXP's own guides at 30. On a new install they are off: switch them on once (Settings, Route settings, or `/headstart routes on`) for every character of the account.
+  Then on to 30 through Elwynn or Teldrassil, Loch Modan, Westfall, Darkshore, Redridge, Ashenvale, the Wetlands, Duskwood and Hillsbrad: RestedXP's routes made fit for Forever, with Forever's new quests, no grey quest handed in, training and death skips where they pay, and Duo/Trio versions that run the dungeons. They show up in RestedXP under **Headstart Launch (A)** and hand over to RestedXP's own guides at 30. On a new install they are off: switch them on once (the Levelling tab, Route settings, or `/headstart routes on`) for every character of the account.
 - **Your own routes.** Save a run as a route (This run, Save as route): our steps as you played them, or made from your run log, one part per zone, one set per race. Edit it like ours, play it in RestedXP under My routes.
 - **Route editor.** Every step can be changed in game: drag steps around, add, merge, duplicate or delete them, edit each action with pickers for your position and target, or edit the raw text. Your changes are saved for you and can be exported and shared; "back to the shipped route" undoes them.
 - **Level splits.** Time per level and in total from the server's /played, against your best run, in green or red. XP per hour and time to ding. Movable, sizeable, lockable.
@@ -34,7 +34,7 @@ Built for the first hours of a fresh realm, when every starting zone has hundred
 
 ## Use
 
-- `/headstart` (or the minimap button, or the addon compartment) opens the window: routes, this run, share, and the QoL & settings page (Quality of life, Character, Route). `/hs` opens the settings.
+- `/headstart` (or the minimap button, or the addon compartment) opens the window. It has two tabs, each with its own menu: **Levelling** (this run, share, route settings, and the routes) and **QoL** (Find a setting, then the Quality of life and Character pages, Instances among them). `/hs` opens the QoL tab.
 - RestedXP Guides is needed for the routes. Everything else works without it.
 
 ## Credits and licence
