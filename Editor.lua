@@ -1847,16 +1847,19 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
         Section("Mail to my alt", "for bag space: what the bank would take", { icon = 133471 })
         local alt = CreateFrame("Frame", nil, c)
         alt:SetSize(190, 24)
-        alt.input = S.Input(alt, { width = 190, placeholder = "Your alt's name", onCommit = function(t)
-            YR.SetMailRecipient(t)
+        alt.input = S.Input(alt, { width = 190, placeholder = "Name Surname", onCommit = function(t)
+            local full = YR.SetMailRecipient(t)
+            if full and not full:find(" ") and not full:find("-") then
+                YR.Print("mail on Forever needs the full name: " .. full .. "'s surname too, as the character shows it.")
+            end
             YR:RefreshWindow()
         end })
         alt.input:SetPoint("RIGHT")
         function alt:Refresh()
             if not self.input:HasFocus() then self.input:SetText(YR.MailRecipient() or "") end
         end
-        Row("Send to", alt, "The character who gets it, on this realm and faction: just the name, no dash or realm"
-            .. " (a surname is left off). On that character nothing is sent, so the same settings work there")
+        Row("Send to", alt, "The character who gets it, on this realm and faction, by its full name: name and surname, as the character shows it (\"Klistre Merke\"). Type just the name and Headstart adds the surname of one of your characters it knows"
+            .. ". On that character nothing is sent, so the same settings work there")
         Row("Send when I open the mailbox", S.Switch(c, function() return YippRouteDB.mailAuto == true end,
             function(on) YippRouteDB.mailAuto = on end),
             "Off: only when you click the button on the mail window (or /headstart mail). Postage is 30 copper a stack")

@@ -28,20 +28,53 @@ end
 local function Me() return (UnitName("player")) end
 
 --- Who gets the mail on this realm and faction, or nil.
+local KnownFullName     -- below
 function YR.MailRecipient()
     local to = YippRouteDB.mailTo and YippRouteDB.mailTo[Key()]
-    if type(to) == "string" and to ~= "" then return to end
+    if type(to) ~= "string" or to == "" then return nil end
+    -- saved before full names were kept (just "Klistre"): the surname of that character, when known
+    if not to:find("[%s%-]") and KnownFullName then return KnownFullName(to) or to end
+    return to
 end
 
+-- On Forever a character's full name is its name and its surname ("Klistre Merke"), and mail needs the
+-- full name: "Klistre" alone gets "Please enter a full character name". The game joins them with this.
+local function Separator()
+    local consts = Constants and Constants.CharacterNameSeparatorConsts
+    local v = consts and consts.CHARACTERNAME_SURNAME_SEPARATOR
+    return type(v) == "string" and v or " "
+end
+
+local function Cap(word) return word:sub(1, 1):upper() .. word:sub(2) end
+
+--- The full name of one of your own characters with this first name, from what Headstart has seen of
+--- them (the run log and the splits keep "Name-Surname"), or nil when it doesn't know exactly one.
+function KnownFullName(first)
+    local found, low = nil, first:lower()
+    local function Look(key)
+        local n, second = tostring(key):match("^([^%-%s]+)[%-%s](.+)$")
+        if n and n:lower() == low and second and not second:find("[%(]") then
+            local full = Cap(n) .. Separator() .. second
+            if found and found ~= full then found = false elseif found == nil then found = full end
+        end
+    end
+    for key in pairs(YippRouteDB.runs or {}) do Look(key) end
+    for _, r in pairs((YippRouteDB.splits or {}).runs or {}) do if type(r) == "table" and r.name then Look(r.name) end end
+    return found or nil
+end
+YR.MailKnownFullName = KnownFullName
+
+--- Keep the full name as typed ("klistre merke" -> "Klistre Merke"; a dash between the two is the same).
+--- Just a first name: the surname filled in when Headstart knows that character of yours.
 function YR.SetMailRecipient(name)
     YippRouteDB.mailTo = YippRouteDB.mailTo or {}
-    name = strtrim(name or "")
-    -- A character name is one word; on Forever the display name adds a surname after a space
-    -- ("Bankalt Smith"), which is not part of the name mail goes to. Keep the first word.
-    name = name:match("^(%S*)") or ""
-    -- "bankalt" -> "Bankalt": what the game would show. A realm part after a dash is left alone.
-    if name ~= "" then name = name:sub(1, 1):upper() .. name:sub(2) end
-    YippRouteDB.mailTo[Key()] = name ~= "" and name or nil
+    name = strtrim(name or ""):gsub("%s+", " ")
+    local words = {}
+    for w in name:gmatch("[^%s%-]+") do words[#words + 1] = Cap(w) end
+    local full = table.concat(words, Separator())
+    if #words == 1 then full = KnownFullName(words[1]) or full end
+    YippRouteDB.mailTo[Key()] = full ~= "" and full or nil
+    return YippRouteDB.mailTo[Key()]
 end
 
 function YR.MailMats()
@@ -59,7 +92,9 @@ end
 
 --- Is this mail for somebody else? (Never mail yourself.)
 local function ToOther(to)
-    return to and to:lower() ~= (Me() or ""):lower() and not to:lower():match("^" .. (Me() or ""):lower() .. "%-")
+    if not to then return false end
+    local first = to:lower():match("^([^%s%-]+)")
+    return first ~= (Me() or ""):lower()
 end
 
 -- ---------------------------------------------------------------------------
@@ -148,6 +183,15 @@ local function NextLetter()
     end
     r.pending = { count = inLetter, price = price }
     SendMail(r.to, ("Headstart: %d for you"):format(inLetter), "")
+    -- the game doesn't always answer a refused letter (a name it won't take says so on screen, nothing
+    -- more): no word in 10 seconds, and it stops instead of waiting for ever
+    local this = r.pending
+    C_Timer.After(10, function()
+        if run == r and r.pending == this then
+            ClearLetter()
+            Finish("the letter didn't go - is " .. r.to .. " the full name (name and surname), on this realm and faction?")
+        end
+    end)
 end
 
 --- Send what the settings pick. `loud`: say so when there's nothing to send (the button).
@@ -213,8 +257,10 @@ function YR.MailIsOpen() return mailOpen end
 
 function YR.StartMail()
     local f = CreateFrame("Frame")
-    for _, e in ipairs({ "MAIL_SHOW", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED" }) do pcall(f.RegisterEvent, f, e) end
-    f:SetScript("OnEvent", function(_, event)
+    for _, e in ipairs({ "MAIL_SHOW", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED", "UI_ERROR_MESSAGE" }) do
+        pcall(f.RegisterEvent, f, e)
+    end
+    f:SetScript("OnEvent", function(_, event, ...)
         if event == "MAIL_SHOW" then
             if mailOpen then return end
             mailOpen = true
@@ -232,8 +278,13 @@ function YR.StartMail()
             run.postage = run.postage + run.pending.price
             run.pending = nil
             C_Timer.After(0.5, NextLetter)
-        elseif event == "MAIL_FAILED" and run then
-            Finish("the game refused the letter - is " .. run.to .. " the right name, on this realm and faction?")
+        elseif (event == "MAIL_FAILED" or (event == "UI_ERROR_MESSAGE" and run and run.pending)) and run then
+            local msg = select(2, ...)
+            if event == "UI_ERROR_MESSAGE" and not (type(msg) == "string" and (msg == ERR_FULL_NAME_REQUIRED
+                or msg:lower():find("mail") or msg:lower():find("name"))) then return end
+            ClearLetter()
+            Finish("the game refused the letter - " .. run.to .. " needs to be the full name (name and surname),"
+                .. " on this realm and faction. Set it in Settings, QoL, Bags")
         end
     end)
 end
