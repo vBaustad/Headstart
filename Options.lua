@@ -69,6 +69,12 @@ function YR:BuildMinimapButton()
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Headstart")
+        if YR.InstanceCounts and YR.Option("instanceTrack") then
+            local hour, day, wait = YR.InstanceCounts()
+            local perHour, perDay = YR.InstanceLimits()
+            GameTooltip:AddLine(("Instances: %d/%d this hour, %d/%d today%s"):format(hour, perHour, day, perDay,
+                wait and ("  (next in " .. YR.InstanceClock(wait) .. ")") or ""), 0.6, 0.8, 1)
+        end
         GameTooltip:AddLine("Click: the Headstart window", 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Right-click: settings", 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Drag: move round the minimap", 0.8, 0.8, 0.8)

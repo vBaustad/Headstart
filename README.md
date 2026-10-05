@@ -28,6 +28,7 @@ Built for the first hours of a fresh realm, when every starting zone has hundred
 - **Better gear.** Every item's tooltip says what it would do for you (+DPS, +toughness, from your own stats and role), and an upgrade in your bags gets an Equip button.
 - **Group.** Invite and leave buttons and key bindings, whisper "inv" to join, party quests shared and accepted for you.
 - **Trinkets and gear sets.** Trinket buttons with your others a click away, trinkets swapped for you as they're used, Carrot on a Stick while mounted, and keys for your equipment sets.
+- **Instance tracker.** New instances this hour and today against the limit, the wait for the next slot, and a log of every run with its time, XP and gold.
 - **Reminders.** Trainer spells waiting, unspent talent points, low durability, stones, oils and bandages you could make, a screenshot at every ding. Flight timer.
 
 ## Use

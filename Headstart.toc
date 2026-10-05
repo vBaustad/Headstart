@@ -37,6 +37,7 @@ Reminders.lua
 Sim.lua
 Upgrades.lua
 Trinkets.lua
+Instances.lua
 PartyQuests.lua
 QuickGroup.lua
 Data\Consumables.lua

@@ -658,6 +658,7 @@ bad_import = YR.ImportGuide(YR, "hello")
 check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a guide is refused, with the reason")
 YR.RevertGuide(YR, "coldridge")
 YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
+YR.ToggleWindow(YR, "instances")         # the instances page builds and fills
 check(len(g.SEEN_ICONS) == 0, "Settings builds a page the first time it's opened: the trainer's isn't yet")
 for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "trinkets", "character", "trainer", "route"):
     YR.ShowSettingsTab(YR, key)        # every page builds, and fills, without an error
@@ -1054,6 +1055,8 @@ import smoke_myroutes
 bad += smoke_myroutes.run()
 import smoke_trinkets
 bad += smoke_trinkets.run()
+import smoke_instances
+bad += smoke_instances.run()
 import smoke_skipquests
 bad += smoke_skipquests.run()
 sys.exit(1 if bad else 0)

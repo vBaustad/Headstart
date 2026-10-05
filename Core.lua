@@ -61,6 +61,8 @@ SlashCmdList.HEADSTART = function(msg)
         YR.OpenPlanner()
     elseif cmd == "inv" or cmd == "invite" then
         YR.InviteTarget()
+    elseif cmd == "instances" or cmd == "inst" then
+        YR:ToggleWindow("instances")
     elseif cmd == "gear" then
         YR.UseGearSet(arg)
     elseif cmd == "trinkets" then
@@ -126,6 +128,7 @@ f:SetScript("OnEvent", function(self, _, name)
     YR.StartSim()
     YR.StartUpgrades()
     YR.StartTrinkets()
+    YR.StartInstances()
     YR.StartCraftRemind()
     YR.StartQuickGroup()
     YR:BuildMinimapButton()

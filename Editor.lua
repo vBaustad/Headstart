@@ -1983,6 +1983,26 @@ local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
             .. " you. Hold Shift as the quest opens to be asked. Leatrix Plus's \"Block shared quests\" would"
             .. " decline them before Headstart sees them")
 
+        Section("Instance tracker", "dungeons and raids against the hourly and daily limit", { icon = 134237,
+            master = { Opt("instanceTrack"), function(on) YippRouteDB.instanceTrack = on end } })
+        Row("Instances an hour", S.Stepper(c, function() return YippRouteDB.instanceHour or 5 end,
+            function(v) YippRouteDB.instanceHour = v end, 1, 30, 1, 110),
+            "The game's limit for new instances in an hour. Forever's isn't known: 5 is Classic's. When the game"
+            .. " says too many, the Instances page shows the count it was at")
+        Row("Instances a day", S.Stepper(c, function() return YippRouteDB.instanceDay or 30 end,
+            function(v) YippRouteDB.instanceDay = v end, 1, 100, 1, 110), "30 on Classic")
+        Row("Back in within (minutes)", S.Stepper(c, function() return YippRouteDB.instanceSame or 30 end,
+            function(v) YippRouteDB.instanceSame = v end, 1, 120, 5, 110),
+            "Going back into the dungeon you just left, with the same group leader and no reset seen, within this"
+            .. " many minutes is the same instance and doesn't count again (the game keeps the copy's ID secret"
+            .. " on Forever, so this is how Headstart tells)")
+        Row("Count all my characters together", S.Switch(c, function() return YippRouteDB.instanceAccount == true end,
+            function(on) YippRouteDB.instanceAccount = on end),
+            "Off: each character has its own count (Classic's rule). On: every character on this account counts"
+            .. " toward one limit (the rule in later expansions)")
+        Row("Warn on screen near the limit", S.Switch(c, Opt("instanceWarn"), function(on) YippRouteDB.instanceWarn = on end),
+            "One instance before the limit, and at it, the middle of the screen says so too. Chat always does")
+
         Section("Quick group", "into a group for a kill and out again", { icon = 134149 })
         Row("Invite and Leave buttons", S.Switch(c, Opt("groupBar"), YR.SetGroupBar),
             "A small bar: Invite asks your target into your group, Leave group leaves it. Both also have key"
@@ -2535,11 +2555,126 @@ end
 -- ---------------------------------------------------------------------------
 -- The window
 -- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- Instances: the count against the limit, and the log (Instances.lua)
+-- ---------------------------------------------------------------------------
+local inst = {}
+
+local function Money(c)
+    c = math.floor(c or 0)
+    if c >= 10000 then return ("%dg %ds"):format(c / 10000, c % 10000 / 100) end
+    if c >= 100 then return ("%ds %dc"):format(c / 100, c % 100) end
+    return c .. "c"
+end
+
+local function InstanceRows()
+    local out = {}
+    local runs = YippRouteDB.instanceRuns or {}
+    for i = #runs, 1, -1 do
+        local r = runs[i]
+        if YippRouteDB.instanceAccount == true or r.char == YR.CharKey() then out[#out + 1] = r end
+    end
+    return out
+end
+
+local function Stat(page, x, label)
+    local box = CreateFrame("Frame", nil, page)
+    box:SetSize(220, 70)
+    box:SetPoint("TOPLEFT", x, -70)
+    S.Fill(box, S.C.card)
+    S.Border(box, S.C.line)
+    box.label = S.Text(box, 11, S.C.muted)
+    box.label:SetPoint("TOPLEFT", 14, -12)
+    box.label:SetText(label:upper())
+    box.value = S.Text(box, 24)
+    box.value:SetPoint("TOPLEFT", 14, -30)
+    box.sub = S.Text(box, 11, S.C.sub)
+    box.sub:SetPoint("LEFT", box.value, "RIGHT", 10, -2)
+    return box
+end
+
+local function BuildInstances(page)
+    local title = S.Text(page, 17)
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText("Instances")
+    inst.hint = S.Text(page, 12, S.C.muted)
+    inst.hint:SetPoint("TOPLEFT", 16, -40)
+    inst.hour = Stat(page, 16, "This hour")
+    inst.next = Stat(page, 248, "Next free slot")
+    inst.day = Stat(page, 480, "Today")
+    inst.list = List(page, PW - 32, math.floor((PH - 230) / 26), 26, function(r, i)
+        local e = inst.rows[i]
+        r:Select(false)
+        r.when:SetText(date("%a %H:%M", e.entered))
+        r.name:SetText((e.name or "?") .. ((YippRouteDB.instanceAccount == true) and ("  |cff999999" .. tostring(e.char):match("^[^%-]+") .. "|r") or ""))
+        local long = (e.left or (GetServerTime and GetServerTime() or time())) - e.entered
+        r.time:SetText(YR.InstanceClock(long) .. (e.left and "" or "  |cff66ccffnow|r"))
+        r.xp:SetText((e.xp or 0) > 0 and (BreakUpLargeNumbers and BreakUpLargeNumbers(e.xp) or tostring(e.xp)) .. " XP" or "")
+        r.gold:SetText((e.money or 0) > 0 and Money(e.money) or "")
+        r.flag:SetText(e.again and ("back in x" .. e.again) or "")
+    end, function() return inst.rows and #inst.rows or 0 end, function(r)
+        r.when = S.Text(r, 11, S.C.muted)
+        r.when:SetPoint("LEFT", 10, 0)
+        r.name = S.Text(r, 13)
+        r.name:SetPoint("LEFT", 100, 0)
+        r.name:SetWidth(300)
+        r.name:SetJustifyH("LEFT")
+        r.time = S.Text(r, 12, S.C.sub)
+        r.time:SetPoint("LEFT", 420, 0)
+        r.xp = S.Text(r, 12, S.C.sub)
+        r.xp:SetPoint("LEFT", 530, 0)
+        r.gold = S.Text(r, 12, S.C.gold or S.C.sub)
+        r.gold:SetPoint("LEFT", 650, 0)
+        r.flag = S.Text(r, 11, S.C.muted)
+        r.flag:SetPoint("RIGHT", -10, 0)
+    end)
+    inst.list:SetPoint("TOPLEFT", 16, -160)
+    local reset = S.Button(page, "A reset I missed", function() YR.InstanceResetSeen() YR:RefreshWindow() end, nil, 150)
+    reset:SetPoint("BOTTOMLEFT", 16, 14)
+    reset.tip = "The next time you go into any of these, it's a new instance (when the game's reset message didn't reach Headstart)"
+    local clear = S.Button(page, "Clear the log", function() YR.InstanceForget() YR:RefreshWindow() end, nil, 130)
+    clear:SetPoint("LEFT", reset, "RIGHT", 8, 0)
+    -- the countdown runs while the page shows
+    local wait = 0
+    page:SetScript("OnUpdate", function(_, elapsed)
+        wait = wait - elapsed
+        if wait > 0 then return end
+        wait = 1
+        if inst.Refresh then inst.Refresh() end
+    end)
+end
+
+function inst.Refresh()
+    if not inst.hour then return end
+    local hour, day, wait = YR.InstanceCounts()
+    local perHour, perDay = YR.InstanceLimits()
+    inst.hour.value:SetText(("%d / %d"):format(hour, perHour))
+    inst.hour.value:SetTextColor(unpack(hour >= perHour and S.C.danger or hour == perHour - 1 and S.C.gold or S.C.text))
+    inst.day.value:SetText(("%d / %d"):format(day, perDay))
+    inst.day.value:SetTextColor(unpack(day >= perDay and S.C.danger or S.C.text))
+    inst.next.value:SetText(wait and YR.InstanceClock(wait) or "now")
+    inst.next.value:SetTextColor(unpack(wait and S.C.danger or S.C.green))
+    inst.next.sub:SetText(wait and "until you can go in again" or "")
+    local locks = YippRouteDB.instanceLocks
+    local last = locks and locks[#locks]
+    inst.hint:SetText(("Each new dungeon or raid you go into counts for an hour and a day.%s"):format(last and
+        (" The game last said too many at %d this hour (%s)."):format(last.hour, date("%a %H:%M", last.at)) or
+        " Limits and how a return counts: Settings, QoL, Group."))
+    inst.rows = InstanceRows()
+    inst.list:Refresh()
+end
+
+local function RefreshInstances()
+    win.subtitle:SetText("")
+    inst.Refresh()
+end
+
 local PAGES = {
     { key = "settings", label = "QoL & settings", icon = "Interface\\Icons\\Trade_Engineering", build = BuildSettings,
       refresh = RefreshSettings },
     { key = "routes", label = "Routes", icon = "Interface\\Icons\\INV_Misc_Map_01", build = BuildRoutes, refresh = RefreshRoutes },
     { key = "run", label = "This run", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", build = BuildRun, refresh = RefreshRun },
+    { key = "instances", label = "Instances", icon = 134237, build = BuildInstances, refresh = RefreshInstances },
     { key = "share", label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,
       refresh = function() win.subtitle:SetText("") end },
 }
