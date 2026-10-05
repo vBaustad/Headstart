@@ -2817,27 +2817,54 @@ function YR:ShowSettingsTab(key)
     ShowTab(key)
 end
 
--- A tab in the title bar: its name, underlined while it's the one showing.
-local function TopTab(parent, label)
+-- The two tabs: one switch in the middle of the title bar, the half that's showing filled in. Each
+-- half has its icon and name; the other half lights up under the mouse.
+local SEG_W, SEG_H = 140, 28
+local function Segment(parent, label, icon)
     local b = CreateFrame("Button", nil, parent)
-    b:SetHeight(HEAD)
-    b.text = S.Text(b, 14, S.C.sub)
-    b.text:SetPoint("CENTER", 0, -1)
+    b:SetSize(SEG_W, SEG_H)
+    b.bg = S.Rounded(b, "BACKGROUND", "round", 1)
+    b.text = S.Text(b, 13, S.C.sub)
+    b.text:SetPoint("CENTER", 12, 0)
     b.text:SetText(label)
-    b:SetWidth(b.text:GetStringWidth() + 32)
-    b.line = b:CreateTexture(nil, "OVERLAY")
-    b.line:SetPoint("BOTTOMLEFT", 10, 0)
-    b.line:SetPoint("BOTTOMRIGHT", -10, 0)
-    b.line:SetHeight(2)
-    S.Set(b.line, S.C.accent)
+    b.icon = S.Icon(b, icon, 16)
+    b.icon:SetPoint("RIGHT", b.text, "LEFT", -8, 0)
+    local function Paint(self, over)
+        local on = self.selected
+        if on then
+            self.bg:SetVertexColor(unpack(S.C.accent))
+        else
+            self.bg:SetVertexColor(1, 1, 1, over and 0.08 or 0)
+        end
+        self.text:SetTextColor(unpack(on and { 1, 1, 1, 1 } or over and S.C.text or S.C.sub))
+        self.icon:SetDesaturated(not on)
+        self.icon:SetAlpha(on and 1 or 0.7)
+    end
     function b:Select(on)
         self.selected = on
-        self.line:SetShown(on)
-        self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
+        Paint(self, false)
     end
-    b:SetScript("OnEnter", function(self) if not self.selected then self.text:SetTextColor(unpack(S.C.text)) end end)
-    b:SetScript("OnLeave", function(self) if not self.selected then self.text:SetTextColor(unpack(S.C.sub)) end end)
+    b:SetScript("OnEnter", function(self) Paint(self, true) end)
+    b:SetScript("OnLeave", function(self) Paint(self, false) end)
+    b:Select(false)
     return b
+end
+
+-- Both halves in their track, centred in the title bar (head). Returns { levelling = , qol = }.
+local function TopTabs(head, onLevelling, onQoL)
+    local track = CreateFrame("Frame", nil, head)
+    track:SetSize(SEG_W * 2 + 6, SEG_H + 6)
+    track:SetPoint("CENTER", head, "CENTER", 0, 0)
+    track:SetFrameLevel(head:GetFrameLevel() + 2)      -- over the bar you drag the window by
+    S.Rounded(track, "BACKGROUND", "round"):SetVertexColor(unpack(S.C.field))
+    S.Rounded(track, "BORDER", "roundline"):SetVertexColor(unpack(S.C.lineHi))
+    local levelling = Segment(track, "Levelling", "Interface\\Icons\\INV_Misc_Map_01")
+    levelling:SetPoint("LEFT", 3, 0)
+    levelling:SetScript("OnClick", onLevelling)
+    local qol = Segment(track, "QoL", "Interface\\Icons\\Trade_Engineering")
+    qol:SetPoint("RIGHT", -3, 0)
+    qol:SetScript("OnClick", onQoL)
+    return { levelling = levelling, qol = qol }, track
 end
 
 local function NavButton(parent, label, icon, y, indent)
@@ -2960,17 +2987,15 @@ end
 
 local function Build()
     win = S.Window("HeadstartWindow", W, H, "Headstart")
-    -- The tabs, after the title; what a page says about itself (win.subtitle) goes after them.
-    ui.topTabs = {}
-    local levelling = TopTab(win, "Levelling")
-    levelling:SetPoint("LEFT", win.title, "RIGHT", 18, 0)
-    levelling:SetScript("OnClick", function() Show(lastLevelling or (YR.RoutesOn() and "routes" or "route")) end)
-    local qol = TopTab(win, "QoL")
-    qol:SetPoint("LEFT", levelling, "RIGHT", 0, 0)
-    qol:SetScript("OnClick", function() Show("settings") end)
-    ui.topTabs.levelling, ui.topTabs.qol = levelling, qol
-    win.subtitle:ClearAllPoints()
-    win.subtitle:SetPoint("LEFT", qol, "RIGHT", 14, 0)
+    -- The tabs in the middle of the title bar; what a page says about itself (win.subtitle) stays
+    -- after the title, cut short where the tabs begin.
+    local track
+    ui.topTabs, track = TopTabs(win.title:GetParent(),
+        function() Show(lastLevelling or (YR.RoutesOn() and "routes" or "route")) end,
+        function() Show("settings") end)
+    win.subtitle:SetPoint("RIGHT", track, "LEFT", -16, 0)
+    win.subtitle:SetJustifyH("LEFT")
+    win.subtitle:SetWordWrap(false)
     -- One menu down the left per tab: Levelling's (SIDE wide), QoL's (NAV_W wide, BuildSettings fills it).
     local function Side(width, color)
         local f = CreateFrame("Frame", nil, win)
