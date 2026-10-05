@@ -660,7 +660,7 @@ YR.RevertGuide(YR, "coldridge")
 YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
 YR.ToggleWindow(YR, "instances")         # the instances page builds and fills
 check(len(g.SEEN_ICONS) == 0, "Settings builds a page the first time it's opened: the trainer's isn't yet")
-for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "trinkets", "character", "trainer", "route"):
+for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "trinkets", "xpbar", "character", "trainer", "route"):
     YR.ShowSettingsTab(YR, key)        # every page builds, and fills, without an error
 icons = [g.SEEN_ICONS[i] for i in range(1, len(g.SEEN_ICONS) + 1)]
 check(any("Seal of" in t or "Holy Light" in t for t in icons), f"trainer rows carry the spell's icon: {icons[:2]}")
@@ -1057,6 +1057,8 @@ import smoke_trinkets
 bad += smoke_trinkets.run()
 import smoke_instances
 bad += smoke_instances.run()
+import smoke_xpbar
+bad += smoke_xpbar.run()
 import smoke_skipquests
 bad += smoke_skipquests.run()
 sys.exit(1 if bad else 0)

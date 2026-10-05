@@ -164,6 +164,15 @@ local function XPRate()
     return (b[2] - a[2]) / (b[1] - a[1]) * 3600
 end
 
+--- For the XP bar: XP an hour over the last 10 minutes of play (nil until there's enough), and this
+--- character's played time, total and this level (from the server's /played, counted on since).
+function YR.SplitsXPRate() return XPRate() end
+function YR.SplitsPlayed()
+    if not rec then return nil end
+    local at = rec.levels and rec.levels[UnitLevel("player")]
+    return rec.elapsed, at and (rec.elapsed - at) or nil
+end
+
 local function Short(n)
     return n >= 1000 and ("%.1fk"):format(n / 1000) or tostring(floor(n))
 end

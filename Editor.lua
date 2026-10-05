@@ -2273,6 +2273,97 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
         c:SetHeight(-y + MAX_TRINKETS * 34 + 40)
 end)
 
+-- XP bar (XPBar.lua): every setting applies at once, so the bar on screen is the preview.
+local function Swatch(c, key)
+    local b = CreateFrame("Button", nil, c)
+    b:SetSize(46, 20)
+    S.Border(b, S.C.lineHi)
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetPoint("TOPLEFT", 1, -1)
+    b.tex:SetPoint("BOTTOMRIGHT", -1, 1)
+    b.tex:SetColorTexture(1, 1, 1, 1)
+    function b:Refresh() self.tex:SetVertexColor(unpack(YR.XPBarDB()[key])) end
+    b:SetScript("OnClick", function()
+        local col = YR.XPBarDB()[key]
+        local before = { col[1], col[2], col[3], col[4] }
+        local function Set(r, g, bl, a)
+            col[1], col[2], col[3] = r, g, bl
+            if a then col[4] = a end
+            b:Refresh()
+            YR.XPBarApply()
+        end
+        if not (ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow) then return end
+        ColorPickerFrame:SetupColorPickerAndShow({
+            r = col[1], g = col[2], b = col[3], opacity = col[4], hasOpacity = true,
+            swatchFunc = function()
+                local r, g, bl = ColorPickerFrame:GetColorRGB()
+                Set(r, g, bl, ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or nil)
+            end,
+            opacityFunc = function()
+                local r, g, bl = ColorPickerFrame:GetColorRGB()
+                Set(r, g, bl, ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or nil)
+            end,
+            cancelFunc = function() Set(before[1], before[2], before[3], before[4]) end,
+        })
+    end)
+    return b
+end
+
+local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
+        local db = YR.XPBarDB
+        local function Set(key) return function(v) db()[key] = v YR.XPBarApply() end end
+        local function Get(key) return function() return db()[key] end end
+        Section("XP bar", "Headstart's own, in place of Blizzard's", { icon = 236562,
+            master = { Get("on"), Set("on") } })
+        Row("Hide Blizzard's bar", S.Switch(c, Get("hideBlizz"), Set("hideBlizz")),
+            "While ours shows, Blizzard's experience (and reputation) bar is made invisible and lets clicks through."
+            .. " Off: both show")
+        Row("Lock in place", S.Switch(c, Get("lock"), Set("lock")), "Unlocked: drag the bar where you want it")
+        Row("Back to its place", S.Button(c, "Reset", function() YR.XPBarResetPosition() end, nil, 90),
+            "The bottom of the screen, in the middle")
+        Row("Width", S.Slider(c, 150, 1800, 10, Get("w"), Set("w"), 260))
+        Row("Height", S.Slider(c, 4, 40, 1, Get("h"), Set("h"), 260))
+        Row("Hide it at the level cap", S.Switch(c, Get("maxHide"), Set("maxHide")))
+
+        Section("Look", nil, { icon = 133741 })
+        local TEX = { { "flat", "Flat" }, { "smooth", "Smooth" }, { "blizzard", "Blizzard's" } }
+        local tex
+        tex = S.Dropdown(c, 170, TEX, function(v) Set("texture")(v) tex:Refresh() end)
+        function tex:Refresh() for _, o in ipairs(TEX) do if o[1] == db().texture then self:SetValue(o[2]) end end end
+        Row("Texture", tex)
+        Row("XP colour", Swatch(c, "xpColor"))
+        Row("Rested colour", Swatch(c, "restColor"), "The rested XP ahead of your XP: you get double XP for kills until it's used")
+        Row("Background", S.Slider(c, 0, 100, 5, function() return math.floor(db().bgAlpha * 100 + 0.5) end,
+            function(v) Set("bgAlpha")(v / 100) end, 260), "How dark the empty part is, in percent")
+        local TICKS = { { 0, "None" }, { 10, "Every tenth" }, { 20, "Every twentieth" }, { 4, "Quarters" } }
+        local ticks
+        ticks = S.Dropdown(c, 170, TICKS, function(v) Set("ticks")(v) ticks:Refresh() end)
+        function ticks:Refresh() for _, o in ipairs(TICKS) do if o[1] == db().ticks then self:SetValue(o[2]) end end end
+        Row("Ticks", ticks)
+        Row("Text size", S.Slider(c, 8, 20, 1, Get("font"), Set("font"), 260))
+
+        Section("Words", "what the bar says, written your way", { icon = 134327 })
+        local TOKENS = "{level} {xp} {max} {left} {pct} {rested} {restedpct} {rate} {ding} {mobs} {kill} {played}"
+            .. " {levelplayed} {session}"
+        local function TextRow(label, key)
+            local box = S.Input(c, { width = 320, onCommit = function(t) Set(key)(t) end })
+            function box:Refresh() if not self:HasFocus() then self:SetValue(db()[key] or "") end end
+            Row(label, box, "Write anything, with these filled in: " .. TOKENS .. ". {rate} is XP an hour, {ding} the"
+                .. " time to ding at that rate, {mobs} the kills to ding (by your last kills' XP), {played} and"
+                .. " {levelplayed} your played time in all and this level, {session} since you logged in. Empty: nothing")
+        end
+        TextRow("Left", "left")
+        TextRow("Middle", "center")
+        TextRow("Right", "right")
+        Row("Only while the mouse is over it", S.Switch(c, Get("textHover"), Set("textHover")))
+        Row("Back to the first words", S.Button(c, "Reset", function()
+            local d = YR.XPBAR_DEFAULT
+            db().left, db().center, db().right = d.left, d.center, d.right
+            YR.XPBarApply()
+            YR:RefreshWindow()
+        end, nil, 90))
+end)
+
 local function QoLRefresh(key, extra)
     return function()
         for _, ctl in ipairs(qolPages[key].controls) do if ctl.Refresh then ctl:Refresh() end end
@@ -2304,6 +2395,9 @@ local CATEGORIES = {
       icon = 133434, status = function() return YR.Option("trinketBar") or YippRouteDB.trinketAuto == true end,
       scope = "Every character; the swap order per character",
       desc = "Trinket buttons with your others a click away, trinkets swapped as they're used, and keys for your gear sets." },
+    { key = "xpbar", label = "XP bar", build = BuildXPBar, refresh = QoLRefresh("xpbar"), icon = 236562,
+      status = function() return YR.XPBarDB().on end, scope = "Every character on this account",
+      desc = "Your own experience bar: its size, place, colours and the words on it, with XP an hour, time and kills to ding." },
     { group = "Character" },
     { key = "character", label = "Character setup", build = BuildSetup, refresh = RefreshSetup, icon = 134166,
       scope = function() return "Every " .. (CLASS_NAME[ViewClass()] or "character") .. "; chat and Edit Mode for all" end,

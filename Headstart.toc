@@ -38,6 +38,7 @@ Sim.lua
 Upgrades.lua
 Trinkets.lua
 Instances.lua
+XPBar.lua
 PartyQuests.lua
 QuickGroup.lua
 Data\Consumables.lua
