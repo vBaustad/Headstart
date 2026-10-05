@@ -87,6 +87,7 @@ local TRACK_Y, THICK, KNOB = -33, 5, 13
 local BLUE, BLUE_DIM = { 0.40, 0.66, 1.00 }, { 0.18, 0.40, 0.80 }
 local TRACK = { 0.17, 0.19, 0.23, 1 }
 local SWEEP = 1.8                     -- seconds for the light to run the bar on a first flight
+local LAND_LABEL = "Land"              -- the button's word (kept apart from the Land() below)
 
 local function Round(x) return floor(x + 0.5) end
 
@@ -178,7 +179,7 @@ local function Build()
     local line = S.Border(frame.stop, S.C.line)
     frame.stop.text = S.Text(frame.stop, 11, S.C.sub)
     frame.stop.text:SetPoint("CENTER")
-    frame.stop.text:SetText("Land")
+    frame.stop.text:SetText(LAND_LABEL)
     frame.stop:SetScript("OnClick", StopAtNext)
     frame.stop:SetScript("OnEnter", function(self)
         line:Color(S.C.lineHi)
