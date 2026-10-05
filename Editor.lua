@@ -2777,6 +2777,8 @@ end
 -- the route list under it instead).
 local PAGES = {
     { key = "routes", tab = "levelling", build = BuildRoutes, refresh = RefreshRoutes },
+    { key = "where", tab = "levelling", nav = true, label = "Where next?", icon = "Interface\\Icons\\Ability_Hunter_Pathfinding",
+      build = YR.BuildWherePage, refresh = function() win.subtitle:SetText("") YR.RefreshWherePage() end },
     { key = "run", tab = "levelling", nav = true, label = "This run", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01",
       build = BuildRun, refresh = RefreshRun },
     { key = "share", tab = "levelling", nav = true, label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,

@@ -710,6 +710,8 @@ YR.ShowSettingsTab(YR, "route")
 check(YR.WindowTab() == "levelling", f"Route settings is on the Levelling tab: {YR.WindowTab()}")
 YR.ToggleWindow(YR, "run")
 check(YR.WindowTab() == "levelling", "This run is on the Levelling tab")
+YR.ToggleWindow(YR, "where")              # Where next? builds and fills from the real routes
+check(YR.WindowTab() == "levelling", "Where next? is on the Levelling tab, and fills without an error")
 YR.ShowSettingsTab(YR, "trainer")
 check(YR.WindowTab() == "qol", "the Trainer page is on the QoL tab")
 # the bar planner builds with the real Setup and Style, and the first-time window shows its button
@@ -1070,4 +1072,6 @@ import smoke_xpbar
 bad += smoke_xpbar.run()
 import smoke_skipquests
 bad += smoke_skipquests.run()
+import smoke_wherenext
+bad += smoke_wherenext.run()
 sys.exit(1 if bad else 0)

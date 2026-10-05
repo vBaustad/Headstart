@@ -55,6 +55,7 @@ Setup.lua
 SetupUI.lua
 Data\PlannerSpells.lua
 Planner.lua
+WhereNext.lua
 Editor.lua
 Guides\Coldridge.lua
 Guides\DunMorogh.lua

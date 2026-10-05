@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Where next?** (Levelling tab) for a character that didn't follow our routes: from its level and the quests the game says it has handed in, which of its routes to pick up and at which step, with how many of each route's quests are done and left, and a button that loads it in RestedXP right there. The route whose level range holds your level and has the most left comes first; a route below your level only when nothing else is left.
+
 - **The window has two tabs, Levelling and QoL**, each with its own menu down the left, so routing and quality of life weigh the same and there's no menu inside a menu any more. Levelling: This run, Share, Route settings, then your routes. QoL: Find a setting, then every QoL and character page, with Instances now one of them. The QoL pages are wider. `/hs` and a right-click on the minimap button open QoL; the window opens on Levelling when routes are on.
 
 - **XP bar** (Settings, QoL, XP bar): Headstart's own experience bar in place of Blizzard's (which is made invisible and click-through while ours shows). Your XP with the rested XP ahead of it, ticks, a spark at the front. Its width, height and place (drag it while unlocked), texture, XP and rested colours (the game's colour picker), background, ticks and text size are yours to set, and every change shows on the bar at once. Three texts - left, middle, right - say what you write in them, with {level} {xp} {max} {left} {pct} {rested} {restedpct} {rate} (XP an hour) {ding} (time to ding) {mobs} (kills to ding, from your last kills' XP) {kill} {played} {levelplayed} {session} filled in; always or only under the mouse. Pointing at it shows all of it at once.
