@@ -36,9 +36,7 @@ local function AcceptAtHealer()
             C_PlayerInteractionManager.ClearInteraction(Enum.PlayerInteractionType.SpiritHealer)
         end)
     elseif AcceptXPLoss then
-        AcceptXPLoss()
-        if StaticPopup1 then StaticPopup1:Hide() end
-        if StaticPopup2 then StaticPopup2:Hide() end
+        AcceptXPLoss()      -- the game closes its own popup as you come alive: hiding it from here would taint it
     end
 end
 

@@ -89,19 +89,37 @@ local function Check(arriving)
 end
 YR.CampingCheck = Check   -- for tests
 
-local pending = false
+-- Bags, the quest log and skills fire all the time: listened to only while this character is on one
+-- of the two quests with the reminder on (looked at again on taking or losing a quest, a loading screen
+-- and a new subzone), so every other character pays nothing for it.
+local NOISY = { "BAG_UPDATE_DELAYED", "QUEST_LOG_UPDATE", "SKILL_LINES_CHANGED" }
+local pending, armed = false, false
 local f = CreateFrame("Frame")
-f:RegisterEvent("BAG_UPDATE_DELAYED")
-f:RegisterEvent("QUEST_LOG_UPDATE")
-f:RegisterEvent("SKILL_LINES_CHANGED")
+local function Arm()
+    local want = (not YR.RoutesOn or YR.RoutesOn()) and YR.Option("campReminder")
+        and (OnQuest(BS_QUEST) or OnQuest(MINING_QUEST)) or false
+    if want == armed then return end
+    armed = want
+    for _, e in ipairs(NOISY) do
+        if want then f:RegisterEvent(e) else f:UnregisterEvent(e) end
+    end
+end
 f:RegisterEvent("ZONE_CHANGED")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
+f:RegisterEvent("QUEST_ACCEPTED")
+f:RegisterEvent("QUEST_REMOVED")
 f:SetScript("OnEvent", function(_, event)
+    if event == "QUEST_ACCEPTED" or event == "QUEST_REMOVED" or event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED" then
+        Arm()
+        -- the quest log isn't there yet in the first moments after logging in
+        if event == "PLAYER_ENTERING_WORLD" then C_Timer.After(5, Arm) end
+    end
     if event == "ZONE_CHANGED" then
         local sub = GetSubZoneText and GetSubZoneText()
         if sub == "Kharanos" or sub == "Thelsamar" then Check(true) end
         return
     end
+    if not armed then return end
     -- bags and the quest log fire in bursts: look once they settle
     if pending then return end
     pending = true

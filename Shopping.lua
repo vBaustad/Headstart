@@ -115,8 +115,9 @@ local function AtVendor()
             if id == e.item and YR.ShoppingWanted(e) then
                 local cost = YR.MerchantInfo(i) or e.price      -- Restock.lua: C_MerchantFrame on Forever
                 if money >= cost then
-                    local popup = StaticPopup_Show("HEADSTART_BUY_LATER", e.name, Coins(cost))
-                    if popup then popup.data = { index = i, item = e.item } end
+                    -- the data as StaticPopup_Show's own argument: writing popup.data from here would taint
+                    -- the popup frame, and the next Blizzard popup to use it (Delete item) could fail
+                    StaticPopup_Show("HEADSTART_BUY_LATER", e.name, Coins(cost), { index = i, item = e.item })
                     return
                 end
             end
@@ -124,6 +125,8 @@ local function AtVendor()
     end
 end
 
+-- Money changes once per item sold: look once it settles, not twenty times for twenty sales.
+local pending = false
 local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("PLAYER_MONEY")
@@ -132,7 +135,8 @@ f:RegisterEvent("MERCHANT_SHOW")
 f:SetScript("OnEvent", function(_, event)
     if event == "MERCHANT_SHOW" then
         C_Timer.After(0.2, AtVendor)
-    else
-        Check()
+    elseif not pending then
+        pending = true
+        C_Timer.After(0.5, function() pending = false Check() end)
     end
 end)

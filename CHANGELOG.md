@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Buy later, the Camping 101 reminder and death skips no longer touch Blizzard's popups from addon code (which could make a later Delete-item confirm fail with "Interface action failed because of an AddOn"). Buy later looks once after a round of selling, not once per item sold; the Camping 101 reminder listens to your bags and quest log only while you're on one of its two quests.
+
 - **Where next?** (Levelling tab) for a character that didn't follow our routes: from its level and the quests the game says it has handed in, which of its routes to pick up and at which step, with how many of each route's quests are done and left, and a button that loads it in RestedXP right there. The route whose level range holds your level and has the most left comes first; a route below your level only when nothing else is left.
 
 - **The window has two tabs, Levelling and QoL**, each with its own menu down the left, so routing and quality of life weigh the same and there's no menu inside a menu any more. Levelling: This run, Share, Route settings, then your routes. QoL: Find a setting, then every QoL and character page, with Instances now one of them. The QoL pages are wider. `/hs` and a right-click on the minimap button open QoL; the window opens on Levelling when routes are on.
