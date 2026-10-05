@@ -87,7 +87,7 @@ local TRACK_Y, THICK, KNOB = -33, 5, 13
 local BLUE, BLUE_DIM = { 0.40, 0.66, 1.00 }, { 0.18, 0.40, 0.80 }
 local TRACK = { 0.17, 0.19, 0.23, 1 }
 local SWEEP = 1.8                     -- seconds for the light to run the bar on a first flight
-local LAND_LABEL = "Land"              -- the button's word (kept apart from the Land() below)
+local LAND_LABEL = "Land"              -- the button's word
 
 local function Round(x) return floor(x + 0.5) end
 
