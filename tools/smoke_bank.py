@@ -277,7 +277,12 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     YR.SetMailRecipient("Bankalt-Smith")
     check(YR.MailRecipient() == "Bankalt Smith", f"a dash between them is the same: {YR.MailRecipient()}")
     YR.SetMailRecipient("  bankalt ")
-    check(YR.MailRecipient() == "Bankalt", f"just a name Headstart doesn't know: kept as typed: {YR.MailRecipient()}")
+    check(YR.MailRecipient() is None and YR.MailRecipientMissingSurname() == "Bankalt",
+          f"just a name Headstart can't complete: not used - the surname is missing ({YR.MailRecipient()})")
+    lua.execute("SENT = {} PRINTS = {}")
+    g.HeadstartMailButton._OnClick()
+    said = [g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1)]
+    check(len(g.SENT) == 0 and any("surname too" in p for p in said), f"nothing sent, and chat says the surname is missing: {said}")
     lua.execute("YippRouteDB.runs = { ['Bankalt-Smith'] = {} }")
     check(YR.MailRecipient() == "Bankalt Smith", f"one of your characters it knows: the surname filled in: {YR.MailRecipient()}")
     YR.SetMailRecipient("bankalt")

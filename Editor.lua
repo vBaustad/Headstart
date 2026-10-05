@@ -1849,14 +1849,19 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
         alt:SetSize(190, 24)
         alt.input = S.Input(alt, { width = 190, placeholder = "Name Surname", onCommit = function(t)
             local full = YR.SetMailRecipient(t)
-            if full and not full:find(" ") and not full:find("-") then
-                YR.Print("mail on Forever needs the full name: " .. full .. "'s surname too, as the character shows it.")
+            local bare = YR.MailRecipientMissingSurname()
+            if bare then
+                YR.Print(("mail on Forever needs the full name: %s's surname too, as the character shows it."):format(bare))
+            elseif full then
+                YR.Print("mail goes to " .. full .. ".")
             end
             YR:RefreshWindow()
         end })
         alt.input:SetPoint("RIGHT")
         function alt:Refresh()
-            if not self.input:HasFocus() then self.input:SetText(YR.MailRecipient() or "") end
+            if not self.input:HasFocus() then
+                self.input:SetText(YR.MailRecipient() or YR.MailRecipientMissingSurname() or "")
+            end
         end
         Row("Send to", alt, "The character who gets it, on this realm and faction, by its full name: name and surname, as the character shows it (\"Klistre Merke\"). Type just the name and Headstart adds the surname of one of your characters it knows"
             .. ". On that character nothing is sent, so the same settings work there")

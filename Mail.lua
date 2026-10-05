@@ -29,12 +29,20 @@ local function Me() return (UnitName("player")) end
 
 --- Who gets the mail on this realm and faction, or nil.
 local KnownFullName     -- below
+--- Who gets the mail: always a full name (name and surname - Forever's mail takes nothing less), or
+--- nil. One saved before full names were kept ("Klistre") gets its surname when Headstart knows that
+--- character, and otherwise counts as not set: a letter to a bare name only fails.
 function YR.MailRecipient()
     local to = YippRouteDB.mailTo and YippRouteDB.mailTo[Key()]
     if type(to) ~= "string" or to == "" then return nil end
-    -- saved before full names were kept (just "Klistre"): the surname of that character, when known
-    if not to:find("[%s%-]") and KnownFullName then return KnownFullName(to) or to end
+    if not to:find("[%s%-]") then return KnownFullName and KnownFullName(to) or nil end
     return to
+end
+
+--- What was typed, when it's only a name that can't be completed (for the settings to say so).
+function YR.MailRecipientMissingSurname()
+    local to = YippRouteDB.mailTo and YippRouteDB.mailTo[Key()]
+    if type(to) == "string" and to ~= "" and not YR.MailRecipient() then return to end
 end
 
 -- On Forever a character's full name is its name and its surname ("Klistre Merke"), and mail needs the
@@ -74,7 +82,7 @@ function YR.SetMailRecipient(name)
     local full = table.concat(words, Separator())
     if #words == 1 then full = KnownFullName(words[1]) or full end
     YippRouteDB.mailTo[Key()] = full ~= "" and full or nil
-    return YippRouteDB.mailTo[Key()]
+    return YR.MailRecipient()
 end
 
 function YR.MailMats()
@@ -200,7 +208,11 @@ function YR.MailToAlt(loud)
     if InCombatLockdown() then if loud then YR.Print("not in combat.") end return end
     local to = YR.MailRecipient()
     if not to then
-        if loud then YR.Print("name the alt to mail in Settings, QoL, Bags (Mail to my alt).") end
+        local bare = YR.MailRecipientMissingSurname()
+        if loud then
+            YR.Print(bare and ("mail needs the full name: %s's surname too. Set it in Settings, QoL, Bags (Mail to my alt)."):format(bare)
+                or "name the alt to mail in Settings, QoL, Bags (Mail to my alt): name and surname.")
+        end
         return
     end
     if not ToOther(to) then
@@ -244,7 +256,7 @@ local function Refresh()
     local b = Button()
     if not b then return end
     local to = YR.MailRecipient()
-    b:SetText(to and ("Send to " .. to) or "Mail to my alt")
+    b:SetText(to and ("Send to " .. to) or (YR.MailRecipientMissingSurname() and "Alt's surname missing" or "Mail to my alt"))
     b:SetShown(YR.Option("mailButton") and mailOpen and ToOther(to or "?") and true or false)
 end
 
