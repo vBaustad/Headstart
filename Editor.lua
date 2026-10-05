@@ -2133,10 +2133,14 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
         Section("Trinket buttons", "click one for your other trinkets", { icon = 133434,
             master = { Opt("trinketBar"), function(on) YippRouteDB.trinketBar = on YR.ShowTrinketBar(on) end } })
         Row("How they work", S.Text(c, 12, S.C.muted),
-            "Two buttons on screen, one per trinket slot, with its cooldown. Click one: the trinkets in your bags,"
+            "Trinket buttons on screen, each with its cooldown. Click one: the trinkets in your bags,"
             .. " and a click on one of those puts it in that slot (in a fight: as soon as it ends). Right-click a"
             .. " button to use the trinket in it. A right-click in the list puts a trinket in your swap order or"
             .. " takes it out. Nothing opens when the mouse only goes past")
+        Row("Only as many as I have trinkets", S.Switch(c, Opt("trinketBarCount"), function(on)
+            YippRouteDB.trinketBarCount = on if YR.TrinketLayout then YR.TrinketLayout() end end),
+            "A button per trinket you have, worn or in your bags: none with no trinkets, one with one, both with two"
+            .. " or more. Off: always both buttons. It changes after a fight, not during one")
         Row("Lock in place", S.Switch(c, Opt("trinketBarLocked"), function(on) YippRouteDB.trinketBarLocked = on end),
             "Unlocked, drag the buttons where you want them")
 

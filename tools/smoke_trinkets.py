@@ -175,6 +175,23 @@ C_EquipmentSet = {
     check(g.WORN[14] == 2, "turned off: no Carrot")
     lua.execute("MOUNTED = false")
 
+    # how many buttons: one per trinket you have (worn or in your bags), at most two; off: always two
+    def shown():
+        t = YR.TrinketSlotsShown()
+        return [t[i] for i in range(1, len(t) + 1)]
+    lua.execute("WORN[13] = nil WORN[14] = nil BAG = {}")
+    check(shown() == [], "no trinkets: no buttons")
+    lua.execute("WORN[14] = 2")
+    check(shown() == [14], f"one, worn in the bottom slot: its button only ({shown()})")
+    lua.execute("WORN[14] = nil BAG = { 4 }")
+    check(shown() == [13], f"one in your bags: a button to put it on with ({shown()})")
+    lua.execute("WORN[13] = 1")
+    check(shown() == [13, 14], f"two (worn and in the bags): both ({shown()})")
+    g.YippRouteDB.trinketBarCount = False
+    lua.execute("WORN[13] = nil BAG = {}")
+    check(shown() == [13, 14], "turned off: always both")
+    g.YippRouteDB.trinketBarCount = None
+
     # gear sets: by number, by name, and after a fight
     YR.UseGearSet("2")
     check(g.USED_SET == 9, "set 2: Fishing")

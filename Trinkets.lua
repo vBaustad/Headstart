@@ -15,7 +15,7 @@
 -- you're flagged for PvP: on a PvP realm a swap at the wrong moment (still on the Carrot when someone
 -- jumps you) costs a fight, so by default every change is yours.
 --   Account options (YippRouteDB, Settings, QoL, Trinkets & sets): trinketBar, trinketBarLocked,
---   trinketPvpPause (on unless turned off); trinketAuto, trinketMount, trinketSwim (off unless turned on),
+--   trinketBarCount, trinketPvpPause (on unless turned off); trinketAuto, trinketMount, trinketSwim (off unless turned on),
 --   trinketMountItem / trinketSwimItem (item IDs; nil = Carrot on a Stick / none), trinketMountSlot
 --   (13 or 14, nil = 14), trinketBarPos. Per character (YippSetupCharDB.trinkets): order (item IDs,
 --   first = most wanted), auto[13] / auto[14] (false = that slot is left alone), before (what the swap
@@ -421,10 +421,49 @@ local function Build()
 end
 
 --- The buttons on screen or not (only out of a fight: they're secure).
+--- Which buttons show: both, or (trinketBarCount, on unless turned off) one per trinket you have - worn
+--- or in your bags - so none with no trinkets, one with one (in the slot it's in, else the top), both
+--- with two or more. One you own but don't wear keeps its button: that's the way to put it on.
+function YR.TrinketSlotsShown()
+    if not YR.Option("trinketBarCount") then return { 13, 14 } end
+    local have, seen = 0, {}
+    for _, s in ipairs(SLOTS) do
+        local id = Worn(s)
+        if id and not seen[id] then have, seen[id] = have + 1, true end
+    end
+    for bag = 0, NUM_BAG_SLOTS or 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local id = C_Container.GetContainerItemID(bag, slot)
+            if id and not seen[id] and IsTrinket(id) then have, seen[id] = have + 1, true end
+        end
+    end
+    if have >= 2 then return { 13, 14 } end
+    if have == 1 then return { (Worn(14) and not Worn(13)) and 14 or 13 } end
+    return {}
+end
+
+local relayout = false       -- the count changed in a fight: the secure buttons wait for it to end
+local function Layout()
+    if not bar then return end
+    if InCombatLockdown() then relayout = true return end
+    relayout = false
+    local shown = YR.TrinketSlotsShown()
+    local on = {}
+    for i, s in ipairs(shown) do
+        on[s] = true
+        buttons[s]:ClearAllPoints()
+        buttons[s]:SetPoint("LEFT", (i - 1) * 44 + 2, 0)
+    end
+    for _, s in ipairs(SLOTS) do buttons[s]:SetShown(on[s] and true or false) end
+    bar:SetShown(YR.Option("trinketBar") and #shown > 0)
+    if #shown == 0 then CloseFlyout() end
+end
+YR.TrinketLayout = Layout
+
 function YR.ShowTrinketBar(on)
     if InCombatLockdown() then return end
     if on and not bar then Build() end
-    if bar then bar:SetShown(on and true or false) end
+    if bar then bar:SetShown(on and true or false) Layout() end
     if not on then CloseFlyout() end
 end
 
@@ -437,7 +476,9 @@ function YR.StartTrinkets()
     f:SetScript("OnEvent", function(_, event)
         if event == "PLAYER_REGEN_DISABLED" then CloseFlyout() return end
         if event == "PLAYER_ENTERING_WORLD" then YR.ShowTrinketBar(YR.Option("trinketBar")) end
+        if event == "PLAYER_EQUIPMENT_CHANGED" or event == "BAG_UPDATE_DELAYED" then Layout() end
         if event == "PLAYER_REGEN_ENABLED" then
+            if relayout then Layout() end
             for slot, id in pairs(pending) do YR.TrinketEquip(id, slot) end
             if wantSet then YR.UseGearSet(wantSet) end
         end
