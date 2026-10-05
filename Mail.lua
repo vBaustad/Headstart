@@ -122,8 +122,9 @@ function YR.MailPick()
             if item and not info.isBound and not info.isLocked then
                 local why
                 if custom[item] then
+                    -- your list, but never a quest item or one a quest still needs (ours or RestedXP's)
                     local _, _, _, _, _, class = C_Item.GetItemInfoInstant(item)
-                    if class ~= 12 then why = "your list" end
+                    if class ~= 12 and not YR.QuestNeeds(item) then why = "your list" end
                 else
                     why = YR.StashReason(item, have, YR.MailMats(), YR.Option("mailRecipes"))
                 end
@@ -246,7 +247,7 @@ local function Button()
         GameTooltip:AddLine(m == "all" and "Crafting mats: all of them." or m == "mine"
             and "Crafting mats no profession of yours crafts with." or "Crafting mats: off.", 1, 1, 1, true)
         GameTooltip:AddLine(YR.Option("mailRecipes") and "Recipes you can't learn yet." or "Recipes: off.", 1, 1, 1, true)
-        GameTooltip:AddLine("And your list, as you made it. Never soulbound or quest items; of the mats, nothing the route needs or AutoFeed's food."
+        GameTooltip:AddLine("And your list. Never soulbound or quest items, or anything a quest still needs (the route's or RestedXP's); of the mats, no AutoFeed food."
             .. " 30 copper a stack in postage. Settings, QoL, Bags.", 0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)

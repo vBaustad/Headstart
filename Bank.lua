@@ -82,11 +82,22 @@ end
 --- `have` is Professions(), passed in so one walk of the bags asks the game once.
 --- The rule itself, shared with the mail to your alt (Mail.lua): `mats` is "mine" | "all" | "off",
 --- `recipes` true to send recipes you can't learn yet.
+--- Needed for a quest: one of our route's steps still needs it, or RestedXP's guides use it (what its
+--- tooltip calls "Item used in guide"). Such an item never leaves your bags - not to the bank, not in
+--- the mail, whatever list it's on.
+function YR.QuestNeeds(item)
+    if not item then return false end
+    if YR.RouteNeed and YR.RouteNeed(item) then return true end
+    local rxp = type(RXP) == "table" and RXP or nil
+    local ok, used = pcall(function() return rxp and rxp.questItemList and rxp.questItemList[item] end)
+    return ok and used ~= nil
+end
+
 function YR.StashReason(item, have, mats, recipes)
     if not item then return nil end
     local _, _, _, _, _, class, subclass = C_Item.GetItemInfoInstant(item)
     if not class or class == QUEST then return nil end
-    if YR.RouteNeed and YR.RouteNeed(item) then return nil end
+    if YR.QuestNeeds(item) then return nil end
     if KeptBy("AutoFeedConsumables", item) then return nil end
     local C = YR.Crafting
 

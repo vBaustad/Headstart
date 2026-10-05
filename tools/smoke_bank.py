@@ -352,6 +352,29 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     lua.execute("RunAfter()")
     check(mailed() == [2589], f"the list sends linen; a soulbound stack stays: {mailed()}")
     g.Fire("MAIL_CLOSED")
+    # never what a quest needs: RestedXP's guides use it, or our route still needs it - list or not
+    lua.execute("SENT = {} RXP = { questItemList = { [2589] = 123 } }")
+    lua.execute("BAGS[0][2] = nil BAGS[0][1] = 2589")
+    g.Fire("MAIL_SHOW")
+    YR.MailToAlt(True)
+    check(len(g.SENT) == 0, "linen on your list, but a RestedXP guide uses it: stays")
+    g.Fire("MAIL_CLOSED")
+    lua.execute("RXP = nil")
+    real_need = YR.RouteNeed
+    lua.eval("function(YR) YR.RouteNeed = function(item) return item == 2589 end end")(YR)
+    lua.execute("SENT = {} BAGS[0][1] = 2589")
+    g.Fire("MAIL_SHOW")
+    YR.MailToAlt(True)
+    check(len(g.SENT) == 0, "on your list, but the route still needs it: stays")
+    lua.execute("SENT = {}")
+    YR.RouteNeed = real_need
+    g.Fire("MAIL_SHOW")
+    YR.MailToAlt(True)
+    check(len(g.SENT) == 1, "and with nothing needing it, the list sends it again")
+    g.Fire("MAIL_SEND_SUCCESS")
+    lua.execute("RunAfter()")
+    g.Fire("MAIL_CLOSED")
+    YR.RouteNeed = real_need
     lua.execute("C_Container.GetContainerItemInfo = nil")
     lua.execute("""C_Container.GetContainerItemInfo = function(bag, slot)
         local id = BAGS[bag] and BAGS[bag][slot]
