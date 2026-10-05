@@ -213,8 +213,8 @@ function YR.MailToAlt(loud)
     if not to then
         local bare = YR.MailRecipientMissingSurname()
         if loud then
-            YR.Print(bare and ("mail needs the full name: %s's surname too. Set it in Settings, QoL, Bags (Mail to my alt)."):format(bare)
-                or "name the alt to mail in Settings, QoL, Bags (Mail to my alt): name and surname.")
+            YR.Print(bare and ("mail needs the full name: %s's surname too. Set it in Headstart, QoL, Bags (Mail to my alt)."):format(bare)
+                or "name the alt to mail in Headstart, QoL, Bags (Mail to my alt): name and surname.")
         end
         return
     end
@@ -248,7 +248,7 @@ local function Button()
             and "Crafting mats no profession of yours crafts with." or "Crafting mats: off.", 1, 1, 1, true)
         GameTooltip:AddLine(YR.Option("mailRecipes") and "Recipes you can't learn yet." or "Recipes: off.", 1, 1, 1, true)
         GameTooltip:AddLine("And your list. Never soulbound or quest items, or anything a quest still needs (the route's or RestedXP's); of the mats, no AutoFeed food."
-            .. " 30 copper a stack in postage. Settings, QoL, Bags.", 0.6, 0.6, 0.6, true)
+            .. " 30 copper a stack in postage. Headstart, QoL, Bags.", 0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -280,7 +280,7 @@ function YR.StartMail()
             if mailOpen then return end
             mailOpen = true
             Refresh()
-            if YippRouteDB.mailAuto == true and not IsShiftKeyDown() then
+            if YippRouteDB.mailAuto == true and YR.QoLOn() and not IsShiftKeyDown() then
                 C_Timer.After(0.5, function() YR.MailToAlt(false) end)
             end
         elseif event == "MAIL_CLOSED" then
@@ -299,7 +299,7 @@ function YR.StartMail()
                 or msg:lower():find("mail") or msg:lower():find("name"))) then return end
             ClearLetter()
             Finish("the game refused the letter - " .. run.to .. " needs to be the full name (name and surname),"
-                .. " on this realm and faction. Set it in Settings, QoL, Bags")
+                .. " on this realm and faction. Set it in Headstart, QoL, Bags")
         end
     end)
 end

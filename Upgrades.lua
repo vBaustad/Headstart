@@ -136,7 +136,8 @@ function YR.CheckUpgrade(bag, slot)
     -- The gear sim (Sim.lua) when it can answer: your own numbers, the item swapped in. What counts is the
     -- change for your role, with a quarter of the toughness change beside it (all of it for a tank), so
     -- an armor-only piece for an empty slot still counts for something.
-    local c = YR.SimCompare and YR.SimCompare(link)
+    -- the kept answer (and the kept role): the bags are looked through after every loot
+    local c = (YR.SimCompareKept and YR.SimCompareKept(link)) or (not YR.SimCompareKept and YR.SimCompare and YR.SimCompare(link))
     if c then
         -- Your role's number never goes down for armor: a one-hander and a shield in place of your
         -- two-hander is less DPS, however much toughness the shield adds (for a tank it's the other way).

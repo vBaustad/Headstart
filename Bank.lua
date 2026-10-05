@@ -193,7 +193,12 @@ local function Step()
         r.i = r.i + 1
         return
     end
-    if locked then return end                                 -- on its way; look again next tick
+    if locked then
+        -- on its way; look again next tick - but not for ever, if it never lets go
+        s.locked = (s.locked or 0) + 1
+        if s.locked >= 40 then return Finish("an item stayed locked") end
+        return
+    end
     if s.clicked then
         s.tries = (s.tries or 0) + 1
         if s.tries >= TRIES then return Finish("the bank is full") end
@@ -243,7 +248,7 @@ local function Button()
         GameTooltip:AddLine(mats == "all" and "Crafting mats: all of them." or mats == "mine"
             and "Crafting mats no profession of yours crafts with." or "Crafting mats: off.", 1, 1, 1, true)
         GameTooltip:AddLine(YR.Option("bankRecipes") and "Recipes you can't learn yet." or "Recipes: off.", 1, 1, 1, true)
-        GameTooltip:AddLine("Quest items, what the route still needs and AutoFeed's food stay. Settings, QoL, Bags.",
+        GameTooltip:AddLine("Quest items, what the route still needs and AutoFeed's food stay. Headstart, QoL, Bags.",
             0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)

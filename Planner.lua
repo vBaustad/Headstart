@@ -602,7 +602,7 @@ local function Save(thenApply)
     })
     local n = 0
     for _ in pairs(plan) do n = n + 1 end
-    YR.Print(("saved your %s plan: %d buttons. It's the %s layout now (QoL & settings, Character setup)."):format(
+    YR.Print(("saved your %s plan: %d buttons. It's the %s layout now (Headstart, QoL, Character setup)."):format(
         Class():lower(), n, Class():lower()))
     if YS.Refresh then YS:Refresh() end
     if YR.RefreshWindow then YR:RefreshWindow() end

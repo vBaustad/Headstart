@@ -1798,7 +1798,8 @@ local function QoLPage(key, build)
         local L = RowPage(page, qolPages[key].controls, 64, 1)
         local c = L.c
         local Section, Row = L.Section, L.Row
-        local function Opt(k) return function() return YR.Option(k) end end
+        -- what you set, also while the main switch has it all off (it comes back as you left it)
+        local function Opt(k) return function() return YR.OptionSet(k) end end
         build(L, c, Section, Row, Opt)
         if key ~= "gear" and key ~= "trinkets" then     -- those two end with a list of their own
             L.Break()
@@ -1819,6 +1820,10 @@ local BuildCamps = QoLPage("camps", function(L, c, Section, Row, Opt)
 
         Section("Flight timer", "a bar while you fly", { icon = 132239,
             master = { Opt("flightTimer"), function(on) YippRouteDB.flightTimer = on YR:SetFlightTimer(on) end } })
+        Row("Your face on the bar", S.Switch(c, Opt("flightFace"), function(on)
+            YippRouteDB.flightFace = on
+            if YR.FlightFace then YR.FlightFace() end
+        end), "Where you are on the bar is a small round portrait of your character. Off: a lit dot")
         Row("How it times a flight", S.Text(c, 12, S.C.muted),
             "A bar while you fly: where from, where to and the time left. Each flight is timed the first time you"
             .. " take it; until then RestedXP's time for it, an estimate from the flight's length, or it counts up. Drag the bar to move it"
@@ -1845,6 +1850,21 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
             .. " learn now stays in your bags, and one you already know is left for the vendor")
         Row("Button on the bank window", S.Switch(c, Opt("bankButton"), YR.SetBankButton),
             "\"Bank mats\" under the bank window does the same whenever you click it (also /headstart bank)")
+
+        Section("Bag windows", "moved where you want them", { icon = 133633 })
+        Row("Move the combined bag", S.Switch(c, function() return YippRouteDB.moveBag == true end, function(on)
+            YippRouteDB.moveBag = on
+            YR.MoverPlace("bag")
+        end), "Drag Blizzard's combined bag by its title bar; it opens there from then on. Off: Blizzard's own"
+            .. " place. Not in combat")
+        Row("Move the reagent bag", S.Switch(c, function() return YippRouteDB.moveReagentBag == true end, function(on)
+            YippRouteDB.moveReagentBag = on
+            YR.MoverPlace("reagentBag")
+        end), "The same for the reagent bag, on its own")
+        Row("Back to their places", S.Button(c, "Reset", function()
+            YR.MoverReset("bag")
+            YR.MoverReset("reagentBag")
+        end, nil, 90), "Both where Blizzard opens them, from the next time they open")
 
         Section("Mail to my alt", "for bag space: what the bank would take", { icon = 133471 })
         local alt = CreateFrame("Frame", nil, c)
@@ -2004,6 +2024,27 @@ local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
             .. " toward one limit (the rule in later expansions)")
         Row("Warn on screen near the limit", S.Switch(c, Opt("instanceWarn"), function(on) YippRouteDB.instanceWarn = on end),
             "One instance before the limit, and at it, the middle of the screen says so too. Chat always does")
+        local HUD = { { "icon", "A small icon" }, { "log", "A small log" }, { "off", "Nothing" } }
+        local hudMode
+        hudMode = S.Dropdown(c, 170, HUD, function(v)
+            YippRouteDB.instanceHud = v
+            YR.InstanceHudApply()
+            hudMode:Refresh()
+        end)
+        function hudMode:Refresh() for _, o in ipairs(HUD) do if o[1] == YR.InstanceHudMode() then self:SetValue(o[2]) end end end
+        Row("On screen", hudMode, "The icon has this hour's count on it (green, yellow one before the limit, red at it,"
+            .. " with the wait for a slot under it); hover it for today's count and your latest runs. The log shows"
+            .. " the counts and your latest runs as text. Click either for the Instances page; Shift-drag moves it")
+        Row("Show it always", S.Switch(c, function() return YippRouteDB.instanceHudAlways == true end, function(on)
+            YippRouteDB.instanceHudAlways = on
+            YR.InstanceHudApply()
+        end), "Off: only while you're in an instance or have gone into one this hour")
+        Row("Runs in the small log", S.Stepper(c, function() return YippRouteDB.instanceHudRows or 3 end, function(v)
+            YippRouteDB.instanceHudRows = v
+            YR.InstanceHudApply()
+        end, 0, 8, 1, 110))
+        Row("Back to its place", S.Button(c, "Reset", function() YR.InstanceHudResetPosition() end, nil, 90),
+            "The left of the screen, where it starts")
 
         Section("Quick group", "into a group for a kill and out again", { icon = 134149 })
         Row("Invite and Leave buttons", S.Switch(c, Opt("groupBar"), YR.SetGroupBar),
@@ -2276,7 +2317,9 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
 end)
 
 -- XP bar (XPBar.lua): every setting applies at once, so the bar on screen is the preview.
-local function Swatch(c, key)
+local function Swatch(c, key, colour, apply)
+    colour = colour or function() return YR.XPBarDB()[key] end
+    apply = apply or function() YR.XPBarApply() end
     local b = CreateFrame("Button", nil, c)
     b:SetSize(46, 20)
     S.Border(b, S.C.lineHi)
@@ -2284,19 +2327,19 @@ local function Swatch(c, key)
     b.tex:SetPoint("TOPLEFT", 1, -1)
     b.tex:SetPoint("BOTTOMRIGHT", -1, 1)
     b.tex:SetColorTexture(1, 1, 1, 1)
-    function b:Refresh() self.tex:SetVertexColor(unpack(YR.XPBarDB()[key])) end
+    function b:Refresh() self.tex:SetVertexColor(unpack(colour())) end
     b:SetScript("OnClick", function()
-        local col = YR.XPBarDB()[key]
+        local col = colour()
         local before = { col[1], col[2], col[3], col[4] }
         local function Set(r, g, bl, a)
             col[1], col[2], col[3] = r, g, bl
-            if a then col[4] = a end
+            if a and col[4] then col[4] = a end
             b:Refresh()
-            YR.XPBarApply()
+            apply()
         end
         if not (ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow) then return end
         ColorPickerFrame:SetupColorPickerAndShow({
-            r = col[1], g = col[2], b = col[3], opacity = col[4], hasOpacity = true,
+            r = col[1], g = col[2], b = col[3], opacity = col[4], hasOpacity = col[4] ~= nil,
             swatchFunc = function()
                 local r, g, bl = ColorPickerFrame:GetColorRGB()
                 Set(r, g, bl, ColorPickerFrame.GetColorAlpha and ColorPickerFrame:GetColorAlpha() or nil)
@@ -2316,13 +2359,13 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         local function Set(key) return function(v) db()[key] = v YR.XPBarApply() end end
         local function Get(key) return function() return db()[key] end end
         Section("XP bar", "Headstart's own, in place of Blizzard's", { icon = 236562,
-            master = { Get("on"), Set("on") } })
+            master = { function() return YR.XPBarOn() end, Set("on") } })
         Row("Hide Blizzard's bar", S.Switch(c, Get("hideBlizz"), Set("hideBlizz")),
             "While ours shows, Blizzard's experience (and reputation) bar is made invisible and lets clicks through."
             .. " Off: both show")
         Row("Lock in place", S.Switch(c, Get("lock"), Set("lock")), "Unlocked: drag the bar where you want it")
         Row("Back to its place", S.Button(c, "Reset", function() YR.XPBarResetPosition() end, nil, 90),
-            "The bottom of the screen, in the middle")
+            "The middle of the screen, above the action bars")
         Row("Width", S.Slider(c, 150, 1800, 10, Get("w"), Set("w"), 260))
         Row("Height", S.Slider(c, 4, 40, 1, Get("h"), Set("h"), 260))
         Row("Hide it at the level cap", S.Switch(c, Get("maxHide"), Set("maxHide")))
@@ -2334,7 +2377,9 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         function tex:Refresh() for _, o in ipairs(TEX) do if o[1] == db().texture then self:SetValue(o[2]) end end end
         Row("Texture", tex)
         Row("XP colour", Swatch(c, "xpColor"))
-        Row("Rested colour", Swatch(c, "restColor"), "The rested XP ahead of your XP: you get double XP for kills until it's used")
+        Row("Completed quests colour", Swatch(c, "questColor"), "After your XP: the XP of the quests in your log that are done"
+            .. " and not handed in yet - where you'll be once you hand them in")
+        Row("Rested colour", Swatch(c, "restColor"), "After that: the rested XP, double XP for kills until it's used")
         Row("Background", S.Slider(c, 0, 100, 5, function() return math.floor(db().bgAlpha * 100 + 0.5) end,
             function(v) Set("bgAlpha")(v / 100) end, 260), "How dark the empty part is, in percent")
         local TICKS = { { 0, "None" }, { 10, "Every tenth" }, { 20, "Every twentieth" }, { 4, "Quarters" } }
@@ -2346,21 +2391,28 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
 
         Section("Words", "what the bar says, written your way", { icon = 134327 })
         local TOKENS = "{level} {xp} {max} {left} {pct} {rested} {restedpct} {rate} {ding} {mobs} {kill} {played}"
-            .. " {levelplayed} {session}"
+            .. " {levelplayed} {session} {quest} {questpct} {quests}"
         local function TextRow(label, key)
             local box = S.Input(c, { width = 320, onCommit = function(t) Set(key)(t) end })
             function box:Refresh() if not self:HasFocus() then self:SetValue(db()[key] or "") end end
             Row(label, box, "Write anything, with these filled in: " .. TOKENS .. ". {rate} is XP an hour, {ding} the"
                 .. " time to ding at that rate, {mobs} the kills to ding (by your last kills' XP), {played} and"
-                .. " {levelplayed} your played time in all and this level, {session} since you logged in. Empty: nothing")
+                .. " {levelplayed} your played time in all and this level, {session} since you logged in, {quest}"
+                .. " {questpct} {quests} the XP, share of the level and number of your quests done and not handed in."
+                .. " Empty: nothing")
         end
         TextRow("Left", "left")
         TextRow("Middle", "center")
         TextRow("Right", "right")
+        Row("A line under the bar", S.Switch(c, Get("under"), Set("under")), "Three more texts, just under the bar")
+        TextRow("Under, left", "left2")
+        TextRow("Under, middle", "center2")
+        TextRow("Under, right", "right2")
         Row("Only while the mouse is over it", S.Switch(c, Get("textHover"), Set("textHover")))
         Row("Back to the first words", S.Button(c, "Reset", function()
             local d = YR.XPBAR_DEFAULT
-            db().left, db().center, db().right = d.left, d.center, d.right
+            for _, k in ipairs({ "left", "center", "right", "left2", "center2", "right2" }) do db()[k] = d[k] end
+            db().under = true
             YR.XPBarApply()
             YR:RefreshWindow()
         end, nil, 90))
@@ -2478,6 +2530,108 @@ local function RefreshInstances()
     inst.Refresh()
 end
 
+-- The two main switches: everything quality of life, and the routes.
+local BuildMain = QoLPage("main", function(L, c, Section, Row, Opt)
+        Section("Main switches", "Headstart as a levelling addon, a QoL addon, or both", { icon = 134400 })
+        Row("Quality of life", S.Switch(c, function() return YR.QoLOn() end, function(on)
+            YR.SetQoLOn(on)
+            YR:RefreshWindow()
+        end), "Off: every page in this menu is off at once - bars, buttons, reminders, bank and mail help, gear"
+            .. " advice, trinkets, the XP bar, the instance tracker, the skins. Your settings are kept and come"
+            .. " back as you left them. For the whole account (/headstart qol on|off)")
+        Row("Headstart routes", S.Switch(c, function() return YR.RoutesOn() end, function(on)
+            YR.SetRoutesOn(on)
+            YR:RefreshWindow()
+        end), "Off: no Headstart routes in RestedXP, and nothing kept or bought for them. The same switch as on"
+            .. " the Levelling tab (/headstart routes on|off)")
+        local with = {}
+        for _, pair in ipairs({ { "flightTimer", "the flight timer" }, { "durability", "the durability warning" },
+            { "autoTrain", "auto-train" }, { "talentMove", "moving the talent window" },
+            { "talentFadeSlider", "the sliders on the talent window" }, { "groupAccept", "accepting shared quests" },
+            { "xpbar", "the XP bar" } }) do
+            if YR.EllesmereHas(pair[1]) then with[#with + 1] = pair[2] end
+        end
+        if #with > 0 then
+            Row("With EllesmereUI", S.Text(c, 12, S.C.muted), "EllesmereUI does these too, so Headstart's start off until you"
+                .. " turn them on yourself: " .. table.concat(with, ", ") .. ". Anything you've set yourself stays as you set it")
+        end
+        Row("Reload the interface", S.Button(c, "Reload", function() ReloadUI() end, nil, 90),
+            "Both switches finish their work on a reload: what was already built or loaded stays until then")
+end)
+
+-- RestedXP skins (RXPSkin.lua): which look, and the Headstart look's colours.
+local BuildRXPSkin = QoLPage("rxpskin", function(L, c, Section, Row, Opt)
+        Section("RestedXP skin", "RestedXP's guide window in another look", { icon = 134939 })
+        local LOOKS = { { "off", "RestedXP's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard" } }
+        local look
+        look = S.Dropdown(c, 190, LOOKS, function(v)
+            if not YR.SetRXPSkin(v) then YR.Print("RestedXP isn't loaded: nothing to skin.") end
+            look:Refresh()
+        end)
+        function look:Refresh() for _, o in ipairs(LOOKS) do if o[1] == YR.RXPSkinMode() then self:SetValue(o[2]) end end end
+        Row("Look", look, "Headstart: flat and dark like this window, a thin line for a border and one accent colour."
+            .. " Blizzard: the game's own frame, fill and gold titles, with no colours to pick. RestedXP's own: the theme you had"
+            .. " before. Both are also in RestedXP's own theme list")
+
+        Section("Headstart look only", "colours for the Headstart look; the Blizzard look has none", { icon = 133741 })
+        local function Accent()
+            YippRouteDB.rxpSkinAccent = YippRouteDB.rxpSkinAccent or YR.RXPSkinAccent()
+            return YippRouteDB.rxpSkinAccent
+        end
+        local function Back()
+            YippRouteDB.rxpSkinBack = YippRouteDB.rxpSkinBack or YR.RXPSkinBack()
+            return YippRouteDB.rxpSkinBack
+        end
+        Row("Accent", Swatch(c, "accent", Accent, YR.RXPSkinApply),
+            "The title and the line under it, the step you're on, the scroll bar, the map pins and the links in"
+            .. " tooltips - in the Headstart look. The Blizzard look stays in the game's gold")
+        Row("Accent in my class colour", S.Switch(c, function() return YippRouteDB.rxpSkinClass == true end, function(on)
+            YippRouteDB.rxpSkinClass = on
+            YR.RXPSkinApply()
+        end), "Each character gets its class's colour, whatever is picked above")
+        Row("Background", Swatch(c, "back", Back, YR.RXPSkinApply), "The window's fill, and how see-through it is")
+        local PRESETS = {
+            { { 0.40, 0.66, 1.00 }, "Blue" }, { { 0.25, 0.85, 0.75 }, "Teal" }, { { 0.40, 0.85, 0.45 }, "Green" },
+            { { 1.00, 0.78, 0.25 }, "Gold" }, { { 1.00, 0.55, 0.20 }, "Orange" }, { { 0.95, 0.35, 0.35 }, "Red" },
+            { { 0.95, 0.45, 0.75 }, "Pink" }, { { 0.65, 0.50, 1.00 }, "Purple" },
+        }
+        local preset = S.Dropdown(c, 190, PRESETS, function(v)
+            YippRouteDB.rxpSkinAccent = { v[1], v[2], v[3] }
+            YippRouteDB.rxpSkinClass = nil
+            YR.RXPSkinApply()
+            YR:RefreshWindow()
+        end)
+        preset:SetValue("Pick one")
+        Row("A ready accent", preset)
+        Row("Back to the first colours", S.Button(c, "Reset", function()
+            YippRouteDB.rxpSkinAccent, YippRouteDB.rxpSkinBack, YippRouteDB.rxpSkinClass = nil, nil, nil
+            YR.RXPSkinApply()
+            YR:RefreshWindow()
+        end, nil, 90))
+end)
+
+-- Talent window (TalentFade.lua): how see-through its background is. The same slider sits on the window.
+local BuildTalentWindow = QoLPage("talentwin", function(L, c, Section, Row, Opt)
+        Section("Talent window", "see where you're running with it open", { icon = 136243 })
+        Row("See-through background (percent)", S.Slider(c, 0, 100, 5, YR.TalentFade, YR.SetTalentFade, 260),
+            "How much of the talent window's background is faded away. 0: Blizzard's own. The talents, texts and"
+            .. " buttons stay as they are")
+        Row("Sliders on the talent window", S.Switch(c, Opt("talentFadeSlider"), function(on)
+            YippRouteDB.talentFadeSlider = on
+            YR.TalentFadeApply()
+        end), "See-through at the bottom left of the talent window, and the size at the bottom right (5 or 1 percent a tap), to change them while you look at it")
+        Row("Size (percent)", S.Slider(c, 50, 150, 1, YR.TalentScale, YR.SetTalentScale, 260),
+            "The talent window smaller or larger. 100: Blizzard's own. The spellbook keeps its size. Not in combat")
+        Row("Move it by dragging", S.Switch(c, Opt("talentMove"), function(on)
+            YippRouteDB.talentMove = on
+            YR.TalentPlace()
+        end), "Drag the window by its title bar or anywhere that isn't a button or a talent; it opens there from"
+            .. " then on. The spellbook is the same window,"
+            .. " so it moves too. Not in combat")
+        Row("Back to its place", S.Button(c, "Reset", function() YR.TalentResetPosition() end, nil, 90),
+            "The middle of the screen, where Blizzard opens it")
+end)
+
 local function QoLRefresh(key, extra)
     return function()
         for _, ctl in ipairs(qolPages[key].controls) do if ctl.Refresh then ctl:Refresh() end end
@@ -2486,6 +2640,9 @@ local function QoLRefresh(key, extra)
 end
 
 local CATEGORIES = {
+    { key = "main", label = "Main switches", build = BuildMain, refresh = QoLRefresh("main"), icon = 134400,
+      status = function() return YR.QoLOn() end, scope = "Every character on this account",
+      desc = "All of quality of life on or off, and the routes on or off: Headstart as one, the other, or both." },
     { group = "Quality of life" },
     { key = "camps", label = "Camps & travel", build = BuildCamps, refresh = QoLRefresh("camps"), icon = 135805,
       status = function() return YR.Option("camp") or YR.Option("flightTimer") end, scope = "Every character on this account",
@@ -2513,8 +2670,14 @@ local CATEGORIES = {
       scope = "Every character; the swap order per character",
       desc = "Trinket buttons with your others a click away, trinkets swapped as they're used, and keys for your gear sets." },
     { key = "xpbar", label = "XP bar", build = BuildXPBar, refresh = QoLRefresh("xpbar"), icon = 236562,
-      status = function() return YR.XPBarDB().on end, scope = "Every character on this account",
+      status = function() return YR.XPBarOn() end, scope = "Every character on this account",
       desc = "Your own experience bar: its size, place, colours and the words on it, with XP an hour, time and kills to ding." },
+    { key = "rxpskin", label = "RestedXP skin", build = BuildRXPSkin, refresh = QoLRefresh("rxpskin"), icon = 134939,
+      status = function() return YR.RXPSkinMode() ~= "off" end, scope = "Every character on this account",
+      desc = "RestedXP's guide window in Headstart's flat look with your own accent colour, or in Blizzard's." },
+    { key = "talentwin", label = "Talent window", build = BuildTalentWindow, refresh = QoLRefresh("talentwin"), icon = 136243,
+      status = function() return YR.TalentFade() > 0 end, scope = "Every character on this account",
+      desc = "The talent window's background faded, so you can see where you're running with it open, and the window moved." },
     { group = "Character" },
     { key = "character", label = "Character setup", build = BuildSetup, refresh = RefreshSetup, icon = 134166,
       scope = function() return "Every " .. (CLASS_NAME[ViewClass()] or "character") .. "; chat and Edit Mode for all" end,

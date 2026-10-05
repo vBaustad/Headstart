@@ -41,11 +41,22 @@ local function Kinds()
     return out
 end
 
+-- Whether you know a recipe: asked for every recipe after every change to your bags, and it only
+-- changes when you learn something - so it's kept until then (YR.CraftForget).
+local known = {}
 local function Known(spell)
-    if IsPlayerSpell and IsPlayerSpell(spell) then return true end
-    local ok, yes = pcall(function() return C_SpellBook and C_SpellBook.IsSpellKnown and C_SpellBook.IsSpellKnown(spell) end)
-    return ok and yes or false
+    local yes = known[spell]
+    if yes == nil then
+        yes = (IsPlayerSpell and IsPlayerSpell(spell)) and true or false
+        if not yes and C_SpellBook and C_SpellBook.IsSpellKnown then
+            local ok, book = pcall(C_SpellBook.IsSpellKnown, spell)
+            yes = (ok and book) and true or false
+        end
+        known[spell] = yes
+    end
+    return yes
 end
+function YR.CraftForget() known = {} end
 
 --- How many times the mats in your bags make this recipe.
 local function Makes(e)
@@ -58,6 +69,7 @@ end
 --- [kind] = { item, times, total, have, profession }. The best recipe whose mats you carry.
 function YR.CraftChances()
     local kinds, have, best = Kinds(), {}, {}
+    if next(kinds) == nil then return best end          -- none of the three kinds is on: nothing to count
     for _, e in ipairs(YR.Consumables or {}) do
         local kind = e[6]
         if kinds[kind] then have[kind] = (have[kind] or 0) + Count(e[4]) end
@@ -105,5 +117,8 @@ function YR.StartCraftRemind()
         "PLAYER_ENTERING_WORLD" }) do
         pcall(f.RegisterEvent, f, e)
     end
-    f:SetScript("OnEvent", Later)
+    f:SetScript("OnEvent", function(_, event)
+        if event == "LEARNED_SPELL_IN_TAB" or event == "PLAYER_ENTERING_WORLD" then YR.CraftForget() end
+        Later()
+    end)
 end

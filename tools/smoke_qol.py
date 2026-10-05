@@ -400,8 +400,10 @@ def run():
     sim = lua.eval("""function(YR, pct, tough)
         local real = YR.SimCompare
         YR.SimCompare = function() return { pct = pct, tough = tough, slot = 5, old = "|Hitem:9|h", role = "melee", word = "DPS" } end
+        YR.SimForget()          -- another sim: the kept answers are the old one's
         local old = YR.CheckUpgrade(0, 1)
         YR.SimCompare = real
+        YR.SimForget()
         return old
     end""")
     check(sim(YR, 0, 0.7) is not None, "+0.0% DPS, +0.7% toughness: offered, nothing gets worse")
@@ -438,6 +440,7 @@ def run():
     YR.ScanUpgrades()
     prints()
     lua.execute('''WORN[8] = "|Hitem:121|h"''')    # you equip the chain boots
+    YR.SimForget()               # what PLAYER_EQUIPMENT_CHANGED does: the kept answers are for the old gear
     win.Hide(win)
     lua.execute("RunAfter()")
     check(not win.IsShown(win), "the boots waiting behind it are worse than what you now wear: not shown")
@@ -507,6 +510,7 @@ def run():
     YR.CheckCrafts()
     check(any("Item3239" in p for p in prints()), f"a mace: weightstones instead: {prints()}")
     def forget():                        # have a weightstone for a moment, so the next run-out tells again
+        YR.CraftForget()                 # and what you know is read again, as when you learn a recipe
         g.COUNT[3239] = 1
         YR.CheckCrafts()
         g.COUNT[3239] = 0

@@ -84,6 +84,7 @@ end
 local W, H = 320, 62
 local PAD = 12
 local TRACK_Y, THICK, KNOB = -33, 5, 13
+local FACE = 22            -- your portrait on the bar, where the knob is
 local BLUE, BLUE_DIM = { 0.40, 0.66, 1.00 }, { 0.18, 0.40, 0.80 }
 local TRACK = { 0.17, 0.19, 0.23, 1 }
 local SWEEP = 1.8                     -- seconds for the light to run the bar on a first flight
@@ -165,6 +166,18 @@ local function Build()
     frame.glow = Circle("ARTWORK", 1, KNOB + 10, { BLUE[1], BLUE[2], BLUE[3], 0.35 })
     frame.head = Circle("ARTWORK", 2, KNOB, { 0.92, 0.96, 1, 1 })
     frame.core = Circle("ARTWORK", 3, KNOB - 6, BLUE)
+    -- or your face there: a round portrait in a light ring (Settings, Camps & travel)
+    frame.ring = Circle("ARTWORK", 2, FACE + 3, { 0.92, 0.96, 1, 1 })
+    frame.face = frame:CreateTexture(nil, "ARTWORK", nil, 4)
+    frame.face:SetSize(FACE, FACE)
+    frame.face:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+    local mask = frame:CreateMaskTexture()
+    mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    mask:SetAllPoints(frame.face)
+    frame.face:AddMaskTexture(mask)
+    frame:HookScript("OnShow", function() YR.FlightFace() end)
+    YR.FlightFace()
+    frame.knob = { frame.glow, frame.head, frame.core, frame.ring, frame.face }
     frame.sweep = Solid("ARTWORK", 0, { BLUE[1], BLUE[2], BLUE[3], 0.6 })
     frame.sweep:SetSize(36, THICK)
     -- bottom row: what's going on, and Land
@@ -224,11 +237,24 @@ local function Progress()
     return math.min(1, (GetTime() - flight.started) / total)
 end
 
+-- The knob's five pieces (frame.knob, made with the frame). Hidden, they're only hidden: not moved.
 local function Knob(x, shown)
-    for _, t in ipairs({ frame.glow, frame.head, frame.core }) do
-        t:ClearAllPoints()
-        t:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y)
-        t:SetShown(shown)
+    local face = shown and YR.Option("flightFace")
+    for _, t in ipairs(frame.knob) do
+        if shown then
+            t:ClearAllPoints()
+            t:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y)
+        end
+        local isFace = t == frame.ring or t == frame.face
+        local isDot = t == frame.head or t == frame.core
+        t:SetShown(shown and not (isFace and not face) and not (isDot and face))
+    end
+end
+
+--- Your portrait as it is now (it's taken when the bar shows, and when the setting changes).
+function YR.FlightFace()
+    if frame and frame.face and YR.Option("flightFace") and SetPortraitTexture then
+        SetPortraitTexture(frame.face, "player")
     end
 end
 
@@ -245,12 +271,20 @@ function YR:AnimateFlight()
         Knob(fillX, true)
         frame.sweep:Hide()
     else
-        frame.fill:Hide()
-        Knob(0, false)
+        -- a flight not timed yet: a light sweeps along the bar. This runs every frame, so the knob is
+        -- put away once and the light moved only when it's a whole pixel on.
         local x = Round(((GetTime() - flight.started) % SWEEP) / SWEEP * (frame.len - 36))
-        frame.sweep:ClearAllPoints()
-        frame.sweep:SetPoint("LEFT", frame, "TOPLEFT", PAD + x, TRACK_Y)
-        frame.sweep:Show()
+        if frame.drawn ~= false then
+            frame.fill:Hide()
+            Knob(0, false)
+            frame.sweep:Show()
+            frame.sweepAt = nil
+        end
+        if frame.sweepAt ~= x then
+            frame.sweepAt = x
+            frame.sweep:ClearAllPoints()
+            frame.sweep:SetPoint("LEFT", frame, "TOPLEFT", PAD + x, TRACK_Y)
+        end
     end
     frame.drawn = fillX or false
 end
@@ -262,14 +296,18 @@ function YR:RefreshFlight()
     if type(rxpBar) == "table" and rxpBar.IsShown and rxpBar:IsShown() then rxpBar:Hide() end
     local gone = GetTime() - flight.started
     local total, guess, cut = flight.total, flight.guess, flight.cut
-    frame.from:SetText(Short(flight.from))
-    frame.to:SetText(Short(flight.to))
-    -- the two names share the row with the time: each gets what's left, cut with an ellipsis
-    local room = W - 2 * PAD - 70 - 24
-    frame.from:SetWidth(0)                       -- unconstrained, to measure it
-    local fromW = math.min(tonumber(frame.from:GetStringWidth()) or room / 2, room / 2)
-    frame.from:SetWidth(fromW)
-    frame.to:SetWidth(math.max(40, room - fromW))
+    -- the names don't change during a flight: written and measured once for it (this runs ten times a second)
+    if frame.named ~= flight then
+        frame.named = flight
+        frame.from:SetText(Short(flight.from))
+        frame.to:SetText(Short(flight.to))
+        -- the two names share the row with the time: each gets what's left, cut with an ellipsis
+        local room = W - 2 * PAD - 70 - 24
+        frame.from:SetWidth(0)                       -- unconstrained, to measure it
+        local fromW = math.min(tonumber(frame.from:GetStringWidth()) or room / 2, room / 2)
+        frame.from:SetWidth(fromW)
+        frame.to:SetWidth(math.max(40, room - fromW))
+    end
     if total and total > 0 and not cut then
         local left = total - gone
         frame.time:SetTextColor(BLUE[1], BLUE[2], BLUE[3])

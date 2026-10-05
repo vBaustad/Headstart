@@ -23,9 +23,29 @@ local F = {}
 F.__index = F
 function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
 function F:SetScript(_, fn) self.fn = fn end
-function CreateFrame() local f = setmetatable({}, F) table.insert(FRAMES, f) return f end
+function CreateFrame(kind, name)
+    if kind == "Button" then
+        local b = setmetatable({}, W)
+        if name then _G[name] = b end
+        return b
+    end
+    local f = setmetatable({}, F) table.insert(FRAMES, f) return f
+end
 function Fire(e, ...) for _, f in ipairs(FRAMES) do if f.ev and f.ev[e] and f.fn then f.fn(f, e, ...) end end end
 C_Timer = { After = function(_, fn) fn() end, NewTicker = function() return { Cancel = function() end } end }
+W = {}
+W.__index = function(t, k) return rawget(W, k) or function() return setmetatable({}, W) end end
+function W:SetShown(on) rawset(self, "shown", on and true or false) end
+function W:Show() rawset(self, "shown", true) end
+function W:Hide() rawset(self, "shown", false) end
+function W:IsShown() return rawget(self, "shown") == true end
+function W:SetText(t) rawset(self, "text", t) end
+function W:SetScript() end
+UIParent = setmetatable({}, W)
+GameTooltip = setmetatable({}, W)
+function GameTooltip:IsOwned() return false end
+function IsShiftKeyDown() return false end
+STYLE = { FONT = "x" }
 SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return s end
@@ -60,8 +80,12 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
         chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
         chunk("Headstart", YR)
+    YR.Style = lua.eval("STYLE")
     YR.StartInstances()
     g = lua.globals()
+    g.YR_CHARKEY = YR.CharKey
+    g.key_restore = YR.CharKey
+    g.YR_SET = lambda fn: setattr(YR, "CharKey", fn)
     bad = 0
 
     def check(ok, what):
@@ -81,8 +105,29 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
         h, d, w = YR.InstanceCounts()
         return h, d, w
 
+    lua.execute("Fire('PLAYER_ENTERING_WORLD')")
+    hud = lambda: g.HeadstartInstanceHud
+    shown = lua.eval("function(o) return rawget(o, 'shown') == true end")
+    text = lua.eval("function(o) return rawget(o, 'text') end")
+    check(not shown(hud()), "on screen: nothing while you've no instance this hour")
+    g.YippRouteDB.instanceHudAlways = True
+    YR.InstanceHudApply()
+    check(shown(hud()) and text(hud().count) == "0/5", f"'Show it always': the icon, 0/5 ({text(hud().count)})")
+    g.YippRouteDB.instanceHudAlways = None
     go_in()
     check(counts()[0] == 1, "into the Deadmines: 1 this hour")
+    check(shown(hud()) and text(hud().count) == "1/5" and shown(hud().icon), f"in an instance: the icon says 1/5 ({text(hud().count)})")
+    s = YR.InstanceSummary(3)
+    check(s.state == "ok" and s.runs[1].inside and s.runs[1].text.startswith("The Deadmines"), f"the summary: in the Deadmines now ({s.runs[1].text})")
+    g.YippRouteDB.instanceHud = "log"
+    YR.InstanceHudApply()
+    check(not shown(hud().icon) and "1/5 this hour" in text(hud().head) and "The Deadmines" in text(hud().rows[1]),
+          f"the small log: counts and the run ({text(hud().head)} | {text(hud().rows[1])})")
+    g.YippRouteDB.instanceHud = "off"
+    YR.InstanceHudApply()
+    check(not shown(hud()), "'Nothing': not shown")
+    g.YippRouteDB.instanceHud = None
+    YR.InstanceHudApply()
     lua.execute("XP = 600 Fire('PLAYER_XP_UPDATE') MONEY = 2500")
     go_out(600)
     run1 = g.YippRouteDB.instanceRuns[1]
@@ -108,6 +153,7 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
     YR2.Print = YR.Print
     YR2.CharKey = YR.CharKey
     YR2.Option = YR.Option
+    YR2.Style = YR.Style
     lua.execute("for i = #FRAMES, 1, -1 do FRAMES[i] = nil end")      # the old module's frame is gone too
     YR2.StartInstances()
     lua.execute("Fire('PLAYER_ENTERING_WORLD')")
@@ -125,7 +171,24 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
         go_out(60)
     h, d, w = counts()
     check(h == 5 and w is not None and 0 < w <= 3600, f"5 of 5 this hour: the next slot in {w} s")
+    s = YR.InstanceSummary(3)
+    check(s.state == "full" and len(s.runs) == 3 and s.runs[1].text.startswith("Gnomeregan"),
+          f"at the limit: the summary is 'full', the latest three runs, newest first ({s.runs[1].text})")
+    YR.InstanceHudApply()
+    check(shown(hud().wait) and text(hud().wait) not in (None, ""), f"the icon shows the wait under it ({text(hud().wait)})")
     check(len(g.NOTICES) >= 2, f"warned on screen at 4 and at 5 ({len(g.NOTICES)})")
+    # asked every second: the week's log is walked once, then not again until the clock or the log says so
+    lua.execute("WALKS = 0 local key = YR_CHARKEY YR_SET(function() WALKS = WALKS + 1 return key() end)")
+    for _ in range(60):
+        counts()
+    # one look at who you are per ask; a walk of the log would add one more for every run in it
+    check(g.WALKS == 60, f"asked sixty times in the same moment: the log isn't walked again ({g.WALKS} looks, 60 asks)")
+    h0 = counts()[0]
+    lua.execute("NOW = NOW + 3600")
+    check(counts()[0] < h0, f"an hour on: counted again, and the hour is emptier ({h0} -> {counts()[0]})")
+    lua.execute("NOW = NOW - 3600")
+    check(counts()[0] == h0, "and back (the clock put back for the tests below)")
+    lua.execute("YR_SET(key_restore)")
     # the game says too many: noted with the count
     lua.execute("Fire('UI_ERROR_MESSAGE', 1, 'You have entered too many instances recently.')")
     locks = g.YippRouteDB.instanceLocks

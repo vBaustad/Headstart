@@ -381,37 +381,51 @@ end
 -- Answers kept until something they depend on changes (gear, bags, stats, level, talents, the role
 -- setting): a tooltip refreshes five times a second while you point at an item, and the bags are looked
 -- through after every loot. false = not gear, or your numbers can't be read.
-local memo, memoRole = {}, nil
+-- Your role is read off the talent tree (every node of it), so it's kept on its own, for longer than
+-- the answers: only talents, a level or the role setting change it - not every loot.
+local memo, memoRole, roleKept = {}, nil, nil
 function YR.SimCompareKept(link)
     local set = YippRouteDB and YippRouteDB.simRole
-    if set ~= memoRole then wipe(memo) memoRole = set end
+    if set ~= memoRole then wipe(memo) memoRole, roleKept = set, nil end
     local c = memo[link]
     if c == nil then
-        memo.role = memo.role or YR.SimRole()
-        c = YR.SimCompare(link, memo.role) or false
+        roleKept = roleKept or YR.SimRole()
+        c = YR.SimCompare(link, roleKept) or false
         memo[link] = c
     end
     return c or nil
+end
+
+-- What you wear, by link: the tooltip asks "is this one of them?" five times a second.
+local worn
+local function Wearing(link)
+    if not worn then
+        worn = {}
+        for slot = 1, 18 do
+            local l = GetInventoryItemLink("player", slot)
+            if l then worn[l] = true end
+        end
+    end
+    return worn[link] == true
 end
 
 local function OnTooltip(tooltip)
     if not YR.Option("simTooltip") or tooltip ~= GameTooltip and tooltip ~= ItemRefTooltip then return end
     local ok, _, link = pcall(tooltip.GetItem, tooltip)
     if not (ok and link) then return end
-    for slot = 1, 18 do
-        if GetInventoryItemLink("player", slot) == link then return end   -- what you wear already
-    end
+    if Wearing(link) then return end           -- what you wear already
     local c = YR.SimCompareKept(link)
     if not c then return end
+    c.line = c.line or YR.SimLine(c)           -- the same answer has the same words
     local r, g, b = 0.6, 0.6, 0.6
     local score = c.role == "tank" and c.tough or c.pct
     if score > 0.05 then r, g, b = 0.4, 1, 0.4 elseif score < -0.05 then r, g, b = 1, 0.45, 0.45 end
-    tooltip:AddLine("Headstart: " .. YR.SimLine(c), r, g, b)
+    tooltip:AddLine("Headstart: " .. c.line, r, g, b)
     tooltip:Show()
 end
 
 --- Drop the item stats kept (a new item's text arrives later than its link, and gear changes).
-function YR.SimForget() wipe(cache) wipe(memo) end
+function YR.SimForget() wipe(cache) wipe(memo) worn = nil end
 
 function YR.StartSim()
     if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
@@ -426,6 +440,11 @@ function YR.StartSim()
     local pending = false
     f:SetScript("OnEvent", function(_, event, unit)
         if event == "UNIT_STATS" and unit ~= "player" then return end
+        if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_ENTERING_WORLD" then worn = nil end
+        if event == "TRAIT_CONFIG_UPDATED" or event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_LEVEL_UP"
+            or event == "PLAYER_ENTERING_WORLD" then
+            roleKept = nil
+        end
         if event == "PLAYER_EQUIPMENT_CHANGED" then YR.SimForget() else wipe(memo) end
         if event == "BAG_UPDATE_DELAYED" or pending then return end   -- bags: only the off hands to pair with
         pending = true

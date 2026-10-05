@@ -21,14 +21,93 @@ function YR.Position()
     if ok and map then return map, x, y end
 end
 
--- An option from the options page: on unless turned off.
-function YR.Option(key)
-    return YippRouteDB[key] ~= false
+-- The two main switches: the routes (YR.RoutesOn, Guides.lua) and all of quality of life, this one.
+-- With quality of life off every QoL option answers "off" whatever it's set to (your settings are
+-- kept for when it's back on); what belongs to the routes and the window itself still answers.
+local LEVELLING = { minimapButton = true, logging = true, showSplits = true, deathSkipRelease = true, campReminder = true,
+    buyLater = true, sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true }
+
+function YR.QoLOn()
+    return YippRouteDB.qolOff ~= true
 end
 
+--- Quality of life on or off, for the whole account. What's on screen follows at once where it can;
+--- the rest (hooks already made, bars already built) follows a /reload.
+function YR.SetQoLOn(on)
+    local was = YR.QoLOn()
+    YippRouteDB.qolOff = (not on) and true or nil
+    if (on and true or false) == was then return end
+    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply" }) do
+        if YR[apply] then pcall(YR[apply]) end
+    end
+    for _, key in ipairs({ "bag", "reagentBag", "talents" }) do
+        if YR.MoverPlace then pcall(YR.MoverPlace, key) end
+    end
+    YR.Print(on and "quality of life on: /reload to bring everything back."
+        or "quality of life off: /reload to take everything off the screen.")
+end
+
+-- EllesmereUI does some of the same things. Where one of its modules is loaded, ours starts OFF:
+-- an option you never set answers "off" (set it yourself, either way, and that's what counts).
+-- Which of ours meets which of its modules:
+--   flightTimer   - Forever Essentials' flight timer
+--   durability    - QoL's low durability warning
+--   autoTrain     - QoL's Train All button
+--   talentMove    - QoL's Shifter (moves and scales Blizzard's windows, the talent window among them)
+--   talentFadeSlider - Blizz UI Enhanced reskins the talent window
+--   groupAccept   - Quest Tracker's auto accept
+--   xpbar         - Action Bars' and DataBars' XP bars
+local ELLESMERE = {
+    flightTimer = { "EllesmereUIForeverEssentials" }, durability = { "EllesmereUIQoL" }, autoTrain = { "EllesmereUIQoL" },
+    talentMove = { "EllesmereUIQoL" }, talentFadeSlider = { "EllesmereUIBlizzardSkin" },
+    groupAccept = { "EllesmereUIQuestTracker" }, xpbar = { "EllesmereUIActionBars", "EllesmereUIDataBars" },
+}
+
+--- The EllesmereUI module that does what this option does, if it's loaded (its name), else nil.
+--- The answer is kept until another addon loads: this is asked on every read of such an option.
+local ellesmere = {}
+function YR.EllesmereHas(key)
+    local mods = ELLESMERE[key]
+    if not (mods and C_AddOns and C_AddOns.IsAddOnLoaded) then return nil end
+    local known = ellesmere[key]
+    if known ~= nil then return known or nil end
+    known = false
+    for _, name in ipairs(mods) do
+        local ok, loaded = pcall(C_AddOns.IsAddOnLoaded, name)
+        if ok and loaded then known = name break end
+    end
+    ellesmere[key] = known
+    return known or nil
+end
+function YR.EllesmereForget() for k in pairs(ellesmere) do ellesmere[k] = nil end end
+
+--- What an option is before you've set it: on, unless EllesmereUI does the same.
+function YR.OptionDefault(key)
+    return YR.EllesmereHas(key) == nil
+end
+
+--- An option as you set it (or its default), whatever the main switch says: what the settings show.
+function YR.OptionSet(key)
+    local v = YippRouteDB[key]
+    if v == nil then return YR.OptionDefault(key) end
+    return v ~= false
+end
+
+-- An option from the options page: on unless turned off (and off while its main switch is).
+function YR.Option(key)
+    if YippRouteDB.qolOff == true and not LEVELLING[key] then return false end
+    return YR.OptionSet(key)
+end
+
+-- "Name-Realm". Asked for in loops (once per logged run, per bag item...), so the string is made
+-- once and handed out again while the name and realm are the same.
+local keyName, keyRealm, key
 function YR.CharKey()
     local name, realm = UnitFullName("player")
-    return (name or "?") .. "-" .. (realm or GetRealmName() or "?")
+    if key and name == keyName and realm == keyRealm then return key end
+    local made = (name or "?") .. "-" .. (realm or GetRealmName() or "?")
+    if name and realm then keyName, keyRealm, key = name, realm, made end
+    return made
 end
 
 SLASH_HEADSTART1 = "/headstart"
@@ -49,6 +128,13 @@ SlashCmdList.HEADSTART = function(msg)
         YR.Print(YR.TrainerLine() or "nothing new at your class trainer.")
     elseif cmd == "upgrades" then
         YR.ScanUpgrades()
+    elseif cmd == "qol" then
+        if arg == "on" or arg == "off" then
+            YR.SetQoLOn(arg == "on")
+        else
+            YR.Print("Headstart's quality of life is " .. (YR.QoLOn() and "on" or "off")
+                .. " for this account: /headstart qol on|off (then /reload).")
+        end
     elseif cmd == "routes" then
         if arg == "on" or arg == "off" then
             YR.SetRoutesOn(arg == "on")
@@ -108,9 +194,11 @@ SlashCmdList.HEADSTARTSETTINGS = function() YR:ToggleSettings() end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
-f:SetScript("OnEvent", function(self, _, name)
-    if name ~= ADDON then return end
-    self:UnregisterEvent("ADDON_LOADED")
+local started
+f:SetScript("OnEvent", function(_, _, name)
+    YR.EllesmereForget()             -- an addon loaded: what EllesmereUI has may be different now
+    if name ~= ADDON or started then return end
+    started = true
     YippRouteDB = YippRouteDB or {}
     YippRouteDB.runs = YippRouteDB.runs or {}
     if YippRouteDB.logging == nil then YippRouteDB.logging = true end   -- on by default: that's the point on the beta
@@ -130,6 +218,9 @@ f:SetScript("OnEvent", function(self, _, name)
     YR.StartTrinkets()
     YR.StartInstances()
     YR.StartXPBar()
+    YR.StartRXPSkin()
+    YR.StartMovers()
+    YR.StartTalentFade()
     YR.StartCraftRemind()
     YR.StartQuickGroup()
     YR:BuildMinimapButton()

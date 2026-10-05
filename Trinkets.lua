@@ -34,7 +34,7 @@ local pending = {}             -- [slot] = item ID to put on when the fight ends
 
 --- The swaps it makes by itself: this one turned on, and not while you're flagged for PvP (unless allowed).
 local function AutoOn(key)
-    if YippRouteDB[key] ~= true then return false end
+    if YippRouteDB[key] ~= true or not YR.QoLOn() then return false end
     if YR.Option("trinketPvpPause") and UnitIsPVP and UnitIsPVP("player") then return false end
     return true
 end
@@ -56,20 +56,48 @@ YR.TrinketDB = CharDB
 local function IDOf(link) return link and tonumber(tostring(link):match("item:(%d+)")) end
 local function Worn(slot) return GetInventoryItemID("player", slot) end
 
+-- An item is a trinket or it isn't, for good: asked once per item.
+local trinket = {}
 local function IsTrinket(id)
-    local _, _, _, loc = C_Item.GetItemInfoInstant(id)
-    return loc == "INVTYPE_TRINKET"
+    local known = trinket[id]
+    if known == nil then
+        local _, _, _, loc = C_Item.GetItemInfoInstant(id)
+        known = loc == "INVTYPE_TRINKET"
+        trinket[id] = known
+    end
+    return known
 end
 
 local function OnUse(id) return C_Item.GetItemSpell and C_Item.GetItemSpell(id) ~= nil end
 
---- Where this item is in your bags (the first one), or nil.
-local function InBags(id)
+-- The bags are walked once for everything that asks where an item is, and how many trinkets are in
+-- them: the answer is kept until the bags or your gear change (and never from one moment to the
+-- next - a second walk in the same moment is what's saved). Asking item by item walked every slot
+-- for every listed trinket, several times over, every second.
+local where, bagTrinkets, walked, walkedAt = {}, 0, false, -1
+
+local function Bags()
+    local now = GetTime()
+    if walked and walkedAt == now then return end
+    walked, walkedAt = true, now
+    for k in pairs(where) do where[k] = nil end
+    bagTrinkets = 0
     for bag = 0, NUM_BAG_SLOTS or 4 do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            if C_Container.GetContainerItemID(bag, slot) == id then return bag, slot end
+            local id = C_Container.GetContainerItemID(bag, slot)
+            if id and not where[id] then
+                where[id] = bag * 1000 + slot
+                if IsTrinket(id) then bagTrinkets = bagTrinkets + 1 end
+            end
         end
     end
+end
+
+--- Where this item is in your bags (the first one), or nil.
+local function InBags(id)
+    Bags()
+    local at = where[id]
+    if at then return math.floor(at / 1000), at % 1000 end
 end
 
 local function WornIn(id)
@@ -105,12 +133,21 @@ local function Busy()
         or (UnitChannelInfo and UnitChannelInfo("player")) or (GetCursorInfo and GetCursorInfo())
 end
 
+--- What waits to go on in a slot when the fight ends (an item ID), or nil.
+function YR.TrinketQueued(slot) return pending[slot] end
+
 --- Put this item in this slot: now, or when the fight ends.
 function YR.TrinketEquip(id, slot)
     if not id then return end
     if Worn(slot) == id then pending[slot] = nil return end
     if InCombatLockdown() then
-        pending[slot] = id
+        -- gear can't be changed in a fight: it waits, and goes on the moment the fight ends. Said once,
+        -- and shown on the slot's button (Paint), so you know the click was taken.
+        if pending[slot] ~= id then
+            pending[slot] = id
+            local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(id) or "that trinket"
+            YR.Print(("%s goes on (%s slot) the moment the fight ends."):format(name, slot == 13 and "top" or slot == 14 and "bottom" or "its"))
+        end
         return
     end
     if Busy() then
@@ -126,13 +163,16 @@ end
 -- ---------------------------------------------------------------------------
 -- Swap trinkets for me
 -- ---------------------------------------------------------------------------
+local ranks = {}            -- [item] = its place in your list (the one table, filled anew each pass)
+
 --- One pass: at most one swap (the bags move under a swap). Returns the item it put on, and the slot.
 function YR.TrinketAuto()
     if not AutoOn("trinketAuto") or Busy() then return nil end
     local db = CharDB()
     local order = db.order
     if #order == 0 then return nil end
-    local rank = {}
+    local rank = ranks
+    for k in pairs(rank) do rank[k] = nil end
     for i, id in ipairs(order) do rank[id] = i end
     for _, s in ipairs(SLOTS) do
         local cur = Worn(s)
@@ -269,26 +309,47 @@ BINDING_NAME_HEADSTART_GEARSET5 = "Equipment set 5"
 local bar, flyout
 local buttons = {}
 
-local function Paint()
-    if not bar then return end
+-- The buttons' faces. Cooldown events come several to a cast: they touch only the cooldown swipe, and
+-- only when the cooldown is a different one (setting the same one again restarts the sweep). Icons
+-- and the auto mark follow your gear and settings. Nothing is done while the bar isn't on screen.
+local function Paint(cooldownsOnly)
+    if not bar or not bar:IsShown() then return end
+    local db = not cooldownsOnly and CharDB() or nil
     for _, s in ipairs(SLOTS) do
         local b = buttons[s]
-        local tex = GetInventoryItemTexture("player", s)
-        b.icon:SetTexture(tex or "Interface\\PaperDoll\\UI-PaperDoll-Slot-Trinket")
-        b.icon:SetDesaturated(tex == nil)
-        local start, duration = GetInventoryItemCooldown("player", s)
-        if b.cd and b.cd.SetCooldown then
-            if start and duration and duration > 1.5 then b.cd:SetCooldown(start, duration) else b.cd:Clear() end
+        if db then
+            local tex = GetInventoryItemTexture("player", s)
+            b.icon:SetTexture(tex or "Interface\\PaperDoll\\UI-PaperDoll-Slot-Trinket")
+            b.icon:SetDesaturated(tex == nil)
+            -- a small mark while "swap trinkets for me" looks after this slot
+            local id = Worn(s)
+            local auto = AutoOn("trinketAuto") and db.auto[s] ~= false and #db.order > 0
+            local listed = not id
+            for _, v in ipairs(db.order) do if v == id then listed = true end end
+            b.auto:SetShown(auto and listed)
+            -- what waits for the fight to end, small in the corner
+            local queued = pending[s]
+            if queued then
+                local _, _, _, _, icon = C_Item.GetItemInfoInstant(queued)
+                b.queued:SetTexture(icon)
+            end
+            b.queued:SetShown(queued ~= nil)
         end
-        -- a small mark while "swap trinkets for me" looks after this slot
-        local id, db = Worn(s), CharDB()
-        local auto = AutoOn("trinketAuto") and db.auto[s] ~= false and #db.order > 0
-        local listed = not id
-        for _, v in ipairs(db.order) do if v == id then listed = true end end
-        b.auto:SetShown(auto and listed)
+        local start, duration = GetInventoryItemCooldown("player", s)
+        local secret = issecretvalue and (issecretvalue(start) or issecretvalue(duration))
+        if b.cd and b.cd.SetCooldown and not secret then
+            local on = start and duration and duration > 1.5
+            if not on then start, duration = 0, 0 end
+            if rawget(b, "cdStart") ~= start or rawget(b, "cdLength") ~= duration then
+                b.cdStart, b.cdLength = start, duration
+                if on then b.cd:SetCooldown(start, duration) else b.cd:Clear() end
+            end
+        end
     end
 end
-YR.TrinketPaint = Paint
+YR.TrinketPaint = function() Paint() end
+--- The bags changed without the game saying so (the tests' bags do): look again.
+function YR.TrinketBagsChanged() walked = false end
 
 local function CloseFlyout() if flyout then flyout:Hide() end end
 
@@ -367,6 +428,25 @@ local function OpenFlyout(slot)
 end
 YR.TrinketFlyout = OpenFlyout
 
+-- Dragging the bar. It holds the two secure buttons, which makes the bar itself protected: moving it
+-- is not allowed in a fight. A drag is only stopped if we started it (the stop comes after any
+-- press-and-move on a button, locked bar or not), never in a fight, and a drag under way when a fight
+-- starts is ended as it starts (PLAYER_REGEN_DISABLED comes just before the lock).
+local moving = false
+local function StartDrag()
+    if YR.Option("trinketBarLocked") or InCombatLockdown() or not bar then return end
+    moving = true
+    bar:StartMoving()
+end
+--- true when a move of ours was stopped (and where the bar is can be kept)
+local function StopDrag()
+    if not moving then return false end
+    moving = false
+    if InCombatLockdown() then return false end
+    bar:StopMovingOrSizing()
+    return true
+end
+
 local function Build()
     if bar or InCombatLockdown() then return end
     local S = YR.Style
@@ -377,9 +457,9 @@ local function Build()
     bar:SetClampedToScreen(true)
     bar:SetMovable(true)
     bar:RegisterForDrag("LeftButton")
-    bar:SetScript("OnDragStart", function(self) if not YR.Option("trinketBarLocked") and not InCombatLockdown() then self:StartMoving() end end)
+    bar:SetScript("OnDragStart", StartDrag)
     bar:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
+        if not StopDrag() then return end
         YippRouteDB.trinketBarPos = { math.floor(self:GetLeft() + 0.5), math.floor(self:GetTop() - UIParent:GetTop() + 0.5) }
     end)
     for i, s in ipairs(SLOTS) do
@@ -398,6 +478,11 @@ local function Build()
         b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         b.cd = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
         b.cd:SetAllPoints(b.icon)
+        b.queued = b:CreateTexture(nil, "OVERLAY", nil, 2)
+        b.queued:SetSize(18, 18)
+        b.queued:SetPoint("BOTTOMLEFT", 2, 2)
+        b.queued:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        b.queued:Hide()
         b.auto = b:CreateTexture(nil, "OVERLAY")
         b.auto:SetSize(8, 8)
         b.auto:SetPoint("TOPRIGHT", -3, -3)
@@ -406,7 +491,7 @@ local function Build()
         b:SetScript("PostClick", function(_, which)
             if which == "LeftButton" then OpenFlyout(s) end
         end)
-        b:SetScript("OnDragStart", function() if not YR.Option("trinketBarLocked") and not InCombatLockdown() then bar:StartMoving() end end)
+        b:SetScript("OnDragStart", StartDrag)
         b:SetScript("OnDragStop", function() bar:GetScript("OnDragStop")(bar) end)
         b:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -424,44 +509,46 @@ end
 --- Which buttons show: both, or (trinketBarCount, on unless turned off) one per trinket you have - worn
 --- or in your bags - so none with no trinkets, one with one (in the slot it's in, else the top), both
 --- with two or more. One you own but don't wear keeps its button: that's the way to put it on.
+local BOTH, TOP, BOTTOM, NONE = { 13, 14 }, { 13 }, { 14 }, {}      -- read, not changed
+
 function YR.TrinketSlotsShown()
-    if not YR.Option("trinketBarCount") then return { 13, 14 } end
-    local have, seen = 0, {}
-    for _, s in ipairs(SLOTS) do
-        local id = Worn(s)
-        if id and not seen[id] then have, seen[id] = have + 1, true end
-    end
-    for bag = 0, NUM_BAG_SLOTS or 4 do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local id = C_Container.GetContainerItemID(bag, slot)
-            if id and not seen[id] and IsTrinket(id) then have, seen[id] = have + 1, true end
-        end
-    end
-    if have >= 2 then return { 13, 14 } end
-    if have == 1 then return { (Worn(14) and not Worn(13)) and 14 or 13 } end
-    return {}
+    if not YR.Option("trinketBarCount") then return BOTH end
+    Bags()
+    local a, b = Worn(13), Worn(14)
+    -- a worn trinket that's also in the bags (two of the same) is one trinket
+    local have = bagTrinkets
+    if a and not where[a] then have = have + 1 end
+    if b and b ~= a and not where[b] then have = have + 1 end
+    if have >= 2 then return BOTH end
+    if have == 1 then return (b and not a) and BOTTOM or TOP end
+    return NONE
 end
 
 local relayout = false       -- the count changed in a fight: the secure buttons wait for it to end
+local laid                   -- which buttons show now (one of BOTH, TOP, BOTTOM, NONE)
 local function Layout()
     if not bar then return end
     if InCombatLockdown() then relayout = true return end
     relayout = false
     local shown = YR.TrinketSlotsShown()
-    local on = {}
-    for i, s in ipairs(shown) do
-        on[s] = true
-        buttons[s]:ClearAllPoints()
-        buttons[s]:SetPoint("LEFT", (i - 1) * 44 + 2, 0)
+    -- the buttons are moved only when which of them show changes (this runs on every bag change)
+    if laid ~= shown then
+        laid = shown
+        for i, s in ipairs(shown) do
+            buttons[s]:ClearAllPoints()
+            buttons[s]:SetPoint("LEFT", (i - 1) * 44 + 2, 0)
+        end
+        for _, s in ipairs(SLOTS) do buttons[s]:SetShown(s == shown[1] or s == shown[2]) end
     end
-    for _, s in ipairs(SLOTS) do buttons[s]:SetShown(on[s] and true or false) end
     bar:SetShown(YR.Option("trinketBar") and #shown > 0)
     if #shown == 0 then CloseFlyout() end
 end
 YR.TrinketLayout = Layout
 
+local showLater = false      -- the bar was to be shown or hidden in a fight: done when it ends
 function YR.ShowTrinketBar(on)
-    if InCombatLockdown() then return end
+    if InCombatLockdown() then showLater = true return end
+    showLater = false
     if on and not bar then Build() end
     if bar then bar:SetShown(on and true or false) Layout() end
     if not on then CloseFlyout() end
@@ -474,10 +561,21 @@ function YR.StartTrinkets()
         pcall(f.RegisterEvent, f, e)
     end
     f:SetScript("OnEvent", function(_, event)
-        if event == "PLAYER_REGEN_DISABLED" then CloseFlyout() return end
+        if event == "PLAYER_REGEN_DISABLED" then
+            if StopDrag() and bar then
+                YippRouteDB.trinketBarPos = { math.floor(bar:GetLeft() + 0.5), math.floor(bar:GetTop() - UIParent:GetTop() + 0.5) }
+            end
+            CloseFlyout()
+            return
+        end
+        if event == "SPELL_UPDATE_COOLDOWN" or event == "BAG_UPDATE_COOLDOWN" then Paint(true) return end
         if event == "PLAYER_ENTERING_WORLD" then YR.ShowTrinketBar(YR.Option("trinketBar")) end
-        if event == "PLAYER_EQUIPMENT_CHANGED" or event == "BAG_UPDATE_DELAYED" then Layout() end
+        if event == "PLAYER_EQUIPMENT_CHANGED" or event == "BAG_UPDATE_DELAYED" then
+            walked = false
+            Layout()
+        end
         if event == "PLAYER_REGEN_ENABLED" then
+            if showLater then YR.ShowTrinketBar(YR.Option("trinketBar")) end
             if relayout then Layout() end
             for slot, id in pairs(pending) do YR.TrinketEquip(id, slot) end
             if wantSet then YR.UseGearSet(wantSet) end
@@ -485,7 +583,10 @@ function YR.StartTrinkets()
         Paint()
     end)
     -- once a second: cooldowns run out without an event, mounting and swimming have none we can rely on
+    -- With none of the three turned on (they're all off until you turn one on) a tick is three reads.
     C_Timer.NewTicker(1, function()
+        local db = YippRouteDB
+        if not (db.trinketAuto == true or db.trinketMount == true or db.trinketSwim == true) then return end
         if InCombatLockdown() then return end
         YR.TrinketWhen()
         YR.TrinketAuto()

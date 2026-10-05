@@ -39,6 +39,9 @@ Upgrades.lua
 Trinkets.lua
 Instances.lua
 XPBar.lua
+RXPSkin.lua
+Movers.lua
+TalentFade.lua
 PartyQuests.lua
 QuickGroup.lua
 Data\Consumables.lua

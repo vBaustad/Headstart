@@ -151,12 +151,15 @@ local function Scan()
                 if id == BENEFITS then benefits = true end
                 if WELCOMING[id] then settled = true end
                 local timed = (duration and duration > 0) and expires or nil
-                -- Keyed by the moment this application ends, so a refresh re-reads the tooltip and
-                -- a redraw does not.
-                local key = tostring(id) .. ":" .. tostring(timed)
-                if statCache[key] == nil then statCache[key] = ReadStats(i) or false end
+                -- Kept per buff with the moment this application ends, so a refresh re-reads the
+                -- tooltip and a redraw does not - and one entry per buff, not one per refresh.
+                local was = statCache[id]
+                if not was or was.expires ~= timed then
+                    was = { expires = timed, stats = ReadStats(i) or false }
+                    statCache[id] = was
+                end
                 buffs[#buffs + 1] = { id = id, name = name, icon = icon, duration = duration,
-                    index = i, expires = timed, stats = statCache[key] or nil }
+                    index = i, expires = timed, stats = was.stats or nil }
             end
         end
     end
@@ -401,6 +404,20 @@ local function SetBurn(left)
     hud.fill:Show()
 end
 
+-- The stats of a tooltip's text, worked out once per text: the HUD is drawn far more often than the
+-- text changes, and reading it is a dozen pattern passes.
+local NO_STATS, statsOf, statsKept = {}, {}, 0
+local function StatsOf(text)
+    if type(text) ~= "string" then return NO_STATS end
+    local stats = statsOf[text]
+    if not stats then
+        if statsKept >= 40 then statsOf, statsKept = {}, 0 end
+        stats = YR.CampStats(text)
+        statsOf[text], statsKept = stats, statsKept + 1
+    end
+    return stats
+end
+
 --- Lay the frame out for the state we are showing. The timer tick only rewrites the numbers; this
 --- runs when what is on screen actually changes.
 --- Campfire (the addon) has a camp HUD of its own, and two campfires on screen is one too many. Ours
@@ -462,7 +479,7 @@ local function Draw()
         hud.state:Hide()
     end
 
-    local stats = (YR.Option("campList") and main) and YR.CampStats(main.stats) or {}
+    local stats = (YR.Option("campList") and main) and StatsOf(main.stats) or NO_STATS
     for i, st in ipairs(stats) do
         local fs = statRows[i] or StatRow(i)
         fs:SetPoint("TOP", 0, -y)
@@ -653,7 +670,9 @@ end
 -- Keeping it current
 -- ---------------------------------------------------------------------------
 --- Read the auras again and redraw. Safe to call as often as you like; the reading is debounced.
-function YR.RefreshCamp()
+--- onAura: called for a change in your auras. In a fight they can't be read, and they change all the
+--- time: once the HUD has said its reading is old, nothing new can be drawn until the fight ends.
+function YR.RefreshCamp(onAura)
     if not (YippRouteDB and YR.Option("camp")) then
         if hud then hud:Hide() end
         return
@@ -663,6 +682,7 @@ function YR.RefreshCamp()
     if fresh then
         state, stale = fresh, false
     else
+        if stale and onAura then return end
         stale = true        -- keep the last reading; say it is old rather than call it empty
     end
     Draw()
@@ -675,7 +695,7 @@ local function Later()
     pending = true
     C_Timer.After(0.2, function()
         pending = false
-        YR.RefreshCamp()
+        YR.RefreshCamp(true)
     end)
 end
 

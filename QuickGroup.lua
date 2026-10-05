@@ -89,9 +89,15 @@ end
 -- ---------------------------------------------------------------------------
 -- The bar
 -- ---------------------------------------------------------------------------
+local function IsMe()
+    local me = UnitIsUnit("target", "player")
+    return (issecretvalue and issecretvalue(me)) or me
+end
+
 local function Paint()
     if not bar then return end
-    local canInv = UnitExists("target") and UnitIsPlayer("target") and not UnitIsUnit("target", "player")
+    -- "is the target you?" can come back secret where the game restricts comparing units: then no invite
+    local canInv = UnitExists("target") and UnitIsPlayer("target") and not IsMe()
         and not (UnitInParty("target") or UnitInRaid("target")) and CanInvite()
     bar.invite:SetEnabled(canInv and true or false)
     bar.leave:SetEnabled(IsInGroup() and true or false)

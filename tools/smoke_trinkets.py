@@ -67,6 +67,7 @@ C_Item = {
         for k, v in pairs(BAG) do
             if v == id then
                 BAG[k] = WORN[slot] WORN[slot] = id EQUIPS = EQUIPS + 1
+                if BAGS_CHANGED then BAGS_CHANGED() end        -- the game says so (BAG_UPDATE_DELAYED) when a bag changes
                 CD[id] = CD[id] or {}
                 -- going on: 30 s cooldown, unless it has a longer one running
                 local c = CD[id]
@@ -91,6 +92,13 @@ C_EquipmentSet = {
         chunk("Headstart", YR)
     YR.StartTrinkets()
     g = lua.globals()
+    g.BAGS_CHANGED = YR.TrinketBagsChanged
+
+    def ex(code):
+        # a change to the bags made here is one the game would have told the addon about
+        lua.execute(code)
+        YR.TrinketBagsChanged()
+
     bad = 0
 
     def check(ok, what):
@@ -102,59 +110,68 @@ C_EquipmentSet = {
         return (g.WORN[13], g.WORN[14])
 
     # off until turned on: a used trinket stays when you haven't asked for swaps
-    lua.execute("WORN[13] = 1 WORN[14] = 2 BAG[1] = 3 BAG[2] = 4 CD[1] = { NOW, 120 }")
+    ex("WORN[13] = 1 WORN[14] = 2 BAG[1] = 3 BAG[2] = 4 CD[1] = { NOW, 120 }")
     YR.TrinketDB().order[1] = 1
     YR.TrinketDB().order[2] = 3
-    lua.execute("Tick()")
+    ex("Tick()")
     check(g.WORN[13] == 1 and g.EQUIPS == 0, "swaps are off until you turn them on: nothing changes")
-    lua.execute("MOUNTED = true BAG[3] = 11122 Tick() MOUNTED = false BAG[3] = nil CD[1] = nil")
+    ex("MOUNTED = true BAG[3] = 11122 Tick() MOUNTED = false BAG[3] = nil CD[1] = nil")
     check(g.WORN[14] == 2, "no Carrot either until you turn it on")
     g.YippRouteDB.trinketAuto = True
     g.YippRouteDB.trinketMount = True
     # flagged for PvP: paused
-    lua.execute("PVP = true CD[1] = { NOW, 120 } Tick()")
+    ex("PVP = true CD[1] = { NOW, 120 } Tick()")
     check(g.WORN[13] == 1, "flagged for PvP: no swap by itself")
-    lua.execute("PVP = false CD[1] = nil")
+    ex("PVP = false CD[1] = nil")
     for k in list(YR.TrinketDB().order.keys()):
         YR.TrinketDB().order[k] = None
 
     # your order: 1 (best), 2, then 3 (no use: always ready). Wearing 1 and 2, 3 in the bag.
-    lua.execute("WORN[13] = 1 WORN[14] = 2 BAG[1] = 3 BAG[2] = 4")
+    ex("WORN[13] = 1 WORN[14] = 2 BAG[1] = 3 BAG[2] = 4")
     order = YR.TrinketDB().order
     for i, v in enumerate((1, 2, 3), start=1):
         order[i] = v
-    lua.execute("Tick()")
+    ex("Tick()")
     check(worn() == (1, 2) and g.EQUIPS == 0, f"both of the best two ready: nothing changes {worn()}")
     # you use trinket 1: a 2-minute cooldown. The first ready one in the order, 3, goes in.
-    lua.execute("CD[1] = { NOW, 120 } Tick()")
+    ex("CD[1] = { NOW, 120 } Tick()")
     check(worn() == (3, 2), f"1 used: 3 (next ready in the order) goes in its slot {worn()}")
-    lua.execute("NOW = NOW + 5 Tick()")
+    ex("NOW = NOW + 5 Tick()")
     check(worn() == (3, 2), f"a pass later: no swapping back and forth while 1 cools down {worn()}")
     # 1 is ready again: back in (the 30 s it then gets for going on isn't "used")
-    lua.execute("NOW = NOW + 120 Tick()")
+    ex("NOW = NOW + 120 Tick()")
     check(worn() == (1, 2), f"1 ready again: back in, over the lower 3 {worn()}")
-    lua.execute("NOW = NOW + 2 Tick()")
+    ex("NOW = NOW + 2 Tick()")
     check(worn() == (1, 2), f"its 30 s for going on doesn't count as used: it stays {worn()}")
     # a trinket you put on by hand that isn't in the order: left alone
-    lua.execute("BAG[2] = nil BAG[2] = 2 WORN[14] = 4 CD[2] = nil Tick()")
+    ex("BAG[2] = nil BAG[2] = 2 WORN[14] = 4 CD[2] = nil Tick()")
     check(worn() == (1, 4), f"your own choice (4, not in the order) stays {worn()}")
     # a slot switched off: left alone even when its trinket is used
-    lua.execute("WORN[14] = 2 BAG[2] = 4")
+    ex("WORN[14] = 2 BAG[2] = 4")
     YR.TrinketDB().auto[13] = False
-    lua.execute("CD[1] = { NOW, 120 } Tick()")
+    ex("CD[1] = { NOW, 120 } Tick()")
     check(worn()[0] == 1, f"top slot switched off: 1 stays though it's used {worn()}")
     YR.TrinketDB().auto[13] = None
     # in a fight: nothing; when it ends, the swap
-    lua.execute("COMBAT = true Tick()")
+    ex("COMBAT = true Tick()")
     check(worn()[0] == 1, "in a fight: no swap")
-    lua.execute("COMBAT = false Tick()")
+    ex("COMBAT = false Tick()")
     check(worn()[0] == 3, f"after it: the swap {worn()}")
     # a swap asked for by hand in a fight waits for the end
-    lua.execute("COMBAT = true")
+    ex("COMBAT = true")
+    ex("SAID = {} local p = print print = function(m) SAID[#SAID + 1] = tostring(m) p(m) end")
+    YR.TrinketEquip(4, 14)
     YR.TrinketEquip(4, 14)
     check(g.WORN[14] == 2, "Equip from the list in a fight: not yet")
-    lua.execute("COMBAT = false Fire('PLAYER_REGEN_ENABLED')")
-    check(g.WORN[14] == 4, "the fight ends: on it goes")
+    said = [m for m in g.SAID.values() if "the moment the fight ends" in m]
+    check(YR.TrinketQueued(14) == 4 and len(said) == 1, f"it waits for the slot, and says so once however often you click ({len(said)})")
+    ex("COMBAT = false Fire('PLAYER_REGEN_ENABLED')")
+    check(g.WORN[14] == 4 and YR.TrinketQueued(14) is None, "the fight ends: on it goes at once, nothing left waiting")
+    ex("COMBAT = true")
+    YR.TrinketEquip(2, 14)
+    YR.TrinketEquip(4, 14)
+    check(YR.TrinketQueued(14) is None, "picked another, then the one you wear: nothing waits")
+    ex("COMBAT = false")
 
     # order editing
     YR.TrinketToggleList(4)
@@ -166,29 +183,29 @@ C_EquipmentSet = {
 
     # swap when mounted: the Carrot in the bottom slot, and the trinket back after
     g.YippRouteDB.trinketAuto = False
-    lua.execute("WORN[13] = 1 WORN[14] = 2 BAG = { 3, 11122 } MOUNTED = true Tick()")
+    ex("WORN[13] = 1 WORN[14] = 2 BAG = { 3, 11122 } MOUNTED = true Tick()")
     check(g.WORN[14] == 11122, f"mounted: Carrot on a Stick in the bottom slot ({g.WORN[14]})")
-    lua.execute("MOUNTED = false Tick()")
+    ex("MOUNTED = false Tick()")
     check(g.WORN[14] == 2, f"off the mount: the trinket you wore is back ({g.WORN[14]})")
     g.YippRouteDB.trinketMount = False
-    lua.execute("MOUNTED = true Tick()")
+    ex("MOUNTED = true Tick()")
     check(g.WORN[14] == 2, "turned off: no Carrot")
-    lua.execute("MOUNTED = false")
+    ex("MOUNTED = false")
 
     # how many buttons: one per trinket you have (worn or in your bags), at most two; off: always two
     def shown():
         t = YR.TrinketSlotsShown()
         return [t[i] for i in range(1, len(t) + 1)]
-    lua.execute("WORN[13] = nil WORN[14] = nil BAG = {}")
+    ex("WORN[13] = nil WORN[14] = nil BAG = {}")
     check(shown() == [], "no trinkets: no buttons")
-    lua.execute("WORN[14] = 2")
+    ex("WORN[14] = 2")
     check(shown() == [14], f"one, worn in the bottom slot: its button only ({shown()})")
-    lua.execute("WORN[14] = nil BAG = { 4 }")
+    ex("WORN[14] = nil BAG = { 4 }")
     check(shown() == [13], f"one in your bags: a button to put it on with ({shown()})")
-    lua.execute("WORN[13] = 1")
+    ex("WORN[13] = 1")
     check(shown() == [13, 14], f"two (worn and in the bags): both ({shown()})")
     g.YippRouteDB.trinketBarCount = False
-    lua.execute("WORN[13] = nil BAG = {}")
+    ex("WORN[13] = nil BAG = {}")
     check(shown() == [13, 14], "turned off: always both")
     g.YippRouteDB.trinketBarCount = None
 
@@ -197,14 +214,21 @@ C_EquipmentSet = {
     check(g.USED_SET == 9, "set 2: Fishing")
     YR.UseGearSet("tank")
     check(g.USED_SET == 7, "by name, any case: Tank")
-    lua.execute("USED_SET = nil COMBAT = true")
+    ex("USED_SET = nil COMBAT = true")
     YR.UseGearSet("1")
     check(g.USED_SET is None, "in a fight: not yet")
-    lua.execute("COMBAT = false Fire('PLAYER_REGEN_ENABLED')")
+    ex("COMBAT = false Fire('PLAYER_REGEN_ENABLED')")
     check(g.USED_SET == 7, "the fight ends: the set goes on")
     YR.UseGearSet("nothing")
     check(any("You have: 1 Tank, 2 Fishing" in str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1)),
           "an unknown set: chat lists the ones you have")
+    # one walk of the bags per pass, however many trinkets are listed (it was several walks per trinket)
+    ex("WALKS = 0 local n = C_Container.GetContainerNumSlots C_Container.GetContainerNumSlots = function(b) WALKS = WALKS + 1 return n(b) end")
+    g.YippRouteDB.trinketAuto = True
+    for _ in range(3):
+        YR.TrinketAuto()
+        YR.TrinketSlotsShown()
+    check(0 < g.WALKS <= 5, f"three passes in one moment: the bags are walked once ({g.WALKS} bag reads for 5 bags)")
     return bad
 
 

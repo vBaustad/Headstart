@@ -1070,6 +1070,10 @@ import smoke_instances
 bad += smoke_instances.run()
 import smoke_xpbar
 bad += smoke_xpbar.run()
+import smoke_talentfade
+bad += smoke_talentfade.run()
+import smoke_rxpskin
+bad += smoke_rxpskin.run()
 import smoke_skipquests
 bad += smoke_skipquests.run()
 import smoke_wherenext
