@@ -1834,7 +1834,7 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
         Section("Bank", "hold Shift as you open the bank to keep everything", { icon = 133639 })
         Row("Bank when I open the bank", S.Switch(c, Opt("bankAuto"), function(on) YippRouteDB.bankAuto = on end),
             "What you choose below goes from your bags to the bank as it opens, one stack at a time, and chat"
-            .. " says what went. Quest items, anything the route still needs and AutoFeed's food and water"
+            .. " says what went. Quest items, anything a quest you'd still do needs (not one that's done or grey for you) and AutoFeed's food and water"
             .. " always stay. It stops when the bank is full")
         local MATS = { { "mine", "Not for my professions" }, { "all", "All of them" }, { "off", "None" } }
         local mats
@@ -1850,21 +1850,6 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
             .. " learn now stays in your bags, and one you already know is left for the vendor")
         Row("Button on the bank window", S.Switch(c, Opt("bankButton"), YR.SetBankButton),
             "\"Bank mats\" under the bank window does the same whenever you click it (also /headstart bank)")
-
-        Section("Bag windows", "moved where you want them", { icon = 133633 })
-        Row("Move the combined bag", S.Switch(c, function() return YippRouteDB.moveBag == true end, function(on)
-            YippRouteDB.moveBag = on
-            YR.MoverPlace("bag")
-        end), "Drag Blizzard's combined bag by its title bar; it opens there from then on. Off: Blizzard's own"
-            .. " place. Not in combat")
-        Row("Move the reagent bag", S.Switch(c, function() return YippRouteDB.moveReagentBag == true end, function(on)
-            YippRouteDB.moveReagentBag = on
-            YR.MoverPlace("reagentBag")
-        end), "The same for the reagent bag, on its own")
-        Row("Back to their places", S.Button(c, "Reset", function()
-            YR.MoverReset("bag")
-            YR.MoverReset("reagentBag")
-        end, nil, 90), "Both where Blizzard opens them, from the next time they open")
 
         Section("Mail to my alt", "for bag space: what the bank would take", { icon = 133471 })
         local alt = CreateFrame("Frame", nil, c)
@@ -2005,47 +1990,6 @@ local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
             .. " you. Hold Shift as the quest opens to be asked. Leatrix Plus's \"Block shared quests\" would"
             .. " decline them before Headstart sees them")
 
-        Section("Instance tracker", "dungeons and raids against the hourly and daily limit", { icon = 134237,
-            master = { Opt("instanceTrack"), function(on) YippRouteDB.instanceTrack = on end } })
-        Row("Instances an hour", S.Stepper(c, function() return YippRouteDB.instanceHour or 5 end,
-            function(v) YippRouteDB.instanceHour = v end, 1, 30, 1, 110),
-            "The game's limit for new instances in an hour. Forever's isn't known: 5 is Classic's. When the game"
-            .. " says too many, the Instances page shows the count it was at")
-        Row("Instances a day", S.Stepper(c, function() return YippRouteDB.instanceDay or 30 end,
-            function(v) YippRouteDB.instanceDay = v end, 1, 100, 1, 110), "30 on Classic")
-        Row("Back in within (minutes)", S.Stepper(c, function() return YippRouteDB.instanceSame or 30 end,
-            function(v) YippRouteDB.instanceSame = v end, 1, 120, 5, 110),
-            "Going back into the dungeon you just left, with the same group leader and no reset seen, within this"
-            .. " many minutes is the same instance and doesn't count again (the game keeps the copy's ID secret"
-            .. " on Forever, so this is how Headstart tells)")
-        Row("Count all my characters together", S.Switch(c, function() return YippRouteDB.instanceAccount == true end,
-            function(on) YippRouteDB.instanceAccount = on end),
-            "Off: each character has its own count (Classic's rule). On: every character on this account counts"
-            .. " toward one limit (the rule in later expansions)")
-        Row("Warn on screen near the limit", S.Switch(c, Opt("instanceWarn"), function(on) YippRouteDB.instanceWarn = on end),
-            "One instance before the limit, and at it, the middle of the screen says so too. Chat always does")
-        local HUD = { { "icon", "A small icon" }, { "log", "A small log" }, { "off", "Nothing" } }
-        local hudMode
-        hudMode = S.Dropdown(c, 170, HUD, function(v)
-            YippRouteDB.instanceHud = v
-            YR.InstanceHudApply()
-            hudMode:Refresh()
-        end)
-        function hudMode:Refresh() for _, o in ipairs(HUD) do if o[1] == YR.InstanceHudMode() then self:SetValue(o[2]) end end end
-        Row("On screen", hudMode, "The icon has this hour's count on it (green, yellow one before the limit, red at it,"
-            .. " with the wait for a slot under it); hover it for today's count and your latest runs. The log shows"
-            .. " the counts and your latest runs as text. Click either for the Instances page; Shift-drag moves it")
-        Row("Show it always", S.Switch(c, function() return YippRouteDB.instanceHudAlways == true end, function(on)
-            YippRouteDB.instanceHudAlways = on
-            YR.InstanceHudApply()
-        end), "Off: only while you're in an instance or have gone into one this hour")
-        Row("Runs in the small log", S.Stepper(c, function() return YippRouteDB.instanceHudRows or 3 end, function(v)
-            YippRouteDB.instanceHudRows = v
-            YR.InstanceHudApply()
-        end, 0, 8, 1, 110))
-        Row("Back to its place", S.Button(c, "Reset", function() YR.InstanceHudResetPosition() end, nil, 90),
-            "The left of the screen, where it starts")
-
         Section("Quick group", "into a group for a kill and out again", { icon = 134149 })
         Row("Invite and Leave buttons", S.Switch(c, Opt("groupBar"), YR.SetGroupBar),
             "A small bar: Invite asks your target into your group, Leave group leaves it. Both also have key"
@@ -2098,6 +2042,24 @@ local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
         Row("  Bandages", S.Switch(c, Opt("craftBandages"), function(on) YippRouteDB.craftBandages = on end), "First Aid")
         Row("  Remind when I have fewer than", S.Stepper(c, function() return YippRouteDB.craftBelow or 1 end,
             function(v) YippRouteDB.craftBelow = v end, 1, 100, 1, 110), "1: only when you have none at all")
+        Section("Whisper sound", "a sound of your choice when someone whispers you", { icon = 133469 })
+        local sound
+        sound = S.Dropdown(c, 240, YR.WhisperSounds, function(v)
+            YippRouteDB.whisperSound = v ~= "off" and v or nil
+            sound:Refresh()
+        end, { icon = "sound", tip = "Listen", shows = function(v) return v ~= "off" end,
+            onClick = function(v) YR.PlayWhisperSound(v) end })
+        function sound:Refresh() self:SetValue(YR.WhisperSoundName()) end
+        Row("Sound", sound, "The speaker on each line plays it without picking it. The game's own sounds first; with a"
+            .. " sound pack or another addon that brings LibSharedMedia (Details, WeakAuras, boss mods), every sound"
+            .. " of theirs is in the list too - scroll it. The game's own quiet whisper sound still plays under it")
+        local CHANNEL = { { "Master", "Master (heard with effects turned down)" }, { "SFX", "Sound effects" }, { "Dialog", "Dialog" } }
+        local channel
+        channel = S.Dropdown(c, 240, CHANNEL, function(v) YippRouteDB.whisperChannel = v channel:Refresh() end)
+        function channel:Refresh() for _, o in ipairs(CHANNEL) do if o[1] == YR.WhisperChannel() then self:SetValue(o[2]) end end end
+        Row("Volume follows", channel, "Which of the game's volume sliders it obeys")
+        Row("Battle.net whispers too", S.Switch(c, Opt("whisperBNet"), function(on) YippRouteDB.whisperBNet = on end))
+
         Section("At every ding", nil, { icon = 134441 })
         Row("Screenshot at every ding", S.Switch(c, Opt("levelShot"), function(on) YippRouteDB.levelShot = on end),
             "Saved in your Screenshots folder, a moment after the ding so the animation is in it")
@@ -2418,6 +2380,81 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         end, nil, 90))
 end)
 
+-- Swing timer (Swing.lua): Blizzard's swing bars dressed, or our own bars.
+local BuildSwing = QoLPage("swing", function(L, c, Section, Row, Opt)
+        local db = YR.SwingDB
+        local function Set(key) return function(v) db()[key] = v YR.SwingApply() end end
+        local function Get(key) return function() return db()[key] end end
+        Section("Swing timer", "your auto-attack bars, made to be seen", { icon = 132349,
+            master = { function() return db().on == true end, Set("on") } })
+        local STYLE = { { "blizzard", "Blizzard's bars, dressed" }, { "own", "Headstart's own bars" } }
+        local style
+        style = S.Dropdown(c, 210, STYLE, function(v) Set("style")(v) style:Refresh() end)
+        function style:Refresh() for _, o in ipairs(STYLE) do if o[1] == db().style then self:SetValue(o[2]) end end end
+        Row("Bars", style, "Blizzard's bars, dressed: the game's own swing bars with the look below - their timing, and"
+            .. " their place, size and when they show stay in Edit Mode. Headstart's own bars: bars of ours in their"
+            .. " place, with their own size, place and words further down")
+
+        Row("Try it", S.Button(c, "Test", function()
+            local ok, why = YR.SwingTest()
+            if not ok then YR.Print(why or "turn the swing timer on first.") end
+        end, nil, 90), "A few sample swings on every bar, to see the look as it is set now. Not in a fight")
+
+        Section("On the bars", "both kinds", { icon = 134327 })
+        Row("Weapon icon", S.Switch(c, Get("icon"), Set("icon")), "The weapon in that hand, left of its bar. Off to begin with")
+        Row("Swing length", S.Switch(c, Get("speed"), Set("speed")),
+            "How long the whole swing takes: after the name on Blizzard's bars (\"2.6s\"), after the time left on ours"
+            .. " (\"0.8 / 2.6\"). It follows your haste and slows")
+        Row("Another colour out of reach", S.Switch(c, Get("range"), Set("range")),
+            "The bar turns the out-of-reach colour while your target is too far for that attack (the game's own check)")
+
+        Section("Look", "both kinds", { icon = 133741 })
+        local TEX = { { "smooth", "Smooth" }, { "flat", "Flat" }, { "blizzard", "Blizzard" } }
+        local tex
+        tex = S.Dropdown(c, 170, TEX, function(v) Set("texture")(v) tex:Refresh() end)
+        function tex:Refresh() for _, o in ipairs(TEX) do if o[1] == db().texture then self:SetValue(o[2]) end end end
+        Row("Texture", tex)
+        Row("Text size", S.Stepper(c, Get("font"), Set("font"), 8, 24, 1, 110))
+        Row("Outline", S.Switch(c, Get("outline"), Set("outline")), "A thin dark line round each bar")
+        Row("Main hand", Swatch(c, "main", Get("mainColor"), YR.SwingApply))
+        Row("Off hand", Swatch(c, "off", Get("offColor"), YR.SwingApply))
+        Row("Ranged", Swatch(c, "ranged", Get("rangedColor"), YR.SwingApply))
+        Row("Out of reach", Swatch(c, "far", Get("farColor"), YR.SwingApply))
+        Row("Background (percent)", S.Slider(c, 0, 100, 5, function() return math.floor(db().bgAlpha * 100 + 0.5) end,
+            function(v) Set("bgAlpha")(v / 100) end, 260), "How dark the empty part of a bar is")
+        Row("Back to the first look", S.Button(c, "Reset", function()
+            local keep = { on = db().on, pos = db().pos, lock = db().lock, style = db().style, look = db().look }
+            YippRouteDB.swing = keep
+            YR.SwingApply()
+            YR:RefreshWindow()
+        end, nil, 90))
+
+        Section("Blizzard's bars only", "size, place, name and time: Edit Mode", { icon = 134063 })
+        Row("My colours on them", S.Switch(c, Get("colors"), Set("colors")),
+            "Off: Blizzard's own colours stay, with our texture and text")
+        Row("Blizzard's frame round each bar", S.Switch(c, Get("border"), Set("border")), "Off: the bar without its frame")
+
+        Section("Headstart's bars only", nil, { icon = 132349 })
+        Row("Hide Blizzard's swing bars", S.Switch(c, Get("hideBlizz"), Set("hideBlizz")),
+            "Made see-through while ours show, and back as they were when ours are off. They show in Edit Mode, where"
+            .. " you can also turn them off for good")
+        local SHOW = { { "combat", "In combat" }, { "always", "Always" }, { "swing", "Only while a swing runs" } }
+        local show
+        show = S.Dropdown(c, 190, SHOW, function(v) Set("show")(v) show:Refresh() end)
+        function show:Refresh() for _, o in ipairs(SHOW) do if o[1] == db().show then self:SetValue(o[2]) end end end
+        Row("When", show, "Main hand; off hand while you hold a weapon there; ranged for a hunter, and for anyone while"
+            .. " a ranged swing runs")
+        Row("Lock in place", S.Switch(c, Get("lock"), Set("lock")), "Off: every bar shows with a blue edge, to drag where you want it")
+        Row("Back to its place", S.Button(c, "Reset", function() YR.SwingResetPosition() end, nil, 90),
+            "Over the action bars, in the middle")
+        Row("Name", S.Switch(c, Get("name"), Set("name")), "Main hand, Off hand, Ranged")
+        Row("Time left", S.Switch(c, Get("time"), Set("time")), "Seconds to the next swing, in tenths")
+        Row("Bright line at the front", S.Switch(c, Get("spark"), Set("spark")))
+        Row("Width", S.Stepper(c, Get("w"), Set("w"), 80, 800, 10, 110))
+        Row("Height of a bar", S.Stepper(c, Get("h"), Set("h"), 8, 60, 1, 110))
+        Row("Space between bars", S.Stepper(c, Get("gap"), Set("gap"), 0, 30, 1, 110))
+end)
+
 -- ---------------------------------------------------------------------------
 -- Instances: the count against the limit, and the log (Instances.lua)
 -- ---------------------------------------------------------------------------
@@ -2456,10 +2493,76 @@ local function Stat(page, x, y, label)
     return box
 end
 
--- A QoL page, under its heading like the others: the hint, the three counts, the log.
-local function BuildInstances(page)
+-- A QoL page, under its heading like the others. Two views, picked at the top right: the log (the hint,
+-- the three counts, the runs) and the tracker's settings.
+local BuildInstanceSettings = QoLPage("instances", function(L, c, Section, Row, Opt)
+        Section("Instance tracker", "dungeons and raids against the hourly and daily limit", { icon = 134237,
+            master = { Opt("instanceTrack"), function(on) YippRouteDB.instanceTrack = on end } })
+        Row("Instances an hour", S.Stepper(c, function() return YippRouteDB.instanceHour or 5 end,
+            function(v) YippRouteDB.instanceHour = v end, 1, 30, 1, 110),
+            "The game's limit for new instances in an hour. Forever's isn't known: 5 is Classic's. When the game"
+            .. " says too many, the log here shows the count it was at")
+        Row("Instances a day", S.Stepper(c, function() return YippRouteDB.instanceDay or 30 end,
+            function(v) YippRouteDB.instanceDay = v end, 1, 100, 1, 110), "30 on Classic")
+        Row("Back in within (minutes)", S.Stepper(c, function() return YippRouteDB.instanceSame or 30 end,
+            function(v) YippRouteDB.instanceSame = v end, 1, 120, 5, 110),
+            "Going back into the dungeon you just left, with the same group leader and no reset seen, within this"
+            .. " many minutes is the same instance and doesn't count again (the game keeps the copy's ID secret"
+            .. " on Forever, so this is how Headstart tells)")
+        Row("Count all my characters together", S.Switch(c, function() return YippRouteDB.instanceAccount == true end,
+            function(on) YippRouteDB.instanceAccount = on end),
+            "Off: each character has its own count (Classic's rule). On: every character on this account counts"
+            .. " toward one limit (the rule in later expansions)")
+        Row("Warn on screen near the limit", S.Switch(c, Opt("instanceWarn"), function(on) YippRouteDB.instanceWarn = on end),
+            "One instance before the limit, and at it, the middle of the screen says so too. Chat always does")
+        local HUD = { { "icon", "A small icon" }, { "log", "A small log" }, { "off", "Nothing" } }
+        local hudMode
+        hudMode = S.Dropdown(c, 170, HUD, function(v)
+            YippRouteDB.instanceHud = v
+            YR.InstanceHudApply()
+            hudMode:Refresh()
+        end)
+        function hudMode:Refresh() for _, o in ipairs(HUD) do if o[1] == YR.InstanceHudMode() then self:SetValue(o[2]) end end end
+        Row("On screen", hudMode, "The icon has this hour's count on it (green, yellow one before the limit, red at it,"
+            .. " with the wait for a slot under it); hover it for today's count and your latest runs. The log shows"
+            .. " the counts and your latest runs as text. Click either for this page; Shift-drag moves it")
+        Row("Show it always", S.Switch(c, function() return YippRouteDB.instanceHudAlways == true end, function(on)
+            YippRouteDB.instanceHudAlways = on
+            YR.InstanceHudApply()
+        end), "Off: only while you're in an instance or have gone into one this hour")
+        Row("Runs in the small log", S.Stepper(c, function() return YippRouteDB.instanceHudRows or 3 end, function(v)
+            YippRouteDB.instanceHudRows = v
+            YR.InstanceHudApply()
+        end, 0, 8, 1, 110))
+        Row("Back to its place", S.Button(c, "Reset", function() YR.InstanceHudResetPosition() end, nil, 90),
+            "The left of the screen, where it starts")
+end)
+
+local function BuildInstances(outer)
+    local page = CreateFrame("Frame", nil, outer)
+    page:SetAllPoints()
+    local opts = CreateFrame("Frame", nil, outer)
+    opts:SetPoint("TOPLEFT", 0, -30)
+    opts:SetPoint("BOTTOMRIGHT")
+    BuildInstanceSettings(opts)
+    local chips = {}
+    function inst.View(view)
+        inst.view = view
+        page:SetShown(view == "log")
+        opts:SetShown(view == "settings")
+        for name, chip in pairs(chips) do chip:SetOn(name == view) end
+    end
+    chips.settings = S.Chip(outer, "Settings", function() inst.View("settings") YR:RefreshWindow() end)
+    chips.settings:SetPoint("TOPRIGHT", -16, -6)
+    chips.log = S.Chip(outer, "Log", function() inst.View("log") YR:RefreshWindow() end)
+    chips.log:SetPoint("RIGHT", chips.settings, "LEFT", -6, 0)
+    for _, chip in pairs(chips) do chip:SetFrameLevel(outer:GetFrameLevel() + 10) end
+    inst.View("log")
     inst.hint = S.Text(page, 12, S.C.muted)
     inst.hint:SetPoint("TOPLEFT", 16, -10)
+    inst.hint:SetPoint("RIGHT", chips.log, "LEFT", -12, 0)
+    inst.hint:SetJustifyH("LEFT")
+    inst.hint:SetWordWrap(false)
     inst.hour = Stat(page, 16, -34, "This hour")
     inst.next = Stat(page, 248, -34, "Next free slot")
     inst.day = Stat(page, 480, -34, "Today")
@@ -2520,7 +2623,7 @@ function inst.Refresh()
     local last = locks and locks[#locks]
     inst.hint:SetText(("Each new dungeon or raid you go into counts for an hour and a day.%s"):format(last and
         (" The game last said too many at %d this hour (%s)."):format(last.hour, date("%a %H:%M", last.at)) or
-        " Limits and how a return counts: the Group page."))
+        " Limits and what shows on screen: Settings, at the right."))
     inst.rows = InstanceRows()
     inst.list:Refresh()
 end
@@ -2528,40 +2631,14 @@ end
 local function RefreshInstances()
     win.subtitle:SetText("")
     inst.Refresh()
+    for _, ctl in ipairs(qolPages.instances.controls) do if ctl.Refresh then ctl:Refresh() end end
 end
 
--- The two main switches: everything quality of life, and the routes.
-local BuildMain = QoLPage("main", function(L, c, Section, Row, Opt)
-        Section("Main switches", "Headstart as a levelling addon, a QoL addon, or both", { icon = 134400 })
-        Row("Quality of life", S.Switch(c, function() return YR.QoLOn() end, function(on)
-            YR.SetQoLOn(on)
-            YR:RefreshWindow()
-        end), "Off: every page in this menu is off at once - bars, buttons, reminders, bank and mail help, gear"
-            .. " advice, trinkets, the XP bar, the instance tracker, the skins. Your settings are kept and come"
-            .. " back as you left them. For the whole account (/headstart qol on|off)")
-        Row("Routes", S.Switch(c, function() return YR.RoutesOn() end, function(on)
-            YR.SetRoutesOn(on)
-            YR:RefreshWindow()
-        end), "Off: none of your routes in RestedXP, and nothing kept or bought for them. The same switch as on"
-            .. " the Levelling tab (/headstart routes on|off)")
-        local with = {}
-        for _, pair in ipairs({ { "flightTimer", "the flight timer" }, { "durability", "the durability warning" },
-            { "autoTrain", "auto-train" }, { "talentMove", "moving the talent window" },
-            { "talentFadeSlider", "the sliders on the talent window" }, { "groupAccept", "accepting shared quests" },
-            { "xpbar", "the XP bar" } }) do
-            if YR.EllesmereHas(pair[1]) then with[#with + 1] = pair[2] end
-        end
-        if #with > 0 then
-            Row("With EllesmereUI", S.Text(c, 12, S.C.muted), "EllesmereUI does these too, so Headstart's start off until you"
-                .. " turn them on yourself: " .. table.concat(with, ", ") .. ". Anything you've set yourself stays as you set it")
-        end
-        Row("Reload the interface", S.Button(c, "Reload", function() ReloadUI() end, nil, 90),
-            "Both switches finish their work on a reload: what was already built or loaded stays until then")
-end)
-
--- RestedXP skins (RXPSkin.lua): which look, and the Headstart look's colours.
-local BuildRXPSkin = QoLPage("rxpskin", function(L, c, Section, Row, Opt)
-        Section("RestedXP skin", "RestedXP's guide window in another look", { icon = 134939 })
+-- Skins: RestedXP's guide window (RXPSkin.lua) and the game's damage meter (DamageSkin.lua). For each:
+-- which look, and the Headstart look's colours.
+local BuildSkins = QoLPage("skins", function(L, c, Section, Row, Opt)
+    do
+        Section("RestedXP guide window", "RestedXP's window in another look", { icon = 134939 })
         local LOOKS = { { "off", "RestedXP's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard" } }
         local look
         look = S.Dropdown(c, 190, LOOKS, function(v)
@@ -2573,7 +2650,7 @@ local BuildRXPSkin = QoLPage("rxpskin", function(L, c, Section, Row, Opt)
             .. " Blizzard: the game's own frame, fill and gold titles, with no colours to pick. RestedXP's own: the theme you had"
             .. " before. Both are also in RestedXP's own theme list")
 
-        Section("Headstart look only", "colours for the Headstart look; the Blizzard look has none", { icon = 133741 })
+        Section("RestedXP colours", "for its Headstart look; the Blizzard look has none", { icon = 133741 })
         local function Accent()
             YippRouteDB.rxpSkinAccent = YippRouteDB.rxpSkinAccent or YR.RXPSkinAccent()
             return YippRouteDB.rxpSkinAccent
@@ -2608,10 +2685,50 @@ local BuildRXPSkin = QoLPage("rxpskin", function(L, c, Section, Row, Opt)
             YR.RXPSkinApply()
             YR:RefreshWindow()
         end, nil, 90))
+    end
+    do
+        Section("Damage meter", "the game's own meter with a tidy top bar", { icon = 132349 })
+        local LOOKS = { { "off", "Blizzard's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard, tidied" } }
+        local look
+        look = S.Dropdown(c, 190, LOOKS, function(v)
+            YR.SetDamageSkin(v)
+            if v ~= "off" and not YR.DamageSkinAvailable() then
+                YR.Print("the damage meter isn't on screen: turn it on in the game's options and the look is put on it.")
+            end
+            look:Refresh()
+        end)
+        function look:Refresh() for _, o in ipairs(LOOKS) do if o[1] == YR.DamageSkinMode() then self:SetValue(o[2]) end end end
+        Row("Look", look, "Both looks put the top bar in order: the title on one line at the left; the fight's timer and"
+            .. " the three buttons, at one size, at the right. Headstart: a flat dark card in colours you pick."
+            .. " Blizzard, tidied: the game's dark fill and thin frame, the title in gold. The bars themselves stay"
+            .. " with the meter's own settings in Edit Mode")
+
+        Section("Damage meter colours", "for its Headstart look", { icon = 133741 })
+        local function Accent()
+            YippRouteDB.dmgSkinAccent = YippRouteDB.dmgSkinAccent or YR.DamageSkinAccent()
+            return YippRouteDB.dmgSkinAccent
+        end
+        local function FrameColour()
+            YippRouteDB.dmgSkinFrame = YippRouteDB.dmgSkinFrame or YR.DamageSkinFrame()
+            return YippRouteDB.dmgSkinFrame
+        end
+        Row("Accent", Swatch(c, "accent", Accent, YR.DamageSkinApply), "The title and the line under the top bar")
+        Row("Accent in my class colour", S.Switch(c, function() return YippRouteDB.dmgSkinClass == true end, function(on)
+            YippRouteDB.dmgSkinClass = on
+            YR.DamageSkinApply()
+        end))
+        Row("Frame", Swatch(c, "frame", FrameColour, YR.DamageSkinApply), "The window's fill, and how see-through it is")
+        Row("Back to the first colours", S.Button(c, "Reset", function()
+            YippRouteDB.dmgSkinAccent, YippRouteDB.dmgSkinFrame, YippRouteDB.dmgSkinClass = nil, nil, nil
+            YR.DamageSkinApply()
+            YR:RefreshWindow()
+        end, nil, 90))
+    end
 end)
 
--- Talent window (TalentFade.lua): how see-through its background is. The same slider sits on the window.
-local BuildTalentWindow = QoLPage("talentwin", function(L, c, Section, Row, Opt)
+-- Blizzard's windows: the talent window (TalentFade.lua: how see-through its background is, its size,
+-- moving it) and the bag windows (Movers.lua).
+local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
         Section("Talent window", "see where you're running with it open", { icon = 136243 })
         Row("See-through background (percent)", S.Slider(c, 0, 100, 5, YR.TalentFade, YR.SetTalentFade, 260),
             "How much of the talent window's background is faded away. 0: Blizzard's own. The talents, texts and"
@@ -2630,6 +2747,63 @@ local BuildTalentWindow = QoLPage("talentwin", function(L, c, Section, Row, Opt)
             .. " so it moves too. Not in combat")
         Row("Back to its place", S.Button(c, "Reset", function() YR.TalentResetPosition() end, nil, 90),
             "The middle of the screen, where Blizzard opens it")
+
+        Section("Blizzard's bars", "out of the way until you want them", { icon = 133633 })
+        local BAR = { { "show", "As Blizzard has it" }, { "hover", "Only under the mouse" }, { "hide", "Hidden" } }
+        local function BarDrop(key)
+            local d
+            d = S.Dropdown(c, 190, BAR, function(v) YR.SetBarHide(key, v) d:Refresh() end)
+            function d:Refresh()
+                local now = YippRouteDB[key] or "show"
+                for _, o in ipairs(BAR) do if o[1] == now then self:SetValue(o[2]) end end
+            end
+            return d
+        end
+        Row("Bag bar", BarDrop("bagBar"), "The row of bags at the bottom right. Only under the mouse: it's see-through until"
+            .. " you point where it is. Hidden: gone, and its buttons can't be clicked by accident (B still opens your bags)."
+            .. " It keeps its place in Edit Mode, and shows while Edit Mode is open")
+        Row("Micro menu", BarDrop("microMenu"), "The row of small buttons: character, talents, the game menu and the rest."
+            .. " The same three choices; your keys for them work either way")
+
+        Section("Chat buttons", "the strip beside the chat, and the two buttons over it", { icon = 133469 })
+        local STRIP = { { "show", "As Blizzard has it" }, { "slim", "Slim, with small icons" }, { "hide", "Hidden" } }
+        local strip
+        strip = S.Dropdown(c, 210, STRIP, function(v)
+            YippRouteDB.chatStrip = v ~= "show" and v or nil
+            YR.BarHideApply()
+            strip:Refresh()
+        end)
+        function strip:Refresh()
+            local now = YippRouteDB.chatStrip or "show"
+            for _, o in ipairs(STRIP) do if o[1] == now then self:SetValue(o[2]) end end
+        end
+        Row("Button strip", strip, "Slim: the strip beside the chat a good third narrower, its buttons (the chat menu,"
+            .. " channels) small with one plain icon each; they work as before, and the strip still fades in under the"
+            .. " mouse. Hidden: gone, the chat menu with it. Either way the chat window can be moved closer to the"
+            .. " screen's edge in Edit Mode")
+        Row("Hide the text-to-speech button", S.Switch(c, function() return YippRouteDB.chatTTSHide == true end, function(on)
+            YippRouteDB.chatTTSHide = on or nil
+            YR.BarHideApply()
+        end), "The speaker button over the strip")
+        Row("Hide the social button", S.Switch(c, function() return YippRouteDB.chatSocialHide == true end, function(on)
+            YippRouteDB.chatSocialHide = on or nil
+            YR.BarHideApply()
+        end), "The friends button over the chat, with the number of friends online. Your key for the social window still works")
+
+        Section("Bag windows", "moved where you want them", { icon = 134400 })
+        Row("Move the combined bag", S.Switch(c, function() return YippRouteDB.moveBag == true end, function(on)
+            YippRouteDB.moveBag = on
+            YR.MoverPlace("bag")
+        end), "Drag Blizzard's combined bag by its title bar; it opens there from then on. Off: Blizzard's own"
+            .. " place. Not in combat")
+        Row("Move the reagent bag", S.Switch(c, function() return YippRouteDB.moveReagentBag == true end, function(on)
+            YippRouteDB.moveReagentBag = on
+            YR.MoverPlace("reagentBag")
+        end), "The same for the reagent bag, on its own")
+        Row("Back to their places", S.Button(c, "Reset", function()
+            YR.MoverReset("bag")
+            YR.MoverReset("reagentBag")
+        end, nil, 90), "Both where Blizzard opens them, from the next time they open")
 end)
 
 local function QoLRefresh(key, extra)
@@ -2639,29 +2813,34 @@ local function QoLRefresh(key, extra)
     end
 end
 
+-- QoL's menu, grouped by where you meet the thing in play: what Headstart puts on your screen, what it
+-- does with your bags and gear, what it does around other players and tells you, and a new character.
 local CATEGORIES = {
-    { key = "main", label = "Main switches", build = BuildMain, refresh = QoLRefresh("main"), icon = 134400,
-      status = function() return YR.QoLOn() end, scope = "Every character on this account",
-      desc = "All of quality of life on or off, and the routes on or off: Headstart as one, the other, or both." },
-    { group = "Quality of life" },
-    { key = "camps", label = "Camps & travel", build = BuildCamps, refresh = QoLRefresh("camps"), icon = 135805,
+    { group = "On screen" },
+    { key = "xpbar", label = "XP bar", build = BuildXPBar, refresh = QoLRefresh("xpbar"), icon = 236562,
+      status = function() return YR.XPBarOn() end, scope = "Every character on this account",
+      desc = "Your own experience bar: its size, place, colours and the words on it, with XP an hour, time and kills to ding." },
+    { key = "camps", label = "Camps & flights", build = BuildCamps, refresh = QoLRefresh("camps"), icon = 135805,
       status = function() return YR.Option("camp") or YR.Option("flightTimer") end, scope = "Every character on this account",
       desc = "The campfire on screen while a camp is near or its buff runs, and the bar while you fly." },
-    { key = "bags", label = "Bags", build = BuildBags, refresh = QoLRefresh("bags"), icon = 133633,
+    { key = "swing", label = "Swing timer", build = BuildSwing, refresh = QoLRefresh("swing"), icon = 132349,
+      status = function() return YR.SwingOn() end, scope = "Every character on this account",
+      desc = "Blizzard's swing bars dressed to be seen - your colours, larger text, the weapon's icon, the swing's length - or Headstart's own bars in their place." },
+    { key = "skins", label = "Skins", build = BuildSkins, refresh = QoLRefresh("skins"), icon = 134939,
+      status = function() return YR.RXPSkinMode() ~= "off" or YR.DamageSkinMode() ~= "off" end, scope = "Every character on this account",
+      desc = "RestedXP's guide window and the game's damage meter in Headstart's flat look with your colours, or in Blizzard's." },
+    { key = "windows", label = "Windows", build = BuildWindows, refresh = QoLRefresh("windows"), icon = 136243,
+      status = function() return YR.TalentFade() > 0 or YR.Option("talentMove") or YippRouteDB.moveBag == true or YippRouteDB.moveReagentBag == true
+          or YippRouteDB.bagBar ~= nil or YippRouteDB.microMenu ~= nil or YippRouteDB.chatStrip ~= nil end,
+      scope = "Every character on this account",
+      desc = "The talent window see-through, resized and moved, the bag bar and micro menu hidden or shown under the mouse, and the bag windows moved." },
+    { group = "Bags & gear" },
+    { key = "bags", label = "Bank & mail", build = BuildBags, refresh = QoLRefresh("bags"), icon = 133633,
       status = function() return YR.Option("bankAuto") or YR.Option("bankButton") or YR.Option("mailButton") end, scope = "Every character on this account",
       desc = "Crafting mats and recipes you can't use yet: into the bank, or in the mail to your alt." },
     { key = "vendors", label = "Vendors", build = BuildVendors, refresh = QoLRefresh("vendors"), icon = 133784,
       status = function() return YR.Option("restock") end, scope = "Every character on this account",
       desc = "Your reagents, ammo and own list bought back up to what you keep, at any vendor who sells them." },
-    { key = "group", label = "Group", build = BuildGroup, refresh = QoLRefresh("group"), icon = 134149,
-      status = function() return YR.Option("groupBar") end, scope = "Every character on this account",
-      desc = "Into a group for a kill and out again, and quests shared and accepted without the clicking." },
-    { key = "instances", label = "Instances", build = BuildInstances, refresh = RefreshInstances, icon = 134237,
-      scope = "Every character on this account",
-      desc = "The new dungeons and raids you went into this hour and today, against the limit, and the wait for a free slot." },
-    { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134327,
-      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") end, scope = "Every character on this account",
-      desc = "One quiet line when there is something to do: the trainer, talents, repairs, things to make." },
     { key = "gear", label = "Gear & rewards", build = BuildGear, refresh = QoLRefresh("gear", RefreshRewards), icon = 132739,
       status = function() return YR.Option("simTooltip") or YR.Option("upgrades") end, scope = "Every character; quest rewards per class",
       desc = "Better gear in your bags pointed out, and quest rewards picked for you." },
@@ -2669,16 +2848,17 @@ local CATEGORIES = {
       icon = 133434, status = function() return YR.Option("trinketBar") or YippRouteDB.trinketAuto == true end,
       scope = "Every character; the swap order per character",
       desc = "Trinket buttons with your others a click away, trinkets swapped as they're used, and keys for your gear sets." },
-    { key = "xpbar", label = "XP bar", build = BuildXPBar, refresh = QoLRefresh("xpbar"), icon = 236562,
-      status = function() return YR.XPBarOn() end, scope = "Every character on this account",
-      desc = "Your own experience bar: its size, place, colours and the words on it, with XP an hour, time and kills to ding." },
-    { key = "rxpskin", label = "RestedXP skin", build = BuildRXPSkin, refresh = QoLRefresh("rxpskin"), icon = 134939,
-      status = function() return YR.RXPSkinMode() ~= "off" end, scope = "Every character on this account",
-      desc = "RestedXP's guide window in Headstart's flat look with your own accent colour, or in Blizzard's." },
-    { key = "talentwin", label = "Talent window", build = BuildTalentWindow, refresh = QoLRefresh("talentwin"), icon = 136243,
-      status = function() return YR.TalentFade() > 0 end, scope = "Every character on this account",
-      desc = "The talent window's background faded, so you can see where you're running with it open, and the window moved." },
-    { group = "Character" },
+    { group = "Group & alerts" },
+    { key = "group", label = "Group", build = BuildGroup, refresh = QoLRefresh("group"), icon = 134149,
+      status = function() return YR.Option("groupBar") end, scope = "Every character on this account",
+      desc = "Into a group for a kill and out again, and quests shared and accepted without the clicking." },
+    { key = "instances", label = "Instances", build = BuildInstances, refresh = RefreshInstances, icon = 134237,
+      status = function() return YR.Option("instanceTrack") end, scope = "Every character on this account",
+      desc = "The new dungeons and raids you went into this hour and today, against the limit, and the wait for a free slot." },
+    { key = "reminders", label = "Reminders & sounds", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134327,
+      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") or YippRouteDB.whisperSound ~= nil end, scope = "Every character on this account",
+      desc = "One quiet line when there is something to do - the trainer, talents, repairs, things to make - and a sound for whispers." },
+    { group = "New character" },
     { key = "character", label = "Character setup", build = BuildSetup, refresh = RefreshSetup, icon = 134166,
       scope = function() return "Every " .. (CLASS_NAME[ViewClass()] or "character") .. "; chat and Edit Mode for all" end,
       desc = "Your main's bars, macros and settings on a new character - or plan the bars here." },
@@ -2686,8 +2866,28 @@ local CATEGORIES = {
       status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
       desc = "Your class spells learned as the trainer opens, the ones you choose, as your gold allows." },
 }
--- Older names for a page (Setup asks for "character"; "qol" was the one long page).
-local CATEGORY_ALIAS = { qol = "camps" }
+-- Older names for a page ("qol" was the one long page; the skins and the talent window had their own).
+local CATEGORY_ALIAS = { qol = "xpbar", main = "xpbar", rxpskin = "skins", dmgskin = "skins", talentwin = "windows" }
+
+-- A main switch at the top of a side menu: its name, the switch at the right, and what it does when you
+-- point at it. QoL's menu has Quality of life, Levelling's has Routes.
+local function MasterRow(side, width, label, get, set, tip)
+    local r = CreateFrame("Frame", nil, side)
+    r:SetSize(width - 24, 30)
+    S.Fill(r, S.C.card)
+    S.Border(r, S.C.line)
+    r.text = S.Text(r, 13)
+    r.text:SetPoint("LEFT", 10, 0)
+    r.text:SetText(label)
+    local sw = S.Switch(r, get, function(on) set(on) YR:RefreshWindow() end)
+    sw:SetPoint("RIGHT", -8, 0)
+    r:EnableMouse(true)
+    r:SetScript("OnEnter", function(self) S.Tip(self, tip) end)
+    r:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ui.masters = ui.masters or {}
+    ui.masters[#ui.masters + 1] = sw
+    return r
+end
 
 local function ShowTab(key)
     key = CATEGORY_ALIAS[key] or key
@@ -2775,6 +2975,7 @@ local function BuildSettings(page)
         search:SetValue("")
         results:Hide()
         ShowTab(e.key)
+        if e.key == "instances" and inst.View then inst.View("settings") end
         local range = e.area.GetVerticalScrollRange and e.area:GetVerticalScrollRange() or 0
         if e.area.SetVerticalScroll then e.area:SetVerticalScroll(math.max(0, math.min(range, -e.y - 60))) end
         e.row.flash:Show()
@@ -2825,16 +3026,45 @@ local function BuildSettings(page)
     search:SetPoint("TOPLEFT", 12, -12)
     YR.SettingsSearch, YR.SettingsGo = Search, Go      -- for tests
 
-    local y = -48
+    -- everything on this tab on or off
+    local master = MasterRow(nav, NAV_W, "Quality of life", function() return YR.QoLOn() end, YR.SetQoLOn,
+        "Off: every page in this menu is off at once - bars, buttons, reminders, bank and mail help, gear advice,"
+        .. " trinkets, the XP bar, the instance tracker, the skins. Your settings are kept and come back as you left"
+        .. " them. For the whole account; finishes its work on a reload (/headstart qol on|off)")
+    master:SetPoint("TOPLEFT", 12, -44)
+    -- with EllesmereUI: which of ours start off, at the foot of the menu
+    local with = {}
+    for _, pair in ipairs({ { "flightTimer", "the flight timer" }, { "durability", "the durability warning" },
+        { "autoTrain", "auto-train" }, { "talentMove", "moving the talent window" },
+        { "talentFadeSlider", "the sliders on the talent window" }, { "groupAccept", "accepting shared quests" },
+        { "xpbar", "the XP bar" } }) do
+        if YR.EllesmereHas(pair[1]) then with[#with + 1] = pair[2] end
+    end
+    if #with > 0 then
+        local note = CreateFrame("Frame", nil, nav)
+        note:SetSize(NAV_W - 24, 16)
+        note:SetPoint("BOTTOMLEFT", 12, 10)
+        note.text = S.Text(note, 11, S.C.muted)
+        note.text:SetPoint("LEFT")
+        note.text:SetText(("With EllesmereUI: %d start off"):format(#with))
+        note:EnableMouse(true)
+        note:SetScript("OnEnter", function(self)
+            S.Tip(self, "EllesmereUI does these too, so Headstart's start off until you turn them on yourself: "
+                .. table.concat(with, ", ") .. ". Anything you've set yourself stays as you set it")
+        end)
+        note:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+
+    local y = -82
     for _, t in ipairs(CATEGORIES) do
         if t.group then
             local g = S.Text(nav, 11, S.C.muted)
             g:SetPoint("TOPLEFT", 18, y - 8)
             g:SetText(t.group:upper())
-            y = y - 30
+            y = y - 28
         else
             local b = CreateFrame("Button", nil, nav)
-            b:SetSize(NAV_W - 16, 30)
+            b:SetSize(NAV_W - 16, 28)
             b:SetPoint("TOPLEFT", 8, y)
             b.bg = S.Fill(b, { 0, 0, 0, 0 })
             b.bar = b:CreateTexture(nil, "ARTWORK")
@@ -2872,7 +3102,7 @@ local function BuildSettings(page)
             b:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end end)
             b:SetScript("OnClick", function() search:SetValue("") results:Hide() ShowTab(t.key) end)
             t.button = b
-            y = y - 32
+            y = y - 30
         end
     end
 
@@ -2891,7 +3121,7 @@ local function BuildSettings(page)
     reload:SetPoint("BOTTOMLEFT", 16, 14)
     local close = S.Button(page, "Close", function() win:Hide() end, nil, 110)
     close:SetPoint("BOTTOMRIGHT", -16, 14)
-    settings.tab = "camps"
+    settings.tab = "xpbar"
 end
 
 local function RefreshSettings()
@@ -2934,7 +3164,7 @@ local function RefreshRoutePage()
 end
 
 -- ---------------------------------------------------------------------------
--- The window: two tabs at the top, Levelling and QoL, each with its own menu down the left
+-- The window: two tabs at the top, QoL and Levelling, each with its own menu down the left
 -- ---------------------------------------------------------------------------
 -- tab: which top tab a page is under. nav: shown in Levelling's menu (the routes page is opened from
 -- the route list under it instead).
@@ -3023,12 +3253,12 @@ local function TopTabs(head, onLevelling, onQoL)
     track:SetFrameLevel(head:GetFrameLevel() + 2)      -- over the bar you drag the window by
     S.Rounded(track, "BACKGROUND", "round"):SetVertexColor(unpack(S.C.field))
     S.Rounded(track, "BORDER", "roundline"):SetVertexColor(unpack(S.C.lineHi))
-    local levelling = Segment(track, "Levelling", "Interface\\Icons\\INV_Misc_Map_01")
-    levelling:SetPoint("LEFT", 3, 0)
-    levelling:SetScript("OnClick", onLevelling)
     local qol = Segment(track, "QoL", "Interface\\Icons\\Trade_Engineering")
-    qol:SetPoint("RIGHT", -3, 0)
+    qol:SetPoint("LEFT", 3, 0)
     qol:SetScript("OnClick", onQoL)
+    local levelling = Segment(track, "Levelling", "Interface\\Icons\\INV_Misc_Map_01")
+    levelling:SetPoint("RIGHT", -3, 0)
+    levelling:SetScript("OnClick", onLevelling)
     return { levelling = levelling, qol = qol }, track
 end
 
@@ -3178,8 +3408,12 @@ local function Build()
     ui.sideL, ui.sideQ = side, Side(NAV_W, S.C.side)
     pages = {}
     ui.routeTabs = {}
-    -- Levelling's pages first, then every route in a list that scrolls (there are more routes than room)
-    local y = -12
+    -- The routes switch, Levelling's pages, then every route in a list that scrolls (more routes than room)
+    local routes = MasterRow(side, SIDE, "Routes", function() return YR.RoutesOn() end, YR.SetRoutesOn,
+        "On: your routes are loaded into RestedXP, and what they need is kept in your bags and bought for you."
+        .. " Off: none of that. For the whole account; takes a /reload (/headstart routes on|off)")
+    routes:SetPoint("TOPLEFT", 12, -12)
+    local y = -50
     for _, p in ipairs(PAGES) do
         if p.nav then
             p.button = NavButton(side, p.label, p.icon, y)
@@ -3324,6 +3558,7 @@ end
 
 function YR:RefreshWindow()
     if not (win and win:IsShown()) then return end
+    for _, sw in ipairs(ui.masters or {}) do sw:Refresh() end
     for _, p in ipairs(PAGES) do
         if p.key == current then p.refresh() end
     end
@@ -3339,8 +3574,8 @@ function YR:ToggleWindow(page)
     if not win then Build() end
     if win:IsShown() and not page then win:Hide() return end
     win:Show()
-    -- first open: the routes when they're on, else the QoL & settings page (Headstart as the QoL addon)
-    Show(page or current or (YR.RoutesOn() and "routes" or "settings"))
+    -- first open: QoL (Headstart is the QoL addon first; the routes are a tab away)
+    Show(page or current or "settings")
 end
 
 function Headstart_OnAddonCompartmentClick()

@@ -84,7 +84,7 @@ end
 local W, H = 320, 62
 local PAD = 12
 local TRACK_Y, THICK, KNOB = -33, 5, 13
-local FACE = 22            -- your portrait on the bar, where the knob is
+local FACE = 16            -- your portrait on the bar, where the knob is
 local BLUE, BLUE_DIM = { 0.40, 0.66, 1.00 }, { 0.18, 0.40, 0.80 }
 local TRACK = { 0.17, 0.19, 0.23, 1 }
 local SWEEP = 1.8                     -- seconds for the light to run the bar on a first flight

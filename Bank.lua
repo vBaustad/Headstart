@@ -10,7 +10,8 @@
 --                  profession you have crafts with, and banks the rest
 --     bankRecipes  on unless turned off: recipes for a profession you haven't got, or that need
 --                  more skill than you have (one you already know is left for the vendor)
---   What never goes: quest items, anything the route still needs (Needs.lua), and what another
+--   What never goes: quest items, anything a quest you'd still do needs (the route's, Needs.lua, or
+--   RestedXP's; not a quest that's done or grey for your level), and what another
 --   YippYapp addon says to keep - AutoFeed's food and water, and with "mine", Skillwright's reagents.
 --
 -- Which profession crafts with what, and what a recipe needs to learn, comes from Data/Crafting.lua.
@@ -82,15 +83,30 @@ end
 --- `have` is Professions(), passed in so one walk of the bags asks the game once.
 --- The rule itself, shared with the mail to your alt (Mail.lua): `mats` is "mine" | "all" | "off",
 --- `recipes` true to send recipes you can't learn yet.
---- Needed for a quest: one of our route's steps still needs it, or RestedXP's guides use it (what its
---- tooltip calls "Item used in guide"). Such an item never leaves your bags - not to the bank, not in
---- the mail, whatever list it's on.
+--- Is this quest one you'd still do? Yes while it's in your log. No once it's done, and no when it has
+--- gone grey for your level (a quest from zones behind you: nobody keeps linen for it). A quest the
+--- game can't tell the level of counts as live.
+function YR.QuestLive(quest)
+    if type(quest) ~= "number" then return true end
+    if C_QuestLog.IsOnQuest and C_QuestLog.IsOnQuest(quest) then return true end
+    if C_QuestLog.IsQuestFlaggedCompleted and C_QuestLog.IsQuestFlaggedCompleted(quest) then return false end
+    local level = C_QuestLog.GetQuestDifficultyLevel and C_QuestLog.GetQuestDifficultyLevel(quest)
+    local range = type(_G.UnitQuestTrivialLevelRange) == "function" and _G.UnitQuestTrivialLevelRange("player")
+    local mine = UnitLevel("player")
+    if type(level) ~= "number" or level <= 0 or type(range) ~= "number" or type(mine) ~= "number" then return true end
+    return mine - level <= range
+end
+
+--- Needed for a quest you'd still do (YR.QuestLive): one of our route's steps needs it, or RestedXP's
+--- guides use it (what its tooltip calls "Item used in guide"). Such an item never leaves your bags -
+--- not to the bank, not in the mail, whatever list it's on.
 function YR.QuestNeeds(item)
     if not item then return false end
-    if YR.RouteNeed and YR.RouteNeed(item) then return true end
+    if YR.RouteNeed and YR.RouteNeed(item, YR.QuestLive) then return true end
     local rxp = type(RXP) == "table" and RXP or nil
-    local ok, used = pcall(function() return rxp and rxp.questItemList and rxp.questItemList[item] end)
-    return ok and used ~= nil
+    local ok, quest = pcall(function() return rxp and rxp.questItemList and rxp.questItemList[item] end)
+    if not ok then return true end
+    return quest ~= nil and quest ~= false and YR.QuestLive(tonumber(quest))
 end
 
 function YR.StashReason(item, have, mats, recipes)
@@ -248,7 +264,7 @@ local function Button()
         GameTooltip:AddLine(mats == "all" and "Crafting mats: all of them." or mats == "mine"
             and "Crafting mats no profession of yours crafts with." or "Crafting mats: off.", 1, 1, 1, true)
         GameTooltip:AddLine(YR.Option("bankRecipes") and "Recipes you can't learn yet." or "Recipes: off.", 1, 1, 1, true)
-        GameTooltip:AddLine("Quest items, what the route still needs and AutoFeed's food stay. Headstart, QoL, Bags.",
+        GameTooltip:AddLine("Quest items, what a quest you'd still do needs and AutoFeed's food stay. Headstart, QoL, Bank & mail.",
             0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)

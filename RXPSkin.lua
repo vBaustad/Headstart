@@ -1,4 +1,4 @@
--- RestedXP skins: two looks for RestedXP's guide window, picked in Headstart, QoL, RestedXP skin (or
+-- RestedXP skins: two looks for RestedXP's guide window, picked in Headstart, QoL, Skins (or
 -- in RestedXP's own theme list, where they show up as "Headstart" and "Blizzard").
 --   Headstart: the flat dark look of Headstart's own window - a thin line for a border, one accent
 --   colour on the header, the footer, the step you're on and the map pins. The accent and the
@@ -12,7 +12,8 @@
 --   fill in Blizzard's settings-window frame, and Blizzard's inner panel round each step box; Headstart: flat fill, a thin line, the accent
 --   as a line under the header); the scroll bar a slim thumb on a thin track with the end buttons out
 --   of sight; the border's size on the steps set while one of ours is on (and put back when it isn't).
---   Only RestedXP's window is touched, and only while our theme is on.
+--   RestedXP's two small windows, Active Targets and Active Items, get the step boxes' look.
+--   Only RestedXP's windows are touched, and only while our theme is on.
 --   The small art RestedXP needs from a theme's folder (logo, cog, arrow, tick boxes, scroll bar) is
 --   RestedXP's own neutral "DarkMode" set.
 --   Account options (YippRouteDB): rxpSkinAccent { r, g, b }, rxpSkinBack { r, g, b, a },
@@ -562,6 +563,97 @@ local function StepBoxes()
 end
 YR.RXPSkinStepBoxes = StepBoxes
 
+-- RestedXP's two small windows, Active Targets and Active Items (the buttons for what the step has you
+-- target or use), in the look of the step boxes: in the Blizzard look Blizzard's thin panel and fill,
+-- the title tab edged in the panel's colour with a gold name; in the Headstart look your background,
+-- a thin quiet line and the name in your accent. Both parent secure buttons, so only textures of ours
+-- and colours are touched - never a size or a place. A window whose background you turned off in
+-- RestedXP's options stays without one.
+local small = {}        -- [frame] = true once it has our look on it
+
+local function SmallWindow(frame, mode, accent)
+    if type(frame) ~= "table" or not frame.CreateTexture then return end
+    if not rawget(frame, "headstartHooked") and type(frame.UpdateVisuals) == "function" then
+        frame.headstartHooked = true
+        hooksecurefunc(frame, "UpdateVisuals", function() YR.RXPSkinSmallWindows() end)
+    end
+    local panel, fill = rawget(frame, "headstartPanel"), rawget(frame, "headstartFill")
+    local title = type(frame.title) == "table" and frame.title or nil
+    if mode == "off" then
+        if panel then panel:Hide() end
+        if fill then fill:Hide() end
+        if small[frame] then
+            small[frame] = nil
+            if not InCombatLockdown() then pcall(frame.UpdateVisuals, frame) end     -- RestedXP's own again
+        end
+        return
+    end
+    small[frame] = true
+    local bare = frame.GetBackdrop and frame:GetBackdrop() == nil      -- its background is turned off
+    local art = mode == "blizzard" and not bare and FirstAtlas("common-insideframe")
+    if art and not panel then
+        panel = frame:CreateTexture(nil, "BORDER")
+        panel:SetAllPoints()
+        frame.headstartPanel = panel
+    end
+    if art and not fill then
+        fill = frame:CreateTexture(nil, "BACKGROUND", nil, -1)
+        fill:SetPoint("TOPLEFT", 2, -2)
+        fill:SetPoint("BOTTOMRIGHT", -2, 2)
+        frame.headstartFill = fill
+    end
+    if panel then
+        if art then panel:SetAtlas(art) end
+        panel:SetShown(art and true or false)
+    end
+    if fill then
+        if art then
+            local bronze = FirstAtlas("heavybronze-frame-background")
+            if bronze then fill:SetAtlas(bronze) else fill:SetColorTexture(0.05, 0.045, 0.04, 1) end
+        end
+        fill:SetShown(art and true or false)
+    end
+    local text = title and title.text
+    if mode == "blizzard" then
+        if not bare then
+            if art then
+                frame:SetBackdropColor(0, 0, 0, 0)
+                frame:SetBackdropBorderColor(0, 0, 0, 0)
+            else
+                frame:SetBackdropColor(0.05, 0.045, 0.04, 0.94)
+                frame:SetBackdropBorderColor(PANEL_COLOUR[1], PANEL_COLOUR[2], PANEL_COLOUR[3], 1)
+            end
+        end
+        if title and title.SetBackdropColor then
+            title:SetBackdropColor(0.05, 0.045, 0.04, 1)
+            title:SetBackdropBorderColor(PANEL_COLOUR[1], PANEL_COLOUR[2], PANEL_COLOUR[3], 1)
+        end
+        if text and text.SetTextColor then text:SetTextColor(GOLD[1], GOLD[2], GOLD[3]) end
+    else
+        local back = YR.RXPSkinBack()
+        if not bare then
+            frame:SetBackdropColor(back[1], back[2], back[3], back[4])
+            frame:SetBackdropBorderColor(1, 1, 1, 0.16)
+        end
+        if title and title.SetBackdropColor then
+            title:SetBackdropColor(back[1], back[2], back[3], 1)
+            title:SetBackdropBorderColor(accent[1], accent[2], accent[3], 0.55)
+        end
+        if text and text.SetTextColor then text:SetTextColor(accent[1], accent[2], accent[3]) end
+    end
+end
+
+function YR.RXPSkinSmallWindows()
+    local rxp = Rxp()
+    if not rxp then return end
+    local v2 = rxp.v2 and rxp.v2.IsGuideWindowEnabled and rxp.v2:IsGuideWindowEnabled()
+    local mode = v2 and "off" or YR.RXPSkinMode()
+    local accent = mode == "headstart" and YR.RXPSkinAccent() or nil
+    SmallWindow(rawget(rxp, "activeItemFrame"), mode, accent)
+    local targeting = rawget(rxp, "targeting")
+    SmallWindow(type(targeting) == "table" and rawget(targeting, "activeTargetFrame") or nil, mode, accent)
+end
+
 -- After RestedXP has drawn: its own fills, edges and banners on the header, the list and the footer
 -- made clear, and ours in their place.
 local painted
@@ -574,6 +666,7 @@ local function Paint()
     -- RestedXP's new window (v2) draws itself from the theme: nothing of ours goes over it
     local v2 = rxp.v2 and rxp.v2.IsGuideWindowEnabled and rxp.v2:IsGuideWindowEnabled()
     StepBoxes()
+    YR.RXPSkinSmallWindows()
     if mode == "off" or v2 then
         if painted then
             painted = nil
@@ -715,6 +808,13 @@ function YR.StartRXPSkin()
     if type(rxp.SetupGuideWindow) == "function" then hooksecurefunc(rxp, "SetupGuideWindow", Paint) end
     -- the boxes of the steps you're on are made (and their edges set) each time the step changes
     if type(rxp.SetStep) == "function" then hooksecurefunc(rxp, "SetStep", StepBoxes) end
+    -- the Active Targets window draws its background on its own too (and is made after the guide window)
+    local targeting = rawget(rxp, "targeting")
+    if type(targeting) == "table" then
+        for _, name in ipairs({ "RenderTargetFrameBackground", "CreateTargetFrame" }) do
+            if type(targeting[name]) == "function" then hooksecurefunc(targeting, name, YR.RXPSkinSmallWindows) end
+        end
+    end
     if type(rxp.RXPFrame) == "table" and type(rxp.RXPFrame.UpdateVisuals) == "function" then
         hooksecurefunc(rxp.RXPFrame, "UpdateVisuals", Paint)
     end

@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- **Swing timer** (Headstart, QoL, Swing timer; off until you turn it on): your auto-attack bars made to be seen, two ways. *Blizzard's bars, dressed* (to begin with): the game's own swing bars with our texture, your colours for main hand, off hand, ranged and out of reach, the frame round each bar off, text at your size, the weapon's icon beside the bar and the swing's whole length after its name; Blizzard still runs them, and their place and size stay in Edit Mode. *Headstart's own bars*: bars of ours in their place, with the time left and the swing's length ("0.8 / 2.6"), their own width, height and place, shown always, in combat, or only while a swing runs. Everything is put back when it's off.
+
+- **The settings menu, sorted.** QoL is the first tab and what the window opens on. Its menu is in four groups by where you meet a thing in play: *On screen* (XP bar, Camps & flights, Swing timer, Skins, Windows), *Bags & gear* (Bank & mail, Vendors, Gear & rewards, Trinkets & sets), *Group & alerts* (Group, Instances, Reminders & sounds) and *New character* (Character setup, Trainer). The RestedXP skin and the damage meter skin share one page, Skins; the talent window, the bag windows and the two bars below share Windows; the instance tracker's settings moved from Group to the Instances page (Log and Settings at its top right). The main switches no longer have a page: Quality of life is a switch at the top of QoL's menu, Routes one at the top of Levelling's.
+
+- **Bag bar and micro menu out of the way** (Headstart, QoL, Windows; both as Blizzard has them until you choose): each can be shown only under the mouse, or hidden. They keep their place in Edit Mode and show while it's open. The strip of buttons beside the chat can be made slim - a third narrower, its buttons small with one plain icon each - or hidden, and the text-to-speech and social buttons over it hidden each on its own; the chat window can then be moved closer to the screen's edge in Edit Mode.
+
+- **Bank and mail keep less for quests.** An item stayed in your bags when any quest in your routes or in RestedXP's guides used it. Now only for a quest you'd still do: one in your log, or one you haven't done that isn't grey for your level.
+
+- **RestedXP skins: Active Targets and Active Items** take the look too - Blizzard's thin panel in the Blizzard look, your background and accent in the Headstart look.
+
+- Whisper sound: a speaker on every line of the list plays that sound without picking it, in place of the Play button.
+
+- **Whisper sound** (Headstart, QoL, Reminders & sounds; off until you pick one): a sound of your choice when someone whispers you. Some thirty of the game's own to choose from (alarms, bells, the raid warning, the ready check), and every sound another addon has registered in LibSharedMedia - a sound pack, Details, WeakAuras, boss mods - is in the list too. It can play on the Master channel, so you hear it with sound effects turned down. Battle.net whispers too, unless you turn that off.
+
+- **Damage meter skin** (Headstart, QoL, Skins; off until you pick a look): the game's own damage meter with its top bar put in order - the title on one line at the left, the fight's timer and the three buttons at one size at the right, where the timer used to push the title onto two lines. *Headstart*: a flat dark card, with the frame's colour and the accent yours to pick (or your class colour). *Blizzard, tidied*: the game's dark fill and thin frame, the title in gold. The bars stay with the meter's own Edit Mode settings.
+
 ## 0.10.0-beta2
 
 - **Headstart no longer comes with levelling routes.** It is the quality-of-life addon with the levelling tools: your runs recorded, a run saved as your own RestedXP route (This run, Save as route), the route editor, Share to pass routes on or paste one in, Where next?, level splits and death-skip handling. The routes that came with earlier versions are gone from the list after this update; your own saved and imported routes stay. With no route yet, the Levelling tab says how to make one.

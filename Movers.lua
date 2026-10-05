@@ -7,7 +7,7 @@
 --   A window can also be dragged by its own empty parts (the talent window is): those frames are
 --   registered for a drag and hooked, nothing of theirs replaced. Buttons and talents are frames of
 --   their own on top, so a click or a drag on one of them is still theirs.
---   Account options (YippRouteDB, Headstart, QoL, Bags): moveBag, moveReagentBag (both off unless
+--   Account options (YippRouteDB, Headstart, QoL, Windows): moveBag, moveReagentBag (both off unless
 --   turned on); moved[key] = { left, top } is where each was left.
 local ADDON, YR = ...
 

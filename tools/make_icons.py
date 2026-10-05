@@ -122,3 +122,59 @@ d.ellipse((58, 14, 198, 154), fill=(255, 255, 255, 255))
 d.polygon([(66, 116), (190, 116), (128, 246)], fill=(255, 255, 255, 255))
 d.ellipse((100, 56, 156, 112), fill=(255, 255, 255, 0))
 save(img, "pin")
+
+
+# --- the damage meter skin's top bar (DamageSkin.lua): one stroke weight, like the icons above ---
+import math
+
+# gear: a ring with eight teeth (the meter's settings)
+img, d = canvas()
+for i in range(8):
+    a = math.radians(i * 45)
+    x0, y0 = 128 + math.cos(a) * 66, 128 + math.sin(a) * 66
+    x1, y1 = 128 + math.cos(a) * 96, 128 + math.sin(a) * 96
+    d.line([(x0, y0), (x1, y1)], fill=(255, 255, 255, 255), width=30)
+d.ellipse((58, 58, 198, 198), fill=(255, 255, 255, 255))
+d.ellipse((98, 98, 158, 158), fill=(255, 255, 255, 0))
+save(img, "gear")
+
+# bars: three bars of falling length (what the meter shows: damage, healing, ...)
+img, d = canvas()
+for y, x1 in ((80, 190), (128, 150), (176, 110)):
+    line(d, [(66, y), (x1, y)])
+save(img, "bars")
+
+# clock: a ring with two hands (which fight: this one, or all of them)
+img, d = canvas()
+d.ellipse((44, 44, 212, 212), outline=(255, 255, 255, 255), width=20)
+line(d, [(128, 128), (128, 82)])
+line(d, [(128, 128), (162, 146)])
+save(img, "clock")
+
+# reset: three quarters of a ring with an arrow head (clear the meter)
+img, d = canvas()
+d.arc((52, 52, 204, 204), start=-60, end=210, fill=(255, 255, 255, 255), width=22)
+ax, ay = 128 + math.cos(math.radians(-60)) * 76, 128 + math.sin(math.radians(-60)) * 76
+d.polygon([(ax - 34, ay - 30), (ax + 30, ay - 22), (ax + 4, ay + 34)], fill=(255, 255, 255, 255))
+save(img, "reset")
+
+# sound: a speaker with two waves (listen to this one)
+img, d = canvas()
+d.polygon([(50, 104), (88, 104), (132, 62), (132, 194), (88, 152), (50, 152)], fill=(255, 255, 255, 255))
+d.arc((104, 88, 184, 168), start=-55, end=55, fill=(255, 255, 255, 255), width=18)
+d.arc((84, 48, 224, 208), start=-50, end=50, fill=(255, 255, 255, 255), width=18)
+save(img, "sound")
+
+# bubble: a speech bubble (the chat menu)
+img, d = canvas()
+d.rounded_rectangle((46, 56, 210, 168), radius=30, outline=(255, 255, 255, 255), width=20)
+d.polygon([(84, 160), (84, 214), (134, 164)], fill=(255, 255, 255, 255))
+save(img, "bubble")
+
+# people: two heads and shoulders (channels, the social window)
+img, d = canvas()
+d.ellipse((66, 60, 122, 116), fill=(255, 255, 255, 255))
+d.pieslice((40, 126, 148, 234), start=180, end=360, fill=(255, 255, 255, 255))
+d.ellipse((140, 76, 188, 124), fill=(255, 255, 255, 255))
+d.pieslice((120, 136, 212, 228), start=180, end=360, fill=(255, 255, 255, 255))
+save(img, "people")

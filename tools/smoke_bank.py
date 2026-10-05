@@ -353,11 +353,31 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     check(mailed() == [2589], f"the list sends linen; a soulbound stack stays: {mailed()}")
     g.Fire("MAIL_CLOSED")
     # never what a quest needs: RestedXP's guides use it, or our route still needs it - list or not
-    lua.execute("SENT = {} RXP = { questItemList = { [2589] = 123 } }")
+    lua.execute("C_QuestLog = C_QuestLog or {} UnitLevel = UnitLevel or function() return 10 end SENT = {} RXP = { questItemList = { [2589] = 123 } }")
     lua.execute("BAGS[0][2] = nil BAGS[0][1] = 2589")
     g.Fire("MAIL_SHOW")
     YR.MailToAlt(True)
     check(len(g.SENT) == 0, "linen on your list, but a RestedXP guide uses it: stays")
+    # ...unless that quest is behind you: done, or grey for your level and not in your log
+    lua.execute("""
+QDONE, QON, QLEVEL = {}, {}, { [123] = 10 }
+C_QuestLog.IsQuestFlaggedCompleted = function(q) return QDONE[q] or false end
+C_QuestLog.IsOnQuest = function(q) return QON[q] or false end
+C_QuestLog.GetQuestDifficultyLevel = function(q) return QLEVEL[q] or 0 end
+function UnitQuestTrivialLevelRange() return 5 end
+PLAYER_LEVEL = 15
+function UnitLevel() return PLAYER_LEVEL end
+""")
+    check(YR.QuestNeeds(2589) is True, "a level 10 quest at level 15: still green, kept")
+    lua.execute("PLAYER_LEVEL = 16")
+    check(YR.QuestNeeds(2589) is False, "at level 16 it's grey: not kept for it")
+    lua.execute("QON[123] = true")
+    check(YR.QuestNeeds(2589) is True, "grey, but in your log: kept")
+    lua.execute("QON[123] = nil PLAYER_LEVEL = 12 QDONE[123] = true")
+    check(YR.QuestNeeds(2589) is False, "the quest is done: not kept for it")
+    lua.execute("QDONE[123] = nil QLEVEL[123] = nil PLAYER_LEVEL = 60")
+    check(YR.QuestNeeds(2589) is True, "a quest the game has no level for: kept")
+    lua.execute("PLAYER_LEVEL = 15 QLEVEL[123] = 10")
     g.Fire("MAIL_CLOSED")
     lua.execute("RXP = nil")
     real_need = YR.RouteNeed

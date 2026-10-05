@@ -254,6 +254,36 @@ def slim():
     YR.SetRXPSkin("headstart")
     check(raw(g.SLIM, "shown") is False and raw(old, "alpha") == 1 and raw(old, "mouse") is True,
           "another look: Blizzard's bar away, RestedXP's back")
+    # RestedXP's two small windows (Active Items, Active Targets) take the step boxes' look
+    lua.execute("""
+function InCombatLockdown() return false end
+ATLASES["common-insideframe"] = true
+ITEMS, TARGETS = New(), New()
+for _, f in ipairs({ ITEMS, TARGETS }) do
+    local t = New() rawset(t, "text", New()) rawset(f, "title", t)
+    rawset(f, "UpdateVisuals", function(self) rawset(self, "redrawn", (rawget(self, "redrawn") or 0) + 1) end)
+end
+RXP.activeItemFrame = ITEMS
+RXP.targeting = { activeTargetFrame = TARGETS }
+""")
+    YR.RXPSkinForgetArt()
+    YR.SetRXPSkin("blizzard")
+    for name, f in (("Active Items", g.ITEMS), ("Active Targets", g.TARGETS)):
+        panel = raw(f, "headstartPanel")
+        check(panel is not None and raw(panel, "atlas") == "common-insideframe" and raw(panel, "shown") is True
+              and raw(f, "edgeAlpha") == 0 and list(raw(f.title.text, "text").values()) == [1, 0.82, 0],
+              f"Blizzard look, {name}: Blizzard's thin panel in place of its edge, the name in gold")
+    YR.SetRXPSkin("headstart")
+    accent = list(YR.RXPSkinAccent().values())
+    check(raw(raw(g.ITEMS, "headstartPanel"), "shown") is False and raw(g.ITEMS, "edgeAlpha") == 0.16
+          and list(raw(g.TARGETS.title.text, "text").values()) == accent,
+          "Headstart look: a thin quiet line, the name in the accent")
+    lua.execute("ITEMS:SetBackdropBorderColor(1, 1, 1, 1) ITEMS:UpdateVisuals()")
+    check(raw(g.ITEMS, "edgeAlpha") == 0.16, "RestedXP draws the window again: our look goes back on")
+    before = raw(g.ITEMS, "redrawn")
+    YR.SetRXPSkin("off")
+    check(raw(g.ITEMS, "redrawn") > before and raw(raw(g.ITEMS, "headstartPanel"), "shown") is False,
+          "off: ours away, and RestedXP draws its own again")
     return bad
 
 

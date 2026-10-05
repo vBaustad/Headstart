@@ -10,7 +10,7 @@
 --   A slider on the talent window itself (bottom left; the size's bottom right) and the same in the settings.
 --   Blizzard's window loads when first opened (Blizzard_PlayerSpells), so we hook it then. On its
 --   textures only alpha is set; nothing is hidden or re-parented.
---   Account options (YippRouteDB, Headstart, QoL, Talent window): talentFade (0-100, how see-through;
+--   Account options (YippRouteDB, Headstart, QoL, Windows): talentFade (0-100, how see-through;
 --   0 is Blizzard's own), talentFadeSlider (the slider on the window, on unless turned off), talentMove
 --   (drag by the title bar, on unless turned off; where you left it is YippRouteDB.moved.talents),
 --   talentScale (50-150 percent, 100 is Blizzard's own). The size is the talent page's only: the

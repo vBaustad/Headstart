@@ -726,6 +726,29 @@ YR.ToggleWindow(YR, "where")              # Where next? builds and fills from th
 check(YR.WindowTab() == "levelling", "Where next? is on the Levelling tab, and fills without an error")
 YR.ShowSettingsTab(YR, "trainer")
 check(YR.WindowTab() == "qol", "the Trainer page is on the QoL tab")
+# the menu's pages by their names, old ones included (the skins and the talent window had their own)
+for key in ("xpbar", "swing", "skins", "windows", "instances", "main", "rxpskin", "dmgskin", "talentwin"):
+    YR.ShowSettingsTab(YR, key)
+check(True, "Skins, Windows and the pages' old names open")
+found = YR.SettingsSearch("instances an hour")
+check(found is not None and len(found) == 1 and found[1].key == "instances",
+      "the instance tracker's settings are found on the Instances page")
+YR.SettingsGo(found[1])
+check(True, "and going to one opens that page's settings")
+found = YR.SettingsSearch("micro menu")
+check(found is not None and len(found) == 1 and found[1].key == "windows", "the bag bar and micro menu are on Windows")
+YR.SettingsSearch("")
+# a menu with a button on each line (the speaker on the whisper sounds): it acts on that line's value
+# without picking it, and a line can go without one
+heard = lua.eval("""function(YR)
+    local heard, picked = {}, {}
+    local list = { { "off", "None" }, { "a", "Bell" }, { "b", "Horn" } }
+    YR.Style.OpenMenu(CreateFrame("Frame"), list, function(v) picked[#picked + 1] = v end, 200,
+        { icon = "sound", tip = "Listen", shows = function(v) return v ~= "off" end, onClick = function(v) heard[#heard + 1] = v end })
+    return heard, picked
+end""")(YR)
+check(heard is not None, "a menu with a speaker on its lines opens")
+YR.Style.CloseMenu()
 # the bar planner builds with the real Setup and Style, and the first-time window shows its button
 YR.OpenPlanner()
 check(g.HeadstartPlanner is not None and g.HeadstartPlanner.hidden is False, "the bar planner opens")
@@ -1086,6 +1109,14 @@ import smoke_talentfade
 bad += smoke_talentfade.run()
 import smoke_rxpskin
 bad += smoke_rxpskin.run()
+import smoke_dmgskin
+bad += smoke_dmgskin.run()
+import smoke_whisper
+bad += smoke_whisper.run()
+import smoke_swing
+bad += smoke_swing.run()
+import smoke_barhide
+bad += smoke_barhide.run()
 import smoke_skipquests
 bad += smoke_skipquests.run()
 import smoke_wherenext

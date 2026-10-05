@@ -8,7 +8,7 @@
 --   ("Deadmines has been reset.") makes the next entry a new one at once.
 --   The limit: Forever's isn't known, so it's a setting (5 an hour and 30 a day, as on Classic). The
 --   game saying "too many instances" is noted with the count at that moment, so you can see where it is.
---   Account options (YippRouteDB, Settings, QoL, Group): instanceTrack (on unless turned off),
+--   Account options (YippRouteDB, Settings, QoL, Instances): instanceTrack (on unless turned off),
 --   instanceWarn (on unless turned off), instanceAccount (off: each character on its own), instanceHour
 --   (5), instanceDay (30), instanceSame (minutes, 30). The log: YippRouteDB.instanceRuns (every
 --   character's, a week of them), YippRouteDB.instanceLocks.

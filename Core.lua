@@ -37,7 +37,7 @@ function YR.SetQoLOn(on)
     local was = YR.QoLOn()
     YippRouteDB.qolOff = (not on) and true or nil
     if (on and true or false) == was then return end
-    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply" }) do
+    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply", "BarHideApply", "SwingApply" }) do
         if YR[apply] then pcall(YR[apply]) end
     end
     for _, key in ipairs({ "bag", "reagentBag", "talents" }) do
@@ -213,14 +213,18 @@ f:SetScript("OnEvent", function(_, _, name)
     YR.StartMail()
     YR.StartRestock()
     YR.StartReminders()
+    YR.StartWhisper()
     YR.StartSim()
     YR.StartUpgrades()
     YR.StartTrinkets()
     YR.StartInstances()
     YR.StartXPBar()
     YR.StartRXPSkin()
+    YR.StartDamageSkin()
     YR.StartMovers()
     YR.StartTalentFade()
+    YR.StartBarHide()
+    YR.StartSwing()
     YR.StartCraftRemind()
     YR.StartQuickGroup()
     YR:BuildMinimapButton()

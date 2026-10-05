@@ -4,7 +4,7 @@
 -- opens. Hold Shift as it opens to send nothing.
 --
 --   What goes is the bank's rule (Bank.lua, YR.StashReason) with its own settings, plus your list.
---   What never goes: quest items, soulbound items (the game won't), anything the route still needs,
+--   What never goes: quest items, soulbound items (the game won't), anything a quest you'd still do needs (YR.QuestLive),
 --   and what AutoFeed keeps - and nothing at all to yourself, so the same settings work on the alt.
 --
 --   Account options (YippRouteDB, Settings, QoL):
@@ -213,8 +213,8 @@ function YR.MailToAlt(loud)
     if not to then
         local bare = YR.MailRecipientMissingSurname()
         if loud then
-            YR.Print(bare and ("mail needs the full name: %s's surname too. Set it in Headstart, QoL, Bags (Mail to my alt)."):format(bare)
-                or "name the alt to mail in Headstart, QoL, Bags (Mail to my alt): name and surname.")
+            YR.Print(bare and ("mail needs the full name: %s's surname too. Set it in Headstart, QoL, Bank & mail (Mail to my alt)."):format(bare)
+                or "name the alt to mail in Headstart, QoL, Bank & mail (Mail to my alt): name and surname.")
         end
         return
     end
@@ -247,8 +247,8 @@ local function Button()
         GameTooltip:AddLine(m == "all" and "Crafting mats: all of them." or m == "mine"
             and "Crafting mats no profession of yours crafts with." or "Crafting mats: off.", 1, 1, 1, true)
         GameTooltip:AddLine(YR.Option("mailRecipes") and "Recipes you can't learn yet." or "Recipes: off.", 1, 1, 1, true)
-        GameTooltip:AddLine("And your list. Never soulbound or quest items, or anything a quest still needs (the route's or RestedXP's); of the mats, no AutoFeed food."
-            .. " 30 copper a stack in postage. Headstart, QoL, Bags.", 0.6, 0.6, 0.6, true)
+        GameTooltip:AddLine("And your list. Never soulbound or quest items, or anything a quest you'd still do needs (the route's or RestedXP's); of the mats, no AutoFeed food."
+            .. " 30 copper a stack in postage. Headstart, QoL, Bank & mail.", 0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -299,7 +299,7 @@ function YR.StartMail()
                 or msg:lower():find("mail") or msg:lower():find("name"))) then return end
             ClearLetter()
             Finish("the game refused the letter - " .. run.to .. " needs to be the full name (name and surname),"
-                .. " on this realm and faction. Set it in Headstart, QoL, Bags")
+                .. " on this realm and faction. Set it in Headstart, QoL, Bank & mail")
         end
     end)
 end

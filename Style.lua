@@ -308,12 +308,15 @@ function S.Input(parent, opts)
 end
 
 -- A dropdown: shows the current choice; clicking opens a menu. options = { { value, label } } or a
--- function returning them. onPick(value).
+-- function returning them. onPick(value). side (optional) puts a small icon button at the right of
+-- every line that does something with that line's value without picking it or closing the menu (the
+-- speaker that plays a sound): { icon = one of our art names, tip = , onClick = function(value),
+-- shows = function(value) (optional: which lines have it) }.
 local menu, catcher
 local function CloseMenu() if menu then menu:Hide() end if catcher then catcher:Hide() end end
 S.CloseMenu = CloseMenu
 
-function S.OpenMenu(anchor, options, onPick, width)
+function S.OpenMenu(anchor, options, onPick, width, side)
     if not menu then
         catcher = CreateFrame("Button", nil, UIParent)
         catcher:SetAllPoints(UIParent)
@@ -339,6 +342,21 @@ function S.OpenMenu(anchor, options, onPick, width)
                     item.value = o[1]
                     item.label:SetText(o[2])
                     item.label:SetTextColor(unpack(o[3] or S.C.text))
+                    local extra = self.side
+                    local has = extra and (not extra.shows or extra.shows(o[1])) and true or false
+                    item.label:SetPoint("RIGHT", has and -28 or -8, 0)
+                    local button = rawget(item, "side")
+                    if has and not button then
+                        item.side = S.IconButton(item, extra.icon, function() menu.side.onClick(item.value) end, nil, nil, 20)
+                        item.side:SetPoint("RIGHT", -4, 0)
+                        item.side:HookScript("OnEnter", function(b) item.hi:SetColorTexture(unpack(S.C.accentD)) if menu.side.tip then S.Tip(b, menu.side.tip) end end)
+                        item.side:HookScript("OnLeave", function() item.hi:SetColorTexture(1, 1, 1, 0) end)
+                        button = item.side
+                    end
+                    if button then
+                        button:SetShown(has)
+                        if has then S.ArtTexture(button.icon, extra.icon) end
+                    end
                 else
                     item:Hide()
                 end
@@ -347,13 +365,14 @@ function S.OpenMenu(anchor, options, onPick, width)
     end
     local list = type(options) == "function" and options() or options
     local shown = math.min(#list, 14)
-    menu.options, menu.offset, menu.onPick = list, 0, onPick
+    menu.options, menu.offset, menu.onPick, menu.side = list, 0, onPick, side
     for i = #menu.items + 1, shown do
         local item = CreateFrame("Button", nil, menu)
         item:SetHeight(22)
         item:SetPoint("TOPLEFT", 1, -1 - (i - 1) * 22)
         item:SetPoint("RIGHT", -1, 0)
         local hi = S.Fill(item, { 1, 1, 1, 0 })
+        item.hi = hi
         item.label = S.Text(item, 13)
         item.label:SetPoint("LEFT", 10, 0)
         item.label:SetPoint("RIGHT", -8, 0)
@@ -373,7 +392,7 @@ function S.OpenMenu(anchor, options, onPick, width)
     menu:Show()
 end
 
-function S.Dropdown(parent, width, options, onPick)
+function S.Dropdown(parent, width, options, onPick, side)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(width, 24)
     S.Fill(b, S.C.field)
@@ -389,7 +408,7 @@ function S.Dropdown(parent, width, options, onPick)
     b:SetScript("OnEnter", function() border:Color(S.C.lineHi) end)
     b:SetScript("OnLeave", function() border:Color(S.C.line) end)
     b:SetScript("OnClick", function(self)
-        S.OpenMenu(self, options, function(v) onPick(v) end, math.max(width, 160))
+        S.OpenMenu(self, options, function(v) onPick(v) end, math.max(width, 160), side)
     end)
     function b:SetValue(label) self.label:SetText(label or "") end
     return b

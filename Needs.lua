@@ -99,12 +99,14 @@ local function Title(quest)
 end
 
 -- How many of this item the route still needs, and for what ("Stocking Jetsteam"), or nil.
-function YR.RouteNeed(item)
+-- live (optional): function(quest) - only quests it says yes to count (the bank and the mail leave out
+-- quests you've outlevelled, YR.QuestLive).
+function YR.RouteNeed(item, live)
     if not item then return nil end
     if not needs then Build() end
     local count, what = 0, {}
     for _, n in ipairs(needs[item] or {}) do
-        if not Done(n.quest) then
+        if not Done(n.quest) and (not live or live(n.quest)) then
             count = count + n.count
             what[#what + 1] = Title(n.quest)
         end
