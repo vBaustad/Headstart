@@ -1312,10 +1312,10 @@ local function BuildRouteSettings(page)
     local st = function() return YR:SplitsStyle() end
     local function Style(field) return function(v) st()[field] = v YR:ApplySplitsStyle() end end
 
-    Section("Headstart routes", "off by default: Headstart can be just the QoL addon", { icon = 134269 })
-    Row("Headstart routes in RestedXP (all characters on this account)", S.Switch(c, function() return YR.RoutesOn() end,
+    Section("Routes", "off by default: Headstart can be just the QoL addon", { icon = 134269 })
+    Row("Routes in RestedXP (all characters on this account)", S.Switch(c, function() return YR.RoutesOn() end,
         function(on) YR.SetRoutesOn(on) YR:RefreshWindow() end),
-        "On: Headstart's launch routes (and any you imported or edited) are loaded into RestedXP, and what they"
+        "On: your routes (the ones you saved, imported or edited) are loaded into RestedXP, and what they"
         .. " need is kept in your bags and bought for you. Off: none of that, and the options below wait until"
         .. " it's on. One switch for the whole account; takes a /reload (/headstart routes on|off)")
 
@@ -2539,10 +2539,10 @@ local BuildMain = QoLPage("main", function(L, c, Section, Row, Opt)
         end), "Off: every page in this menu is off at once - bars, buttons, reminders, bank and mail help, gear"
             .. " advice, trinkets, the XP bar, the instance tracker, the skins. Your settings are kept and come"
             .. " back as you left them. For the whole account (/headstart qol on|off)")
-        Row("Headstart routes", S.Switch(c, function() return YR.RoutesOn() end, function(on)
+        Row("Routes", S.Switch(c, function() return YR.RoutesOn() end, function(on)
             YR.SetRoutesOn(on)
             YR:RefreshWindow()
-        end), "Off: no Headstart routes in RestedXP, and nothing kept or bought for them. The same switch as on"
+        end), "Off: none of your routes in RestedXP, and nothing kept or bought for them. The same switch as on"
             .. " the Levelling tab (/headstart routes on|off)")
         local with = {}
         for _, pair in ipairs({ { "flightTimer", "the flight timer" }, { "durability", "the durability warning" },

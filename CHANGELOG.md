@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0-beta2
 
 - **Headstart no longer comes with levelling routes.** It is the quality-of-life addon with the levelling tools: your runs recorded, a run saved as your own RestedXP route (This run, Save as route), the route editor, Share to pass routes on or paste one in, Where next?, level splits and death-skip handling. The routes that came with earlier versions are gone from the list after this update; your own saved and imported routes stay. With no route yet, the Levelling tab says how to make one.
 
@@ -24,7 +24,7 @@
 
 - **XP bar** (Headstart, QoL, XP bar): Headstart's own experience bar in place of Blizzard's (which is made invisible and click-through while ours shows). A blue bar with your level, XP and percent on it, and a line under it: time to level, completed quests, XP an hour. After your XP, in orange, the XP of the quests in your log that are done and not handed in yet; after that the rested XP. It starts in the middle of the screen above the action bars; drag it while unlocked. Its width, height, texture, the three colours (the game's colour picker), background, ticks and text size are yours to set, and every change shows on the bar at once. Six texts - three on the bar, three under it - say what you write in them, with {level} {xp} {max} {left} {pct} {rested} {restedpct} {rate} (XP an hour) {ding} (time to ding) {mobs} (kills to ding, from your last kills' XP) {kill} {played} {levelplayed} {session} {quest} {questpct} {quests} filled in; always or only under the mouse. Pointing at it shows all of it at once.
 
-- **Mail and the bank never take anything a quest needs.** Not what our route's steps still need, and not what RestedXP's guides use (its "Item used in guide" tooltip) - also when the item is on your own Always send list, which used to win.
+- **Mail and the bank never take anything a quest needs.** Not what a route's steps still need, and not what RestedXP's guides use (its "Item used in guide" tooltip) - also when the item is on your own Always send list, which used to win.
 
 - **Instance tracker** (Headstart, QoL, Instances; /headstart instances): how many new dungeons and raids you've gone into this hour and today against the limit, and how long until the next slot frees, so you know before the game says "You have entered too many instances recently". Chat says the count as you go in, and the middle of the screen warns one before the limit and at it. On screen while you're in an instance or have gone into one this hour (or always): a small icon with the hour's count on it - green, yellow one before the limit, red at it with the wait for a slot - with today's count and your latest runs on a hover; or a small log; or nothing. Click it for the Instances page, Shift-drag to move it. Every run is logged for a week: where, when, how long, the XP and the money. Going back into the dungeon you just left, with the same group leader and no reset seen, within 30 minutes is the same instance (the game keeps the copy's ID secret on Forever, so this is how Headstart tells); a reset makes the next one new, and a reload inside carries the run on. Forever's limit isn't known: it's a setting (5 an hour and 30 a day to begin with; Headstart, QoL, Group), each character on its own or the account together, and when the game says too many, the page shows the count it was at.
 
