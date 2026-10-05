@@ -87,7 +87,6 @@ local TRACK_Y, THICK, KNOB = -33, 5, 13
 local BLUE, BLUE_DIM = { 0.40, 0.66, 1.00 }, { 0.18, 0.40, 0.80 }
 local TRACK = { 0.17, 0.19, 0.23, 1 }
 local SWEEP = 1.8                     -- seconds for the light to run the bar on a first flight
-local LAND_LABEL = "Land"              -- the button's word
 
 local function Round(x) return floor(x + 0.5) end
 
@@ -124,7 +123,7 @@ end
 
 -- The game's own "request stop": the taxi lands at the next flight point on the way. Where that is
 -- and when isn't known, so the bar counts up from then; a flight cut short is not the route's time,
--- so it is never learned (Land).
+-- so it is never learned (Landed).
 local function StopAtNext()
     if not CanStop() then return end
     TaxiRequestEarlyLanding()
@@ -179,7 +178,7 @@ local function Build()
     local line = S.Border(frame.stop, S.C.line)
     frame.stop.text = S.Text(frame.stop, 11, S.C.sub)
     frame.stop.text:SetPoint("CENTER")
-    frame.stop.text:SetText(LAND_LABEL)
+    frame.stop.text:SetText("Land")
     frame.stop:SetScript("OnClick", StopAtNext)
     frame.stop:SetScript("OnEnter", function(self)
         line:Color(S.C.lineHi)
@@ -300,7 +299,7 @@ end
 -- ---------------------------------------------------------------------------
 local function Learn(f, seconds)
     -- the latest time counts: a new flight path learned can change the way a flight goes. A flight
-    -- that went through a reload is never learned (Land), its start is only known to the second.
+    -- that went through a reload is never learned (Landed), its start is only known to the second.
     if seconds < 5 then return end
     YippRouteDB.flights = YippRouteDB.flights or {}
     local known = YippRouteDB.flights[f.key]
@@ -322,7 +321,7 @@ local function TakeOff()
     if YR.Option("flightTimer") then ShowBar(true) end
 end
 
-local function Land()
+local function Landed()
     -- a flight landed early (the stop button) or carried over a reload is not the route's time
     if flight and not flight.resumed and not flight.cut then Learn(flight, GetTime() - flight.started) end
     flight = nil
@@ -344,7 +343,7 @@ local function WhileFlying(self, elapsed)
         self:SetScript("OnUpdate", nil)
     elseif not UnitOnTaxi("player") then
         self:SetScript("OnUpdate", nil)
-        Land()
+        Landed()
     end
 end
 -- after the click the game takes a moment to put you on the taxi: wait for it (5 seconds at most)
@@ -380,7 +379,7 @@ watcher:RegisterEvent("PLAYER_CONTROL_GAINED")
 watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 watcher:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_CONTROL_GAINED" then
-        if flight and not UnitOnTaxi("player") then Land() end
+        if flight and not UnitOnTaxi("player") then Landed() end
     elseif event == "PLAYER_ENTERING_WORLD" then
         local now = YippRouteDB.flightNow
         if now and UnitOnTaxi("player") and not flight then
