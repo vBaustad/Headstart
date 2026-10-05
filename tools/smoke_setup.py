@@ -766,4 +766,20 @@ function CameraZoomOut(d) CAM = CAM + d end
 function CameraZoomIn(d) CAM = CAM - d end''')
 YS.ApplyCamera(18)
 report(abs(g.CAM - 18) < 0.01, f"camera out to the main's distance: {g.CAM}")
+# Copy on a character still levelling, over a layout planned to 60: what it can't have yet stays saved
+lua.execute('''UnitLevel = function() return 5 end
+YippSetupDB.classes.PALADIN.profile = { from = "Plan", class = "PALADIN", slots = {
+    [20] = { kind = "spell", name = "Hammer of Wrath", level = 44 },
+    [21] = { kind = "spell", name = "Holy Light", level = 1 },
+    [22] = { kind = "spell", name = "Exorcism", level = 20 } } }
+MACROS = { [121] = { "Exorcism", 134400, select(3, YR_SETUP.MacroFor({ kind = "spell", name = "Exorcism", level = 20 })) } }
+BAR = { [1] = { kind = "spell", id = 10329 }, [22] = { kind = "macro", id = 121 } }''')
+YS.Scan(YS)
+saved = g.YippSetupDB.classes.PALADIN.profile.slots
+ok = saved[20] is not None and saved[20].name == "Hammer of Wrath"
+report(ok, "level 5 copies over a 60 plan: Hammer of Wrath (44) keeps its slot")
+report(saved[21] is None, "a spell you could have and took off the bar: gone, as you left it")
+report(saved[22] is not None and saved[22].kind == "spell" and saved[22].name == "Exorcism",
+       "the question-mark macro Headstart made for Exorcism is saved as the spell, not a macro of yours")
+report(saved[1] is not None and saved[1].name == "Holy Light", "what's on the bars now is saved as usual")
 sys.exit(1 if bad else 0)

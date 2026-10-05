@@ -132,6 +132,8 @@ YS.PlayerKey = function() return PlayerKey() end
 --------------------------------------------------------------------------------
 
 -- Macro actions: read the macro through its name, not GetActionInfo's id, which is not always the index.
+local MacroFor       -- below, with Apply: Copy uses it to know the macros Headstart made for a spell
+
 local function ReadMacroSlot(slot, id)
     local mname = GetActionText(slot)
     local idx = (mname and GetMacroIndexByName(mname)) or id
@@ -195,10 +197,31 @@ function YS:Scan()
             end
         end
     end
+    -- Copied on a character still levelling, over a layout saved for more (planned to 60, or copied from
+    -- a main): what this one can't have yet stays as it was saved. A slot that's empty here keeps a class
+    -- spell above this level; a question-mark macro (or a spell macro) Headstart made for a saved spell is
+    -- that spell, not a new macro of yours. Everything else is what's on the bars now.
+    local old = ClassData(class).profile
+    local myLevel = UnitLevel("player") or 1
+    local kept = 0
+    if old and old.slots then
+        for slot = 1, MAX_SLOT do
+            local was, now = old.slots[slot], slots[slot]
+            if was and was.kind == "spell" and not was.prof and not was.general then
+                if not now and (was.level or 1) > myLevel then
+                    slots[slot], kept = was, kept + 1
+                elseif now and now.kind == "macro" and now.body == select(3, MacroFor(was)) then
+                    slots[slot] = was
+                    n.macro, n.spell = n.macro - 1, n.spell + 1
+                end
+            end
+        end
+    end
     ClassData(class).profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots }
     YS:SaveSharedUI()
-    Print(("saved %s: %d spells, %d profession spells, %d macros and %d items. What goes onto a new character is"
-        .. " chosen in Settings, Character setup."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item))
+    Print(("saved %s: %d spells, %d profession spells, %d macros and %d items%s. What goes onto a new character is"
+        .. " chosen in Settings, Character setup."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item,
+        kept > 0 and (", and kept %d spells from the saved layout for levels you haven't reached"):format(kept) or ""))
 end
 
 --------------------------------------------------------------------------------
@@ -240,7 +263,7 @@ local function RankNumber(e)
 end
 YS.RankNumber = RankNumber
 
-local function MacroFor(e)
+function MacroFor(e)
     if e.kind == "spell" then
         local spell = REPLACE[e.name] or e.name
         -- a downranked button casts that rank, as a macro too: "Holy Light(Rank 2)"
@@ -253,6 +276,7 @@ local function MacroFor(e)
     local body = (e.body or ""):gsub("%s*%(Rank %d+%)", "")
     return e.name, e.icon or DYNAMIC_ICON, body
 end
+YS.MacroFor = MacroFor      -- for tests
 
 -- The spell's ID when this character knows it, else nil.
 local function KnownSpellID(name)
