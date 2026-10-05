@@ -1380,6 +1380,19 @@ local function BuildRouteSettings(page)
         "Your play time from level 1 when you reached each level")
     Row("Show the vs best column", S.Switch(c, function() return st().vs end, Style("vs")),
         "Your total against the best run's at each level: ahead (green, -) or behind (red, +)")
+    local COMPARE = { { "any", "Any run" }, { "class", "Same class" }, { "race", "Same class and race" } }
+    local compare
+    compare = S.Dropdown(c, 190, COMPARE, function(v)
+        YippRouteDB.splitsCompare = v ~= "any" and v or nil
+        compare:Refresh()
+        YR:ApplySplitsStyle()
+    end)
+    function compare:Refresh()
+        for _, o in ipairs(COMPARE) do if o[1] == (YippRouteDB.splitsCompare or "any") then self:SetValue(o[2]) end end
+    end
+    Row("Compare with", compare, "Which of your runs \"vs best\" and \"± level\" use: any run, only your class, or"
+        .. " your class and race (Dwarf and Gnome count as one: they share the start). A run from before races were"
+        .. " kept counts under class and race only if the game can still tell its race")
     Row("Show the ± level column", S.Switch(c, function() return st().levelVs end, Style("levelVs")),
         "What each level alone won or lost against the best run's same level: -0:40 is 40 seconds faster")
     Row("Background", S.Slider(c, 0, 100, 5, function() return st().bg end, Style("bg")),

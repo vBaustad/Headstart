@@ -514,6 +514,20 @@ check(fast.levels[10] == 5337 and fast.levels[13] == 9000,
       f"level 10 against Munix's 5337, not the furthest run's 6137; 13 still Radaid's: {fast.levels[10]}, {fast.levels[13]}")
 check(fast.segs[10] == 537 and fast.segs[11] == 863,
       f"± level: the fastest single level 9-10 (537) and 10-11 (Radaid's 863): {fast.segs[10]}, {fast.segs[11]}")
+# Compare with: any run, your class, or your class and race (Dwarf and Gnome as one)
+lua.execute('''YippRouteDB.splits.runs = {
+  pal = { name = "Pal", class = "PALADIN", race = "Dwarf", levels = { [1] = 0, [10] = 6000 } },
+  gnome = { name = "Gnome", class = "PALADIN", race = "Gnome", levels = { [1] = 0, [10] = 5900 } },
+  rogue = { name = "Rogue", class = "ROGUE", race = "NightElf", levels = { [1] = 0, [10] = 4000 } },
+  human = { name = "Human", class = "PALADIN", race = "Human", levels = { [1] = 0, [10] = 5000 } },
+  old = { name = "Old", class = "PALADIN", levels = { [1] = 0, [10] = 3000 } } }
+  UnitRace = function() return "Dwarf", "Dwarf" end''')
+check(YR.SplitsFastest().levels[10] == 3000, "any run: the fastest of all (the default)")
+g.YippRouteDB.splitsCompare = "class"
+check(YR.SplitsFastest().levels[10] == 3000, "same class: the rogue is out, the old paladin run counts")
+g.YippRouteDB.splitsCompare = "race"
+check(YR.SplitsFastest().levels[10] == 5900, "class and race: a Gnome paladin counts for a Dwarf, a Human and an unplaced run don't")
+g.YippRouteDB.splitsCompare = None
 lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 
 # Shipped guides: both handed to RestedXP at login; a guide splits into steps and joins back unchanged;

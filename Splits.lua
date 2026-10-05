@@ -1,5 +1,5 @@
 -- Level splits: this character's playing time from level 1, level by level, against your best run.
---   YippRouteDB.splits.runs[key] = { name, class, elapsed, xp, levels = { [level] = seconds played } }
+--   YippRouteDB.splits.runs[key] = { name, class, race, elapsed, xp, levels = { [level] = seconds played } }
 -- The time is the server's own /played: asked for at login and after every level, counted on locally
 -- in between. So every character is timed, the clock never stops while you are logged in, and a crash
 -- or a disconnect can't lose time. The server also says how long you have been at this level, which
@@ -111,10 +111,39 @@ YR.SplitsBest = Best   -- for the tests
 -- Not one "best run": the run that got furthest isn't the fastest at every level - one that stopped at
 -- 11 can have been six minutes quicker to 10 - and comparing with it showed a lead that wasn't there.
 -- { levels = { [N] = seconds to reach N }, segs = { [N] = seconds from N-1 to N } }, or nil.
+-- Which runs count (YippRouteDB.splitsCompare): "any" (nil, the default), "class" (your class), or
+-- "race" (your class and race; Dwarves and Gnomes count as one, they share the start and the route).
+-- A run from before races were recorded has its race looked up by its GUID when the game still knows
+-- it; one it can't place is left out of "class and race".
+local RACE_GROUP = { Gnome = "Dwarf" }
+local function RaceGroup(race) return race and (RACE_GROUP[race] or race) or nil end
+
+local function RunRace(k, r)
+    if r.race then return r.race end
+    if GetPlayerInfoByGUID and type(k) == "string" and k:find("^Player%-") then
+        local ok, _, _, _, race = pcall(GetPlayerInfoByGUID, k)
+        if ok and race then r.race = race return race end
+    end
+end
+
+local function Counts(k, r)
+    local by = YippRouteDB.splitsCompare
+    if not by or by == "any" then return true end
+    local _, myClass = UnitClass("player")
+    local myRace = rec and rec.race or select(2, UnitRace("player"))
+    if r.class ~= (rec and rec.class or myClass) then return false end
+    if by == "race" then
+        local race = RunRace(k, r)
+        return race ~= nil and RaceGroup(race) == RaceGroup(myRace)
+    end
+    return true
+end
+YR.SplitsCounts = Counts   -- for the tests
+
 local function Fastest()
     local levels, segs, any = {}, {}, false
     for k, r in pairs(DB().runs) do
-        if k ~= key and not r.noBest and type(r.levels) == "table" then
+        if k ~= key and not r.noBest and type(r.levels) == "table" and Counts(k, r) then
             for lvl, t in pairs(r.levels) do
                 if lvl > 1 then
                     any = true
@@ -432,11 +461,13 @@ function YR:StartSplits()
     end
     key = guid
     rec = DB().runs[key]
+    local _, class = UnitClass("player")
+    local _, race = UnitRace("player")
     if not rec then
-        local _, class = UnitClass("player")
-        rec = { name = YR.CharKey(), class = class, elapsed = 0, xp = 0, levels = {} }
+        rec = { name = YR.CharKey(), class = class, race = race, elapsed = 0, xp = 0, levels = {} }
         DB().runs[key] = rec
     end
+    rec.class, rec.race = rec.class or class, rec.race or race      -- runs from before races were kept
     synced = false
     AskPlayed()
     wipe(rate)
