@@ -74,6 +74,7 @@ YR.MailKnownFullName = KnownFullName
 
 --- Keep the full name as typed ("klistre merke" -> "Klistre Merke"; a dash between the two is the same).
 --- Just a first name: the surname filled in when Headstart knows that character of yours.
+local Refresh      -- the mail window's button (below): its label follows the name
 function YR.SetMailRecipient(name)
     YippRouteDB.mailTo = YippRouteDB.mailTo or {}
     name = strtrim(name or ""):gsub("%s+", " ")
@@ -82,6 +83,7 @@ function YR.SetMailRecipient(name)
     local full = table.concat(words, Separator())
     if #words == 1 then full = KnownFullName(words[1]) or full end
     YippRouteDB.mailTo[Key()] = full ~= "" and full or nil
+    if Refresh then Refresh() end
     return YR.MailRecipient()
 end
 
@@ -252,7 +254,7 @@ local function Button()
     return button
 end
 
-local function Refresh()
+function Refresh()
     local b = Button()
     if not b then return end
     local to = YR.MailRecipient()

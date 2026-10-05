@@ -121,9 +121,6 @@ strtrim = function(s) return s end
     # Menethil: never flown, two hops of 0.2 against Thelsamar's one of 0.1: four times the minute,
     # by way of Thandol Span, halfway
     texts, _ = fly(3, 235)
-    marks = [m for m in g.HeadstartFlightFrame.markers.values() if m.at is not None]
-    shown = [m for m in marks if m.dot.IsShown(m.dot)]
-    check([round(m.at, 2) for m in shown] == [0, 1], f"nodes at the start and the end only: {[m.at for m in shown]}")
     check(texts[0] in ("~4:00", "~3:59"), f"a new route is estimated from its length: {texts[0]}")
 
     lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] = nil')

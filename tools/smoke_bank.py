@@ -47,6 +47,8 @@ function Obj.Hide(self) rawset(self, "_shown", false) end
 function Obj.IsShown(self) return rawget(self, "_shown") ~= false end
 function Obj.SetShown(self, on) rawset(self, "_shown", on and true or false) end
 function Obj.SetScript(self, what, fn) rawset(self, "_" .. what, fn) end
+function Obj.SetText(self, t) rawset(self, "_text", t) end
+function Obj.GetText(self) return rawget(self, "_text") end
 function Obj.RegisterEvent(self, e) rawset(self, "_ev", rawget(self, "_ev") or {}) self._ev[e] = true end
 function CreateFrame(_, name, parent) local f = setmetatable({}, Obj) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 UIParent = CreateFrame()
@@ -287,6 +289,11 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     check(YR.MailRecipient() == "Bankalt Smith", f"one of your characters it knows: the surname filled in: {YR.MailRecipient()}")
     YR.SetMailRecipient("bankalt")
     check(YR.MailRecipient() == "Bankalt Smith", "typed as just the name: saved with the surname")
+    YR.SetMailRecipient("bankalt")
+    lua.execute("HeadstartMailButton:SetText('old')")
+    YR.SetMailRecipient("bankalt")
+    lbl = g.HeadstartMailButton.GetText(g.HeadstartMailButton)
+    check(lbl == "Send to Bankalt Smith", f"the button's label follows the name at once: {lbl}")
     # a letter the game refuses with only a message on screen: it stops, and the button works again
     g.HeadstartMailButton._OnClick()
     check(len(g.SENT) == 1, "a letter goes")
