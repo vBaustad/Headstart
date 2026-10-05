@@ -14,6 +14,7 @@ def run():
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
     lua.execute(r'''
 NOW, QID, ROUTES = 0, 0, true
+HeadstartSkipQuests = { [99162] = "Treacherous Cold" }      -- the routes addon's list
 LOG, ABANDONED, PRINTS = {}, {}, {}
 function GetTime() return NOW end
 function GetQuestID() return QID end

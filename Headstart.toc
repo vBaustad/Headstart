@@ -1,12 +1,12 @@
 ## Interface: 16001
 ## Title: Headstart
-## Notes: Launch-day levelling for WoW: Forever: crowd-aware starting-zone routes for RestedXP, a route editor, level splits, quest rewards picked for you, and new characters set up from your main.
+## Notes: Quality of life and levelling tools for WoW: Forever: camps, bags, vendors, an XP bar, your runs recorded and saved as your own RestedXP routes, a route editor, level splits, and new characters set up from your main.
 ## Author: vBaustad
 ## Version: 0.10.0-beta1
 ## X-License: CC BY-NC-SA 4.0
 ## X-Website: https://github.com/vBaustad/Headstart
 ## X-Curse-Project-ID: 1719292
-## OptionalDeps: RXPGuides, AutoFeed
+## OptionalDeps: RXPGuides, AutoFeed, Headstart_Routes
 ## IconTexture: Interface\Icons\INV_Misc_Map_01
 ## SavedVariables: YippRouteDB, YippSetupDB
 ## SavedVariablesPerCharacter: YippSetupCharDB
@@ -60,26 +60,3 @@ Data\PlannerSpells.lua
 Planner.lua
 WhereNext.lua
 Editor.lua
-Guides\Coldridge.lua
-Guides\DunMorogh.lua
-Guides\DunMoroghElwynn.lua
-Guides\Northshire.lua
-Guides\Shadowglen.lua
-Guides\Levelling\6_11_elwynn_forest.lua
-Guides\Levelling\6_11_elwynn_dwarf_gnome.lua
-Guides\Levelling\11_13_loch_modan.lua
-Guides\Levelling\11_12_elwynn_dwarf_gnome.lua
-Guides\Levelling\12_14_loch_modan_dwarf_gnome.lua
-Guides\Levelling\11_13_loch_modan_hunter.lua
-Guides\Levelling\6_11_teldrassil.lua
-Guides\Levelling\13_15_westfall.lua
-Guides\Levelling\14_16_darkshore.lua
-Guides\Levelling\16_19_darkshore.lua
-Guides\Levelling\19_20_redridge.lua
-Guides\Levelling\19_21_darkshore_ashenvale.lua
-Guides\Levelling\20_21_darkshore_ashenvale.lua
-Guides\Levelling\21_23_ashenvale.lua
-Guides\Levelling\23_24_wetlands.lua
-Guides\Levelling\24_27_redridge_duskwood.lua
-Guides\Levelling\27_30_wetlands_hillsbrad.lua
-Guides\Levelling\28_30_duskwood.lua

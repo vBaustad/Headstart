@@ -12,4 +12,3 @@ ignore:
   - "CHANGELOG.md"
   - "tools"
   - "dist"
-  - "Guides/Levelling/files.txt"

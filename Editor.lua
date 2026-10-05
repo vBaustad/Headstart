@@ -3238,8 +3238,19 @@ local function Build()
     function ui.LayoutRoutes()
         local mine = YR.MyRoutes()
         local all = YippRouteDB.allRoutes or not next(mine)
-        label:SetText(all and "ALL ROUTES" or "YOUR ROUTES")
+        -- Headstart comes without routes: until you save a run as one or import one, say how
+        local none = #ui.routeTabs == 0
+        label:SetText(none and "NO ROUTES YET" or all and "ALL ROUTES" or "YOUR ROUTES")
         toggle.text:SetText(all and "Mine" or "Show all")
+        toggle:SetShown(not none)
+        if none and not ui.noRoutes then
+            ui.noRoutes = S.Text(side, 12, S.C.muted)
+            ui.noRoutes:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -10)
+            ui.noRoutes:SetWidth(SIDE - 36)
+            ui.noRoutes:SetJustifyH("LEFT")
+            ui.noRoutes:SetText("Play with Record runs on, then Save as route under This run. Or paste a route in under Share.")
+        end
+        if ui.noRoutes then ui.noRoutes:SetShown(none) end
         local chosen = YippRouteDB.routeBrackets or {}
         local current
         for _, b in ipairs(ui.routeTabs) do

@@ -8,7 +8,8 @@
 --   * where to start in it: the first step with a quest you haven't done, and the steps without a
 --     quest right before it (the way there).
 -- The Levelling tab's "Where next?" page (Editor.lua) shows it, with a button that loads the route in
--- RestedXP at that step.
+-- RestedXP at that step. The routes are whatever this install has: a routes addon's, your saved runs,
+-- imported ones; with none, the page says how to get one.
 local _, YR = ...
 local S = YR.Style
 
@@ -226,6 +227,9 @@ function YR.RefreshWherePage()
     elseif not YR.RoutesOn() then
         ui.name:SetText("Headstart's routes are off")
         ui.detail:SetText("Switch them on under Route settings, then /reload.")
+    elseif #list == 0 then
+        ui.name:SetText("No routes yet")
+        ui.detail:SetText("Save a run as a route under This run, or paste one in under Share: then this page says where to pick it up.")
     else
         ui.name:SetText("Nothing left")
         ui.detail:SetText("Every quest in this character's routes is handed in.")

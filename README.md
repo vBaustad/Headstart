@@ -1,18 +1,11 @@
 # Headstart
 
-A launch-day levelling kit for **WoW: Forever**: crowd-aware starting-zone routes for RestedXP, an in-game route editor, level splits, a quest reward picker, a run log, and one-click setup of a new character from your main. It is also the YippYapp quality-of-life addon: the QoL features below work on any character, with the routes switched off too.
-
-Built for the first hours of a fresh realm, when every starting zone has hundreds of players in it: the routes go to the edges of the zone first, skip the camped opening quests, and group up at the single-spawn kills.
+Quality of life and levelling tools for **WoW: Forever**: camps, bags, vendors, an XP bar, gear and reward help, one-click setup of a new character from your main, and for levelling a run log, your runs saved as your own RestedXP routes, an in-game route editor and level splits. Headstart does not come with levelling routes: you make your own from your runs, or paste in one someone shared.
 
 ## Features
 
-- **Launch routes for RestedXP, to level 30.** Alliance starting zones for every class:
-  - Dwarf and Gnome: Coldridge Valley 1-5, then Dun Morogh 5-11 (Mining and Blacksmithing picked up on the way); or, as an option, Elwynn from 6
-  - Human: Northshire 1-6
-  - Night Elf: Shadowglen 1-6
-
-  Then on to 30 through Elwynn or Teldrassil, Loch Modan, Westfall, Darkshore, Redridge, Ashenvale, the Wetlands, Duskwood and Hillsbrad: RestedXP's routes made fit for Forever, with Forever's new quests, no grey quest handed in, training and death skips where they pay, and Duo/Trio versions that run the dungeons. They show up in RestedXP under **Headstart Launch (A)** and hand over to RestedXP's own guides at 30. On a new install they are off: switch them on once (the Levelling tab, Route settings, or `/headstart routes on`) for every character of the account.
-- **Your own routes.** Save a run as a route (This run, Save as route): our steps as you played them, or made from your run log, one part per zone, one set per race. Edit it like ours, play it in RestedXP under My routes.
+- **Your own routes.** Play with Record runs on, then save the run as a route (This run, Save as route): made from your run log, one part per zone, one set per race, played in RestedXP under My routes. Share passes a route on as text, or takes one someone gave you. Switch routes on once (the Levelling tab, Route settings, or `/headstart routes on`) for every character of the account.
+- **Where next?** For a character that levelled by hand: which of its routes to pick up now and at which step, from its level and the quests it has handed in.
 - **Route editor.** Every step can be changed in game: drag steps around, add, merge, duplicate or delete them, edit each action with pickers for your position and target, or edit the raw text. Your changes are saved for you and can be exported and shared; "back to the shipped route" undoes them.
 - **Level splits.** Time per level and in total from the server's /played, against your best run, in green or red. XP per hour and time to ding. Movable, sizeable, lockable.
 - **Quest rewards picked for you** up to a level you choose, from a priority list per class. It remembers what you picked by hand last time. Hold Shift to choose yourself. A choice that isn't gear (a profession to learn) is always yours. Each class has its own settings.
@@ -39,12 +32,11 @@ Built for the first hours of a fresh realm, when every starting zone has hundred
 
 ## Credits and licence
 
-The Dun Morogh, Northshire and Shadowglen routes are adapted from [RestedXP](https://github.com/RestedXP/RXPGuides)'s Forever guides, and Coldridge takes its coordinates and wording from them, under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) licence. Thank you, RestedXP.
+Headstart's route tools work on [RestedXP](https://github.com/RestedXP/RXPGuides) guide text, and RestedXP Guides plays the routes. Thank you, RestedXP. Routes built on RestedXP's guides are under their [Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) licence; Headstart ships none.
 
 Headstart as a whole is shared under the same licence: see [LICENSE](LICENSE).
 
 ## Development
 
-- `python tools/smoke.py` and `python tools/smoke_setup.py` run the tests (they need `lupa`).
-- `python tools/fork_zones.py` and `python tools/fork_dunmorogh.py` rebuild the forked routes from a RestedXP checkout; `tools/clean_guide.py` strips what never shows on Forever (Season of Discovery, hardcore and self-found steps).
+- `python tools/smoke.py` and `python tools/smoke_setup.py` run the tests (they need `lupa`). smoke.py's route tests need a routes addon in `../Headstart_Routes` and skip without it; `python tools/smoke_noroutes.py` tests Headstart as published, with none.
 - `python tools/package.py` builds `dist/Headstart-<version>.zip`.

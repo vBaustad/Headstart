@@ -1,6 +1,8 @@
--- The routes Headstart ships, and each player's own edits of them.
+-- The routes Headstart knows, and each player's own edits of them.
 --
--- A guide file doesn't register itself with RestedXP any more; it hands its text to YR:ShipGuide.
+-- Headstart itself comes without routes. They come from a routes addon beside it (it queues its guides
+-- in the global HeadstartRoutes before Headstart loads; taken in below), from a run saved as a route
+-- (MyRoutes.lua) and from Share's import. Each is handed to YR:ShipGuide as text.
 -- At login, RegisterGuides gives RestedXP either the player's edited version (saved by the route
 -- editor in YippRouteDB.custom) or, if they never edited it, the shipped one. RestedXP reads guides
 -- added after it has loaded straight away (RXPGuides.RegisterGuide), so nothing is written to disk:
@@ -17,6 +19,13 @@ function YR:ShipGuide(key, text)
     local g = { key = key, text = text }
     YR.shipped[#YR.shipped + 1] = g
     byKey[key] = g
+end
+
+-- A routes addon's guides: { { key = , text = } }, queued before this file ran (it loads first).
+if type(HeadstartRoutes) == "table" then
+    for _, g in ipairs(HeadstartRoutes) do
+        if type(g) == "table" and type(g.key) == "string" and type(g.text) == "string" then YR:ShipGuide(g.key, g.text) end
+    end
 end
 
 local function Custom()

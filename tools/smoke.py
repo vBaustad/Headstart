@@ -165,6 +165,18 @@ function GetQuestLogRewardMoney(id) return KNOWN[id] and KNOWN[id][4] or 0 end
 function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESULT", id, KNOWN[id] ~= nil) end ASKED = {} end
 ''')
 YR = lua.table()
+# The routes are not part of Headstart: they are the routes addon beside it (Headstart_Routes, private),
+# which loads first and queues its guides for Guides.lua. The route tests below need it.
+ROUTES = os.path.join(os.path.dirname(ROOT), "Headstart_Routes")
+if not os.path.isdir(ROUTES):
+    print("SKIPPED: these tests need the routes addon in " + ROUTES)
+    sys.exit(0)
+sys.path.insert(0, os.path.join(ROUTES, "tools"))      # check_deathskips, check_levels
+RNS = lua.table()
+for l in open(os.path.join(ROUTES, "Headstart_Routes.toc"), encoding="utf-8"):
+    f = l.strip().replace(chr(92), "/")
+    if f.endswith(".lua") and not f.startswith("#"):
+        lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROUTES, f), encoding="utf-8").read(), f)("Headstart_Routes", RNS)
 # every file the .toc loads, in its order
 TOC = [l.strip().replace(chr(92), "/") for l in open(os.path.join(ROOT, "Headstart.toc"), encoding="utf-8")
        if l.strip().endswith(".lua") and not l.startswith("#")]
@@ -1078,4 +1090,6 @@ import smoke_skipquests
 bad += smoke_skipquests.run()
 import smoke_wherenext
 bad += smoke_wherenext.run()
+import smoke_noroutes
+bad += smoke_noroutes.run()
 sys.exit(1 if bad else 0)

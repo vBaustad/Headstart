@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Headstart no longer comes with levelling routes.** It is the quality-of-life addon with the levelling tools: your runs recorded, a run saved as your own RestedXP route (This run, Save as route), the route editor, Share to pass routes on or paste one in, Where next?, level splits and death-skip handling. The routes that came with earlier versions are gone from the list after this update; your own saved and imported routes stay. With no route yet, the Levelling tab says how to make one.
+
 - **Lighter and safer.** A pass over all of quality of life for work done too often and for anything that could trip the game's protection. The XP bar no longer redraws itself every second (its look is set when a setting changes, the bar when your XP or quest log does, and each text only when it's a different one); the instance count is kept instead of walked from a week's log every second; trinket auto-swap walks your bags once a pass, not several times per trinket; the camp icon no longer redraws through a fight; your role for gear advice is kept between loots; the flight bar stops re-measuring names that don't change. Dragging on a trinket button in a fight no longer gives "Interface action failed because of an AddOn", and the trinket bar is built after a fight if you logged in during one. Windows opened in a fight get your place and size when it ends.
 
 - Buy later, the Camping 101 reminder and death skips no longer touch Blizzard's popups from addon code (which could make a later Delete-item confirm fail with "Interface action failed because of an AddOn"). Buy later looks once after a round of selling, not once per item sold; the Camping 101 reminder listens to your bags and quest log only while you're on one of its two quests.
@@ -45,12 +47,6 @@
 - **The new character window closes once you click Apply to this character** (it stays, and says why, if you're in a fight).
 
 - **Settings, redesigned.** Each page opens with its icon, what it's for, and who the settings on it are for ("Every character on this account", "Every Paladin"), saved as you change them. The menu has an icon per page and a dot that is green while something on that page is on. Settings come in cards with an icon; a feature with one switch has it in the card's header, and the rows under it dim while it's off. Under every setting is the first line of what it does, so you can read the page without pointing at anything (the (i) still has the whole text). "Find a setting" at the top of the menu searches every page by name and description, and picking a result opens its page with the setting lit up.
-
-- Dun Morogh: the bears for **Thick Bear Fur** (Stocking Jetsteam) are now east of Kharanos, on the way to Steelgrill's Depot, where all ten furs in five logged runs dropped. RestedXP's loop south of Kharanos never gave one, and a run lost about 10 minutes looking.
-
-- **Treacherous Cold is dropped when another addon accepts it.** The route skips it, but Leatrix Plus's quest automation (and the like) takes every quest Father Gavin offers. Headstart drops it once, and says so; take it again and it stays. A quest you read and accept by hand is left alone.
-
-- Thelsamar crafting stop: says the Camping 101: Blacksmithing hand-in in Kharanos isn't worth a trip back. A run that hearthed back for both Camping 101 hand-ins spent about 10 minutes on 540 XP.
 
 - **Buy later and vendor restock no longer error at a vendor.** Both asked the game for an item's price in a way only the old Vanilla interface has, which Forever doesn't load ("Shopping.lua:116: attempt to call a nil value" at a vendor selling a weapon you were saving for).
 

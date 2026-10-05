@@ -4,9 +4,9 @@
 -- session: take it again and it stays, whatever accepted it. Only with routes on.
 local _, YR = ...
 
-YR.SKIP_QUESTS = {
-    [99162] = "Treacherous Cold",   -- three rifles for 700 XP, one by Kharanos and two out of the way
-}
+-- Which quests: the routes addon's list (the global HeadstartSkipQuests, { [questID] = name }, set
+-- before Headstart loads). Headstart itself has none.
+YR.SKIP_QUESTS = type(HeadstartSkipQuests) == "table" and HeadstartSkipQuests or {}
 
 local AUTO = 1          -- seconds from the quest window opening to accepted: faster is an addon
 
