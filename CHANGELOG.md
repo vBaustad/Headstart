@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0-beta3
 
 - **Swing timer** (Headstart, QoL, Swing timer; off until you turn it on): your auto-attack bars made to be seen, two ways. *Blizzard's bars, dressed* (to begin with): the game's own swing bars with our texture, your colours for main hand, off hand, ranged and out of reach, the frame round each bar off, text at your size, the weapon's icon beside the bar and the swing's whole length after its name; Blizzard still runs them, and their place and size stay in Edit Mode. *Headstart's own bars*: bars of ours in their place, with the time left and the swing's length ("0.8 / 2.6"), their own width, height and place, shown always, in combat, or only while a swing runs. Everything is put back when it's off.
 
