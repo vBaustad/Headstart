@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0-beta4
 
 - **Set up layout no longer drops the spells you know.** "Class spells up to level" (10 to begin with) left every spell learned after that level off the bars, also on a character well past it: with the bars cleared first, a level 30 was left with a handful of buttons. The limit now only decides how far ahead buttons are made on a new character - a spell at or under your own level is always placed, and a spell above the limit goes into its slot when you learn it. `/ysetup debug` says what a layout would do on this character.
 

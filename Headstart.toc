@@ -2,7 +2,7 @@
 ## Title: Headstart
 ## Notes: Quality of life and levelling tools for WoW: Forever: camps, bags, vendors, an XP bar, your runs recorded and saved as your own RestedXP routes, a route editor, level splits, and new characters set up from your main.
 ## Author: vBaustad
-## Version: 0.10.0-beta3
+## Version: 0.10.0-beta4
 ## X-License: CC BY-NC-SA 4.0
 ## X-Website: https://github.com/vBaustad/Headstart
 ## X-Curse-Project-ID: 1719292
