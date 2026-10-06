@@ -43,7 +43,9 @@ end
     YR = lua.table()
     YR.RoutesOn = lua.eval("function() return ROUTES end")
     YR.Print = lua.eval("function(msg) table.insert(PRINTS, msg) end")
-    chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
+    lua.execute("OPTION = true")
+    YR.Option = lua.eval("function(key) return key == 'skipQuests' and OPTION end")
+    chunk =lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
         open(os.path.join(ROOT, "SkipQuests.lua"), encoding="utf-8").read(), "SkipQuests.lua")
     chunk("Headstart", YR)
     g = lua.globals()
@@ -72,6 +74,13 @@ end
     chunk("Headstart", YR)
     g.OFFER(99162, 0)
     check(len(g.ABANDONED) == 0, "routes off: left alone")
+    lua.execute("ROUTES = true; OPTION = false")
+    chunk("Headstart", YR)
+    g.OFFER(99162, 0)
+    check(len(g.ABANDONED) == 0, "the option off: left alone")
+    lua.execute("HeadstartSkipQuests = nil; FRAMES_MADE = 0; local make = CreateFrame; CreateFrame = function(...) FRAMES_MADE = FRAMES_MADE + 1 return make(...) end")
+    chunk("Headstart", YR)
+    check(g.FRAMES_MADE == 0, "no routes addon, no list: it listens to nothing")
     return bad
 
 

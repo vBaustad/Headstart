@@ -1,12 +1,14 @@
 -- Quests the route leaves out on purpose, dropped again when another addon (Leatrix Plus's quest
 -- automation, say) takes one by itself. Taken that way, it's accepted the moment its window opens;
 -- taken by hand, you've read it first, so a quest you accept yourself is kept. Dropped once a
--- session: take it again and it stays, whatever accepted it. Only with routes on.
+-- session: take it again and it stays, whatever accepted it. Only with routes on, with a routes addon
+-- that names such quests, and with the account option skipQuests (on unless turned off).
 local _, YR = ...
 
 -- Which quests: the routes addon's list (the global HeadstartSkipQuests, { [questID] = name }, set
--- before Headstart loads). Headstart itself has none.
+-- before Headstart loads). Headstart itself has none, and then listens to nothing.
 YR.SKIP_QUESTS = type(HeadstartSkipQuests) == "table" and HeadstartSkipQuests or {}
+if not next(YR.SKIP_QUESTS) then return end
 
 local AUTO = 1          -- seconds from the quest window opening to accepted: faster is an addon
 
@@ -16,7 +18,7 @@ local frame = CreateFrame("Frame")
 frame:RegisterEvent("QUEST_DETAIL")
 frame:RegisterEvent("QUEST_ACCEPTED")
 frame:SetScript("OnEvent", function(_, event, arg1, arg2)
-    if not YR.RoutesOn() then return end
+    if not YR.RoutesOn() or not YR.Option("skipQuests") then return end
     if event == "QUEST_DETAIL" then
         local id = GetQuestID()
         if id and YR.SKIP_QUESTS[id] then shown[id] = GetTime() end

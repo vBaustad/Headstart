@@ -196,8 +196,12 @@ end
 function YR.RoleVersions(text, only)
     text = text or ""
     local out = {}
-    if only == nil or only == "solo" then out[1] = Variant(text, "solo") end
-    for _, size in ipairs(Sizes("\n" .. text)) do
+    local sizes = Sizes("\n" .. text)
+    -- no group marks at all (most routes): the solo route is the text as it is, without taking every
+    -- step apart and putting it together again at login
+    local plain = #sizes == 0 and not text:find("#role", 1, true) and not text:find("#share", 1, true)
+    if only == nil or only == "solo" then out[1] = plain and text or Variant(text, "solo") end
+    for _, size in ipairs(sizes) do
         local label = size == 2 and "Duo" or "Trio"
         for i = 1, size do
             local role = label .. " " .. LETTERS[i]
