@@ -77,7 +77,10 @@ local function Sample()
         ScanCompletions()
     end
     if run.stopped then return end
-    local map, x, y = YR.Position()
+    -- The position track is for working on routes (where the time went between events). With routes off
+    -- nothing reads it, and it is nine tenths of the log: not written then. Events keep their own position.
+    local map, x, y
+    if YR.RoutesOn() then map, x, y = YR.Position() end
     if map then
         local now, level, xp, flags = time(), UnitLevel("player"), UnitXP("player"), Flags()
         -- standing still: the one held-back row is moved on in time, not made anew every two seconds
@@ -351,6 +354,26 @@ function YR.PruneLogs(days)
     return n
 end
 
+--- Keeping the log from growing without end, for an account that doesn't use routes: the position
+--- samples (the track) of every character but this one are dropped; their events stay, and so does all
+--- of this character's log. Never on an account that has had routes on (YippRouteDB.routesEver): its
+--- tracks are what the route work is done from. Returns how many samples went.
+function YR.DropIdleTracks()
+    if YR.RoutesOn() then
+        YippRouteDB.routesEver = true
+        return 0
+    end
+    if YippRouteDB.routesEver then return 0 end
+    local me, n = YR.CharKey(), 0
+    for key, r in pairs(YippRouteDB.runs or {}) do
+        if key ~= me and type(r) == "table" and type(r.track) == "table" and #r.track > 0 then
+            n = n + #r.track
+            r.track = {}
+        end
+    end
+    return n
+end
+
 function YR:StartLog()
     -- a brand-new character is "Unknown" for its first moments: wait for the real name, or every new
     -- character's run lands under the same key (and the clean-up below can't tell which log is yours)
@@ -368,6 +391,10 @@ function YR:StartLog()
     if not YippRouteDB.trackSlimmed then
         for _, r in pairs(YippRouteDB.runs) do if type(r.track) == "table" then YR.SlimTrack(r.track) end end
         YippRouteDB.trackSlimmed = 1
+    end
+    local dropped = YR.DropIdleTracks()
+    if dropped > 0 then
+        YR.Print(("routes are off: dropped %d old position samples of your other characters' run logs (their events stay; nothing of this character's)."):format(dropped))
     end
     if not YR.Option("logging") then return end
     local key = YR.CharKey()

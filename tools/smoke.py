@@ -1101,6 +1101,21 @@ import smoke_trainer
 bad += smoke_trainer.run()
 import smoke_mailstep
 bad += smoke_mailstep.run()
+# the log's position track on an account that doesn't use routes: other characters' samples go once
+# (events stay, this character's log stays whole); never on an account that has had routes on
+lua.execute("""
+KEEP_ROUTES, KEEP_EVER = YippRouteDB.routes, YippRouteDB.routesEver
+YippRouteDB.routes, YippRouteDB.routesEver = false, nil
+YippRouteDB.runs["Other-Realm"] = { ev = { { 1, "accept" } }, track = { { 1 }, { 2 }, { 3 } } }
+ME_TRACK = #YippRouteDB.runs[YR_KEY].track
+""".replace("YR_KEY", '"' + YR.CharKey() + '"'))
+check(YR.DropIdleTracks() >= 3 and len(g.YippRouteDB.runs["Other-Realm"].track) == 0 and len(g.YippRouteDB.runs["Other-Realm"].ev) == 1
+      and len(g.YippRouteDB.runs[YR.CharKey()].track) == g.ME_TRACK, "routes never on: another character's position samples go, its events and this character's log stay")
+lua.execute('YippRouteDB.runs["Other-Realm"].track = { { 1 } }; YippRouteDB.routesEver = true')
+check(YR.DropIdleTracks() == 0 and len(g.YippRouteDB.runs["Other-Realm"].track) == 1, "an account that has had routes on: nothing is dropped, routes off or not")
+lua.execute('YippRouteDB.routes = true; YippRouteDB.routesEver = nil')
+check(YR.DropIdleTracks() == 0 and g.YippRouteDB.routesEver is True, "routes on: nothing dropped, and remembered")
+lua.execute('YippRouteDB.runs["Other-Realm"] = nil; YippRouteDB.routes, YippRouteDB.routesEver = KEEP_ROUTES, KEEP_EVER')
 import smoke_stepkeeper
 bad += smoke_stepkeeper.run()
 import smoke_myroutes

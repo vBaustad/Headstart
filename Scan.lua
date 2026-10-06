@@ -75,6 +75,11 @@ end)
 
 function YR:StartScan()
     if ticker then YR.Print("already scanning.") return end
+    -- the list of quest IDs to ask about (Data/QuestIDs.lua) is a developer's file, left out of the release
+    if type(YR.QUEST_IDS) ~= "table" then
+        YR.Print("the quest list for scanning isn't in this build of Headstart (Data/QuestIDs.lua, from the repository).")
+        return
+    end
     queue = {}
     for _, part in ipairs({ "route", "new", "rest" }) do
         for _, id in ipairs(YR.QUEST_IDS[part]) do queue[#queue + 1] = id end
