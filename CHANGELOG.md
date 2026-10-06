@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0-beta5
 
 - **Auto-train is off until you turn it on** (Headstart, QoL, Trainer). It spends your gold at the trainer, and nobody should find that out by installing Headstart. If you never touched the switch it is off now: turn it on there to have your spells learned for you again.
 
