@@ -12,12 +12,19 @@ if type(RXP) ~= "table" or type(RXP.SetStep) ~= "function" or type(RXP.LoadGuide
 -- RestedXP pads the level range ("05-11 Dun Morogh") and adds " (Duo B)" and the like to role versions
 local function Plain(s) return (s:gsub("%f[%d]0+(%d)", "%1")) end
 
+-- Asked at every step change: the answer for a guide's name is kept (false: not one of ours) until
+-- the routes are read again (cache, below, is emptied then too).
+local keyOf = {}
 local function OurKey(guide)
-    local name = type(guide) == "table" and type(guide.name) == "string" and Plain(guide.name)
-    if not name then return nil end
+    local raw = type(guide) == "table" and type(guide.name) == "string" and guide.name
+    if not raw then return nil end
+    if keyOf[raw] ~= nil then return keyOf[raw] or nil end
+    local name = Plain(raw)
+    keyOf[raw] = false
     for _, g in ipairs(YR.shipped or {}) do
-        if YR.GuideName(g.key) == name then return g.key end
+        if YR.GuideName(g.key) == name then keyOf[raw] = g.key break end
     end
+    return keyOf[raw] or nil
 end
 
 -- The steps RestedXP has for this character, in its order: the route's steps whose "step << ..." filter
@@ -91,7 +98,7 @@ end
 -- RestedXP sets steps while it loads a route (the saved number first): nothing is remembered until it
 -- is done and the place checked, or the old number would overwrite the step we're looking for.
 local loading = false
-hooksecurefunc(RXP, "SetStep", function() if not loading then Remember() end end)
+hooksecurefunc(RXP, "SetStep", function() if not loading and YR.RoutesOn and YR.RoutesOn() then Remember() end end)
 local load = RXP.LoadGuide
 RXP.LoadGuide = function(...)
     loading = true
@@ -99,7 +106,7 @@ RXP.LoadGuide = function(...)
     loading = false
     if not results[1] then error(results[2], 0) end
     if YR.RoutesOn and YR.RoutesOn() then
-        cache = {}                        -- the route may have been edited or updated since
+        cache, keyOf = {}, {}             -- the route may have been edited or updated since
         loading = true
         local ok, err = pcall(Restore)
         loading = false

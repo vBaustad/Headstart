@@ -36,7 +36,7 @@ RXP.guides.other = { name = "19-21 Darkshore", group = "RestedXP Forever Guide (
 RXP.guides.pad = { name = "05-11 Dun Morogh", group = "Headstart Launch (A)" }
 ROUTE.pad = { name = "5-11 Dun Morogh", steps = { "step\n    .turnin 60 >> M" } }
 function UnitLevel() return 20 end
-function CreateFrame() return {} end
+function CreateFrame() return { RegisterEvent = function() end, SetScript = function() end } end
 ''')
     YR = lua.table()
     YR.Style = lua.table()

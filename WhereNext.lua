@@ -211,11 +211,20 @@ function YR.BuildWherePage(page)
     ui.more:SetPoint("BOTTOMLEFT", 20, 16)
 end
 
+-- The page is refreshed whenever the window is; walking every route each time is the costly part, so
+-- the answer is kept until something it rests on changes: your level, the routes, a quest handed in.
+local kept, keptFor
+local watch = CreateFrame("Frame")
+watch:RegisterEvent("QUEST_TURNED_IN")
+watch:SetScript("OnEvent", function() kept = nil end)
+
 function YR.RefreshWherePage()
     if not ui.who then return end
     local level = UnitLevel("player")
     local race, class = UnitRace("player"), UnitClass("player")
-    local list = YR.WhereNext(level)
+    local stamp = level .. ":" .. #(YR.shipped or {}) .. ":" .. tostring(YR.RoutesOn()) .. ":" .. tostring(race) .. tostring(class)
+    if not kept or keptFor ~= stamp then kept, keptFor = YR.WhereNext(level), stamp end
+    local list = kept
     ui.who:SetText(("Level %d %s %s. From the quests the game says this character has handed in, whether or not it followed a route."):format(
         level, race or "", class or ""))
     local best = list[1]

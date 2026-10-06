@@ -28,8 +28,11 @@ local function Read(id)
     return r
 end
 
+local events = CreateFrame("Frame")          -- listens for the answers only while a scan runs
+
 local function Finish()
     if ticker then ticker:Cancel() ticker = nil end
+    events:UnregisterEvent("QUEST_DATA_LOAD_RESULT")
     local s = YippRouteDB.scan
     s.finished = time()
     local n, named = 0, 0
@@ -63,7 +66,6 @@ local function Tick()
     if pos > #queue and inFlight == 0 then Finish() end
 end
 
-local events = CreateFrame("Frame")
 events:SetScript("OnEvent", function(_, _, id, success)
     if not (pending and pending[id]) then return end
     pending[id] = nil
@@ -101,6 +103,7 @@ function YR:StopScan()
     if not ticker then return end
     ticker:Cancel()
     ticker = nil
+    events:UnregisterEvent("QUEST_DATA_LOAD_RESULT")
     YippRouteDB.scan.stopped = time()
     YR.Print(("scan stopped at %d of %d. /reload to write what we have."):format(pos - 1, #queue))
 end

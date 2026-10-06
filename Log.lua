@@ -246,7 +246,8 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
         -- only what a trainer taught: a level-up also "learns" passives nobody walks anywhere for
         if trainerOpen then Add("learn", nil, { spell = a, name = C_Spell.GetSpellName(a) }) end
     elseif event == "CHAT_MSG_LOOT" then
-        if type(a) == "string" then Looted(a) end
+        -- like the skill text below: if it's secret in dungeons and raids, no loot is logged there
+        if type(a) == "string" and not (issecretvalue and issecretvalue(a)) then Looted(a) end
     elseif event == "CHAT_MSG_SKILL" then
         -- the text is secret in dungeons and raids: no skill-ups logged there
         if SKILL_UP and type(a) == "string" and not (issecretvalue and issecretvalue(a)) then SkillUp(a) end

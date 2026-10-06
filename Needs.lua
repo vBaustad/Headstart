@@ -13,15 +13,24 @@ local titles           -- questID -> title, from the routes' accept and turn-in 
 -- Whether a step's "<< ..." filter lets this character see it: alternatives split by "/", each a
 -- list of words that must all hold (Class, Race, Faction, or "!" before one for "not"). Words it
 -- doesn't know (RestedXP's own, like "sod") count as true: better to keep an item than lose it.
+-- Asked for every filtered step of every route (hundreds at a time): the words are one table, who you
+-- are is read once it's known, and each filter's answer is kept.
+local KNOWN = { warrior = 1, paladin = 1, hunter = 1, rogue = 1, priest = 1, shaman = 1, mage = 1, warlock = 1,
+    druid = 1, human = 1, dwarf = 1, gnome = 1, nightelf = 1, orc = 1, troll = 1, tauren = 1, scourge = 1,
+    undead = 1, alliance = 1, horde = 1 }
+local mine, who, shown = {}, nil, {}
 local function Shows(filter)
     if not filter or filter:match("^%s*$") then return true end
     local _, class = UnitClass("player")
     local _, race = UnitRace("player")
     local faction = UnitFactionGroup("player")
-    local mine = { [(class or ""):lower()] = true, [(race or ""):lower()] = true, [(faction or ""):lower()] = true }
-    local KNOWN = { warrior = 1, paladin = 1, hunter = 1, rogue = 1, priest = 1, shaman = 1, mage = 1, warlock = 1,
-        druid = 1, human = 1, dwarf = 1, gnome = 1, nightelf = 1, orc = 1, troll = 1, tauren = 1, scourge = 1,
-        undead = 1, alliance = 1, horde = 1 }
+    local now = (class or "") .. "/" .. (race or "") .. "/" .. (faction or "")
+    if now ~= who then              -- the first call, or before the game knew who you are
+        who, shown = now, {}
+        mine = { [(class or ""):lower()] = true, [(race or ""):lower()] = true, [(faction or ""):lower()] = true }
+    end
+    if shown[filter] ~= nil then return shown[filter] end
+    local answer = false
     for alt in filter:gmatch("[^/]+") do
         local ok = true
         for word in alt:gmatch("%S+") do
@@ -32,9 +41,10 @@ local function Shows(filter)
                 if (neg == "!") == has then ok = false end
             end
         end
-        if ok then return true end
+        if ok then answer = true break end
     end
-    return false
+    shown[filter] = answer
+    return answer
 end
 
 YR.Shows = Shows
