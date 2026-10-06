@@ -94,6 +94,8 @@ def run():
         function YS:ScanUI() return { scanned = true } end
         function YS:Apply() APPLIED = APPLIED + 1 end
         YS.PlayerKey = function() return "Duplo-Forever" end
+        BARS_NOW = {}
+        YS.ReadBars = function() local c = {} for k, v in pairs(BARS_NOW) do c[k] = v end return c end
         function YR.Print(m) table.insert(PRINTS, m) end
     ''')
     lua.execute('''MACROS = { { "Food", 1, "/use Bread" }, [121] = { "Opener", 2, "/cast [stealth] Cheap Shot; Stealth" } }
@@ -239,6 +241,34 @@ def run():
     win.Hide(win)
     check(not YR.PlannerCarrying(), "closing drops what you carry")
 
+    # a character with spells on its bars already and nothing saved: the plan starts from the bars, and
+    # applying a plan that leaves buttons out asks before it empties them
+    lua.execute('PROFILE, POPUP = nil, nil APPLIED = 0 BARS_NOW = { [1] = { kind = "spell", name = "Holy Light" }, [2] = { kind = "macro", name = "Food", icon = 7 } }')
+    YR.OpenPlanner()
+    plan, slots = state()
+    check(plan[1] is not None and plan[1].name == "Holy Light" and plan[2] is not None, "nothing saved yet: the plan starts from what's on your bars")
+    lua.execute("local plan = YR_.PlannerState() plan[1] = nil") if False else None
+    lua.eval("function(YR) local plan = YR.PlannerState() plan[1] = nil end")(YR)
+    YR.PlannerAskSave(True)
+    check(g.POPUP is not None and g.POPUP.which == "HEADSTART_PLAN_LOSES" and g.POPUP.a == 1 and g.APPLIED == 0 and g.PROFILE is None,
+          "a plan without a button that's on the bars: asked first, nothing saved or applied yet")
+    lua.execute('StaticPopupDialogs.HEADSTART_PLAN_LOSES.OnAccept(nil, POPUP.data)')
+    check(g.APPLIED == 1 and g.PROFILE.slots[1] is not None and g.PROFILE.slots[1].name == "Holy Light",
+          "Keep them: the button goes into the plan, then it's saved and applied")
+    lua.execute('PROFILE, POPUP = nil, nil APPLIED = 0')
+    YR.OpenPlanner()
+    lua.eval("function(YR) local plan = YR.PlannerState() plan[1] = nil end")(YR)
+    YR.PlannerAskSave(True)
+    lua.execute('StaticPopupDialogs.HEADSTART_PLAN_LOSES.OnAlt()')
+    check(g.APPLIED == 1 and g.PROFILE.slots[1] is None, "Empty them: applied as planned")
+    lua.execute('OPTS.clearBars = false PROFILE, POPUP = nil, nil APPLIED = 0')
+    YR.OpenPlanner()
+    lua.eval("function(YR) local plan = YR.PlannerState() plan[1] = nil end")(YR)
+    YR.PlannerAskSave(True)
+    check(g.POPUP is None and g.APPLIED == 1, "with 'clear the bars first' off nothing is emptied, so nothing is asked")
+    lua.execute('OPTS.clearBars = nil BARS_NOW = {} PROFILE = nil')
+    win.Hide(win)
+
     # ---- general spells, professions, macros, forms ------------------------------------------------
     lua.execute("function UnitClass() return 'Rogue', 'ROGUE' end")
     rl = YR.PlannerList()
@@ -246,6 +276,19 @@ def run():
     check("Throw" in rnames and "Shoot Bow" in rnames, "a rogue gets Throw and the bow/gun/crossbow shots")
     check(len(YR.PlannerForms_()) == 1 and YR.PlannerForms_()[1][1] == "Stealth" and YR.PlannerForms_()[1][2] == 1,
           "a rogue's form bar: Stealth, bonus bar 1")
+    # a class spell only some races get is offered to those races only
+    def priest(race_fn):
+        lua.execute("function UnitClass() return 'Priest', 'PRIEST' end " + race_fn)
+        l = YR.PlannerList()
+        return [l[i].name for i in range(1, len(l) + 1)]
+    names = priest("function UnitRace() return 'Dwarf', 'Dwarf', 3 end")
+    check("Desperate Prayer" in names and "Starshards" not in names and "Smite" in names,
+          "a dwarf priest: Desperate Prayer and every priest's spells, not the night elf's Starshards")
+    names = priest("function UnitRace() return 'Night Elf', 'NightElf', 4 end")
+    check("Starshards" in names and "Desperate Prayer" not in names, "a night elf priest: Starshards, not Desperate Prayer")
+    names = priest("function UnitRace() return nil end")
+    check("Starshards" in names and "Desperate Prayer" in names, "the game won't say your race: every race's are offered")
+    lua.execute("function UnitRace() return 'Dwarf', 'Dwarf', 3 end")
     lua.execute("function UnitClass() return 'Druid', 'DRUID' end")
     df = [(YR.PlannerForms_()[i][1], YR.PlannerForms_()[i][2]) for i in range(1, len(YR.PlannerForms_()) + 1)]
     check(df == [("Cat Form", 1), ("Bear Form", 3)], f"a druid's form bars from the game's data: {df}")
@@ -345,7 +388,14 @@ def run():
     win.Hide(win)
     still = [k for k in ov if ov[k].IsShown(ov[k])]
     check(still == [], f"closed: no overlay left on the bars, past the gap either ({still})")
-    lua.execute('''for i = 1, 12 do _G["MultiBarRightButton" .. i]:Hide() end''')
+    # an emptied bar: the game hides an empty button but keeps its holder in place - planned over that
+    lua.execute('''for i = 1, 12 do local b = _G["MultiBarRightButton" .. i] b:Hide() rawset(b, "container", CreateFrame()) end''')
+    YR.OpenPlanner()
+    ov = YR.PlannerOverlays()
+    up = [ov[k] for k in ov if ov[k].IsShown(ov[k])]
+    check(len(up) == 36, f"a bar of empty (hidden) buttons whose holders are on screen can still be planned on ({len(up)})")
+    win.Hide(win)
+    lua.execute('''for i = 1, 12 do _G["MultiBarRightButton" .. i].container:Hide() end''')
     # no Blizzard bar on screen (a bar addon): straight to the grid
     lua.execute('''for i = 1, 12 do _G["ActionButton" .. i]:Hide() _G["MultiBarBottomLeftButton" .. i]:Hide() end''')
     YR.OpenPlanner()

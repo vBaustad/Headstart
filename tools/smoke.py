@@ -82,6 +82,7 @@ UIParent = CreateFrame()
 function ReloadUI() RELOADED = true end
 function RequestTimePlayed() ASKED_PLAYED = (ASKED_PLAYED or 0) + 1 end
 UISpecialFrames, StaticPopupDialogs = {}, {}
+function HasAction() return false end
 tinsert = table.insert
 function StaticPopup_Show(which) POPUP = which end
 GameTooltip = setmetatable({}, { __index = function() return function() end end })

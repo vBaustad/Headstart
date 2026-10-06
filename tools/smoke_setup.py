@@ -511,6 +511,27 @@ ok = g.BAR[2] is not None and g.BAR[2].kind == "macro"
 print(("ok  " if ok else "FAIL"), "level limit 20: Flash of Light (level 20) gets its placeholder")
 bad += not ok
 
+# the level limit is for a new character's question marks: it never drops a spell at or under your level
+lua.execute("Fresh(); OLD_LEVEL = UnitLevel UnitLevel = function() return 30 end NAMEID['Flash of Light'] = 19750 KNOWN[19750] = true")
+YS.Apply(YS)
+ok = g.BAR[2] is not None and g.BAR[2].kind == "spell" and g.BAR[2].id == 19750
+print(("ok  " if ok else "FAIL"), "level 30, limit 10: a level 20 spell you know still goes on its slot")
+bad += not ok
+# ... and a spell above the limit, left out when the layout went on, goes into its empty slot once learned
+lua.execute("Fresh(); UnitLevel = function() return 1 end KNOWN[19750] = nil")
+YS.Apply(YS)
+ok = g.BAR[2] is None
+print(("ok  " if ok else "FAIL"), "level 1, limit 10: a level 20 spell has no button yet")
+bad += not ok
+lua.execute("UnitLevel = function() return 20 end KNOWN[19750] = true")
+events._OnEvent(events, "SPELLS_CHANGED")
+ok = g.BAR[2] is not None and g.BAR[2].kind == "spell" and g.BAR[2].id == 19750
+print(("ok  " if ok else "FAIL"), "... and goes into its slot the moment it is learned")
+bad += not ok
+lua.execute("UnitLevel = OLD_LEVEL NAMEID['Flash of Light'] = nil KNOWN[19750] = nil")
+g.SlashCmdList.YIPPSETUP("debug")
+print("ok  ", "/ysetup debug prints without an error")
+
 lua.execute("Fresh({ clearBars = false }); BAR[20] = { kind = 'spell', id = 635 }")
 YS.Apply(YS)
 ok = g.BAR[20] is not None and g.BAR[20].id == 635

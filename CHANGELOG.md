@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Set up layout no longer drops the spells you know.** "Class spells up to level" (10 to begin with) left every spell learned after that level off the bars, also on a character well past it: with the bars cleared first, a level 30 was left with a handful of buttons. The limit now only decides how far ahead buttons are made on a new character - a spell at or under your own level is always placed, and a spell above the limit goes into its slot when you learn it. `/ysetup debug` says what a layout would do on this character.
+
+- The Invite and Leave buttons are easy to move while unlocked: drag them by the buttons themselves or by the blue edge, which is wider now. They could only be grabbed by a two-pixel rim.
+
+- **Bar planner: it no longer takes your bars away.** On a character that already had spells on its bars and no saved layout, the planner opened empty; adding the few spells you were missing and pressing Save and apply cleared every bar and put only those back, and deleted the character's macros. Now the plan starts from what is on your bars when nothing is saved for the class; Save and apply asks before it empties any button you have now (Keep them, Empty them, or Cancel); and a plan made on the character itself never deletes that character's own macros. Planning on your bars also works on empty buttons now: the game hides an empty button unless "Always show buttons" is on for its bar, and the planner then had nowhere to put a spell. And its list only offers the class spells your race gets: a priest saw every race's priest spells, a mage both factions' portals.
+
+- Fixed "Headstart tried to call the protected function PlayerSpellsFrame:SetClampedToScreen()" when the talent window was opened for the first time in a fight with "Move it by dragging" on: the window is now made movable when the fight ends.
+
 ## 0.10.0-beta3
 
 - **Swing timer** (Headstart, QoL, Swing timer; off until you turn it on): your auto-attack bars made to be seen, two ways. *Blizzard's bars, dressed* (to begin with): the game's own swing bars with our texture, your colours for main hand, off hand, ranged and out of reach, the frame round each bar off, text at your size, the weapon's icon beside the bar and the swing's whole length after its name; Blizzard still runs them, and their place and size stay in Edit Mode. *Headstart's own bars*: bars of ours in their place, with the time left and the swing's length ("0.8 / 2.6"), their own width, height and place, shown always, in combat, or only while a swing runs. Everything is put back when it's off.

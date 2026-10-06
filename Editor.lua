@@ -1627,7 +1627,8 @@ local function BuildSetup(page)
     Section("Spells", nil, { icon = 133742 })
     Row("Class spells", Sw("classSpells"))
     Row("Class spells up to level", S.Slider(L.c, 1, 60, 1, function() return o().maxLevel end,
-        function(v) o().maxLevel = v Recount() end), "Spells your main has on its bars that are learned at this level or lower")
+        function(v) o().maxLevel = v Recount() end), "How far ahead buttons are made: spells learned at this level or lower get their button now. A spell above it"
+        .. " keeps its slot empty and goes in when you learn it. Spells at or under your own level are always placed")
     local BUTTONS = {
         { "placeholder", "Spells; ? until learned" },
         { "spells", "Only spells" },

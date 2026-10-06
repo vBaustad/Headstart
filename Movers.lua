@@ -22,7 +22,11 @@ local function Place(m)
     if m.handle then m.handle:SetShown(on) end
     if not frame or not on then return end
     if not m.handle then
-        -- the first time it's on and the window exists: the strip to drag by, and the hooks
+        -- the first time it's on and the window exists: the strip to drag by, and the hooks. Not in a
+        -- fight: the talent window is protected there, and making it movable would be blocked (the
+        -- window can first exist in a fight - its addon loads when you press the key). The end of
+        -- the fight comes back here.
+        if InCombatLockdown() then return end
         frame:SetMovable(true)
         frame:SetClampedToScreen(true)
         local h = CreateFrame("Frame", nil, frame)
@@ -34,6 +38,8 @@ local function Place(m)
         h:RegisterForDrag("LeftButton")
         local function Start() if m.on() and not InCombatLockdown() then frame:StartMoving() end end
         local function Stop()
+            -- let go in a fight that began mid-drag: the window is the game's until it ends
+            if InCombatLockdown() and frame.IsProtected and frame:IsProtected() then return end
             frame:StopMovingOrSizing()
             -- a moved frame is "user placed": the client would save where it is and put it there itself
             -- at the next login, before Blizzard or we do. Where it goes is ours to keep, not the client's.

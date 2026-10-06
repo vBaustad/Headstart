@@ -85,15 +85,18 @@ function YR.PlannerList()
     local class, out = Class(), {}
     local data = (YR.PlannerSpells or {})[class] or {}
     local levels = (YS.SPELL_LEVELS or {})[class] or {}
+    -- a class spell only some races get (a priest's Starshards, a mage's portals by faction) is offered
+    -- to those races only; when the game won't say your race, every one is offered
+    local race = RaceBit()
     for name, d in pairs(data) do
-        if d[3] == 0 and levels[name] then
+        local mine = race == 0 or (d[4] or 0) == 0 or bit.band(d[4], race) ~= 0
+        if d[3] == 0 and levels[name] and mine then
             out[#out + 1] = { name = name, level = levels[name], icon = d[2], id = d[1] }
         end
     end
     for name, d in pairs((YR.PlannerGeneral or {})[class] or {}) do
         if not data[name] then out[#out + 1] = { name = name, level = 1, icon = d[2], id = d[1], general = true } end
     end
-    local race = RaceBit()
     for name, d in pairs(YR.PlannerRacials or {}) do
         if d[3] == 0 and (d[4] == 0 or bit.band(d[4], race) ~= 0) then
             out[#out + 1] = { name = name, level = 1, icon = d[2], id = d[1], racial = true }
@@ -401,10 +404,16 @@ end
 -- ---------------------------------------------------------------------------
 -- On my bars: one planner button over each real action button that's on screen
 -- ---------------------------------------------------------------------------
---- Blizzard's button for this bar position, if the client has it and it's on screen.
+--- Blizzard's button for this bar position, if the client has it and its place is on screen; and the
+--- frame that marks that place. The game hides an empty button unless "Always show buttons" is on for
+--- its bar (or a spell is on the cursor), but keeps the button's holder where it was: an empty button
+--- is planned over its holder. Without this a bar you had emptied could not be planned on at all.
 local function RealButton(bar, i)
     local b = _G[bar[3] .. i]
-    if b and b.IsVisible and b:IsVisible() then return b end
+    if not (b and b.IsVisible) then return nil end
+    if b:IsVisible() then return b, b end
+    local holder = rawget(b, "container")
+    if type(holder) == "table" and holder.IsVisible and holder:IsVisible() then return b, holder end
 end
 
 --- Which bars have their buttons on screen: { [bar index] = true }.
@@ -424,7 +433,7 @@ local function LayOver()
     local n = 0
     for bi, bar in ipairs(BARS) do
         for i = 1, 12 do
-            local real = RealButton(bar, i)
+            local real, place = RealButton(bar, i)
             local key = (bi - 1) * 12 + i
             local o = overlays[key]
             if real then
@@ -437,7 +446,7 @@ local function LayOver()
                 end
                 o.real = real
                 o:ClearAllPoints()
-                o:SetAllPoints(real)
+                o:SetAllPoints(place)
                 o:Show()
                 n = n + 1
             end
@@ -622,8 +631,46 @@ StaticPopupDialogs["HEADSTART_PLAN_OVERWRITE"] = {
     hideOnEscape = true,
 }
 
-local function AskSave(thenApply)
+-- What's on the bars now and not in the plan: Apply clears the bars first (unless that option is off),
+-- so these would be gone. { [slot] = entry }, and how many.
+local function Lost()
+    local out, n = {}, 0
+    if YS:Options().clearBars == false or not YS.ReadBars then return out, n end
+    for slot, e in pairs(YS.ReadBars()) do
+        if not plan[slot] then out[slot], n = e, n + 1 end
+    end
+    return out, n
+end
+
+local AskSave
+StaticPopupDialogs["HEADSTART_PLAN_LOSES"] = {
+    text = "Headstart: %d buttons on your bars now aren't in this plan. Applying it empties them.",
+    button1 = "Keep them",
+    button2 = "Cancel",
+    button3 = "Empty them",
+    OnAccept = function(_, lost)
+        for slot, e in pairs(lost or {}) do if not plan[slot] then plan[slot] = Copy(e) end end
+        Paint()
+        AskSave(true, true)
+    end,
+    OnAlt = function() AskSave(true, true) end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+--- Save the plan, and with thenApply put it on the bars. Applying asks first when it would empty
+--- buttons you have now (decided: that was asked and answered).
+function AskSave(thenApply, decided)
     if InCombatLockdown() and thenApply then YR.Print("not in combat.") return end
+    if thenApply and not decided then
+        local lost, n = Lost()
+        if n > 0 then
+            local d = StaticPopup_Show("HEADSTART_PLAN_LOSES", n)
+            if d then d.data = lost end
+            return
+        end
+    end
     local old = YS:Profile()
     if old and not old.planned then
         local d = StaticPopup_Show("HEADSTART_PLAN_OVERWRITE", old.from)
@@ -859,7 +906,7 @@ function YR.PlannerRankMenu(b)
     menu:Show()
 end
 
---- Open the planner, starting from the class's saved layout. On your bars unless you last chose the grid,
+--- Open the planner, starting from the class's saved layout (or, with none saved, from your bars). On your bars unless you last chose the grid,
 --- or no Blizzard bar is on screen at all (a bar addon draws its own).
 function YR.OpenPlanner()
     if InCombatLockdown() then YR.Print("not in combat.") return end
@@ -867,6 +914,13 @@ function YR.OpenPlanner()
     local p = YS:Profile()
     plan = {}
     for slot, e in pairs(p and p.slots or {}) do plan[slot] = Copy(e) end
+    -- nothing saved for this class yet: the plan begins as what is on your bars now, so adding the
+    -- spells you're missing and applying doesn't take the rest away
+    if not p and YS.ReadBars then
+        local n = 0
+        for slot, e in pairs(YS.ReadBars()) do plan[slot], n = Copy(e), n + 1 end
+        if n > 0 then YR.Print(("the plan starts from the %d buttons on your bars now."):format(n)) end
+    end
     wipe(lists)      -- spells learned or macros made since the last open
     win.subtitle:SetText("")
     formBar = 0

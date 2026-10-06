@@ -154,7 +154,9 @@ YS.General = General
 -- Class spells up to the level limit, racials (Stoneform: every character has them from level 1),
 -- profession spells (placed on the new character once learned) and your own macros (AutoFeed's
 -- included). Items are left out.
-function YS:Scan()
+--- What is on this character's bars now, as a layout's slots: { [slot] = entry }, and the counts.
+--- (Scan saves it; the bar planner starts from it and checks a plan against it.)
+function YS.ReadBars()
     local maxLevel = SCAN_LEVEL
     local _, class = UnitClass("player")
     local levels = YS.SPELL_LEVELS[class] or {}
@@ -197,6 +199,13 @@ function YS:Scan()
             end
         end
     end
+    return slots, n
+end
+
+function YS:Scan()
+    local maxLevel = SCAN_LEVEL
+    local _, class = UnitClass("player")
+    local slots, n = YS.ReadBars()
     -- Copied on a character still levelling, over a layout saved for more (planned to 60, or copied from
     -- a main): what this one can't have yet stays as it was saved. A slot that's empty here keeps a class
     -- spell above this level; a question-mark macro (or a spell macro) Headstart made for a saved spell is
@@ -330,8 +339,11 @@ local function Wanted(e, levels, autofeed, o)
         if e.prof then return o.professions end
         if e.general or General(e.name) then return o.classSpells end
         if e.racial or YS.RACIALS[e.name] then return o.racials end
+        -- The level limit is about how far ahead question-mark buttons are made on a new character.
+        -- It never leaves out a spell at or under your own level: on a character already levelled,
+        -- a limit of 10 took every spell learned after level 10 off the bars.
         local lvl = e.level or levels[e.name]
-        return lvl ~= nil and o.classSpells and lvl <= o.maxLevel
+        return lvl ~= nil and o.classSpells and lvl <= math.max(o.maxLevel or 1, UnitLevel("player") or 1)
     elseif e.kind == "macro" then
         if autofeed[e.name] then return o.autofeed end
         return o.macros
@@ -498,7 +510,11 @@ function YS:Apply(force)
     local autofeed = AutoFeedNames()
     local again = YippSetupCharDB.applied ~= nil
     local removed = 0
-    if o.clearMacros then removed = again and ClearPlaceholders() or ClearCharacterMacros(AutoFeedOwned()) end
+    -- A plan made on this very character is put on a character that has macros of its own: only the
+    -- question-mark macros Headstart made go, never yours. (A layout from another character is for a
+    -- new one, whose first Set up clears the character's macros to make room.)
+    local own = p.planned == true and type(p.from) == "string" and p.from:sub(1, #PlayerKey()) == PlayerKey()
+    if o.clearMacros then removed = (again or own) and ClearPlaceholders() or ClearCharacterMacros(AutoFeedOwned()) end
     local levels = YS.SPELL_LEVELS[class] or {}
     local made, placed, full, noAutoFeed, askedAutoFeed = 0, 0, nil, nil, 0
     local macros      -- MacroIndex(), read again after each macro made
@@ -597,8 +613,10 @@ function YS:Upgrade()
     local levels, autofeed = YS.SPELL_LEVELS[class] or {}, AutoFeedNames()
     for slot, e in pairs(p.slots) do
         local id = Wanted(e, levels, autofeed, o) and RealSpell(e)
-        if id and (e.prof or YS.SpellButtons(o) == "spells") and not HasAction(slot) then
-            PlaceSpell(slot, id)      -- just learned, and no placeholder holds its slot: straight in
+        if id and not HasAction(slot) then
+            -- just learned, and nothing holds its slot (it was above the level limit when the layout
+            -- went on, or question-mark buttons are off): straight in
+            PlaceSpell(slot, id)
         elseif id and HasAction(slot) then
             local kind, actionID = GetActionInfo(slot)
             local m = kind == "macro" and ReadMacroSlot(slot, actionID)
@@ -777,11 +795,40 @@ end
 -- Slash command and events
 --------------------------------------------------------------------------------
 
+--- /ysetup debug: what a Set up layout would do on this character, in a few lines to copy from chat.
+function YS:Debug()
+    local _, class = UnitClass("player")
+    local p, o = YS:Profile(), YS:Options()
+    local levels, autofeed = YS.SPELL_LEVELS[class] or {}, AutoFeedNames()
+    Print(("debug: %s level %d. Options: level limit %s, buttons %s, clear bars %s, clear macros %s, class spells %s."):format(
+        tostring(class), UnitLevel("player") or 0, tostring(o.maxLevel), YS.SpellButtons(o), tostring(o.clearBars),
+        tostring(o.clearMacros), tostring(o.classSpells)))
+    if not p then Print("debug: no layout saved for this class.") return end
+    local saved, wanted, known, tooHigh = 0, 0, 0, 0
+    for _, e in pairs(p.slots or {}) do
+        saved = saved + 1
+        if Wanted(e, levels, autofeed, o) then
+            wanted = wanted + 1
+            if e.kind == "spell" and RealSpell(e) then known = known + 1 end
+        elseif e.kind == "spell" and (e.level or levels[e.name]) then
+            tooHigh = tooHigh + 1
+        end
+    end
+    local now = 0
+    for slot = 1, MAX_SLOT do if HasAction(slot) then now = now + 1 end end
+    Print(("debug: layout from %s%s: %d buttons saved; %d would go on (%d of them spells you know), %d class spells"
+        .. " left out by the level limit. On your bars now: %d buttons. Last applied: %s."):format(
+        tostring(p.from), p.planned and " (planned)" or "", saved, wanted, known, tooHigh, now,
+        YippSetupCharDB.applied and date("%d %b %H:%M", YippSetupCharDB.applied) or "never"))
+end
+
 SLASH_YIPPSETUP1 = "/ysetup"
 SlashCmdList.YIPPSETUP = function(msg)
     local cmd, arg = strsplit(" ", strtrim(msg or ""):lower(), 2)
     if cmd == "scan" then
         YS:Copy()
+    elseif cmd == "debug" then
+        YS:Debug()
     elseif cmd == "apply" then
         YS:Apply(arg == "force")
     else

@@ -213,7 +213,10 @@ end
     touched = lua.eval("function(f) return rawget(f, 'hookOnShow') ~= nil or rawget(f, 'SetPoint') ~= nil end")
     check(not touched(g.ContainerFrameCombinedBags) and not touched(g.ContainerFrame6), "bags, options off: neither window is touched")
     g.YippRouteDB.moveBag = True
+    lua.execute("COMBAT = true")
     YR.MoverPlace("bag")
+    check(not touched(g.ContainerFrameCombinedBags), "turned on in a fight: the window isn't made movable there (it would be blocked)")
+    lua.execute("COMBAT = false Fire('PLAYER_REGEN_ENABLED')")
     check(touched(g.ContainerFrameCombinedBags) and not touched(g.ContainerFrame6), "the combined bag turned on: that one only")
     bagpoint = lua.eval("function() local p = rawget(ContainerFrameCombinedBags, 'point') return p and p[1], p and p[4], p and p[5] end")
     handles = [f for f in g.FRAMES.values() if lua.eval("function(f) return rawget(f, '_OnDragStop') ~= nil end")(f)]

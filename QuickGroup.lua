@@ -110,16 +110,20 @@ local function Build()
     bar:SetMovable(true)
     bar:EnableMouse(true)
     bar:RegisterForDrag("LeftButton")
-    bar:SetScript("OnDragStart", function(self) if not YR.Option("groupBarLocked") then self:StartMoving() end end)
-    bar:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local l, t = self:GetLeft(), self:GetTop()
+    -- Unlocked, the bar is dragged by anything on it: the two buttons cover nearly all of it, so
+    -- they drag it too (a click without moving the mouse still clicks), and the blue edge round it.
+    local function Start() if not YR.Option("groupBarLocked") then bar:StartMoving() end end
+    local function Stop()
+        bar:StopMovingOrSizing()
+        local l, t = bar:GetLeft(), bar:GetTop()
         if l and t then
-            self:ClearAllPoints()
-            self:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+            bar:ClearAllPoints()
+            bar:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
             YippRouteDB.groupBarPos = { l, t }
         end
-    end)
+    end
+    bar:SetScript("OnDragStart", Start)
+    bar:SetScript("OnDragStop", Stop)
     local function Btn(text, fn, x)
         local b = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
         b:SetSize(84, 22)
@@ -127,13 +131,17 @@ local function Build()
         b:SetText(text)
         b:SetScript("OnClick", fn)
         b:SetMotionScriptsWhileDisabled(true)
+        b:RegisterForDrag("LeftButton")
+        b:SetScript("OnDragStart", Start)
+        b:SetScript("OnDragStop", Stop)
         return b
     end
     bar.invite = Btn("Invite", function() YR.InviteTarget() end, 2)
     bar.leave = Btn("Leave group", function() YR.LeaveGroup() end, 90)
     -- The drag edge, only while unlocked: the same blue as the campfire's.
     bar.edge = bar:CreateTexture(nil, "BACKGROUND")
-    bar.edge:SetAllPoints()
+    bar.edge:SetPoint("TOPLEFT", -8, 8)
+    bar.edge:SetPoint("BOTTOMRIGHT", 8, -8)
     bar.edge:SetColorTexture(0.3, 0.65, 1, 0.35)
     bar:ClearAllPoints()
     local p = YippRouteDB.groupBarPos
@@ -147,7 +155,10 @@ function YR.RefreshGroupBar()
         return
     end
     if not bar then Build() end
-    bar.edge:SetShown(not YR.Option("groupBarLocked"))
+    local unlocked = not YR.Option("groupBarLocked")
+    bar.edge:SetShown(unlocked)
+    -- the edge is part of what you can grab while it shows
+    if unlocked then bar:SetHitRectInsets(-8, -8, -8, -8) else bar:SetHitRectInsets(0, 0, 0, 0) end
     Paint()
     bar:Show()
 end
