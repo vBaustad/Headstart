@@ -162,7 +162,10 @@ YS.General = General
 -- included). Items are left out.
 --- What is on this character's bars now, as a layout's slots: { [slot] = entry }, and the counts.
 --- (Scan saves it; the bar planner starts from it and checks a plan against it.)
-function YS.ReadBars()
+--- withOther (the planner): a button a layout can't hold - a mount, a toy, a pet's, an equipment set,
+--- a spell from outside the class - is there too, as { kind = "other" }: it can't be saved or put on
+--- another character, but it is on the bar, and nothing may take it for an empty slot.
+function YS.ReadBars(withOther)
     local maxLevel = SCAN_LEVEL
     local _, class = UnitClass("player")
     local levels = YS.SPELL_LEVELS[class] or {}
@@ -199,8 +202,13 @@ function YS.ReadBars()
                 slots[slot] = entry
                 local key = entry.prof and "prof" or entry.kind
                 n[key] = n[key] + 1
-            elseif not (kind == "spell" and lvl) then
-                n.other = n.other + 1
+            else
+                if not (kind == "spell" and lvl) then n.other = n.other + 1 end
+                if withOther then
+                    local texture = _G.C_ActionBar and _G.C_ActionBar.GetActionTexture or _G.GetActionTexture
+                    slots[slot] = { kind = "other", name = tostring(kind or "?") .. ":" .. tostring(id or "?"),
+                        icon = texture and texture(slot) or nil }
+                end
             end
         end
     end
@@ -212,7 +220,7 @@ end
 --- A question-mark macro Headstart made for a saved spell counts as that spell.
 --- Returns the plan's slots, and the slots as the bars alone have them (to tell what you take off).
 function YS.PlanStart()
-    local now = YS.ReadBars()
+    local now = YS.ReadBars(true)
     local plan = {}
     for slot, e in pairs(now) do plan[slot] = e end
     local old = YS:Profile()
@@ -258,7 +266,7 @@ function YS:Scan()
     ClassData(class).profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots }
     YS:SaveSharedUI()
     Print(("saved %s: %d spells, %d profession spells, %d macros and %d items%s. What goes onto a new character is"
-        .. " chosen in Settings, Character setup."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item,
+        .. " chosen in Headstart, QoL, Bars & setup."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item,
         kept > 0 and (", and kept %d spells from the saved layout for levels you haven't reached"):format(kept) or ""))
 end
 
@@ -518,24 +526,93 @@ function YS:MacrosNeeded(p, o, class)
     return n, limit
 end
 
+-- This character's own macros (not AutoFeed's): { { name, icon, body }, ... }.
+local function CharacterMacros()
+    local out, keep = {}, AutoFeedOwned()
+    local _, numChar = GetNumMacros()
+    local base = Constants and Constants.MacroConsts and Constants.MacroConsts.MAX_ACCOUNT_MACROS or 120
+    for i = base + 1, base + (numChar or 0) do
+        local name, icon, body = GetMacroInfo(i)
+        if name and not keep[name] then out[#out + 1] = { name, icon, body } end
+    end
+    return out
+end
+
+--- What a full Set up would take from this character as it is now: buttons on its bars, and macros of
+--- its own that would be deleted. (0, 0 on a new character.)
+function YS:ApplyCost(force)
+    local p = YS:Profile() or (force and YippSetupDB.profile)
+    if not p then return 0, 0 end
+    local o = YS:Options()
+    local buttons, macros = 0, 0
+    if o.clearBars then
+        for slot = 1, MAX_SLOT do if HasAction(slot) then buttons = buttons + 1 end end
+    end
+    local own = p and p.planned == true and type(p.from) == "string" and p.from:sub(1, #PlayerKey()) == PlayerKey()
+    if o.clearMacros and YippSetupCharDB.applied == nil and not own then macros = #CharacterMacros() end
+    return buttons, macros
+end
+
+-- A character in play, not a new one: Set up asks first, and offers the bars alone.
+local NEW_LEVEL, NEW_BUTTONS = 10, 12
+StaticPopupDialogs["YIPPSETUP_CONFIRM"] = {
+    text = "Headstart: Set up layout on this character replaces what is on it now.\n\n%s\n\nA copy of your bars and"
+        .. " macros is kept: /ysetup undo puts them back.",
+    button1 = "Set up everything",
+    button2 = "Cancel",
+    button3 = "Bars only",
+    OnAccept = function(_, force) YS:Apply(force, nil, { sure = true }) end,
+    OnAlt = function(_, force) YS:Apply(force, nil, { sure = true, barsOnly = true }) end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
 --- Put the saved layout on the bars. force: another class's layout. only (the planner, on a character
 --- in play): { [slot] = true } - nothing but these slots is touched: the bars aren't cleared, no macro
---- of yours is deleted, and one of these slots with nothing saved for it is emptied.
-function YS:Apply(force, only)
+--- of yours is deleted, the interface is left alone, and one of these slots with nothing saved for it
+--- is emptied. how: { sure = asked and answered, barsOnly = the bars and Headstart's own question
+--- marks, but none of your macros deleted and no interface, chat or settings changed }.
+function YS:Apply(force, only, how)
     if InCombatLockdown() then
         Print("can't change action bars in combat.")
         return
+    end
+    how = how or {}
+    -- A character in play has things to lose: asked first, with what goes.
+    if not only and not how.sure then
+        local buttons, macros = YS:ApplyCost(force)
+        local level = UnitLevel("player") or 1
+        if (YS:Profile() or (force and YippSetupDB.profile)) and (level > NEW_LEVEL or macros > 0 or buttons > NEW_BUTTONS) then
+            local o = YS:Options()
+            local lines = {}
+            if buttons > 0 then lines[#lines + 1] = ("%d buttons come off your bars"):format(buttons) end
+            if macros > 0 then lines[#lines + 1] = ("%d of this character's macros are deleted"):format(macros) end
+            if o.settings or o.editMode or o.chat or o.barVisibility then
+                lines[#lines + 1] = "game settings, Edit Mode and chat windows change (Bars only leaves them)"
+            end
+            -- the data goes in as an argument: a field written on Blizzard's popup would be ours (tainted)
+            StaticPopup_Show("YIPPSETUP_CONFIRM", table.concat(lines, "; ") .. ".", nil, force)
+            return
+        end
     end
     local _, class = UnitClass("player")
     -- force: another class's layout (the last one saved before layouts were per class)
     local p = YS:Profile() or (force and YippSetupDB.profile)
     if not p then
-        Print(("no layout saved for %s yet. On your %s main, click Copy this layout (Settings, Character setup)."
+        Print(("no layout saved for %s yet. On your %s main, click Copy this layout (Headstart, QoL, Bars & setup)."
             .. " /ysetup apply force uses another class's."):format(class:lower(), class:lower()))
         return
     end
     local o = YS:Options()
+    -- before anything goes: the bars and this character's macros as they are, for /ysetup undo
+    if not only then
+        YippSetupCharDB.backup = { at = time(), slots = (YS.ReadBars(true)), macros = CharacterMacros() }
+    end
     if o.clearBars and not only then ClearBars() end
+    -- which slots hold a spell we put there: a slot you empty yourself afterwards is left empty
+    local placedSet = only and YippSetupCharDB.placed or {}
+    YippSetupCharDB.placed = placedSet
     local autofeed = AutoFeedNames()
     local again = YippSetupCharDB.applied ~= nil
     local removed = 0
@@ -545,7 +622,7 @@ function YS:Apply(force, only)
     local own = p.planned == true and type(p.from) == "string" and p.from:sub(1, #PlayerKey()) == PlayerKey()
     -- (with `only`, the question marks stay too: the ones on the slots left alone are still in use)
     if o.clearMacros and not only then
-        removed = (again or own) and ClearPlaceholders() or ClearCharacterMacros(AutoFeedOwned())
+        removed = (again or own or how.barsOnly) and ClearPlaceholders() or ClearCharacterMacros(AutoFeedOwned())
     end
     local levels = YS.SPELL_LEVELS[class] or {}
     local made, placed, full, noAutoFeed, askedAutoFeed = 0, 0, nil, nil, 0
@@ -559,10 +636,12 @@ function YS:Apply(force, only)
             PickupAction(slot)      -- one of them: what was there goes, then what's saved (if anything) goes in
             ClearCursor()
         end
+        if not only or only[slot] then placedSet[slot] = nil end
         local idx
         local spellID = e and (levels[e.name] or YS.RACIALS[e.name] or e.prof or e.general) and RealSpell(e)
         if spellID then
             PlaceSpell(slot, spellID)
+            placedSet[slot] = true
             placed = placed + 1
         elseif e and e.kind == "item" then
             local pickup = (C_Item and C_Item.PickupItem) or PickupItem
@@ -609,6 +688,9 @@ function YS:Apply(force, only)
         end
     end
     YippSetupCharDB.applied = p.scanned
+    -- the layout as it went on, kept for this character: spells learned later go by it, whatever
+    -- another character of the class saves afterwards
+    YippSetupCharDB.layout = Copy(p.slots)
     Print(("placed %d buttons from %s (%d new macros, %d %s removed).")
         :format(placed, p.from, made, removed, again and "unused question-mark macros" or "old character macros"))
     if full then
@@ -622,10 +704,62 @@ function YS:Apply(force, only)
             and ("AutoFeed couldn't make '%s' (macro slots full, or another macro has that name), so that slot is empty."):format(noAutoFeed)
             or ("'%s' is AutoFeed's macro and AutoFeed isn't loaded, so that slot is empty."):format(noAutoFeed))
     end
+    -- The planner's apply and "Bars only" stop here: no game setting, Edit Mode, chat window, camera
+    -- or RestedXP guide is touched on a character in play.
+    if only or how.barsOnly then return end
     if o.noAutoPush and not NoAutoPush() then
         Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
     end
     YS:ApplyUI(YS:SharedUI(), o)
+end
+
+--- /ysetup undo: the bars and this character's macros as they were before the last Set up. Buttons a
+--- layout can't hold (a mount, a toy, a pet's) can't be put back by an addon: those slots are said.
+function YS:Undo()
+    local b = YippSetupCharDB.backup
+    if not b then Print("nothing to undo: no Set up has been done on this character since the copy was kept.") return end
+    if InCombatLockdown() then Print("can't change action bars in combat.") return end
+    local made = 0
+    for _, m in ipairs(b.macros or {}) do
+        local have
+        local idx = GetMacroIndexByName(m[1])
+        if idx and idx > 0 and select(3, GetMacroInfo(idx)) == m[3] then have = true end
+        if not have and pcall(CreateMacro, m[1], m[2], m[3], true) then made = made + 1 end
+    end
+    ClearBars()
+    local index = MacroIndex()
+    local back, lost = 0, 0
+    for slot = 1, MAX_SLOT do
+        local e = b.slots and b.slots[slot]
+        if e and e.kind == "spell" then
+            local id = (e.stale and e.rankID and IsPlayerSpell(e.rankID) and e.rankID) or (e.prof and ProfessionSpellID(e))
+                or KnownSpellID(e.name)
+            if id then PlaceSpell(slot, id) back = back + 1 else lost = lost + 1 end
+        elseif e and e.kind == "macro" then
+            local idx = index[e.body]
+            if idx then
+                PickupMacro(idx)
+                PlaceAction(slot)
+                ClearCursor()
+                back = back + 1
+            else
+                lost = lost + 1
+            end
+        elseif e and e.kind == "item" then
+            local pickup = (C_Item and C_Item.PickupItem) or PickupItem
+            pickup(e.id)
+            PlaceAction(slot)
+            ClearCursor()
+            back = back + 1
+        elseif e then
+            lost = lost + 1
+        end
+    end
+    for name, v in pairs(b.cvars or {}) do pcall(C_CVar.SetCVar, name, v) end
+    YippSetupCharDB.applied, YippSetupCharDB.layout, YippSetupCharDB.placed, YippSetupCharDB.backup = nil, nil, nil, nil
+    Print(("put back %d buttons and %d macros as they were before the last Set up.%s"):format(back, made,
+        lost > 0 and (" %d buttons couldn't be put back by an addon (mounts, toys, pet buttons and the like)."):format(lost) or ""))
+    if YR.RefreshWindow then YR:RefreshWindow() end
 end
 
 -- A spell just learned: its placeholder macro is swapped for the spell itself and then deleted; a
@@ -634,9 +768,13 @@ end
 -- Only on a character that was set up, and never in combat (it waits for combat to end).
 local waiting = false
 function YS:Upgrade()
-    local p = YS:Profile()
     local o = YS:Options()
-    if not (p and YippSetupCharDB.applied and o.swap) then return end
+    if not (YippSetupCharDB.applied and o.swap) then return end
+    -- the layout as it went on this character (kept since; before that, the class's saved layout)
+    local slots = YippSetupCharDB.layout or (YS:Profile() or {}).slots
+    if not slots then return end
+    YippSetupCharDB.placed = YippSetupCharDB.placed or {}
+    local put = YippSetupCharDB.placed
     if InCombatLockdown() then
         waiting = true
         return
@@ -649,12 +787,15 @@ function YS:Upgrade()
     local swapped = {}
     local _, class = UnitClass("player")
     local levels, autofeed = YS.SPELL_LEVELS[class] or {}, AutoFeedNames()
-    for slot, e in pairs(p.slots) do
+    for slot, e in pairs(slots) do
         local id = Wanted(e, levels, autofeed, o) and RealSpell(e)
-        if id and not HasAction(slot) then
+        if put[slot] and not HasAction(slot) then
+            -- it was there and you took it off: left off
+        elseif id and not HasAction(slot) then
             -- just learned, and nothing holds its slot (it was too far ahead when the layout went on,
             -- or question-mark buttons are off): straight in
             PlaceSpell(slot, id)
+            put[slot] = true
         elseif not id and not HasAction(slot) and e.kind == "spell" and not e.prof
                 and Wanted(e, levels, autofeed, o) and KnownSpellID(REPLACE[e.name] or e.name) then
             -- learned, and its button is a macro by your choices (a mouseover spell, or macros for
@@ -669,12 +810,14 @@ function YS:Upgrade()
                 PickupMacro(idx)
                 PlaceAction(slot)
                 ClearCursor()
+                put[slot] = true
             end
         elseif id and HasAction(slot) then
             local kind, actionID = GetActionInfo(slot)
             local m = kind == "macro" and ReadMacroSlot(slot, actionID)
             if m and m.body == select(3, MacroFor(e)) then
                 PlaceSpell(slot, id)
+                put[slot] = true
                 swapped[m.name] = m.body
             -- a new rank from the trainer: a spell on the bar is that rank only, so the slot gets the
             -- highest one, or for a downranked slot the main's rank (RealSpell)
@@ -800,6 +943,8 @@ end
 local function FirstTimeHere()
     local id = CharacterID()
     if not id or YippSetupCharDB.seen == id or (window and window:IsShown()) or not YS:Options().popup then return end
+    -- for a new character: one already in play isn't offered a layout over its own (it's in Settings)
+    if (UnitLevel("player") or 1) > NEW_LEVEL then return end
     if InCinematic() or not UIParent:IsShown() then
         C_Timer.After(2, FirstTimeHere)
         return
@@ -882,6 +1027,8 @@ SlashCmdList.YIPPSETUP = function(msg)
         YS:Copy()
     elseif cmd == "debug" then
         YS:Debug()
+    elseif cmd == "undo" then
+        YS:Undo()
     elseif cmd == "apply" then
         YS:Apply(arg == "force")
     else
@@ -896,7 +1043,8 @@ f:RegisterEvent("SPELLS_CHANGED")        -- a spell learned (it also fires for m
 f:RegisterEvent("PLAYER_REGEN_ENABLED")
 local upgradeSoon = false
 local function UpgradeSoon()
-    if upgradeSoon then return end
+    -- a character never set up has nothing to keep up: nothing is set going (this is every spell change)
+    if upgradeSoon or not (YippSetupCharDB and YippSetupCharDB.applied) then return end
     upgradeSoon = true          -- a burst (training five spells, a login) costs one pass
     C_Timer.After(0.2, function() upgradeSoon = false if YippSetupCharDB then YS:Upgrade() end end)
 end
@@ -916,7 +1064,7 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
         C_Timer.After(0.5, FirstZoom)
         C_Timer.After(2, FirstTimeHere)
         C_Timer.After(3, FillInUI)
-        if YippSetupCharDB.applied then NoAutoPush() end
+        if YippSetupCharDB.applied and YS:Options().noAutoPush and not InCombatLockdown() then NoAutoPush() end
     elseif event == "SPELLS_CHANGED" or (event == "PLAYER_REGEN_ENABLED" and waiting) then
         UpgradeSoon()
     end

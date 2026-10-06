@@ -51,7 +51,8 @@ strsplit = function() end
 strtrim = function(s) return s end
 floor = math.floor
 wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
-YippRouteDB = {}
+-- the options that are off until turned on, on: the features are what is tested here
+YippRouteDB = { restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
 PRINTS, NOTICES = {}, {}
 function print(m) table.insert(PRINTS, m) end
 RaidWarningFrame, ChatTypeInfo = {}, { RAID_WARNING = {} }
@@ -153,6 +154,7 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
     YR2.Print = YR.Print
     YR2.CharKey = YR.CharKey
     YR2.Option = YR.Option
+    YR2.Open = YR.Open
     YR2.Style = YR.Style
     lua.execute("for i = #FRAMES, 1, -1 do FRAMES[i] = nil end")      # the old module's frame is gone too
     YR2.StartInstances()

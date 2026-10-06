@@ -50,7 +50,7 @@ local function Flags()
     local f = 0
     if UnitAffectingCombat("player") then f = f + 1 end
     if UnitIsDeadOrGhost("player") then f = f + 2 end
-    if UnitCastingInfo("player") or UnitChannelInfo("player") then f = f + 4 end
+    if YR.Open((UnitCastingInfo("player"))) or YR.Open((UnitChannelInfo("player"))) then f = f + 4 end
     return f
 end
 
@@ -67,11 +67,27 @@ local function FlushHeld()
     held = nil
 end
 
+local ScanCompletions, questsDirty
+
 local function Sample()
+    -- the quest log changed since the last sample: read once here, not on every one of a burst of
+    -- its events (each objective tick, each loot, each zone line fires several)
+    if questsDirty then
+        questsDirty = false
+        ScanCompletions()
+    end
     if run.stopped then return end
     local map, x, y = YR.Position()
     if map then
-        local row = { time(), map, x, y, UnitLevel("player"), UnitXP("player"), Flags() }
+        local now, level, xp, flags = time(), UnitLevel("player"), UnitXP("player"), Flags()
+        -- standing still: the one held-back row is moved on in time, not made anew every two seconds
+        if held and lastKept and held[2] == map and held[3] == x and held[4] == y and held[5] == level
+                and held[6] == xp and held[7] == flags and now - lastKept[1] < HEARTBEAT then
+            held[1] = now
+            WatchStep()
+            return
+        end
+        local row = { now, map, x, y, level, xp, flags }
         if lastRow and lastKept and Same(row, lastRow) and row[1] - lastKept[1] < HEARTBEAT then
             held = row
         else
@@ -117,7 +133,7 @@ end
 -- The first pass after login only records what is already complete: those were finished in an
 -- earlier session, and logging them "now" would make the objective look instant.
 local primed = false
-local function ScanCompletions()
+function ScanCompletions()
     for i = 1, C_QuestLog.GetNumQuestLogEntries() do
         local info = C_QuestLog.GetInfo(i)
         local id = info and not info.isHeader and info.questID
@@ -188,6 +204,12 @@ end
 events:SetScript("OnEvent", function(_, event, a, b, c)
     if not run or run.stopped then return end
     if event == "PLAYER_LOGOUT" then FlushHeld() return end
+    -- a quest event with the log still unread: read it first, so a completion is written before the
+    -- turn-in it belongs to
+    if questsDirty and event ~= "QUEST_LOG_UPDATE" and (event == "QUEST_TURNED_IN" or event == "QUEST_ACCEPTED" or event == "QUEST_REMOVED") then
+        questsDirty = false
+        ScanCompletions()
+    end
     if event == "QUEST_ACCEPTED" then
         local objectives = C_QuestLog.GetQuestObjectives(a)
         Add("accept", a, { npc = Npc(), title = C_QuestLog.GetTitleForQuestID(a),
@@ -199,7 +221,7 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
     elseif event == "QUEST_REMOVED" then
         complete[a] = nil
     elseif event == "QUEST_LOG_UPDATE" then
-        ScanCompletions()
+        questsDirty = true
     elseif event == "PLAYER_XP_UPDATE" then
         XPChanged()
     elseif event == "PLAYER_LEVEL_UP" then
@@ -215,7 +237,7 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
     elseif event == "PLAYER_REGEN_ENABLED" then
         Add("peace")
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
-        if c == HEARTHSTONE then Add("hearth") end
+        if YR.Open(c) == HEARTHSTONE then Add("hearth") end
     elseif event == "ZONE_CHANGED_NEW_AREA" then
         Add("zone", nil, { zone = GetZoneText() })
     elseif event == "TRAINER_CLOSED" then
@@ -346,7 +368,7 @@ function YR:StartLog()
         for _, r in pairs(YippRouteDB.runs) do if type(r.track) == "table" then YR.SlimTrack(r.track) end end
         YippRouteDB.trackSlimmed = 1
     end
-    if not YippRouteDB.logging then return end
+    if not YR.Option("logging") then return end
     local key = YR.CharKey()
     YippRouteDB.runs[key] = YippRouteDB.runs[key] or { started = time(), ev = {}, track = {} }
     run = YippRouteDB.runs[key]
@@ -373,5 +395,5 @@ end
 function YR:LogStatus()
     local r = YippRouteDB.runs[YR.CharKey()]
     YR.Print(("logging %s; this character: %d events, %d position samples."):format(
-        YippRouteDB.logging and "on" or "off", r and #r.ev or 0, r and #r.track or 0))
+        YR.Option("logging") and "on" or "off", r and #r.ev or 0, r and #r.track or 0))
 end

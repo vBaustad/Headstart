@@ -1,5 +1,5 @@
 -- Whisper sound: a sound of your choice when someone whispers you, loud enough to notice. Off until you
--- pick one (Headstart, QoL, Reminders & sounds).
+-- pick one (Headstart, QoL, Chat).
 --   The sounds: a list of the game's own (alarms, bells, the raid warning, the ready check and the
 --   like, each by its SOUNDKIT name - one this client doesn't have is left out of the list), and, when
 --   another addon has LibSharedMedia loaded, every sound registered there too (sound packs, Details,

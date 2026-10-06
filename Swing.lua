@@ -444,45 +444,76 @@ function YR.SwingStart(kind, length)
     YR.SwingLayout()
 end
 
--- A sample on Blizzard's bars, dressed: each is shown and filled by us for a few seconds, then left
--- as it was (hidden again if it was hidden). Not in a fight: there the bars are Blizzard's to run.
-local sampler
+-- A sample of Blizzard's bars, dressed. Blizzard's own bars are not touched for it (showing an Edit
+-- Mode frame from an addon would run its code as ours, and hiding it again in a fight is blocked):
+-- three bars of our own are laid exactly over where Blizzard's sit, in the same look, and filled for
+-- a few seconds. Where a bar of Blizzard's has no place yet, its sample stands in the middle.
+local sampler, samples
 local function DressTest()
-    if InCombatLockdown() then return false, "not in a fight: the bars are busy there." end
-    Dress()
-    local list = {}
-    for i, name in ipairs(BLIZZARD) do
-        local f = _G[name]
-        local k = f and kept[f]
-        if k and k.on then
-            local length = 1.6 + i * 0.6
-            list[#list + 1] = { f = f, k = k, length = length, was = f:IsShown() }
-            f:Show()
-            f.StatusBar:SetMinMaxValues(0, length)
-            k.length:SetText(("%.1fs"):format(length))
-            k.length:SetShown(YR.SwingDB().speed)
+    if InCombatLockdown() then return false, "not in a fight." end
+    local db = YR.SwingDB()
+    sampler = sampler or CreateFrame("Frame", nil, UIParent)
+    if not samples then
+        samples = {}
+        for i, hand in ipairs(HANDS) do
+            local bar = CreateFrame("StatusBar", nil, sampler)
+            bar:SetFrameStrata("HIGH")
+            bar.bg = bar:CreateTexture(nil, "BACKGROUND")
+            bar.bg:SetAllPoints()
+            bar.lines = Outline(bar, bar)
+            bar.name = bar:CreateFontString(nil, "OVERLAY")
+            bar.name:SetPoint("LEFT", 6, 0)
+            bar.len = bar:CreateFontString(nil, "OVERLAY")
+            bar.len:SetPoint("LEFT", bar.name, "RIGHT", 6, 0)
+            bar.len:SetTextColor(1, 1, 1, 0.75)
+            bar.time = bar:CreateFontString(nil, "OVERLAY")
+            bar.time:SetPoint("RIGHT", -6, 0)
+            bar.hand = hand
+            samples[i] = bar
         end
     end
-    if #list == 0 then return false, "Blizzard's swing bars aren't there to show (are they on in Edit Mode?)." end
-    sampler = sampler or CreateFrame("Frame")
-    local start, last = GetTime(), -1
+    for i, bar in ipairs(samples) do
+        local theirs = _G[BLIZZARD[i]]
+        local sb = type(theirs) == "table" and theirs.StatusBar
+        bar:ClearAllPoints()
+        if type(sb) == "table" and sb.GetLeft and sb:GetLeft() then
+            bar:SetAllPoints(sb)
+        else
+            bar:SetSize(260, 20)
+            bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 260 - (i - 1) * 26)
+        end
+        bar.length = 1.6 + i * 0.6
+        bar.tenth = nil
+        bar:SetStatusBarTexture(TEXTURES[db.texture] or TEXTURES.smooth)
+        local c = db[bar.hand.color]
+        bar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
+        bar.bg:SetColorTexture(0, 0, 0, db.bgAlpha)
+        ShowLines(bar.lines, db.outline)
+        bar:SetMinMaxValues(0, bar.length)
+        for _, fs in ipairs({ bar.name, bar.time }) do fs:SetFont(YR.Style.FONT, db.font, "OUTLINE") end
+        bar.len:SetFont(YR.Style.FONT, math.max(8, db.font - 1), "OUTLINE")
+        bar.name:SetText(bar.hand.name)
+        bar.len:SetText(("%.1fs"):format(bar.length))
+        bar.len:SetShown(db.speed)
+        bar:Show()
+    end
+    sampler:Show()
+    local start = GetTime()
     sampler:SetScript("OnUpdate", function(self)
         local elapsed = GetTime() - start
-        local done = elapsed > 4 or InCombatLockdown()
-        for _, e in ipairs(list) do
-            local at = elapsed % e.length
-            e.f.StatusBar:SetValue(at)
-            local label = e.k.labels[#e.k.labels]
-            local tenth = math.floor((e.length - at) * 10)
-            if label and label.SetText and tenth ~= e.tenth then
-                e.tenth = tenth
-                label:SetText(("%.1f"):format(tenth / 10))
-            end
-            if done and not e.was then e.f:Hide() end
-        end
-        if done then
+        if elapsed > 4 or InCombatLockdown() then
             self:SetScript("OnUpdate", nil)
-            for _, e in ipairs(list) do LengthText(e.k) end
+            self:Hide()                 -- our own frame: allowed at any time
+            return
+        end
+        for _, bar in ipairs(samples) do
+            local at = elapsed % bar.length
+            bar:SetValue(at)
+            local tenth = math.floor((bar.length - at) * 10)
+            if tenth ~= bar.tenth then
+                bar.tenth = tenth
+                bar.time:SetText(("%.1f"):format(tenth / 10))
+            end
         end
     end)
     return true

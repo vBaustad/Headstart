@@ -314,6 +314,8 @@ end
 local function ApplyGuide()
     local rxp = RXP
     if not (rxp and rxp.LoadGuideTable and rxp.GetGuideTable) then return "RestedXP not loaded" end
+    -- the opener is a level 1 route: a character past it keeps the guide it is on
+    if (UnitLevel("player") or 1) > 5 then return "left as it is (not a new character)" end
     local _, race = UnitRace("player")
     local guide = GUIDE_FOR_RACE[race]
     if not guide then return "no Headstart opener for this race" end
@@ -346,9 +348,17 @@ function YS:ApplyUI(ui, o)
     local set, bars = 0, 0
     local suite = FirstLoaded(UI_SUITES)
     local barAddon = suite or FirstLoaded(BAR_ADDONS)
+    -- each game setting as it was, kept beside the bars' copy for /ysetup undo
+    local char = _G.YippSetupCharDB          -- this character's saved table (Setup.lua fills it at login)
+    local backup = type(char) == "table" and char.backup or nil
     for name, v in pairs(o.settings and ui.cvars or {}) do
-        if C_CVar.GetCVar(name) ~= nil and C_CVar.GetCVar(name) ~= v and pcall(C_CVar.SetCVar, name, v) then
+        local was = C_CVar.GetCVar(name)
+        if was ~= nil and was ~= v and pcall(C_CVar.SetCVar, name, v) then
             set = set + 1
+            if backup then
+                backup.cvars = backup.cvars or {}
+                backup.cvars[name] = was
+            end
         end
     end
     local barsDone = not barAddon and o.barVisibility
@@ -371,6 +381,9 @@ function YS:ApplyUI(ui, o)
         if layoutChanged and not clean then taint = true end
     end
     local chat = o.chat and YS.ApplyChat(ui.chat) or "off"
+    -- chat windows are set through Blizzard's own functions, called from here: what they write on the
+    -- chat frames is ours until a reload, so it ends with the same Reload question
+    if o.chat and type(chat) == "string" and chat:find("windows$") then taint = true end
     if o.camera then YS.ApplyCamera(ui.camera) end
     local barText = barAddon and ("left to " .. barAddon) or (o.barVisibility and (tostring(bars) .. " changed") or "off")
     YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. RestedXP guide: %s.")

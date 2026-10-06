@@ -80,6 +80,9 @@ local SKILL_UPS = {
     { item = 2835, quest = 96044, count = 10 },   -- Rough Stone: Rough Weightstones
 }
 
+local skillItems = {}
+for _, n in ipairs(SKILL_UPS) do skillItems[n.item] = true end
+
 -- Routes change when the player saves an edit: read them again next time.
 function YR:ForgetNeeds() needs = nil end
 
@@ -104,6 +107,8 @@ end
 function YR.RouteNeed(item, live)
     if not item then return nil end
     if not needs then Build() end
+    -- most items no route needs: said at once, before anything is made (this is every item tooltip)
+    if not needs[item] and not skillItems[item] then return nil end
     local count, what = 0, {}
     for _, n in ipairs(needs[item] or {}) do
         if not Done(n.quest) and (not live or live(n.quest)) then

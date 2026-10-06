@@ -1,4 +1,4 @@
--- RestedXP skins: two looks for RestedXP's guide window, picked in Headstart, QoL, Skins (or
+-- RestedXP skins: two looks for RestedXP's guide window, picked in Headstart, QoL, RestedXP (or
 -- in RestedXP's own theme list, where they show up as "Headstart" and "Blizzard").
 --   Headstart: the flat dark look of Headstart's own window - a thin line for a border, one accent
 --   colour on the header, the footer, the step you're on and the map pins. The accent and the
@@ -90,6 +90,14 @@ function YR.RXPSkinThemes()
         edges = { edge = "Interface/Tooltips/UI-Tooltip-Border", guideName = "Interface/Tooltips/UI-Tooltip-Border" },
     }
     return headstart, blizzard
+end
+
+--- The look as you picked it, whatever the main switch says: what the settings show.
+function YR.RXPSkinModeSet()
+    local rxp = Rxp()
+    local profile = rxp and rxp.settings and rxp.settings.profile
+    local name = profile and profile.activeTheme
+    return name == HEADSTART and "headstart" or name == BLIZZARD and "blizzard" or "off"
 end
 
 --- Which of ours is on: "headstart", "blizzard", or "off" (RestedXP's own, or RestedXP isn't there).

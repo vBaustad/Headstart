@@ -89,7 +89,7 @@ GameTooltip = setmetatable({}, { __index = function() return function() end end 
 function hooksecurefunc(a, b, c) if c then HOOKS[b] = c else HOOKS[a] = b end end
 -- bags (BAGS[bag * 100 + slot] = { itemID, stackCount }) and a vendor window
 BAGS = {}
-C_Container = { UseContainerItem = function() end, GetContainerNumSlots = function() return 16 end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end,
+C_Container = { UseContainerItem = function() end, GetContainerNumSlots = function() return 16 end, GetContainerItemInfo = function(bag, slot) return BAGS[bag * 100 + slot] end, GetContainerItemLink = function(bag, slot) local b = BAGS[bag * 100 + slot] return type(b) == "table" and b.hyperlink or nil end,
     GetContainerItemID = function(bag, slot) local i = BAGS[bag * 100 + slot] return i and i.itemID end }
 MerchantFrame = { shown = false, IsShown = function(self) return self.shown end }
 DONE = {}
@@ -217,6 +217,7 @@ g.LOG = lua.eval("{ { 179, false } }")
 g.CLOCK += 300; g.XP = 380
 g.LOG = lua.eval("{ { 179, true } }")
 g.Fire("QUEST_LOG_UPDATE"); g.Fire("QUEST_LOG_UPDATE")     # completion must be logged once
+YR.LogSample()                   # the log is read on the next sample (two seconds at most), not per event
 g.CLOCK += 40
 g.Fire("QUEST_TURNED_IN", 179, 80, 35)
 g.RunTickers()                   # a position sample
@@ -228,7 +229,7 @@ check(acc[6] == 1426 and acc[7] == 29.93 and acc[8] == 71.2, f"accept: position 
 check(com[1] - acc[1] == 300 and tin[1] - com[1] == 40, "times: 5 min objective, 40 s to turn in")
 check(tin.xp == 80 and tin.money == 35, "turn-in: XP and money received")
 check(len(run.track) >= 1, "position samples recorded")
-check(run.track[1][7] == 0, "position sample carries flags (not in combat)")
+check(run.track[1][7] == 0, f"position sample carries flags (not in combat): {run.track[1][7]}")
 
 # standing still: the samples in between are left out, one kept every 30 s; moving off writes the last
 # still one first, so the move starts 2 s after it
@@ -728,16 +729,20 @@ check(YR.WindowTab() == "levelling", "Where next? is on the Levelling tab, and f
 YR.ShowSettingsTab(YR, "trainer")
 check(YR.WindowTab() == "qol", "the Trainer page is on the QoL tab")
 # the menu's pages by their names, old ones included (the skins and the talent window had their own)
-for key in ("xpbar", "swing", "skins", "windows", "instances", "main", "rxpskin", "dmgskin", "talentwin"):
+for key in ("start", "xpbar", "swing", "chat", "windows", "instances", "main", "rxpskin", "dmgskin", "skins", "talentwin"):
     YR.ShowSettingsTab(YR, key)
-check(True, "Skins, Windows and the pages' old names open")
+check(True, "Chat, Bars & windows, the two skins and the pages' old names open")
 found = YR.SettingsSearch("instances an hour")
 check(found is not None and len(found) == 1 and found[1].key == "instances",
       "the instance tracker's settings are found on the Instances page")
 YR.SettingsGo(found[1])
 check(True, "and going to one opens that page's settings")
 found = YR.SettingsSearch("micro menu")
-check(found is not None and len(found) == 1 and found[1].key == "windows", "the bag bar and micro menu are on Windows")
+check(found is not None and len(found) == 1 and found[1].key == "windows", "the bag bar and micro menu are on Bars & windows")
+found = YR.SettingsSearch("button strip")
+check(found is not None and len(found) == 1 and found[1].key == "chat", "the chat's buttons are on Chat")
+found = YR.SettingsSearch("volume follows")
+check(found is not None and len(found) == 1 and found[1].key == "chat", "and so is the whisper sound")
 YR.SettingsSearch("")
 # a menu with a button on each line (the speaker on the whisper sounds): it acts on that line's value
 # without picking it, and a line can go without one

@@ -59,7 +59,8 @@ SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return s end
 floor = math.floor
-YippRouteDB = {}
+-- the options that are off until turned on, on: the features are what is tested here
+YippRouteDB = { restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
 function print() end
 SLIDERS = 0
 STYLE = { FONT = "x", C = { sub = { 1, 1, 1 } } }
@@ -186,7 +187,7 @@ end
     lua.execute("PlayerSpellsFrame:SetPoint('TOP', UIParent, 'TOP', 0, -41)")
     check(point()[0] == "TOP", "never moved: left where Blizzard puts it")
     handle = [f for f in g.FRAMES.values() if lua.eval("function(f) return rawget(f, '_OnDragStop') ~= nil end")(f)][0]
-    lua.eval("function(h) rawget(h, '_OnDragStop')(h) end")(handle)
+    lua.eval("function(h) rawget(h, '_OnDragStart')(h) rawget(h, '_OnDragStop')(h) end")(handle)
     pos = g.YippRouteDB.moved.talents
     check(pos[1] == 321 and pos[2] == 778, f"dragged: where you left it is kept ({pos[1]}, {pos[2]})")
     lua.execute("PlayerSpellsFrame:SetPoint('TOP', UIParent, 'TOP', 0, -41)")
@@ -194,7 +195,7 @@ end
     # dragged by the talent page itself (anywhere that isn't a button), not only the title bar
     g.YippRouteDB.moved.talents = None
     check(raw_has(t, "hookOnDragStop") and raw_has(w, "hookOnDragStop"), "the window and the talent page can be dragged by")
-    lua.eval("function(t) rawget(t, 'hookOnDragStop')(t) end")(t)
+    lua.eval("function(t) rawget(t, 'hookOnDragStart')(t) rawget(t, 'hookOnDragStop')(t) end")(t)
     check(g.YippRouteDB.moved.talents is not None and g.YippRouteDB.moved.talents[1] == 321, "dragged by the talent page: kept")
     check(not raw_has(t.ApplyButton, "hookOnDragStop"), "a button is not something to drag by")
     lua.execute("COMBAT = true PlayerSpellsFrame:SetPoint('TOP', UIParent, 'TOP', 0, -41)")
@@ -209,6 +210,18 @@ end
     # the bags: nothing at all until their option is on, then the same, each on its own
     lua.execute("ContainerFrameCombinedBags, ContainerFrame6 = New(), New()")
     YR.StartMovers()
+    # window sizes: untouched until set; set, it's sized as it shows; back to 100 is Blizzard's again
+    lua.execute("SocialUIFrame = New() Fire('PLAYER_ENTERING_WORLD')")
+    raw = lua.eval("rawget")
+    check(raw(g.SocialUIFrame, "scale") is None, "window sizes: a window is never touched until you set a size")
+    YR.SetWindowScale("social", 80)
+    check(abs(raw(g.SocialUIFrame, "scale") - 0.8) < 0.001 and g.YippRouteDB.windowScale.social == 80, "social window at 80 percent")
+    lua.execute("SocialUIFrame:SetScale(1) rawget(SocialUIFrame, 'hookOnShow')(SocialUIFrame)")
+    check(abs(raw(g.SocialUIFrame, "scale") - 0.8) < 0.001, "Blizzard sizes it again as it opens: ours goes back on")
+    lua.execute("LFGParentFrame = New() Fire('ADDON_LOADED', 'Blizzard_GroupFinder')")
+    check(raw(g.LFGParentFrame, "scale") is None, "the group finder, not set: left alone when it loads")
+    YR.SetWindowScale("social", 100)
+    check(raw(g.SocialUIFrame, "scale") == 1 and g.YippRouteDB.windowScale.social is None, "back to 100: Blizzard's size")
     lua.execute("Fire('PLAYER_ENTERING_WORLD')")
     touched = lua.eval("function(f) return rawget(f, 'hookOnShow') ~= nil or rawget(f, 'SetPoint') ~= nil end")
     check(not touched(g.ContainerFrameCombinedBags) and not touched(g.ContainerFrame6), "bags, options off: neither window is touched")
@@ -220,7 +233,7 @@ end
     check(touched(g.ContainerFrameCombinedBags) and not touched(g.ContainerFrame6), "the combined bag turned on: that one only")
     bagpoint = lua.eval("function() local p = rawget(ContainerFrameCombinedBags, 'point') return p and p[1], p and p[4], p and p[5] end")
     handles = [f for f in g.FRAMES.values() if lua.eval("function(f) return rawget(f, '_OnDragStop') ~= nil end")(f)]
-    lua.eval("function(h) rawget(h, '_OnDragStop')(h) end")(handles[-1])
+    lua.eval("function(h) rawget(h, '_OnDragStart')(h) rawget(h, '_OnDragStop')(h) end")(handles[-1])
     lua.execute("ContainerFrameCombinedBags:SetPoint('BOTTOMRIGHT', UIParent, 'BOTTOMRIGHT', -10, 90)")
     check(tuple(bagpoint()) == ("TOPLEFT", 321, 778), f"dragged, then Blizzard lays the bags out: back to yours ({tuple(bagpoint())})")
     g.YippRouteDB.moveBag = False

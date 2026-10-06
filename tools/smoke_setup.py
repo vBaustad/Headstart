@@ -84,7 +84,7 @@ SPELLS_BY_ID = SPELLS
 C_Item = { GetItemNameByID = function() return nil end }
 function HasAction(s) return BAR[s] ~= nil end
 function GetActionInfo(s) local b = BAR[s] return b.kind, b.id end
-function GetActionText(s) local b = BAR[s] if not b then return nil end return b.kind == "macro" and MACROS[b.id][1] or nil end
+function GetActionText(s) local b = BAR[s] if not b then return nil end return b.kind == "macro" and (MACROS[b.id] or {})[1] or nil end
 function GetMacroIndexByName(n) for i, m in pairs(MACROS) do if m[1] == n then return i end end return 0 end
 function GetMacroInfo(i) local m = MACROS[i] if m then return m[1], m[2], m[3] end end
 function GetNumMacros() local a, c = 0, 0 for i in pairs(MACROS) do if i <= 120 then a = a + 1 else c = c + 1 end end return a, c end
@@ -148,6 +148,7 @@ for f in ("Style.lua", "Data/SpellLevels.lua", "Setup.lua", "SetupUI.lua"):
 YS = YS.Setup          # the setup's own table inside Headstart
 
 g = lua.globals()
+SURE = lua.eval("{ sure = true }")      # Set up on a character in play asks first: the tests have answered
 lua.execute(r'''
 YippSetupDB, YippSetupCharDB = {}, {}
 MACROS[121] = { "AutoFeed", 134400, "#showtooltip\n/use item:8950" }    -- the main's AutoFeed food macro
@@ -176,7 +177,7 @@ ok = YS.SpellButtons(YS.Options(YS)) == "spells"
 print(("ok  " if ok else "FAIL"), "a class set up for the first time: Only spells by default")
 bad_default = not ok
 YS.Options(YS).spellButtons = "placeholder"
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.CVARS.AutoPushSpellToActionBar == "0"
 print(("ok  " if ok else "FAIL"), "Blizzard's auto-placing of new spells turned off")
 bad_autopush = not ok
@@ -218,7 +219,7 @@ for s, want in expect.items():
 
 made = len([k for k in g.MACROS])
 lua.execute("YS_before = 0 for _ in pairs(MACROS) do YS_before = YS_before + 1 end")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 lua.execute("YS_after = 0 for _ in pairs(MACROS) do YS_after = YS_after + 1 end")
 again = g.YS_after - g.YS_before
 print(("ok  " if again == 0 else "FAIL"), "applying twice creates", again, "new macros")
@@ -228,7 +229,7 @@ bad += again != 0
 lua.execute(r'''local last = 120 while MACROS[last + 1] do last = last + 1 end
     MACROS[last + 1] = { "MyOwn", 132089, "/cast [stealth] Ambush" }
     MACROS[last + 2] = { "Gone", 134400, "#showtooltip Retired Spell\n/cast Retired Spell" }''')
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 left = [g.MACROS[k][1] for k in g.MACROS]
 ok = "MyOwn" in left and "Gone" not in left
 print(("ok  " if ok else "FAIL"), "set up again: your own macro stays, an unused question mark goes", left)
@@ -269,7 +270,7 @@ bad += not ok
 # A character where AutoFeed hasn't made its macro yet: AutoFeed is asked to make it (so it owns and
 # fills it), and it goes in its slot. Nothing is copied from the main.
 lua.execute(r'''MACROS = {}; AutoFeedCharDB = { owned = {} }''')
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 made = [k for k in g.MACROS if g.MACROS[k][1] == "AutoFeed"]
 b9 = g.BAR[9]
 ok = len(made) == 1 and bool(g.AutoFeedCharDB.owned.AutoFeed) and b9 is not None and b9.kind == "macro" and b9.id == made[0]
@@ -279,7 +280,7 @@ bad += not ok
 
 # Without AutoFeed loaded: nothing is made, the slot stays empty, and it says why.
 lua.execute(r'''MACROS = {}; AutoFeedCharDB = { owned = {} }; SAVED_LIBSTUB = LibStub; LibStub = nil''')
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 names = [g.MACROS[k][1] for k in g.MACROS]
 ok = "AutoFeed" not in names and g.BAR[9] is None
 said = any("AutoFeed isn't loaded" in str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1))
@@ -311,7 +312,7 @@ bad += not ok
 # A layout copied before bars and settings were saved: Set up layout still picks the guide, and
 # logging in on the main fills the missing part in.
 lua.execute(r'''YippSetupDB.ui = nil; RXP.loaded = nil''')
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.RXP.loaded is not None
 print(("ok  " if ok else "FAIL"), "old layout without ui: RestedXP guide still loaded")
 bad += not ok
@@ -401,12 +402,16 @@ lua.execute("""KNOWN[639] = true; NAMEID["Holy Light"] = 639
 local f = C_Spell.GetSpellName; C_Spell.GetSpellName = function(id) if id == 639 then return "Holy Light" end return f(id) end""")
 ok = g.BAR[1].id == 635
 # the main keeps Holy Light at Rank 1 on purpose (downranking): it stays Rank 1
-lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]; e.down, e.id = true, 635""")
+lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]; e.down, e.id = true, 635
+    local mine = YippSetupCharDB.layout and YippSetupCharDB.layout[1]      -- the layout as it went on this character
+    if mine then mine.down, mine.id = true, 635 end""")
 events._OnEvent(events, "SPELLS_CHANGED")
 ok2 = g.BAR[1].id == 635
 print(("ok  " if ok2 else "FAIL"), f"downranked on the main: slot 1 stays Rank 1 ({g.BAR[1].id})")
 bad += not ok2
-lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]; e.down, e.id = nil, nil""")
+lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]; e.down, e.id = nil, nil
+    local mine = YippSetupCharDB.layout and YippSetupCharDB.layout[1]
+    if mine then mine.down, mine.id = nil, nil end""")
 # a new rank always goes on the bar unless the spell is kept at a rank: there is no switch for it
 YS.Options(YS).rankUp = False          # the switch there used to be: ignored now
 events._OnEvent(events, "SPELLS_CHANGED")
@@ -478,13 +483,13 @@ end
 ''')
 g.YR_SETUP = YS
 lua.execute("Fresh({ items = true })")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.BAR[8] is not None and g.BAR[8].kind == "item" and g.BAR[8].id == 6948
 print(("ok  " if ok else "FAIL"), "items on: the Hearthstone goes back on its slot")
 bad += not ok
 
 lua.execute("Fresh({ placeholders = false })")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.BAR[4] is None and g.BAR[1] is not None and g.BAR[1].kind == "spell"
 print(("ok  " if ok else "FAIL"), "placeholders off: an unlearned spell's slot stays empty, a known one is placed")
 bad += not ok
@@ -495,14 +500,14 @@ print(("ok  " if ok else "FAIL"), "... and goes in when it is learned")
 bad += not ok
 
 lua.execute("Fresh({ professions = false }); KNOWN[2580] = true")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 events._OnEvent(events, "SPELLS_CHANGED")
 ok = g.BAR[10] is None
 print(("ok  " if ok else "FAIL"), "professions off: Find Minerals is not placed, even when known")
 bad += not ok
 
 lua.execute("Fresh(); OLD_LEVEL = UnitLevel UnitLevel = function() return 10 end")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.BAR[2] is not None and g.BAR[2].kind == "macro"
 print(("ok  " if ok else "FAIL"), "level 10: Flash of Light (level 20, ten levels ahead) gets its question mark")
 bad += not ok
@@ -510,13 +515,13 @@ lua.execute("UnitLevel = OLD_LEVEL")
 
 # the level limit is for a new character's question marks: it never drops a spell at or under your level
 lua.execute("Fresh(); OLD_LEVEL = UnitLevel UnitLevel = function() return 30 end NAMEID['Flash of Light'] = 19750 KNOWN[19750] = true")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.BAR[2] is not None and g.BAR[2].kind == "spell" and g.BAR[2].id == 19750
 print(("ok  " if ok else "FAIL"), "level 30: a level 20 spell you know goes on its slot")
 bad += not ok
 # ... and a spell above the limit, left out when the layout went on, goes into its empty slot once learned
 lua.execute("Fresh(); UnitLevel = function() return 1 end KNOWN[19750] = nil")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.BAR[2] is None
 print(("ok  " if ok else "FAIL"), "level 1: a level 20 spell is too far ahead for a button yet")
 bad += not ok
@@ -541,7 +546,7 @@ bad += not ok
 # what the planner starts from: the bars, with the saved layout where they're empty; a question mark
 # Headstart made for a saved spell is that spell
 lua.execute("Fresh()")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 plan, now = YS.PlanStart()
 saved = YS.Profile(YS).slots
 ok = all(plan[k] is not None for k in saved) and plan[4] is not None and plan[4].kind == "spell" and now[4] is not None and now[4].kind == "macro"
@@ -565,11 +570,46 @@ ok = plan[1] is not None and plan[1].down is True and plan[1].id == 635
 print(("ok  " if ok else "FAIL"), "... unless you set that rank in the planner: then it stays set")
 bad += not ok
 lua.execute("""KNOWN[639] = nil; NAMEID["Holy Light"] = 635; YippSetupDB.classes.PALADIN.profile.slots[1] = KEPT_SLOT""")
+# Set up on a character in play: asked first, nothing touched until answered; Bars only keeps macros
+# and the interface; undo puts the bars and macros back
+lua.execute("""Fresh(); OLD_LEVEL = UnitLevel UnitLevel = function() return 30 end
+    for i = 20, 40 do BAR[i] = { kind = 'spell', id = 635 } end
+    MACROS[121] = { 'Mine', 1, '/dance' }
+    YippSetupCharDB.applied = nil          -- never set up before: its macros would go
+    ASKED = nil StaticPopup_Show = function(w, text) ASKED = { which = w, text = text } return ASKED end""")
+YS.Apply(YS)
+ok = g.ASKED is not None and g.ASKED.which == "YIPPSETUP_CONFIRM" and g.BAR[30] is not None and g.MACROS[121] is not None     and "21 buttons" in g.ASKED.text and "1 of this character's macros" in g.ASKED.text
+print(("ok  " if ok else "FAIL"), f"Set up at level 30 with buttons and a macro: asked first, with what goes ({g.ASKED and g.ASKED.text})")
+bad += not ok
+lua.execute("CVARS_SET = 0 local old = C_CVar.SetCVar C_CVar.SetCVar = function(...) CVARS_SET = CVARS_SET + 1 return old(...) end")
+lua.execute("StaticPopupDialogs.YIPPSETUP_CONFIRM.OnAlt(nil, nil)")
+ok = g.BAR[30] is None and g.BAR[1] is not None and g.MACROS[121] is not None and g.CVARS_SET == 0
+print(("ok  " if ok else "FAIL"), "Bars only: the saved bars go on, your macro stays, no game setting is touched")
+bad += not ok
+YS.Undo(YS)
+ok = g.BAR[30] is not None and g.BAR[30].id == 635 and g.YippSetupCharDB.applied is None and g.YippSetupCharDB.backup is None
+print(("ok  " if ok else "FAIL"), "/ysetup undo: the bars as they were before, and the character no longer counts as set up")
+bad += not ok
+lua.execute("UnitLevel = OLD_LEVEL")
+# a spell you took off a slot it was put on stays off
+lua.execute("Fresh()")
+YS.Apply(YS, None, None, SURE)
+lua.execute("BAR[1] = nil")
+events._OnEvent(events, "SPELLS_CHANGED")
+ok = g.BAR[1] is None
+print(("ok  " if ok else "FAIL"), "a spell you took off its slot after Set up isn't put back")
+bad += not ok
+# a button a layout can't hold is still a button: the planner's start has it, and never fills its slot
+lua.execute("Fresh(); BAR[1] = { kind = 'mount', id = 77 }")
+plan, now = YS.PlanStart()
+ok = plan[1] is not None and plan[1].kind == "other" and now[1] is not None and now[1].kind == "other"
+print(("ok  " if ok else "FAIL"), "a mount on a slot the saved layout has a spell for: the planner keeps the mount there")
+bad += not ok
 g.SlashCmdList.YIPPSETUP("debug")
 print("ok  ", "/ysetup debug prints without an error")
 
 lua.execute("Fresh({ clearBars = false }); BAR[20] = { kind = 'spell', id = 635 }")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.BAR[20] is not None and g.BAR[20].id == 635
 print(("ok  " if ok else "FAIL"), "clear bars off: a button the saved layout doesn't use is kept")
 bad += not ok
@@ -582,14 +622,14 @@ def chk(ok, what):
 
 
 lua.execute("Fresh({ spellButtons = 'spells' })")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 chk(g.BAR[4] is None and g.BAR[1] is not None and g.BAR[1].kind == "spell",
     "only spells: an unlearned spell's slot stays empty, a known one is the spell")
 mo = g.BAR[5]
 chk(mo is not None and mo.kind == "macro" and "@mouseover" in g.MACROS[mo.id][3],
     "only spells: a mouseover spell is still its macro (that is what makes it mouseover)")
 lua.execute("Fresh({ spellButtons = 'macros' })")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 b = g.BAR[1]
 m = b and b.kind == "macro" and g.MACROS[b.id]
 chk(m and m[3] == "#showtooltip Holy Light\n/cast Holy Light", f"macros for every spell: known Holy Light is a macro too ({m and m[3]!r})")
@@ -600,7 +640,7 @@ lua.execute("""Fresh({ spellButtons = 'macros' })
     local e = YippSetupDB.classes.PALADIN.profile.slots[1]
     SAVED_SLOT1 = { down = e.down, id = e.id, rank = e.rank }
     e.down, e.id, e.rank = true, 635, 1""")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 b = g.BAR[1]
 m = b and b.kind == "macro" and g.MACROS[b.id]
 chk(m and m[3] == "#showtooltip Holy Light(Rank 1)\n/cast Holy Light(Rank 1)",
@@ -608,7 +648,7 @@ chk(m and m[3] == "#showtooltip Holy Light(Rank 1)\n/cast Holy Light(Rank 1)",
 lua.execute("""YippSetupDB.classes.PALADIN.profile.slots[1].rank = nil
     C_Spell.GetSpellSubtext = function(id) return id == 635 and "Rank 1" or nil end   -- the game's own rank text
     Fresh({ spellButtons = 'macros' })""")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 b = g.BAR[1]
 m = b and b.kind == "macro" and g.MACROS[b.id]
 chk(m and "(Rank 1)" in m[3], f"saved before ranks were stored, it still gets its rank ({m and m[3]!r})")
@@ -617,7 +657,7 @@ lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]
     Fresh({ placeholders = false })""")
 chk(YS.SpellButtons(YS.Options(YS)) == "spells", "an old 'placeholders off' reads as Only spells")
 lua.execute("Fresh({ spellButtons = 'spells' }); KNOWN[2580] = true")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 events._OnEvent(events, "SPELLS_CHANGED")
 chk(g.BAR[10] is not None and g.BAR[10].kind == "spell", "a profession spell goes on as the spell itself, never a macro")
 counts = {}
@@ -631,16 +671,16 @@ chk(limit == 30 and 0 < counts["spells"] < counts["placeholder"] < counts["macro
 
 
 lua.execute("Fresh({ classSpells = false, racials = false })")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 ok = g.BAR[1] is None and g.BAR[13] is None and g.BAR[11] is not None
 print(("ok  " if ok else "FAIL"), "class spells and racials off: only macros go on (your Heal macro is there)")
 bad += not ok
 
 lua.execute("Fresh({ mouseover = 'Holy Light' })")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 lua.execute("KNOWN[635] = nil")
 lua.execute("Fresh({ mouseover = 'Holy Light' }); KNOWN[635] = nil")
-YS.Apply(YS)
+YS.Apply(YS, None, None, SURE)
 m = g.MACROS[g.BAR[1].id] if g.BAR[1] and g.BAR[1].kind == "macro" else None
 ok = m is not None and "@mouseover" in m[3]
 print(("ok  " if ok else "FAIL"), f"mouseover list: Holy Light becomes a mouseover macro: {m and m[3]!r}")

@@ -10,14 +10,16 @@
 local ADDON, YR = ...
 
 function YR.ShareAll()
-    return YippRouteDB and YippRouteDB.shareAll == true
+    return YippRouteDB and YippRouteDB.shareAll == true and YR.QoLOn()
 end
 
-function YR.AcceptFrom()
+-- Off until you choose who (it accepts quests for you), and off with quality of life.
+function YR.AcceptFromSet()
     local v = YippRouteDB and YippRouteDB.acceptFrom
-    if v == "party" or v == "off" then return v end
-    return "friends"
+    if v == "party" or v == "off" or v == "friends" then return v end
+    return "off"
 end
+function YR.AcceptFrom() return YR.QoLOn() and YR.AcceptFromSet() or "off" end
 
 local function InParty(name)
     local ok, yes = pcall(function()

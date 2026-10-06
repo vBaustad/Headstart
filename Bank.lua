@@ -276,7 +276,26 @@ local function Opened()
     if bankOpen then return end
     bankOpen = true
     local b = Button()
-    if b then b:SetShown(YR.Option("bankButton")) end
+    if b then
+        b:SetShown(YR.Option("bankButton"))
+        -- A bag addon that draws its own bank (Baganator, EllesmereUI Bags) keeps Blizzard's bank
+        -- window out of sight, and our button with it. Then the button stands by itself at the top
+        -- of the screen while the bank is open. Looked at a moment on: Blizzard shows its window
+        -- just after it says the bank opened.
+        C_Timer.After(0.2, function()
+            if not bankOpen then return end
+            local own = BankFrame and BankFrame.IsVisible and BankFrame:IsVisible()
+            b:SetParent(own and BankFrame or UIParent)
+            b:ClearAllPoints()
+            if own then
+                b:SetPoint("TOPRIGHT", BankFrame, "BOTTOMRIGHT", 0, -2)
+            else
+                b:SetPoint("TOP", UIParent, "TOP", 0, -140)
+                b:SetFrameStrata("HIGH")
+            end
+            b:SetShown(YR.Option("bankButton"))
+        end)
+    end
     -- Shift as the bank opens: keep everything this time. Read now, not later: by the first tick
     -- the key may be up.
     if YR.Option("bankAuto") and not IsShiftKeyDown() then
@@ -287,6 +306,7 @@ end
 
 local function Closed()
     bankOpen = false
+    if button and button:GetParent() == UIParent then button:Hide() end      -- standing by itself: gone with the bank
     if run then Finish("the bank closed before the rest went") end
 end
 

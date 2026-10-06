@@ -468,6 +468,9 @@ local function Build()
         b:SetSize(38, 38)
         b:SetPoint("LEFT", (i - 1) * 44 + 2, 0)
         b:RegisterForClicks("AnyUp")
+        -- with the game's "cast on key down" on, a secure button only acts on the press, and this one
+        -- hears the release: said here that it acts on the release, or a right-click did nothing
+        b:SetAttribute("useOnKeyDown", false)
         b:RegisterForDrag("LeftButton")
         b:SetAttribute("type2", "item")
         b:SetAttribute("item2", tostring(s))

@@ -96,6 +96,7 @@ NUM_BAG_SLOTS = 4
 C_Container = {
     GetContainerNumSlots = function(bag) return bag == 0 and 4 or 0 end,
     GetContainerItemInfo = function(bag, slot) local b = BAGS[bag * 100 + slot] return b and { hyperlink = b[1] } end,
+    GetContainerItemLink = function(bag, slot) local b = BAGS[bag * 100 + slot] return b and b[1] end,
 }
 -- your numbers (the sim reads them), talents, and item tooltips by link
 STATS = { ap = 100, rap = 20, crit = 5, rcrit = 5, sp = 0, heal = 0, scrit = 5, hp = 500, armor = 300, spi = 40 }
@@ -155,7 +156,8 @@ C_FriendList = { IsFriend = function(guid) return FRIENDS[guid:gsub("^Player%-",
     GetFriendInfo = function(n) return FRIENDS[n] and {} or nil end }
 function IsInGuild() return false end
 function wipe(t) for k in pairs(t) do t[k] = nil end return t end
-YippRouteDB = {}
+-- the options that are off until turned on, on: the features are what is tested here
+YippRouteDB = { restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
 SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
@@ -274,8 +276,11 @@ def run():
         COUNT[2512] = 300''')
     YR.Restock(False)
     check(bought() == [(2515, 700)], f"bow: Sharp Arrows (usable, best) up to 1000 counting the rough ones: {bought()}")
-    # a warrior shoots too: 200 to begin with, and a number of its own
+    # a warrior shoots too, but buys no ammo until a number is set for it: its own number
     lua.execute("CLASS = 'WARRIOR' BOUGHT = {} COUNT = { [2512] = 50 }")
+    YR.Restock(False)
+    check(bought() == [], f"a warrior with a bow, no number set: no ammo is bought ({bought()})")
+    YR.SetRestockAmmo(200)
     YR.Restock(False)
     check(bought() == [(2515, 150)], f"a warrior with a bow: up to 200, not a hunter's 1000: {bought()}")
     YR.SetRestockAmmo(100)
@@ -287,6 +292,7 @@ def run():
         WORN = { [18] = "|Hitem:2947|h" }
         function GetInventoryItemCount(_, s) return s == 18 and 30 or 0 end
         VENDOR = { { 2947, 5, 1 }, { 2512, 10, 200 } }''')
+    YR.SetRestockAmmo(200)
     YR.Restock(False)
     check(bought() == [(2947, 150)], f"a rogue with throwing knives: the same knives up to 200, counting the 30 held: {bought()}")
     lua.execute("GetInventoryItemCount = nil WORN = {}")

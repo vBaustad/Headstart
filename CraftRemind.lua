@@ -108,10 +108,12 @@ end
 function YR.StartCraftRemind()
     local f = CreateFrame("Frame")
     local pending = false
+    local function Check() pending = false YR.CheckCrafts() end
     local function Later()
-        if pending then return end
+        -- off: nothing is set going at all (this is every loot, every bag change)
+        if pending or not YR.Option("craftRemind") then return end
         pending = true
-        C_Timer.After(1, function() pending = false YR.CheckCrafts() end)
+        C_Timer.After(1, Check)
     end
     for _, e in ipairs({ "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_REGEN_ENABLED", "LEARNED_SPELL_IN_TAB",
         "PLAYER_ENTERING_WORLD" }) do

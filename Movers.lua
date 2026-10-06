@@ -7,7 +7,7 @@
 --   A window can also be dragged by its own empty parts (the talent window is): those frames are
 --   registered for a drag and hooked, nothing of theirs replaced. Buttons and talents are frames of
 --   their own on top, so a click or a drag on one of them is still theirs.
---   Account options (YippRouteDB, Headstart, QoL, Windows): moveBag, moveReagentBag (both off unless
+--   Account options (YippRouteDB, Headstart, QoL, Bars & windows): moveBag, moveReagentBag (both off unless
 --   turned on); moved[key] = { left, top } is where each was left.
 local ADDON, YR = ...
 
@@ -36,9 +36,16 @@ local function Place(m)
         h:SetFrameLevel(frame:GetFrameLevel() + 600)
         h:EnableMouse(true)
         h:RegisterForDrag("LeftButton")
-        local function Start() if m.on() and not InCombatLockdown() then frame:StartMoving() end end
+        local function Start()
+            if m.on() and not InCombatLockdown() then
+                m.moving = true
+                frame:StartMoving()
+            end
+        end
         local function Stop()
-            -- let go in a fight that began mid-drag: the window is the game's until it ends
+            -- a fight that began mid-drag ended the drag itself (StartMovers, PLAYER_REGEN_DISABLED)
+            if not m.moving then return end
+            m.moving = nil
             if InCombatLockdown() and frame.IsProtected and frame:IsProtected() then return end
             frame:StopMovingOrSizing()
             -- a moved frame is "user placed": the client would save where it is and put it there itself
@@ -53,7 +60,7 @@ local function Place(m)
         end
         h:SetScript("OnDragStart", Start)
         h:SetScript("OnDragStop", Stop)
-        m.handle = h
+        m.handle, m.stop = h, Stop
         for _, part in pairs(m.parts and m.parts(frame) or {}) do
             if type(part) == "table" and part.RegisterForDrag and part.HookScript then
                 part:RegisterForDrag("LeftButton")
@@ -103,6 +110,52 @@ function YR.MoverReset(key)
 end
 
 -- The bags have no back(): after a reset Blizzard puts them in its own place the next time they open.
+-- ---------------------------------------------------------------------------
+-- Window sizes: the social window and the group finder smaller or larger (Settings only: nothing is
+-- added to the windows themselves). A window is sized when it shows, out of combat; 100 leaves it
+-- as Blizzard has it, and a window is only ever touched once you've set a size for it.
+--   Account options (YippRouteDB.windowScale): social, lfg = percent (50-150).
+-- ---------------------------------------------------------------------------
+local SIZED = {
+    social = function() return _G.SocialUIFrame end,
+    lfg = function() return _G.LFGParentFrame end,
+}
+local sizeHooked, sizeSet = {}, {}
+
+function YR.WindowScale(key)
+    local v = type(YippRouteDB.windowScale) == "table" and tonumber(YippRouteDB.windowScale[key])
+    return v and math.max(50, math.min(150, v)) or 100
+end
+
+local function Size(key)
+    local frame = SIZED[key] and SIZED[key]()
+    if type(frame) ~= "table" or not frame.SetScale then return false end
+    if not sizeHooked[key] and frame.HookScript then
+        sizeHooked[key] = true
+        frame:HookScript("OnShow", function() Size(key) end)
+    end
+    local want = YR.QoLOn() and YR.WindowScale(key) / 100 or 1
+    if want == 1 and not sizeSet[key] then return true end          -- never asked for: never touched
+    if InCombatLockdown() and frame.IsProtected and frame:IsProtected() then return true end
+    if math.abs((frame:GetScale() or 1) - want) > 0.001 then frame:SetScale(want) end
+    sizeSet[key] = want ~= 1 or nil
+    return true
+end
+
+function YR.SetWindowScale(key, percent)
+    if not SIZED[key] then return end
+    YippRouteDB.windowScale = type(YippRouteDB.windowScale) == "table" and YippRouteDB.windowScale or {}
+    percent = math.max(50, math.min(150, math.floor((tonumber(percent) or 100) + 0.5)))
+    YippRouteDB.windowScale[key] = percent ~= 100 and percent or nil
+    sizeSet[key] = sizeSet[key] or true          -- back to 100 puts Blizzard's size on again
+    Size(key)
+end
+
+--- Every sized window as its setting says (login, the end of a fight, the main switch).
+function YR.WindowScaleApply()
+    for key in pairs(SIZED) do Size(key) end
+end
+
 function YR.StartMovers()
     YR.Mover("bag", function() return _G.ContainerFrameCombinedBags end,
         function() return YippRouteDB.moveBag == true and YR.QoLOn() end, 50, 30)
@@ -113,7 +166,22 @@ function YR.StartMovers()
     local f = CreateFrame("Frame")
     f:RegisterEvent("PLAYER_ENTERING_WORLD")
     f:RegisterEvent("PLAYER_REGEN_ENABLED")
-    f:SetScript("OnEvent", function()
+    f:RegisterEvent("ADDON_LOADED")          -- the social window and the group finder load when first opened
+    f:RegisterEvent("PLAYER_REGEN_DISABLED")
+    f:SetScript("OnEvent", function(self, event)
+        if event == "PLAYER_REGEN_DISABLED" then
+            -- a fight begins with a window on the cursor: let go of it now, while that's still allowed
+            -- (this comes just before the lockdown), or it would stay on the cursor through the fight
+            for _, m in pairs(movers) do if m.moving and m.stop then m.stop() end end
+            return
+        end
+        if event == "ADDON_LOADED" then
+            local all = true
+            for key in pairs(SIZED) do if not Size(key) then all = false end end
+            if all then self:UnregisterEvent("ADDON_LOADED") end
+            return
+        end
         for key in pairs(movers) do YR.MoverPlace(key) end
+        YR.WindowScaleApply()
     end)
 end

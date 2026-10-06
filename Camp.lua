@@ -690,13 +690,34 @@ end
 
 -- UNIT_AURA comes in bursts (a camp hands out several auras at once), so one read per burst.
 local pending = false
-local function Later()
+local function Read()
+    pending = false
+    YR.RefreshCamp(true)
+end
+-- Is any of these new auras one of the camp's? (updateInfo.addedAuras)
+local function OursAmong(added)
+    for _, aura in ipairs(added) do
+        local id = aura.spellId
+        if issecretvalue and issecretvalue(id) then return true end      -- can't tell: look
+        if id == NEARBY or RANK[id] then return true end
+    end
+    return false
+end
+local function Later(_, event, _, info)
+    -- nothing to draw: nothing to read (turning the icon on reads at once, SetOption)
+    if not YR.Option("camp") then return end
+    if event == "UNIT_AURA" then
+        -- in a fight the auras can't be read: the reading is taken when it ends
+        if InCombatLockdown() then return end
+        -- auras were only added, and none is a camp's: a food buff, a potion, somebody's blessing
+        if type(info) == "table" and not info.isFullUpdate and info.addedAuras
+                and not info.removedAuraInstanceIDs and not info.updatedAuraInstanceIDs and not OursAmong(info.addedAuras) then
+            return
+        end
+    end
     if pending then return end
     pending = true
-    C_Timer.After(0.2, function()
-        pending = false
-        YR.RefreshCamp(true)
-    end)
+    C_Timer.After(0.2, Read)
 end
 
 local function SetOption(key, on)

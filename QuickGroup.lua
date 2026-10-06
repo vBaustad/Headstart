@@ -17,8 +17,11 @@ local function Choice(key, default)
     if v == "anyone" or v == "friends" or v == "off" then return v end
     return default
 end
-function YR.WhisperInvite() return Choice("whisperInvite", "friends") end
-function YR.AcceptInvites() return Choice("acceptInvites", "friends") end
+-- Both are off until you choose who (they join and form groups for you), and off with quality of life.
+function YR.WhisperInviteSet() return Choice("whisperInvite", "off") end
+function YR.AcceptInvitesSet() return Choice("acceptInvites", "off") end
+function YR.WhisperInvite() return YR.QoLOn() and YR.WhisperInviteSet() or "off" end
+function YR.AcceptInvites() return YR.QoLOn() and YR.AcceptInvitesSet() or "off" end
 function YR.WhisperWord()
     local w = YippRouteDB.whisperWord
     return (type(w) == "string" and w ~= "") and w:lower() or "inv"
@@ -27,7 +30,7 @@ end
 --- Can we invite at all: solo, or leading a group with room in it.
 local function CanInvite()
     if not IsInGroup() then return true end
-    if not UnitIsGroupLeader("player") and not UnitIsGroupAssistant("player") then return false, "you're not the leader" end
+    if not YR.Open(UnitIsGroupLeader("player")) and not YR.Open(UnitIsGroupAssistant("player")) then return false, "you're not the leader" end
     if not IsInRaid() and GetNumGroupMembers() >= 5 then return false, "the group is full" end
     return true
 end
@@ -35,8 +38,8 @@ end
 --- Invite your target: a player, not you, not already with you.
 function YR.InviteTarget()
     if not UnitExists("target") then YR.Print("target someone to invite.") return end
-    if not UnitIsPlayer("target") or UnitIsUnit("target", "player") then YR.Print("that's not a player you can invite.") return end
-    if UnitInParty("target") or UnitInRaid("target") then YR.Print("they're already in your group.") return end
+    if not UnitIsPlayer("target") or YR.Open(UnitIsUnit("target", "player")) ~= false then YR.Print("that's not a player you can invite.") return end
+    if YR.Open(UnitInParty("target")) or YR.Open(UnitInRaid("target")) then YR.Print("they're already in your group.") return end
     local ok, why = CanInvite()
     if not ok then YR.Print("can't invite: " .. why .. ".") return end
     local name = GetUnitName("target", true)
@@ -98,7 +101,7 @@ local function Paint()
     if not bar then return end
     -- "is the target you?" can come back secret where the game restricts comparing units: then no invite
     local canInv = UnitExists("target") and UnitIsPlayer("target") and not IsMe()
-        and not (UnitInParty("target") or UnitInRaid("target")) and CanInvite()
+        and not (YR.Open(UnitInParty("target")) or YR.Open(UnitInRaid("target"))) and CanInvite()
     bar.invite:SetEnabled(canInv and true or false)
     bar.leave:SetEnabled(IsInGroup() and true or false)
 end
@@ -146,7 +149,7 @@ local function Build()
     bar:ClearAllPoints()
     local p = YippRouteDB.groupBarPos
     if p and p[1] and p[2] then bar:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p[1], p[2])
-    else bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 180) end
+    else bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 226) end       -- clear of the trinket buttons, which start at 180
 end
 
 function YR.RefreshGroupBar()

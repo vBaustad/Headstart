@@ -423,7 +423,7 @@ function YR.StartXPBar()
             if blizzHidden then blizzHidden = false end        -- Blizzard lays its bars out afresh: ours to hide again
         end
         if event == "PLAYER_ENTERING_WORLD" then
-            Build()
+            if YR.XPBarOn() then Build() end        -- off: nothing of it is made until it's turned on
             lastXP, lastMax, lastLevel = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
         elseif event == "PLAYER_XP_UPDATE" then
             OnXP()

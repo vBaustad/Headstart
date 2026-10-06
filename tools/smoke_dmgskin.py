@@ -51,6 +51,7 @@ function Obj:CreateTexture() FACES = FACES + 1 return New("Texture") end
 function Obj:SetTexture(t) rawset(self, "file", t) end
 function New(kind) local o = setmetatable({}, Obj) rawset(o, "kind", kind or "Frame") return o end
 BUTTONS = {}
+function InCombatLockdown() return false end
 function CreateFrame(kind) local f = New() if kind == "Button" then BUTTONS[#BUTTONS + 1] = f end return f end
 GameTooltip = New()
 function Piece(kind, point, x)

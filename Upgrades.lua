@@ -312,8 +312,8 @@ function YR.ScanUpgrades()
     local found = {}      -- [slot] = the best new upgrade for it
     for bag = 0, NUM_BAG_SLOTS or 4 do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local info = C_Container.GetContainerItemInfo(bag, slot)
-            local seen = type(info) == "table" and info.hyperlink
+            -- the link alone: the full item info is a new table for every slot of every bag
+            local seen = C_Container.GetContainerItemLink(bag, slot)
             local old, better, s, link, how
             if seen and not told[seen] and not checked[seen] then
                 old, better, s, link, how = YR.CheckUpgrade(bag, slot)
@@ -347,10 +347,12 @@ end
 function YR.StartUpgrades()
     local f = CreateFrame("Frame")
     local pending = false
+    local function Scan() pending = false YR.ScanUpgrades() end
     local function Later()
-        if pending then return end
+        -- off: nothing is set going at all (this is every loot, every bag change)
+        if pending or not YR.Option("upgrades") then return end
         pending = true
-        C_Timer.After(0.5, function() pending = false YR.ScanUpgrades() end)
+        C_Timer.After(0.5, Scan)
     end
     for _, e in ipairs({ "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_REGEN_ENABLED" }) do
         pcall(f.RegisterEvent, f, e)

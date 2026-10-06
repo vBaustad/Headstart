@@ -189,17 +189,17 @@ end
     lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, false, true)")
     check(list(raw(sb, "colour").values()) == list(YR.SwingDB().farColor.values())[:3], "out of reach: the out-of-reach colour on Blizzard's bar")
     lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, true, true)")
-    # the Test button on Blizzard's bars: shown and filled by us for a few seconds, then as they were
+    # the Test button with Blizzard's bars dressed: bars of our own over theirs for a few seconds;
+    # Blizzard's own are never shown or hidden for it
     lua.execute("SwingTimerMainHandFrame.shown = false")
     ok = YR.SwingTest()
-    sampler = [f for f in g.FRAMES.values() if raw(f, "_OnUpdate") is not None and f != holder]
-    check(ok is True and raw(their, "shown") is True and len(sampler) == 1, "Test on Blizzard's bars: shown, with something filling them")
-    lua.execute("NOW = NOW + 1")
-    raw(sampler[0], "_OnUpdate")(sampler[0], 0.016)
-    check(abs(raw(sb, "value") - 1.0) < 0.001 and raw(g.TIME_LABEL, "words") == "1.2", f"a second in: filled that far, with the time left ({raw(g.TIME_LABEL, 'words')})")
-    lua.execute("NOW = NOW + 4")
-    raw(sampler[0], "_OnUpdate")(sampler[0], 0.016)
-    check(raw(their, "shown") is False and raw(sampler[0], "_OnUpdate") is None, "four seconds on: hidden again as it was, and nothing left running")
+    running = [f for f in g.FRAMES.values() if raw(f, "_OnUpdate") is not None and f != holder]
+    check(ok is True and raw(their, "shown") is False and len(running) == 1 and raw(running[0], "shown") is True,
+          "Test with Blizzard's bars dressed: a sample of our own shows; Blizzard's hidden bar isn't touched")
+    lua.execute("NOW = NOW + 5")
+    raw(running[0], "_OnUpdate")(running[0], 0.016)
+    check(raw(running[0], "shown") is False and raw(running[0], "_OnUpdate") is None and raw(their, "shown") is False,
+          "four seconds on: the sample is gone, nothing left running")
     lua.execute("SwingTimerMainHandFrame.shown = true")
     YR.SwingDB().colors = False
     YR.SwingApply()

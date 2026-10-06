@@ -119,7 +119,11 @@ end
 function YR:Party()
     -- only who is still in the group
     for name in pairs(party) do
-        if not (UnitInParty(Ambiguate(name, "none")) or UnitInRaid(Ambiguate(name, "none"))) then party[name] = nil end
+        local short = Ambiguate(name, "none")
+        local inParty, inRaid = UnitInParty(short), UnitInRaid(short)
+        -- an answer the game keeps secret is no answer: they stay on the list
+        local unknown = issecretvalue and (issecretvalue(inParty) or issecretvalue(inRaid))
+        if not unknown and not (inParty or inRaid) then party[name] = nil end
     end
     return party
 end

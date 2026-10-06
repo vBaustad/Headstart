@@ -454,9 +454,11 @@ function S.Stepper(parent, get, set, min, max, step, width)
         if v then set(math.max(min, math.min(max, v))) end
         input:SetValue(get())
     end
-    local minus = S.IconButton(f, "down", function() Apply(get() - (step or 1)) end, nil, S.C.text, 24)
+    -- Shift-click moves ten steps at a time
+    local function Step() return (step or 1) * (IsShiftKeyDown and IsShiftKeyDown() and 10 or 1) end
+    local minus = S.IconButton(f, "down", function() Apply(get() - Step()) end, nil, S.C.text, 24)
     minus:SetPoint("LEFT")
-    local plus = S.IconButton(f, "up", function() Apply(get() + (step or 1)) end, nil, S.C.text, 24)
+    local plus = S.IconButton(f, "up", function() Apply(get() + Step()) end, nil, S.C.text, 24)
     plus:SetPoint("RIGHT")
     input = S.Input(f, { width = (width or 110) - 52, onCommit = Apply })
     input:SetPoint("LEFT", minus, "RIGHT", 2, 0)
@@ -559,6 +561,9 @@ function S.ScrollArea(parent, width, height)
     sf:EnableMouseWheel(true)
     sf:SetScript("OnMouseWheel", function(self, d) Scroll(self:GetVerticalScroll() - d * 36) end)
     sf:SetScript("OnScrollRangeChanged", function(self) self:UpdateBar() end)
+    -- scrolled by anything but the wheel or the bar (a link that jumps to a section, the search):
+    -- the handle follows there too
+    sf:SetScript("OnVerticalScroll", function(self) self:UpdateBar() end)
     return sf
 end
 

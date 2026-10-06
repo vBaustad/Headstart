@@ -10,22 +10,30 @@ end
 
 -- Where the player is, as uiMapID and 0-100 map coordinates, or nil where the game won't say
 -- (instances, or a value Forever keeps secret: the arithmetic errors and pcall turns that into nil).
+local function ReadPosition()        -- one function, not a new one each time this is asked (every two seconds)
+    local m = C_Map.GetBestMapForUnit("player")
+    local p = m and C_Map.GetPlayerMapPosition(m, "player")
+    if not p then return nil end
+    local px, py = p:GetXY()
+    return m, floor(px * 10000 + 0.5) / 100, floor(py * 10000 + 0.5) / 100
+end
 function YR.Position()
-    local ok, map, x, y = pcall(function()
-        local m = C_Map.GetBestMapForUnit("player")
-        local p = m and C_Map.GetPlayerMapPosition(m, "player")
-        if not p then return nil end
-        local px, py = p:GetXY()
-        return m, floor(px * 10000 + 0.5) / 100, floor(py * 10000 + 0.5) / 100
-    end)
+    local ok, map, x, y = pcall(ReadPosition)
     if ok and map then return map, x, y end
+end
+
+--- A value the game may keep secret (who leads the group, whether a unit is you, what was cast -
+--- where it restricts that): nil when it is, so a test on it is simply false instead of an error.
+function YR.Open(v)
+    if issecretvalue and issecretvalue(v) then return nil end
+    return v
 end
 
 -- The two main switches: the routes (YR.RoutesOn, Guides.lua) and all of quality of life, this one.
 -- With quality of life off every QoL option answers "off" whatever it's set to (your settings are
 -- kept for when it's back on); what belongs to the routes and the window itself still answers.
 local LEVELLING = { minimapButton = true, logging = true, showSplits = true, deathSkipRelease = true, campReminder = true,
-    buyLater = true, sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true }
+    buyLater = true, sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true, skipQuests = true }
 
 function YR.QoLOn()
     return YippRouteDB.qolOff ~= true
@@ -37,7 +45,7 @@ function YR.SetQoLOn(on)
     local was = YR.QoLOn()
     YippRouteDB.qolOff = (not on) and true or nil
     if (on and true or false) == was then return end
-    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply", "BarHideApply", "SwingApply" }) do
+    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply", "BarHideApply", "SwingApply", "WindowScaleApply" }) do
         if YR[apply] then pcall(YR[apply]) end
     end
     for _, key in ipairs({ "bag", "reagentBag", "talents" }) do
@@ -47,48 +55,134 @@ function YR.SetQoLOn(on)
         or "quality of life off: /reload to take everything off the screen.")
 end
 
--- EllesmereUI does some of the same things. Where one of its modules is loaded, ours starts OFF:
--- an option you never set answers "off" (set it yourself, either way, and that's what counts).
--- Which of ours meets which of its modules:
---   flightTimer   - Forever Essentials' flight timer
---   durability    - QoL's low durability warning
---   autoTrain     - QoL's Train All button
---   talentMove    - QoL's Shifter (moves and scales Blizzard's windows, the talent window among them)
---   talentFadeSlider - Blizz UI Enhanced reskins the talent window
---   groupAccept   - Quest Tracker's auto accept
---   xpbar         - Action Bars' and DataBars' XP bars
-local ELLESMERE = {
-    flightTimer = { "EllesmereUIForeverEssentials" }, durability = { "EllesmereUIQoL" }, autoTrain = { "EllesmereUIQoL" },
-    talentMove = { "EllesmereUIQoL" }, talentFadeSlider = { "EllesmereUIBlizzardSkin" },
-    groupAccept = { "EllesmereUIQuestTracker" }, xpbar = { "EllesmereUIActionBars", "EllesmereUIDataBars" },
+-- Other addons do some of the same things. Where one that is loaded has the same feature switched
+-- on, ours starts OFF: an option you never set answers "off" (set it yourself, either way, and that's
+-- what counts). Being loaded is not enough where the other addon's feature is itself a choice: its
+-- own setting is read (through pcall: another addon's saved table may not be shaped as it was).
+--   EllesmereUI (a module per folder), Leatrix Plus (every feature off until its owner turns it on),
+--   Naowh Forever (its settings aren't known here: loaded counts), NovaInstanceTracker.
+local function Loaded(name)
+    if not (C_AddOns and C_AddOns.IsAddOnLoaded) then return false end
+    local ok, loaded = pcall(C_AddOns.IsAddOnLoaded, name)
+    return ok and loaded and true or false
+end
+local function Flat(db, key) return type(_G[db]) == "table" and _G[db][key] end
+local function Leatrix(key) return Loaded("Leatrix_Plus") and Flat("LeaPlusDB", key) == "On" end
+-- A value somewhere in one of an addon's profiles (EllesmereUI keeps profiles; which one is active
+-- isn't read here: a value any profile has counts).
+local function InProfiles(db, ...)
+    local root = _G[db]
+    if type(root) ~= "table" then return nil end
+    local path = { ... }
+    local function Walk(t)
+        local v = t
+        for _, k in ipairs(path) do
+            if type(v) ~= "table" then return nil end
+            v = v[k]
+        end
+        return v
+    end
+    local direct = Walk(root)
+    if direct ~= nil then return direct end
+    for _, group in pairs(root) do
+        if type(group) == "table" then
+            local v = Walk(group)
+            if v ~= nil then return v end
+            for _, profile in pairs(group) do
+                if type(profile) == "table" then
+                    v = Walk(profile)
+                    if v ~= nil then return v end
+                end
+            end
+        end
+    end
+    return nil
+end
+-- [option] = { { name shown, function: is its feature on now? }, ... }
+local OTHERS = {
+    flightTimer = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIForeverEssentials") and (type(Flat("EllesmereUIDB", "flightTimer")) ~= "table" or Flat("EllesmereUIDB", "flightTimer").enabled ~= false) end },
+        { "Leatrix Plus", function() return Leatrix("ShowFlightTimes") end },
+        { "Naowh Forever", function() return Loaded("NaowhForever") end },
+    },
+    durability = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIQoL") and Flat("EllesmereUIDB", "repairWarning") ~= false end },
+        { "Naowh Forever", function() return Loaded("NaowhForever") end },
+    },
+    talentMove = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIQoL") and Flat("EllesmereUIDB", "shifterEnabled") == true end },
+    },
+    talentFadeSlider = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIBlizzardSkin") and Flat("EllesmereUIDB", "reskinPlayerSpells") ~= false end },
+    },
+    groupAccept = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIQuestTracker") and InProfiles("EllesmereUIQuestTrackerDB", "questTracker", "autoAccept") == true end },
+        { "Leatrix Plus", function() return Leatrix("AutomateQuests") or Leatrix("NoSharedQuests") end },
+    },
+    xpbar = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIActionBars") and InProfiles("EllesmereUIActionBarsDB", "useBlizzardDataBars") == false end },
+        { "Naowh Forever", function() return Loaded("NaowhForever") end },
+    },
+    instanceTrack = { { "NovaInstanceTracker", function() return Loaded("NovaInstanceTracker") end } },
+    restock = { { "Naowh Forever", function() return Loaded("NaowhForever") end } },
+    trinketBar = { { "Naowh Forever", function() return Loaded("NaowhForever") end } },
+    campReminder = { { "Naowh Forever", function() return Loaded("NaowhForever") end } },
+    remindTalents = { { "Naowh Forever", function() return Loaded("NaowhForever") end } },
+    acceptInvites = {
+        { "Leatrix Plus", function() return Leatrix("AcceptPartyFriends") or Leatrix("NoPartyInvites") end },
+        { "EllesmereUI", function() return Loaded("EllesmereUIFriends") and (InProfiles("EllesmereUIFriendsDB", "autoAcceptFriendInvites") == true or InProfiles("EllesmereUIFriendsDB", "autoAcceptGuildInvites") == true) end },
+    },
+    whisperInvite = { { "Leatrix Plus", function() return Leatrix("InviteFromWhisper") end } },
+    chatButtons = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIChat") end },
+        { "Leatrix Plus", function() return Leatrix("NoChatButtons") or Leatrix("NoSocialButton") or Leatrix("UnclampChat") end },
+    },
+    blizzardBars = { { "EllesmereUI", function() return Loaded("EllesmereUIActionBars") end } },
+    windowScale = { { "EllesmereUI", function() return Loaded("EllesmereUIQoL") and Flat("EllesmereUIDB", "shifterEnabled") == true end } },
+    moveBag = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIBags") end },
+        { "Baganator", function() return Loaded("Baganator") end },
+    },
+    swing = {
+        { "EllesmereUI", function() return Loaded("EllesmereUIResourceBars") and InProfiles("EllesmereUIResourceBarsDB", "swingTimer", "enabled") == true end },
+        { "Naowh Forever", function() return Loaded("NaowhForever") end },
+    },
+    whisperSound = { { "EllesmereUI", function() return Loaded("EllesmereUIChat") end } },
 }
 
---- The EllesmereUI module that does what this option does, if it's loaded (its name), else nil.
+--- The other addon that does what this option does, with that feature on (its name), else nil.
 --- The answer is kept until another addon loads: this is asked on every read of such an option.
-local ellesmere = {}
-function YR.EllesmereHas(key)
-    local mods = ELLESMERE[key]
-    if not (mods and C_AddOns and C_AddOns.IsAddOnLoaded) then return nil end
-    local known = ellesmere[key]
+local others = {}
+function YR.OtherHas(key)
+    local list = OTHERS[key]
+    if not list then return nil end
+    local known = others[key]
     if known ~= nil then return known or nil end
     known = false
-    for _, name in ipairs(mods) do
-        local ok, loaded = pcall(C_AddOns.IsAddOnLoaded, name)
-        if ok and loaded then known = name break end
+    for _, other in ipairs(list) do
+        local ok, on = pcall(other[2])
+        if ok and on then known = other[1] break end
     end
-    ellesmere[key] = known
+    others[key] = known
     return known or nil
 end
-function YR.EllesmereForget() for k in pairs(ellesmere) do ellesmere[k] = nil end end
+YR.EllesmereHas = YR.OtherHas            -- its name while EllesmereUI was the only one looked for
+function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 
--- Options that are off until you turn them on yourself. autoTrain spends your gold at the trainer:
--- nobody should find that out by installing Headstart.
-local STARTS_OFF = { autoTrain = true }
+-- Options that are off until you turn them on yourself: everything that spends gold, moves your
+-- items, joins or forms a group for you, takes screenshots, puts a bar or buttons of ours on your
+-- screen or changes one of Blizzard's windows. Nobody should find those out by installing Headstart.
+-- What stays on is seen and harmless: tooltips, the flight timer, the camp icon, lines in chat.
+local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true,
+    groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true }
+YR.STARTS_OFF = STARTS_OFF
 
---- What an option is before you've set it: on, unless it starts off or EllesmereUI does the same.
+--- What an option is before you've set it: on, unless it starts off or another addon does the same.
 function YR.OptionDefault(key)
     if STARTS_OFF[key] then return false end
-    return YR.EllesmereHas(key) == nil
+    -- recording runs and the level splits box are for levelling by a route: on with the routes
+    if key == "logging" or key == "showSplits" then return YR.RoutesOn ~= nil and YR.RoutesOn() or false end
+    return YR.OtherHas(key) == nil
 end
 
 --- An option as you set it (or its default), whatever the main switch says: what the settings show.
@@ -194,6 +288,30 @@ SlashCmdList.HEADSTART = function(msg)
     end
 end
 
+-- Defaults changed to "off until you turn it on" (see STARTS_OFF). An account that had Headstart
+-- before that keeps everything as it was: once, each of those options you never touched is written
+-- down as what it was then. A new install starts quiet, and is shown the Get started page.
+local WAS_ON = { "restock", "bankAuto", "levelShot", "trinketBar", "groupBar", "upgrades", "talentMove", "talentFadeSlider" }
+function YR.Latch(fresh)
+    local db = YippRouteDB
+    if db.quiet then return end
+    db.quiet = 1
+    if fresh then
+        db.welcome = true
+        return
+    end
+    for _, key in ipairs(WAS_ON) do
+        if db[key] == nil then db[key] = YR.OtherHas(key) == nil end
+    end
+    for _, key in ipairs({ "acceptInvites", "whisperInvite", "acceptFrom" }) do
+        if db[key] == nil then db[key] = "friends" end
+    end
+    if db.showSplits == nil then db.showSplits = true end
+    if db.logging == nil then db.logging = true end
+    if type(db.xpbar) ~= "table" then db.xpbar = {} end
+    if db.xpbar.on == nil then db.xpbar.on = YR.OtherHas("xpbar") == nil end
+end
+
 SLASH_HEADSTARTSETTINGS1 = "/hs"
 SlashCmdList.HEADSTARTSETTINGS = function() YR:ToggleSettings() end
 
@@ -204,9 +322,19 @@ f:SetScript("OnEvent", function(_, _, name)
     YR.EllesmereForget()             -- an addon loaded: what EllesmereUI has may be different now
     if name ~= ADDON or started then return end
     started = true
+    local fresh = YippRouteDB == nil
     YippRouteDB = YippRouteDB or {}
     YippRouteDB.runs = YippRouteDB.runs or {}
-    if YippRouteDB.logging == nil then YippRouteDB.logging = true end   -- on by default: that's the point on the beta
+    YR.Latch(fresh)
+    -- The spell tables hold all nine classes and only yours is ever read: the other eight are let go
+    -- (some three thousand small tables). SpellLevels stays whole: Bars & setup shows any class.
+    local _, class = UnitClass("player")
+    for _, name in ipairs({ "TrainerSpells", "PlannerSpells", "PlannerGeneral", "RestockData" }) do
+        local t = YR[name]
+        if class and type(t) == "table" and t[class] ~= nil then
+            for other in pairs(t) do if other ~= class then t[other] = nil end end
+        end
+    end
     YR:RegisterGuides()
     YR:RegisterExtras()
     YR:StartLog()

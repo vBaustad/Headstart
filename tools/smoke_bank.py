@@ -121,7 +121,8 @@ MONEY = 100000
 function GetMoney() return MONEY end
 function GetCoinTextureString(c) return c .. "c" end
 function SendMail(to, subject) local l = {} for _, v in pairs(LETTER) do table.insert(l, v) end table.insert(SENT, { to = to, items = l }) LETTER = {} end
-YippRouteDB = {}
+-- the options that are off until turned on, on: the features are what is tested here
+YippRouteDB = { restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
 SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
@@ -219,6 +220,11 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     check(banked() == [2406, 2449, 2672, 4292], "the button banks the same at any time")
     g.Fire("BANKFRAME_CLOSED")
     g.YippRouteDB.bankAuto = None
+    fill()
+    visit()
+    check(banked() == [], "never set: nothing goes by itself (banking as the bank opens is off until you turn it on)")
+    g.Fire("BANKFRAME_CLOSED")
+    g.YippRouteDB.bankAuto = True
 
     # a bank with room for two stacks: two go, then it stops and says so
     fill()

@@ -13,12 +13,14 @@
 --     restockCounts    [itemID] = how many to keep, for the class reagents; nil = the default
 --     restockCustom    [itemID] = how many to keep, for items you added yourself
 --     restockAmmoBy    [CLASS] = how much ammo (or throwing weapons) to keep; nil = the class default
---                      (hunter 1000, warrior and rogue 200, 0 = none). restockAmmo: the old one, a hunter's
+--                      (hunter 1000; warrior and rogue 0 until set; 0 = none). restockAmmo: the old one, a hunter's
 --     restockReserve   gold to keep: nothing is bought that would take you under it
 local ADDON, YR = ...
 
 -- The classes that shoot: a hunter lives on it, a warrior or rogue pulls with it.
-local AMMO_DEFAULT = { HUNTER = 1000, WARRIOR = 200, ROGUE = 200 }
+-- only a hunter lives on ammo: a warrior's or rogue's is theirs to ask for (it was 200 for both, bought
+-- at any vendor for a bow carried for its stats)
+local AMMO_DEFAULT = { HUNTER = 1000, WARRIOR = 0, ROGUE = 0 }
 local AMMO_FOR = { [2] = 2, [18] = 2, [3] = 3 }   -- bow and crossbow take arrows, guns bullets
 local AMMO_CLASS = 6
 local THROWN = 16                                  -- a throwing weapon: the stack is the weapon itself

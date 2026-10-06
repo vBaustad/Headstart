@@ -148,6 +148,8 @@ local function IconOf(e)
         return e.icon or 134400
     elseif e.kind == "item" then
         return (C_Item.GetItemIconByID and C_Item.GetItemIconByID(e.id)) or 134400
+    elseif e.kind == "other" then
+        return e.icon or 134400
     end
     return 134400
 end
@@ -258,6 +260,8 @@ local function PlaceIn(b)
     local e, fromSlot = carry, carry.from
     e.from = nil
     local was = plan[b.slot]
+    -- a button the planner can't hold (a mount, a toy): putting something on it replaces it
+    if was and was.kind == "other" then was = nil end
     plan[b.slot] = e
     if was and fromSlot then
         plan[fromSlot] = was
@@ -309,6 +313,10 @@ local function Tooltip(self)
     if r then GameTooltip:SetSpellByID(r.id)
     elseif d then GameTooltip:SetSpellByID(d[1])
     elseif e.prof and e.id then GameTooltip:SetSpellByID(e.id)
+    elseif e.kind == "other" then
+        GameTooltip:AddLine("On your bar now")
+        GameTooltip:AddLine("Not something a layout can hold (a mount, a toy, a pet's button, a set): it stays as it is."
+            .. " Right-click takes it off; another button put here replaces it.", 0.7, 0.7, 0.7, true)
     else
         GameTooltip:AddLine(e.name or "?")
         if e.kind == "macro" and e.body then GameTooltip:AddLine(e.body, 0.7, 0.7, 0.7, true) end
@@ -373,7 +381,7 @@ local function MakeSlot(parent, bi, i)
         end
         if carry then
             PlaceIn(self)
-        elseif plan[self.slot] then
+        elseif plan[self.slot] and plan[self.slot].kind ~= "other" then     -- a button it can't hold can't be moved
             local e = plan[self.slot]
             plan[self.slot] = nil
             Carry(e)
@@ -382,7 +390,7 @@ local function MakeSlot(parent, bi, i)
     end)
     b:SetScript("OnDragStart", function(self)
         local e = plan[self.slot]
-        if not e then return end
+        if not e or e.kind == "other" then return end
         plan[self.slot] = nil
         e.from = self.slot
         Carry(e)
@@ -618,13 +626,16 @@ local function Same(a, b)
 end
 
 local function Save(thenApply)
+    -- what a layout can hold: a mount, a toy or a pet's button stays on this character's bar only
+    local keep, n = {}, 0
+    for slot, e in pairs(plan) do
+        if e.kind ~= "other" then keep[slot], n = Copy(e), n + 1 end
+    end
     YS:SetProfile({
         from = YS.PlayerKey() .. " (plan)", class = Class(), maxLevel = 60, scanned = time(),
-        slots = Copy(plan), planned = true,        -- bars only: the interface is the account's (YS:SharedUI)
+        slots = keep, planned = true,        -- bars only: the interface is the account's (YS:SharedUI)
     })
-    local n = 0
-    for _ in pairs(plan) do n = n + 1 end
-    YR.Print(("saved your %s plan: %d buttons. It's the %s layout now (Headstart, QoL, Character setup)."):format(
+    YR.Print(("saved your %s plan: %d buttons. It's the %s layout now (Headstart, QoL, Bars & setup)."):format(
         Class():lower(), n, Class():lower()))
     if YS.Refresh then YS:Refresh() end
     if YR.RefreshWindow then YR:RefreshWindow() end
@@ -673,8 +684,7 @@ function AskSave(thenApply, sure)
     end
     local old = YS:Profile()
     if old and not old.planned then
-        local d = StaticPopup_Show("HEADSTART_PLAN_OVERWRITE", old.from)
-        if d then d.data = thenApply end
+        StaticPopup_Show("HEADSTART_PLAN_OVERWRITE", old.from, nil, thenApply)
     else
         Save(thenApply)
     end

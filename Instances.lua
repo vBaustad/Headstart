@@ -92,13 +92,13 @@ local function Leader()
     if not IsInGroup() then return YR.CharKey() end
     for i = 1, 4 do
         local u = "party" .. i
-        if UnitExists(u) and UnitIsGroupLeader(u) then
+        if UnitExists(u) and YR.Open(UnitIsGroupLeader(u)) then
             -- a name the game keeps secret can't be compared later: it's as good as no name
             local name = UnitName(u)
             if type(name) == "string" and not (issecretvalue and issecretvalue(name)) then return name end
         end
     end
-    return UnitIsGroupLeader("player") and YR.CharKey() or "?"
+    return YR.Open(UnitIsGroupLeader("player")) and YR.CharKey() or "?"
 end
 
 local function Warn(msg)

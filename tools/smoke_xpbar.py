@@ -44,7 +44,8 @@ strsplit = function() end
 strtrim = function(s) return s end
 floor = math.floor
 wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
-YippRouteDB = {}
+-- the options that are off until turned on, on: the features are what is tested here
+YippRouteDB = { restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
 NOW = 1000
 function GetTime() return NOW end
 XP, XPMAX, LEVEL, RESTED = 1000, 4000, 18, 600
@@ -134,15 +135,34 @@ function print() end
     lua.execute("LOADED = {} ASKS = 0 C_AddOns = { IsAddOnLoaded = function(n) ASKS = ASKS + 1 return LOADED[n] == true end }")
     YR.EllesmereForget()
     g.YippRouteDB.xpbar.on = None
-    check(YR.XPBarOn() and YR.Option("flightTimer") and YR.Option("durability"), "no EllesmereUI: ours on as always")
+    for key in ("restock", "trinketBar", "levelShot"):
+        g.YippRouteDB[key] = None
+    check(not YR.XPBarOn() and not YR.Option("restock") and not YR.Option("trinketBar") and not YR.Option("levelShot"),
+          "never set: our XP bar, restock, trinket buttons and screenshots are off until you turn them on")
+    check(YR.Option("flightTimer") and YR.Option("durability") and YR.Option("camp"),
+          "what is seen and harmless is on: the flight timer, the durability line, the camp icon")
     asked = g.ASKS
     for _ in range(50):
-        YR.XPBarOn()
+        YR.Option("flightTimer")
     check(g.ASKS == asked, "asked fifty times more: the client isn't asked again until an addon loads")
-    lua.execute("LOADED.EllesmereUIActionBars = true LOADED.EllesmereUIForeverEssentials = true")
+    lua.execute("LOADED.EllesmereUIForeverEssentials = true LOADED.EllesmereUIQoL = true EllesmereUIDB = { repairWarning = false }")
     YR.EllesmereForget()
-    check(not YR.XPBarOn() and not YR.Option("flightTimer"), "its Action Bars and Forever Essentials loaded: our XP bar and flight timer start off")
-    check(YR.Option("durability") and YR.Option("camp"), "what it doesn't do here (its QoL isn't loaded; it has no camp HUD) stays on")
+    check(not YR.Option("flightTimer"), "EllesmereUI's Forever Essentials loaded (its flight timer is on unless turned off): ours starts off")
+    check(YR.Option("durability"), "its QoL loaded but its repair warning turned off there: ours stays on")
+    lua.execute("EllesmereUIDB = { flightTimer = { enabled = false } }")
+    YR.EllesmereForget()
+    check(YR.Option("flightTimer") and not YR.Option("durability"), "the other way round in its settings: the other way round here")
+    lua.execute("LOADED = { Leatrix_Plus = true } EllesmereUIDB = nil LeaPlusDB = { ShowFlightTimes = 'Off' }")
+    YR.EllesmereForget()
+    check(YR.Option("flightTimer"), "Leatrix Plus loaded with its flight times off: ours on")
+    lua.execute("LeaPlusDB.ShowFlightTimes = 'On'")
+    YR.EllesmereForget()
+    check(not YR.Option("flightTimer") and YR.OtherHas("flightTimer") == "Leatrix Plus", "its flight times on: ours starts off, and we can say who has it")
+    lua.execute("LOADED = { NovaInstanceTracker = true } LeaPlusDB = nil")
+    YR.EllesmereForget()
+    check(not YR.Option("instanceTrack"), "NovaInstanceTracker loaded: our instance tracker starts off")
+    lua.execute("LOADED = { EllesmereUIForeverEssentials = true }")
+    YR.EllesmereForget()
     g.YippRouteDB.flightTimer = True
     g.YippRouteDB.xpbar.on = True
     check(YR.XPBarOn() and YR.Option("flightTimer"), "turned on by you: on, EllesmereUI or not")
@@ -162,6 +182,25 @@ function print() end
     db = YR.XPBarDB()
     check(db.h == 22 and db.font == 13 and abs(db.xpColor[1] - 0.09) < 0.01, f"old first values take the new look ({db.h}, {db.font})")
     check(db.left == "mine", "words you wrote yourself are kept")
+    # defaults: a new install starts quiet and is shown Get started; an account that had Headstart
+    # before keeps everything as it was
+    lua.execute("KEPT_DB = YippRouteDB YippRouteDB = {} LOADED = {}")
+    YR.EllesmereForget()
+    YR.Latch(True)
+    db = g.YippRouteDB
+    check(db.welcome is True and db.restock is None and not YR.Option("restock") and not YR.Option("bankAuto")
+          and not YR.XPBarOn() and not YR.Option("logging"),
+          "a new install: quiet (no restock, no banking, no XP bar, no run log), and Get started is shown")
+    lua.execute("YippRouteDB = { runs = {} }")
+    YR.Latch(False)
+    db = g.YippRouteDB
+    check(db.welcome is None and db.restock is True and db.bankAuto is True and db.trinketBar is True
+          and db.acceptInvites == "friends" and db.acceptFrom == "friends" and db.xpbar.on is True and db.showSplits is True,
+          "an account that had Headstart: each option never touched is written down as it was (on)")
+    lua.execute("YippRouteDB.restock = nil")
+    YR.Latch(False)
+    check(g.YippRouteDB.restock is None, "once only: it isn't written again on a later login")
+    lua.execute("YippRouteDB = KEPT_DB")
     return bad
 
 

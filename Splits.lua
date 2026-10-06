@@ -30,10 +30,15 @@ local GREEN, RED, WHITE, GREY, BLUE = "|cff40ff40", "|cffff5050", "|cffffffff", 
 local STYLE_DEFAULT = { size = 14, lock = false, rate = true, ding = true, vs = true, rows = 20, bg = 0,
     clock = "full", levelCol = true, totalCol = true, levelVs = true }
 
+-- What's missing is filled in once for a style table, not on every read: this is asked for some
+-- two hundred times each time the box is drawn.
+local styleFilled
 function YR:SplitsStyle()
     local st = YippRouteDB.splitsStyle
+    if st and styleFilled == st then return st end
     if not st then st = {} YippRouteDB.splitsStyle = st end
     for k, v in pairs(STYLE_DEFAULT) do if st[k] == nil then st[k] = v end end
+    styleFilled = st
     return st
 end
 
@@ -158,6 +163,18 @@ local function Fastest()
 end
 YR.SplitsFastest = Fastest   -- for the tests
 
+-- The best run changes when somebody dings or a run is deleted, not twice a second: the box's clock
+-- works from a copy at most ten seconds old. Anything but the clock's own tick asks afresh.
+local best, bestAt
+local function FastestKept(fresh)
+    local now = GetTime()
+    if fresh or not bestAt or now - bestAt > 10 then
+        best, bestAt = Fastest(), now
+        return best, true
+    end
+    return best, false
+end
+
 local function XPRate()
     local a, b = rate[1], rate[#rate]
     if not (a and b) or b[1] - a[1] < 60 then return nil end
@@ -258,9 +275,16 @@ local function Layout()
     SetRow(0, "", GREY .. "level|r", GREY .. "total|r", GREY .. "vs best|r", GREY .. "± level|r")
 end
 
-local function Refresh()
+-- tick: the clock's own twice-a-second call. Then only what a clock changes is done: the three lines
+-- at the top and the level in progress. The levels already reached, the columns' widths and the
+-- box's height are worked out again when something else asked (a ding, a setting, the box shown) or
+-- the best run was read afresh.
+local listedRows = 0
+local function Refresh(tick)
     if not (frame and frame:IsShown()) then return end
-    local run, pb = rec, Fastest()
+    local run = rec
+    local pb, reread = FastestKept(not tick)
+    local full = not tick or reread
     local n = 0
     if run and not synced then
         frame.xph:SetText("")
@@ -295,6 +319,17 @@ local function Refresh()
         frame.time:SetText(BLUE .. "Time:|r " .. (best and WHITE .. Clock(best.levels[Top(best)]) .. "|r" or "-"))
         run, pb = best, nil
     end
+    if not full then
+        -- the clock alone: if the level in progress has outgrown a column, the columns are laid again
+        local live = frame.rows[1]
+        for c = 1, 5 do
+            if live and live[c]:IsShown() and (live[c]:GetStringWidth() or 0) > (widths[c] or 0) + 0.5 then
+                Arrange(listedRows)
+                break
+            end
+        end
+        return
+    end
     -- every level reached, newest first, as many as the settings say
     if run then
         local listed, most = 0, YR:SplitsStyle().rows
@@ -314,6 +349,7 @@ local function Refresh()
     for i = n + 1, #frame.rows do
         for _, fs in ipairs(frame.rows[i]) do fs:Hide() end
     end
+    listedRows = n
     Arrange(n)
     frame:SetHeight(TOP + (n + 1) * ROW_H)
 end
@@ -329,7 +365,7 @@ local function Tick()
         end
     end
     last = now
-    Refresh()
+    Refresh(true)
 end
 
 -- The position is kept as pixels from the screen's top-left corner, which the settings show and set.
@@ -483,7 +519,7 @@ function YR:StartSplits()
     lastXP, lastMax, lastLevel = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
     last = GetTime()
     ticker = ticker or C_Timer.NewTicker(TICK, Tick)
-    if YippRouteDB.showSplits ~= false then YR:ShowSplits(true) end
+    if YR.Option("showSplits") then YR:ShowSplits(true) end
 end
 
 -- Stop run: the clock and the levels stop here, and the run log ends (until Resume). A stopped run

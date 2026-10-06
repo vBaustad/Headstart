@@ -1,5 +1,5 @@
 -- Damage meter skin: two looks for the game's own damage meter (Blizzard_DamageMeter), picked in
--- Headstart, QoL, Skins. Off until you pick one.
+-- Headstart, QoL, Damage meter. Off until you pick one.
 --   What's wrong with the meter as it comes: its top bar. The timer comes in at the left in a fight and
 --   pushes the title onto two lines, the title sits in the middle of nowhere, and the three buttons are
 --   three different things at three different sizes.
@@ -92,12 +92,25 @@ local function Windows()
 end
 
 -- A piece's own place and size, kept the first time we move it, and put back when the look goes off.
+-- In a fight the game can keep a piece's place and size secret: then nothing is kept this time (it
+-- is asked again the next time the look goes on, out of a fight).
 local function Remember(k, piece)
     if type(piece) ~= "table" or k.points[piece] or not piece.GetNumPoints then return end
     local points = {}
-    for i = 1, piece:GetNumPoints() do points[i] = { piece:GetPoint(i) } end
+    for i = 1, piece:GetNumPoints() do
+        local p = { piece:GetPoint(i) }
+        for n = 1, 5 do if issecretvalue and issecretvalue(p[n]) then return end end
+        points[i] = p
+    end
+    local size = piece.GetSize and { piece:GetSize() } or nil
+    if size and issecretvalue and (issecretvalue(size[1]) or issecretvalue(size[2])) then return end
     k.points[piece] = points
-    if piece.GetSize then k.sizes[piece] = { piece:GetSize() } end
+    k.sizes[piece] = size
+end
+
+-- A piece we may move now: not one the game protects while a fight is on.
+local function Free(piece)
+    return not (InCombatLockdown() and piece.IsProtected and piece:IsProtected())
 end
 
 -- A button with a face of ours. Blizzard's buttons each bring their own art at its own size (a boxed
@@ -182,10 +195,12 @@ local function PutBack(k)
     for region, was in pairs(k.letters) do region:SetTextColor(was[1] or 1, was[2] or 1, was[3] or 1) end
     k.tinted, k.letters = {}, {}
     for piece, points in pairs(k.points) do
-        piece:ClearAllPoints()
-        for _, p in ipairs(points) do piece:SetPoint(p[1], p[2], p[3], p[4], p[5]) end
-        local size = k.sizes[piece]
-        if size and piece.SetSize and (size[1] or 0) > 0 and (size[2] or 0) > 0 then piece:SetSize(size[1], size[2]) end
+        if Free(piece) then
+            piece:ClearAllPoints()
+            for _, p in ipairs(points) do piece:SetPoint(p[1], p[2], p[3], p[4], p[5]) end
+            local size = k.sizes[piece]
+            if size and piece.SetSize and (size[1] or 0) > 0 and (size[2] or 0) > 0 then piece:SetSize(size[1], size[2]) end
+        end
     end
     k.points, k.sizes = {}, {}
 end
@@ -282,9 +297,11 @@ local function Skin(window)
     for _, b in ipairs({ p.minimize, p.settings, reset, p.session, p.typeDrop }) do
         if type(b) == "table" and b.ClearAllPoints then
             if not rawequal(b, reset) then Remember(k, b) end
-            b:ClearAllPoints()
-            b:SetSize(BUTTON, BUTTON)
-            b:SetPoint("RIGHT", over, "RIGHT", at, 0)
+            if Free(b) then
+                b:ClearAllPoints()
+                b:SetSize(BUTTON, BUTTON)
+                b:SetPoint("RIGHT", over, "RIGHT", at, 0)
+            end
             at = at - BUTTON - GAP
         end
     end
