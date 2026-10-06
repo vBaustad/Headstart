@@ -126,6 +126,13 @@ function YR:RegisterGuides()
         end
     end
     if YR.Role then YR:RegisterRole(YR:Role()) end
+    -- What the routes need and which quests they take is read from every route's text the first time
+    -- it's asked for, which was the first item tooltip or quest window of the session (a hitch). Read
+    -- them a few seconds after login instead, one a frame apart from the other.
+    if C_Timer and C_Timer.After then
+        C_Timer.After(4, function() if YR.RouteNeed then YR.RouteNeed(0) end end)
+        C_Timer.After(5, function() if YR.RouteQuest then YR.RouteQuest(0) end end)
+    end
 end
 
 -- Group routes. Two marks in a step:
