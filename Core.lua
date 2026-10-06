@@ -81,8 +81,13 @@ function YR.EllesmereHas(key)
 end
 function YR.EllesmereForget() for k in pairs(ellesmere) do ellesmere[k] = nil end end
 
---- What an option is before you've set it: on, unless EllesmereUI does the same.
+-- Options that are off until you turn them on yourself. autoTrain spends your gold at the trainer:
+-- nobody should find that out by installing Headstart.
+local STARTS_OFF = { autoTrain = true }
+
+--- What an option is before you've set it: on, unless it starts off or EllesmereUI does the same.
 function YR.OptionDefault(key)
+    if STARTS_OFF[key] then return false end
     return YR.EllesmereHas(key) == nil
 end
 

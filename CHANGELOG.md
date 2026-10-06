@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Auto-train is off until you turn it on** (Headstart, QoL, Trainer). It spends your gold at the trainer, and nobody should find that out by installing Headstart. If you never touched the switch it is off now: turn it on there to have your spells learned for you again.
+
+- **A spell always goes to its newest rank** unless you set a rank for it in the bar planner. The "Put new ranks on the bars" switch is gone, and an old button still at a lower rank is no longer taken for a rank you chose: the planner renews it.
+
+- The flight timer's bar sits a little lower, clear of the names over it.
+
+- **Bar planner and Set up, made simple.** The planner now always opens with your bars as they are, plus what you planned for later levels - what you see is what you get. Save and apply changes only the buttons you changed in the planner: it never clears the bars, never deletes a macro of yours, and leaves alone a button the planner can't show (a pet's, a toy). "Class spells up to level" is gone as a setting: every spell at or under your level goes on its button, the next ten levels' wait as question marks, and the rest go into their slot when you learn them. Clearing the bars and the character's macros first is only for Set up layout on a new character.
+
 ## 0.10.0-beta4
 
 - **Set up layout no longer drops the spells you know.** "Class spells up to level" (10 to begin with) left every spell learned after that level off the bars, also on a character well past it: with the bars cleared first, a level 30 was left with a handful of buttons. The limit now only decides how far ahead buttons are made on a new character - a spell at or under your own level is always placed, and a spell above the limit goes into its slot when you learn it. `/ysetup debug` says what a layout would do on this character.

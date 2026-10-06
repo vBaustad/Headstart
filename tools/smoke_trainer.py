@@ -25,7 +25,7 @@ SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return s end
 floor = math.floor
-YippRouteDB = {}
+YippRouteDB = { autoTrain = true }       -- off until you turn it on (checked below)
 function UnitClass() return "Paladin", "PALADIN" end
 function UnitName() return nil end
 SHIFT, TRADESKILL, MONEY, BOUGHT, PRINTS = false, false, 0, {}, {}
@@ -56,6 +56,10 @@ RXP = { settings = { profile = { enableTrainerAutomation = true } } }
         nonlocal bad
         print(("ok  " if ok else "FAIL"), what)
         bad += not ok
+
+    g.YippRouteDB.autoTrain = None
+    check(YR.Option("autoTrain") is False, "auto-train is off until you turn it on")
+    g.YippRouteDB.autoTrain = True
 
     def visit(money, shift=False, tradeskill=False):
         lua.execute(f"BOUGHT = {{}}; PRINTS = {{}}; MONEY = {money}; SHIFT = {'true' if shift else 'false'};"

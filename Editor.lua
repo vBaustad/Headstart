@@ -1625,10 +1625,8 @@ local function BuildSetup(page)
     L.Break()
 
     Section("Spells", nil, { icon = 133742 })
-    Row("Class spells", Sw("classSpells"))
-    Row("Class spells up to level", S.Slider(L.c, 1, 60, 1, function() return o().maxLevel end,
-        function(v) o().maxLevel = v Recount() end), "How far ahead buttons are made: spells learned at this level or lower get their button now. A spell above it"
-        .. " keeps its slot empty and goes in when you learn it. Spells at or under your own level are always placed")
+    Row("Class spells", Sw("classSpells"), "Every spell at or under your level goes on its button; the next ten levels'"
+        .. " wait as question marks; the rest keep their slot and go in when you learn them")
     local BUTTONS = {
         { "placeholder", "Spells; ? until learned" },
         { "spells", "Only spells" },
@@ -1687,7 +1685,6 @@ local function BuildSetup(page)
 
     Section("While levelling", nil, { icon = 132307 })
     Row("Put spells on the bars as I learn them", Sw("swap"), "A placeholder becomes the real spell, or an empty saved slot gets it")
-    Row("Put new ranks on the bars", Sw("rankUp"), "A new rank from the trainer replaces the old one in your main's slots. A spell your main keeps at a lower rank stays at that rank")
     Row("Show the setup window on new characters", Sw("popup"))
     Row("Skip the intro on new characters", Sw("skipIntro"), "The cinematic a level-1 character logs in to is cancelled as it starts")
     L.Break()

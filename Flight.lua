@@ -81,9 +81,9 @@ end
 -- stops on the way, a Land button for the next one. The stops themselves aren't drawn: the game doesn't
 -- say how long each leg takes (tried in game, 2026-10-01). On a first flight, with no time to go by, a
 -- light runs along the bar.
-local W, H = 320, 62
+local W, H = 320, 66
 local PAD = 12
-local TRACK_Y, THICK, KNOB = -33, 5, 13
+local TRACK_Y, THICK, KNOB = -38, 5, 13
 local FACE = 16            -- your portrait on the bar, where the knob is
 local BLUE, BLUE_DIM = { 0.40, 0.66, 1.00 }, { 0.18, 0.40, 0.80 }
 local TRACK = { 0.17, 0.19, 0.23, 1 }

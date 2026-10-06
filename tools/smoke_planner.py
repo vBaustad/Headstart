@@ -92,10 +92,17 @@ def run():
         function YS:SetProfile(p) PROFILE = p end
         function YS:Options() return OPTS end
         function YS:ScanUI() return { scanned = true } end
-        function YS:Apply() APPLIED = APPLIED + 1 end
+        function YS:Apply(force, only) APPLIED = APPLIED + 1 ONLY = only end
         YS.PlayerKey = function() return "Duplo-Forever" end
         BARS_NOW = {}
         YS.ReadBars = function() local c = {} for k, v in pairs(BARS_NOW) do c[k] = v end return c end
+        -- as Setup.lua's: the bars, with the saved layout where the bars have nothing
+        YS.PlanStart = function()
+            local now, plan = YS.ReadBars(), {}
+            for k, v in pairs(now) do plan[k] = v end
+            for k, v in pairs(PROFILE and PROFILE.slots or {}) do if not now[k] then plan[k] = v end end
+            return plan, now
+        end
         function YR.Print(m) table.insert(PRINTS, m) end
     ''')
     lua.execute('''MACROS = { { "Food", 1, "/use Bread" }, [121] = { "Opener", 2, "/cast [stealth] Cheap Shot; Stealth" } }
@@ -241,32 +248,38 @@ def run():
     win.Hide(win)
     check(not YR.PlannerCarrying(), "closing drops what you carry")
 
-    # a character with spells on its bars already and nothing saved: the plan starts from the bars, and
-    # applying a plan that leaves buttons out asks before it empties them
-    lua.execute('PROFILE, POPUP = nil, nil APPLIED = 0 BARS_NOW = { [1] = { kind = "spell", name = "Holy Light" }, [2] = { kind = "macro", name = "Food", icon = 7 } }')
+    # a character in play: the plan is its bars (with the saved layout where they're empty), and Apply
+    # touches only the buttons changed here
+    lua.execute('''POPUP = nil APPLIED = 0 ONLY = nil
+        PROFILE = { from = "Duplo-Forever (plan)", planned = true, slots = { [3] = { kind = "spell", name = "Flash of Light" } } }
+        BARS_NOW = { [1] = { kind = "spell", name = "Holy Light" }, [2] = { kind = "macro", name = "Food", icon = 7, body = "/use Food" } }''')
     YR.OpenPlanner()
     plan, slots = state()
-    check(plan[1] is not None and plan[1].name == "Holy Light" and plan[2] is not None, "nothing saved yet: the plan starts from what's on your bars")
-    lua.execute("local plan = YR_.PlannerState() plan[1] = nil") if False else None
-    lua.eval("function(YR) local plan = YR.PlannerState() plan[1] = nil end")(YR)
+    check(plan[1] is not None and plan[1].name == "Holy Light" and plan[2] is not None and plan[3] is not None and plan[3].name == "Flash of Light",
+          "the plan starts from your bars, with what's saved for a slot the bars leave empty")
     YR.PlannerAskSave(True)
-    check(g.POPUP is not None and g.POPUP.which == "HEADSTART_PLAN_LOSES" and g.POPUP.a == 1 and g.APPLIED == 0 and g.PROFILE is None,
-          "a plan without a button that's on the bars: asked first, nothing saved or applied yet")
-    lua.execute('StaticPopupDialogs.HEADSTART_PLAN_LOSES.OnAccept(nil, POPUP.data)')
-    check(g.APPLIED == 1 and g.PROFILE.slots[1] is not None and g.PROFILE.slots[1].name == "Holy Light",
-          "Keep them: the button goes into the plan, then it's saved and applied")
-    lua.execute('PROFILE, POPUP = nil, nil APPLIED = 0')
+    only = sorted(g.ONLY.keys()) if g.ONLY is not None else None
+    check(g.APPLIED == 1 and only == [3] and g.POPUP is None,
+          f"applied untouched: only the saved spell missing from the bars goes on, nothing is asked ({only})")
+    lua.execute("APPLIED = 0 ONLY = nil BARS_NOW[3] = { kind = 'spell', name = 'Flash of Light' }")
     YR.OpenPlanner()
-    lua.eval("function(YR) local plan = YR.PlannerState() plan[1] = nil end")(YR)
     YR.PlannerAskSave(True)
-    lua.execute('StaticPopupDialogs.HEADSTART_PLAN_LOSES.OnAlt()')
-    check(g.APPLIED == 1 and g.PROFILE.slots[1] is None, "Empty them: applied as planned")
-    lua.execute('OPTS.clearBars = false PROFILE, POPUP = nil, nil APPLIED = 0')
+    check(g.APPLIED == 0, "the bars already are the plan: nothing is applied")
+    lua.eval("function(YR) local plan = YR.PlannerState() plan[1] = nil plan[5] = { kind = 'spell', name = 'Purify' } end")(YR)
+    YR.PlannerAskSave(True)
+    only = sorted(g.ONLY.keys()) if g.ONLY is not None else None
+    check(g.APPLIED == 1 and only == [1, 5] and g.PROFILE.slots[2] is not None and g.PROFILE.slots[1] is None,
+          f"one taken off and one added in the planner: those two slots and no others ({only})")
+    # many buttons taken off at once (Empty, then Apply): asked first
+    lua.execute("BARS_NOW = {} for i = 1, 8 do BARS_NOW[i] = { kind = 'spell', name = 'Holy Light' } end PROFILE = nil APPLIED = 0 POPUP = nil")
     YR.OpenPlanner()
-    lua.eval("function(YR) local plan = YR.PlannerState() plan[1] = nil end")(YR)
+    lua.eval("function(YR) local plan = YR.PlannerState() for k in pairs(plan) do plan[k] = nil end end")(YR)
     YR.PlannerAskSave(True)
-    check(g.POPUP is None and g.APPLIED == 1, "with 'clear the bars first' off nothing is emptied, so nothing is asked")
-    lua.execute('OPTS.clearBars = nil BARS_NOW = {} PROFILE = nil')
+    check(g.APPLIED == 0 and g.POPUP is not None and g.POPUP.which == "HEADSTART_PLAN_REMOVES" and g.POPUP.a == 8,
+          "a plan that takes eight buttons off the bars: asked first, nothing applied")
+    lua.execute("StaticPopupDialogs.HEADSTART_PLAN_REMOVES.OnAccept()")
+    check(g.APPLIED == 1, "Apply: then it is")
+    lua.execute('BARS_NOW = {} PROFILE = nil ONLY = nil APPLIED = 0')
     win.Hide(win)
 
     # ---- general spells, professions, macros, forms ------------------------------------------------

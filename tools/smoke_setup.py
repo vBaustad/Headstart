@@ -407,12 +407,8 @@ ok2 = g.BAR[1].id == 635
 print(("ok  " if ok2 else "FAIL"), f"downranked on the main: slot 1 stays Rank 1 ({g.BAR[1].id})")
 bad += not ok2
 lua.execute("""local e = YippSetupDB.classes.PALADIN.profile.slots[1]; e.down, e.id = nil, nil""")
-YS.Options(YS).rankUp = False
-events._OnEvent(events, "SPELLS_CHANGED")
-ok2 = g.BAR[1].id == 635
-print(("ok  " if ok2 else "FAIL"), f"new ranks turned off: slot 1 stays Rank 1 ({g.BAR[1].id})")
-bad += not ok2
-YS.Options(YS).rankUp = True
+# a new rank always goes on the bar unless the spell is kept at a rank: there is no switch for it
+YS.Options(YS).rankUp = False          # the switch there used to be: ignored now
 events._OnEvent(events, "SPELLS_CHANGED")
 ok = ok and g.BAR[1].id == 639
 print(("ok  " if ok else "FAIL"), f"Holy Light Rank 2 trained: slot 1 now holds {g.BAR[1].id} (was Rank 1, 635)")
@@ -505,23 +501,24 @@ ok = g.BAR[10] is None
 print(("ok  " if ok else "FAIL"), "professions off: Find Minerals is not placed, even when known")
 bad += not ok
 
-lua.execute("Fresh({ maxLevel = 20 })")
+lua.execute("Fresh(); OLD_LEVEL = UnitLevel UnitLevel = function() return 10 end")
 YS.Apply(YS)
 ok = g.BAR[2] is not None and g.BAR[2].kind == "macro"
-print(("ok  " if ok else "FAIL"), "level limit 20: Flash of Light (level 20) gets its placeholder")
+print(("ok  " if ok else "FAIL"), "level 10: Flash of Light (level 20, ten levels ahead) gets its question mark")
 bad += not ok
+lua.execute("UnitLevel = OLD_LEVEL")
 
 # the level limit is for a new character's question marks: it never drops a spell at or under your level
 lua.execute("Fresh(); OLD_LEVEL = UnitLevel UnitLevel = function() return 30 end NAMEID['Flash of Light'] = 19750 KNOWN[19750] = true")
 YS.Apply(YS)
 ok = g.BAR[2] is not None and g.BAR[2].kind == "spell" and g.BAR[2].id == 19750
-print(("ok  " if ok else "FAIL"), "level 30, limit 10: a level 20 spell you know still goes on its slot")
+print(("ok  " if ok else "FAIL"), "level 30: a level 20 spell you know goes on its slot")
 bad += not ok
 # ... and a spell above the limit, left out when the layout went on, goes into its empty slot once learned
 lua.execute("Fresh(); UnitLevel = function() return 1 end KNOWN[19750] = nil")
 YS.Apply(YS)
 ok = g.BAR[2] is None
-print(("ok  " if ok else "FAIL"), "level 1, limit 10: a level 20 spell has no button yet")
+print(("ok  " if ok else "FAIL"), "level 1: a level 20 spell is too far ahead for a button yet")
 bad += not ok
 lua.execute("UnitLevel = function() return 20 end KNOWN[19750] = true")
 events._OnEvent(events, "SPELLS_CHANGED")
@@ -529,6 +526,45 @@ ok = g.BAR[2] is not None and g.BAR[2].kind == "spell" and g.BAR[2].id == 19750
 print(("ok  " if ok else "FAIL"), "... and goes into its slot the moment it is learned")
 bad += not ok
 lua.execute("UnitLevel = OLD_LEVEL NAMEID['Flash of Light'] = nil KNOWN[19750] = nil")
+# the planner's apply: only the slots it names - nothing else is cleared, no macro of yours is deleted
+lua.execute("""Fresh(); BAR[30] = { kind = 'spell', id = 999 } BAR[1] = { kind = 'spell', id = 999 }
+    MACROS[121] = { 'Mine', 1, '/dance' }""")
+YS.Apply(YS, None, lua.eval("{ [1] = true, [40] = true }"))
+ok = g.BAR[30] is not None and g.BAR[30].id == 999 and g.BAR[1] is not None and g.BAR[1].id == 635 and g.MACROS[121] is not None
+print(("ok  " if ok else "FAIL"), "apply to named slots: slot 1 gets the saved spell, a button elsewhere and your macros stay")
+bad += not ok
+lua.execute("BAR[40] = { kind = 'spell', id = 999 }")
+YS.Apply(YS, None, lua.eval("{ [40] = true }"))
+ok = g.BAR[40] is None and g.BAR[30] is not None
+print(("ok  " if ok else "FAIL"), "a named slot with nothing saved for it is emptied")
+bad += not ok
+# what the planner starts from: the bars, with the saved layout where they're empty; a question mark
+# Headstart made for a saved spell is that spell
+lua.execute("Fresh()")
+YS.Apply(YS)
+plan, now = YS.PlanStart()
+saved = YS.Profile(YS).slots
+ok = all(plan[k] is not None for k in saved) and plan[4] is not None and plan[4].kind == "spell" and now[4] is not None and now[4].kind == "macro"
+print(("ok  " if ok else "FAIL"), "the planner's start: every saved button, and a question-mark macro on the bar read as its spell")
+bad += not ok
+lua.execute("BAR[60] = { kind = 'spell', id = 635 }")
+plan, now = YS.PlanStart()
+ok = plan[60] is not None and plan[60].name == "Holy Light"
+print(("ok  " if ok else "FAIL"), "... and a button on the bars that isn't in the saved layout is in it too")
+bad += not ok
+# an old button at a lower rank is not a choice: read as behind (stale), never as kept at that rank
+lua.execute("""Fresh(); KNOWN[639] = true; NAMEID["Holy Light"] = 639; BAR[1] = { kind = 'spell', id = 635 }""")
+now, _ = YS.ReadBars()
+ok = now[1] is not None and now[1].stale is True and now[1].rankID == 635 and now[1].down is None
+print(("ok  " if ok else "FAIL"), "a Rank 1 button with Rank 2 known: behind, not downranked")
+bad += not ok
+lua.execute("""KEPT_SLOT = YippSetupDB.classes.PALADIN.profile.slots[1]
+    YippSetupDB.classes.PALADIN.profile.slots[1] = { kind = 'spell', name = 'Holy Light', level = 1, down = true, id = 635, rank = 1 }""")
+plan, _ = YS.PlanStart()
+ok = plan[1] is not None and plan[1].down is True and plan[1].id == 635
+print(("ok  " if ok else "FAIL"), "... unless you set that rank in the planner: then it stays set")
+bad += not ok
+lua.execute("""KNOWN[639] = nil; NAMEID["Holy Light"] = 635; YippSetupDB.classes.PALADIN.profile.slots[1] = KEPT_SLOT""")
 g.SlashCmdList.YIPPSETUP("debug")
 print("ok  ", "/ysetup debug prints without an error")
 

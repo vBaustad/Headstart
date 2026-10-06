@@ -52,6 +52,7 @@ local GRID_W = 16 + LIST_W + 20 + 86 + 12 * (SLOT + GAP) + 16
 local WIN_H = 760
 
 local win, plan, carry, cursor, menu
+local opened = {}                  -- the bars as they were when the planner opened: { [slot] = entry }
 local slots, overlays, rows = {}, {}, {}
 local filter = ""
 local mode = "bars"                -- "bars" | "grid"
@@ -604,6 +605,18 @@ local function Copy(t)
     return c
 end
 
+-- Is the planned button what is on the bar already?
+local function Same(a, b)
+    if a == nil or b == nil then return a == b end
+    if a.kind ~= b.kind or a.name ~= b.name then return false end
+    if a.kind == "macro" then return a.body == b.body end
+    if a.kind == "item" then return a.id == b.id end
+    -- the rank: one you set here (down), or - on the bar - an old button still at a lower rank (stale).
+    -- A spell not kept at a rank is its highest, so a stale button differs from the plan and is renewed.
+    local function Rank(e) return (e.down and e.id) or (e.stale and e.rankID) or nil end
+    return Rank(a) == Rank(b)
+end
+
 local function Save(thenApply)
     YS:SetProfile({
         from = YS.PlayerKey() .. " (plan)", class = Class(), maxLevel = 60, scanned = time(),
@@ -617,7 +630,13 @@ local function Save(thenApply)
     if YR.RefreshWindow then YR:RefreshWindow() end
     if thenApply then
         if win then win:Hide() end          -- the overlays off the bars, so the real buttons show
-        YS:Apply()
+        -- only the buttons that differ from the bars: a button you didn't touch is left as it is (also
+        -- one the planner can't show - a pet's, a toy), and one you took off here comes off the bar
+        local only, n = {}, 0
+        for slot = 1, 180 do
+            if not Same(plan[slot], opened[slot]) then only[slot], n = true, n + 1 end
+        end
+        if n > 0 then YS:Apply(nil, only) else YR.Print("the bars already are as planned.") end
     end
 end
 
@@ -631,45 +650,26 @@ StaticPopupDialogs["HEADSTART_PLAN_OVERWRITE"] = {
     hideOnEscape = true,
 }
 
--- What's on the bars now and not in the plan: Apply clears the bars first (unless that option is off),
--- so these would be gone. { [slot] = entry }, and how many.
-local function Lost()
-    local out, n = {}, 0
-    if YS:Options().clearBars == false or not YS.ReadBars then return out, n end
-    for slot, e in pairs(YS.ReadBars()) do
-        if not plan[slot] then out[slot], n = e, n + 1 end
-    end
-    return out, n
-end
-
+-- Taking a few buttons off in the planner is the plan. Taking many off at once (Empty, then Apply) is
+-- more likely a slip: that is asked first.
+local MANY = 6
 local AskSave
-StaticPopupDialogs["HEADSTART_PLAN_LOSES"] = {
-    text = "Headstart: %d buttons on your bars now aren't in this plan. Applying it empties them.",
-    button1 = "Keep them",
+StaticPopupDialogs["HEADSTART_PLAN_REMOVES"] = {
+    text = "Headstart: this plan takes %d buttons off your bars. Apply it?",
+    button1 = "Apply",
     button2 = "Cancel",
-    button3 = "Empty them",
-    OnAccept = function(_, lost)
-        for slot, e in pairs(lost or {}) do if not plan[slot] then plan[slot] = Copy(e) end end
-        Paint()
-        AskSave(true, true)
-    end,
-    OnAlt = function() AskSave(true, true) end,
+    OnAccept = function() AskSave(true, true) end,
     timeout = 0,
     whileDead = true,
     hideOnEscape = true,
 }
 
---- Save the plan, and with thenApply put it on the bars. Applying asks first when it would empty
---- buttons you have now (decided: that was asked and answered).
-function AskSave(thenApply, decided)
+function AskSave(thenApply, sure)
     if InCombatLockdown() and thenApply then YR.Print("not in combat.") return end
-    if thenApply and not decided then
-        local lost, n = Lost()
-        if n > 0 then
-            local d = StaticPopup_Show("HEADSTART_PLAN_LOSES", n)
-            if d then d.data = lost end
-            return
-        end
+    if thenApply and not sure then
+        local off = 0
+        for slot in pairs(opened) do if not plan[slot] then off = off + 1 end end
+        if off >= MANY then StaticPopup_Show("HEADSTART_PLAN_REMOVES", off) return end
     end
     local old = YS:Profile()
     if old and not old.planned then
@@ -906,21 +906,21 @@ function YR.PlannerRankMenu(b)
     menu:Show()
 end
 
---- Open the planner, starting from the class's saved layout (or, with none saved, from your bars). On your bars unless you last chose the grid,
+--- Open the planner, starting from your bars (and the saved layout where they're empty). On your bars unless you last chose the grid,
 --- or no Blizzard bar is on screen at all (a bar addon draws its own).
 function YR.OpenPlanner()
     if InCombatLockdown() then YR.Print("not in combat.") return end
     if not win then Build() end
-    local p = YS:Profile()
-    plan = {}
-    for slot, e in pairs(p and p.slots or {}) do plan[slot] = Copy(e) end
-    -- nothing saved for this class yet: the plan begins as what is on your bars now, so adding the
-    -- spells you're missing and applying doesn't take the rest away
-    if not p and YS.ReadBars then
-        local n = 0
-        for slot, e in pairs(YS.ReadBars()) do plan[slot], n = Copy(e), n + 1 end
-        if n > 0 then YR.Print(("the plan starts from the %d buttons on your bars now."):format(n)) end
+    -- The plan is your bars as they are now, with the saved layout where the bars have nothing (the
+    -- spells planned for later levels; on a new character, all of it). What you see is what Apply
+    -- gives you: only the buttons you change here change on the bars.
+    plan, opened = {}, {}
+    local start, now = YS.PlanStart()
+    for slot, e in pairs(start) do
+        plan[slot] = Copy(e)
+        plan[slot].stale, plan[slot].rankID = nil, nil     -- planned at its highest rank unless you set one
     end
+    for slot, e in pairs(now) do opened[slot] = Copy(e) end
     wipe(lists)      -- spells learned or macros made since the last open
     win.subtitle:SetText("")
     formBar = 0
