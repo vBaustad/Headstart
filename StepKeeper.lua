@@ -43,7 +43,7 @@ end
 
 local function Quests(step)
     local q = {}
-    for kind, id in step:gmatch("\n%s*%.(%a+)%s+(%d+)") do
+    for kind, id in step:gmatch("\n%s*%.(%a+)%s+%-?(%d+)") do
         if kind == "accept" or kind == "turnin" or kind == "complete" then q[#q + 1] = kind .. id end
     end
     return table.concat(q, " ")

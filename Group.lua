@@ -137,7 +137,7 @@ local function Read()
     for _, g in ipairs(YR.shipped) do
         local text = YR:GuideText(g.key) or ""
         for q in text:gmatch("%.accept%s+(%d+)") do routeQuests[tonumber(q)] = true end
-        for t in text:gmatch("%.accept%s+%d+%s*>>%s*Accept ([^\n|<]+)") do routeTitles[strtrim(t)] = true end
+        for t in text:gmatch("%.accept%s+%d+[,%d]*%s*>>%s*Accept ([^\n|<]+)") do routeTitles[strtrim(t)] = true end
     end
 end
 function YR.RouteQuest(questID)

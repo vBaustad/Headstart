@@ -333,7 +333,7 @@ end
 
 local function QuestsOf(step)
     local out = {}
-    for kind, q in step:gmatch("\n%s*%.(%a+)%s+(%d+)") do
+    for kind, q in step:gmatch("\n%s*%.(%a+)%s+%-?(%d+)") do
         if kind == "accept" or kind == "turnin" or kind == "complete" then out[#out + 1] = { kind, tonumber(q) } end
     end
     return out

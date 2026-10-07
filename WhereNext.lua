@@ -30,7 +30,8 @@ end
 
 local function HasQuest(step)
     local s = "\n" .. step
-    return s:find("\n%s*%.accept%s+%d") or s:find("\n%s*%.turnin%s+%d") or s:find("\n%s*%.complete%s+%d")
+    -- "-ID": RestedXP's "skip when you don't have it" form of a hand-in or an objective
+    return s:find("\n%s*%.accept%s+%d") or s:find("\n%s*%.turnin%s+%-?%d") or s:find("\n%s*%.complete%s+%-?%d")
 end
 
 --- One route against what the character has done. done(questID) -> true when handed in (the game's
@@ -46,7 +47,7 @@ function YR.RouteProgress(key, done)
     local seen, firstOpen = {}, nil
     for i, step in ipairs(steps) do
         local open = false
-        for kind, id in ("\n" .. step):gmatch("\n%s*%.(%a+)%s+(%d+)") do
+        for kind, id in ("\n" .. step):gmatch("\n%s*%.(%a+)%s+%-?(%d+)") do
             if kind == "accept" or kind == "turnin" or kind == "complete" then
                 id = tonumber(id)
                 local was = done(id)

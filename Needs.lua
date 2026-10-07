@@ -56,8 +56,8 @@ local function Build()
     local mine = YR:RoutesFor(race)
     for _, g in ipairs(YR.shipped) do
         local text = mine[g.key] and YR:GuideText(g.key) or ""
-        for q, t in text:gmatch("%.accept (%d+)%s*>>%s*Accept ([^\n|]+)") do titles[tonumber(q)] = titles[tonumber(q)] or t end
-        for q, t in text:gmatch("%.turnin (%d+)[^\n]->>%s*Turn in ([^\n|]+)") do titles[tonumber(q)] = titles[tonumber(q)] or t end
+        for q, t in text:gmatch("%.accept (%d+)[,%d]*%s*>>%s*Accept ([^\n|]+)") do titles[tonumber(q)] = titles[tonumber(q)] or t end
+        for q, t in text:gmatch("%.turnin %-?(%d+)[^\n]->>%s*Turn in ([^\n|]+)") do titles[tonumber(q)] = titles[tonumber(q)] or t end
         local header, steps = YR.SplitSteps(text)
         for _, step in ipairs(steps) do
             if Shows(step:match("^step%s*<<%s*([^\n%-]+)")) then
