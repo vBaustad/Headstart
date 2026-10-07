@@ -14,22 +14,29 @@ local titles           -- questID -> title, from the routes' accept and turn-in 
 -- list of words that must all hold (Class, Race, Faction, or "!" before one for "not"). Words it
 -- doesn't know (RestedXP's own, like "sod") count as true: better to keep an item than lose it.
 -- Asked for every filtered step of every route (hundreds at a time): the words are one table, who you
--- are is read once it's known, and each filter's answer is kept.
+-- are is read once it's known, and each filter's answer is kept. Once the game has said all three (class,
+-- race, faction) they don't change, so a kept answer is given before any of them is asked for again.
 local KNOWN = { warrior = 1, paladin = 1, hunter = 1, rogue = 1, priest = 1, shaman = 1, mage = 1, warlock = 1,
     druid = 1, human = 1, dwarf = 1, gnome = 1, nightelf = 1, orc = 1, troll = 1, tauren = 1, scourge = 1,
     undead = 1, alliance = 1, horde = 1 }
-local mine, who, shown = {}, nil, {}
+local mine, who, shown, settled = {}, nil, {}, false
 local function Shows(filter)
     if not filter or filter:match("^%s*$") then return true end
-    local _, class = UnitClass("player")
-    local _, race = UnitRace("player")
-    local faction = UnitFactionGroup("player")
-    local now = (class or "") .. "/" .. (race or "") .. "/" .. (faction or "")
-    if now ~= who then              -- the first call, or before the game knew who you are
-        who, shown = now, {}
-        mine = { [(class or ""):lower()] = true, [(race or ""):lower()] = true, [(faction or ""):lower()] = true }
+    if settled then
+        local known = shown[filter]
+        if known ~= nil then return known end
+    else
+        local _, class = UnitClass("player")
+        local _, race = UnitRace("player")
+        local faction = UnitFactionGroup("player")
+        local now = (class or "") .. "/" .. (race or "") .. "/" .. (faction or "")
+        if now ~= who then              -- the first call, or before the game knew who you are
+            who, shown = now, {}
+            mine = { [(class or ""):lower()] = true, [(race or ""):lower()] = true, [(faction or ""):lower()] = true }
+        end
+        settled = class ~= nil and race ~= nil and faction ~= nil
+        if shown[filter] ~= nil then return shown[filter] end
     end
-    if shown[filter] ~= nil then return shown[filter] end
     local answer = false
     for alt in filter:gmatch("[^/]+") do
         local ok = true
@@ -136,51 +143,95 @@ function YR.RouteNeed(item, live)
     return count, table.concat(what, ", ")
 end
 
+-- The sell guard: a line on the item's tooltip, and a warning when you sell what the route needs.
+-- Both are hooks on the game, which can't be taken off again, so: they are put on the first time the
+-- guard is on (the routes on and its option, the part below) - never on an install without routes -
+-- and each asks first thing whether the guard is on now.
+local guard = false
+
 -- A line on the item's tooltip: what the route needs it for, and how many you have.
 local function AddLine(tooltip, item)
-    if not YR.Option("sellGuard") then return end
     local count, what = YR.RouteNeed(item)
     if not count then return end
     local have = C_Item.GetItemCount and C_Item.GetItemCount(item) or 0
     tooltip:AddLine(("Headstart: keep %d for %s (you have %d)"):format(count, what, have), 1, 0.8, 0.3, true)
 end
 
-function YR:HookTooltips()
+local function OnTooltipData(tooltip, data)
+    if not guard then return end
+    if tooltip == GameTooltip and data and data.id then AddLine(tooltip, data.id) end
+end
+
+local function OnTooltipItem(tooltip)
+    if not guard then return end
+    local _, link = tooltip:GetItem()
+    local item = link and tonumber(link:match("item:(%d+)"))
+    if item then AddLine(tooltip, item) end
+end
+
+local tipped = false
+local function HookTips()
+    if tipped then return end
+    tipped = true
     if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
-        TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
-            if tooltip == GameTooltip and data and data.id then AddLine(tooltip, data.id) end
-        end)
+        TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnTooltipData)
     elseif GameTooltip and GameTooltip.HookScript then
-        GameTooltip:HookScript("OnTooltipSetItem", function(tooltip)
-            local _, link = tooltip:GetItem()
-            local item = link and tonumber(link:match("item:(%d+)"))
-            if item then AddLine(tooltip, item) end
-        end)
+        GameTooltip:HookScript("OnTooltipSetItem", OnTooltipItem)
     end
 end
 
 -- Selling at a vendor goes through UseContainerItem (right-click). It can't be stopped without
 -- tainting the bags, so it is caught right after: the item is still in its slot (locked) then, and
--- the vendor's Buyback tab still has it.
-function YR:WatchSells(onSell)
-    local function Sold(bag, slot)
-        if not (MerchantFrame and MerchantFrame:IsShown()) then return end
-        local info = C_Container.GetContainerItemInfo(bag, slot)
-        if not (info and info.itemID) then return end
-        onSell(info.itemID, info.stackCount or 1)
-        if not YR.Option("sellGuard") then return end
-        local need, what = YR.RouteNeed(info.itemID)
-        if need then
-            local name = C_Item.GetItemNameByID(info.itemID) or ("item " .. info.itemID)
-            local msg = ("sold %s, but the route still needs %d for %s. Buy it back on the vendor's Buyback tab.")
-                :format(name, need, what)
-            YR.Print("|cffff7070" .. msg .. "|r")
-            if UIErrorsFrame then UIErrorsFrame:AddMessage("Headstart: the route still needs " .. name, 1, 0.3, 0.3) end
-        end
+-- the vendor's Buyback tab still has it. Who else wants to hear of a sale (the run log) says so with
+-- YR:WatchSells, and with YR.SellsWatched whether it is listening now.
+local watchers, watched, sells = {}, false, false
+
+local function Sold(bag, slot)
+    if not (guard or watched) then return end
+    if not (MerchantFrame and MerchantFrame:IsShown()) then return end
+    local info = C_Container.GetContainerItemInfo(bag, slot)
+    if not (info and info.itemID) then return end
+    for i = 1, #watchers do watchers[i](info.itemID, info.stackCount or 1) end
+    if not guard then return end
+    local need, what = YR.RouteNeed(info.itemID)
+    if need then
+        local name = C_Item.GetItemNameByID(info.itemID) or ("item " .. info.itemID)
+        local msg = ("sold %s, but the route still needs %d for %s. Buy it back on the vendor's Buyback tab.")
+            :format(name, need, what)
+        YR.Print("|cffff7070" .. msg .. "|r")
+        if UIErrorsFrame then UIErrorsFrame:AddMessage("Headstart: the route still needs " .. name, 1, 0.3, 0.3) end
     end
+end
+
+local function HookSells()
+    if sells then return end
+    sells = true
     if C_Container and C_Container.UseContainerItem then
         hooksecurefunc(C_Container, "UseContainerItem", Sold)
     elseif UseContainerItem then
         hooksecurefunc("UseContainerItem", Sold)
     end
+end
+
+function YR:WatchSells(onSell)
+    watchers[#watchers + 1] = onSell
+end
+
+--- A watcher is listening for sales now, or no longer is.
+function YR.SellsWatched(on)
+    watched = on and true or false
+    if watched then HookSells() end
+end
+
+local part
+function YR:HookTooltips()
+    if part then return end
+    part = YR.Part(function() return YR.RoutesOn() and YR.Option("sellGuard") end, nil, nil, {
+        start = function()
+            guard = true
+            HookTips()
+            HookSells()
+        end,
+        stop = function() guard = false end,
+    })
 end

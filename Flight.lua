@@ -6,6 +6,7 @@
 -- the timed flights on that map averaged (YippRouteDB.flightPace[taxi map]). With none of these, the
 -- bar counts up while it learns. RestedXP's own flight bar is hidden while ours shows.
 -- Account option flightTimer (Settings, QoL); the bar is dragged where you want it while it shows.
+-- With it off nothing here runs: a flight is not timed, not learned and not looked at (YR.Part).
 local _, YR = ...
 
 local frame
@@ -81,7 +82,9 @@ end
 -- stops on the way, a Land button for the next one. The stops themselves aren't drawn: the game doesn't
 -- say how long each leg takes (tried in game, 2026-10-01). On a first flight, with no time to go by, a
 -- light runs along the bar.
-local W, H = 320, 66
+-- 72 high: the knob (your face in its ring, 19 across, on the track at 38 down) ends at 48, and the
+-- Land button's top is at 48 - at 66 the face lay over the button when the flight was nearly done
+local W, H = 320, 72
 local PAD = 12
 local TRACK_Y, THICK, KNOB = -38, 5, 13
 local FACE = 16            -- your portrait on the bar, where the knob is
@@ -238,13 +241,27 @@ local function Progress()
 end
 
 -- The knob's five pieces (frame.knob, made with the frame). Hidden, they're only hidden: not moved.
+-- This runs for every pixel the knob moves: one piece is moved (the glow) and the other four ride on
+-- it, and which of them show is set only when that changes.
 local function Knob(x, shown)
     local face = shown and YR.Option("flightFace")
-    for _, t in ipairs(frame.knob) do
-        if shown then
-            t:ClearAllPoints()
-            t:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y)
+    if shown then
+        if not frame.knobTied then
+            frame.knobTied = true
+            for _, t in ipairs(frame.knob) do
+                if t ~= frame.glow then
+                    t:ClearAllPoints()
+                    t:SetPoint("CENTER", frame.glow, "CENTER")
+                end
+            end
         end
+        frame.glow:ClearAllPoints()
+        frame.glow:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y)
+    end
+    local look = shown and (face and 2 or 1) or 0
+    if frame.knobLook == look then return end
+    frame.knobLook = look
+    for _, t in ipairs(frame.knob) do
         local isFace = t == frame.ring or t == frame.face
         local isDot = t == frame.head or t == frame.core
         t:SetShown(shown and not (isFace and not face) and not (isDot and face))
@@ -308,6 +325,14 @@ function YR:RefreshFlight()
         frame.from:SetWidth(fromW)
         frame.to:SetWidth(math.max(40, room - fromW))
     end
+    frame.stop:SetShown(CanStop())
+    -- the words change once a second: written only then (and when what they say about the flight does)
+    local second = floor((total and total > 0 and not cut) and (total - gone) or gone)
+    if frame.second == second and frame.secondOf == flight and frame.secondTotal == total and frame.secondCut == cut
+            and frame.secondGuess == guess then
+        return
+    end
+    frame.second, frame.secondOf, frame.secondTotal, frame.secondCut, frame.secondGuess = second, flight, total, cut, guess
     if total and total > 0 and not cut then
         local left = total - gone
         frame.time:SetTextColor(BLUE[1], BLUE[2], BLUE[3])
@@ -323,7 +348,6 @@ function YR:RefreshFlight()
         frame.time:SetText(Clock(gone))
         frame.note:SetText(cut and "landing at the next stop" or "first flight here: timing it")
     end
-    frame.stop:SetShown(CanStop())
 end
 
 local function ShowBar(on)
@@ -359,45 +383,68 @@ local function TakeOff()
     if YR.Option("flightTimer") then ShowBar(true) end
 end
 
+local watcher            -- the frame the timer listens on, once it has been on (YR.Part)
+local flying             -- the look for the landing, a few times a second, while in the air
+local waited = 0
+
+-- On the ground again (or the timer turned off): nothing is watched between flights.
+local function StopWatching()
+    if flying then
+        flying:Cancel()
+        flying = nil
+    end
+    if watcher then
+        watcher:SetScript("OnUpdate", nil)
+        watcher:UnregisterEvent("PLAYER_CONTROL_GAINED")
+    end
+end
+
 local function Landed()
     -- a flight landed early (the stop button) or carried over a reload is not the route's time
     if flight and not flight.resumed and not flight.cut then Learn(flight, GetTime() - flight.started) end
     flight = nil
     YippRouteDB.flightNow = nil
+    StopWatching()
     ShowBar(false)
 end
 
-local watcher = CreateFrame("Frame")
-local waited = 0
-
--- In the air: landing is when the game stops saying you are on a taxi. Checked a few times a second:
--- PLAYER_CONTROL_GAINED can come while UnitOnTaxi still says yes, and then nothing else tells us
--- (seen in game: Ratchet to Theramore, the bar stayed up "landing").
-local function WhileFlying(self, elapsed)
-    waited = waited + elapsed
-    if waited < 0.25 then return end
-    waited = 0
+-- In the air: landing is when the game stops saying you are on a taxi. The game's own word for it
+-- (PLAYER_CONTROL_GAINED) is listened for while flying, and it is checked a few times a second too:
+-- that event can come while UnitOnTaxi still says yes, and then nothing else tells us (seen in game:
+-- Ratchet to Theramore, the bar stayed up "landing"). A ticker, not a count kept on every frame.
+local function Watch()
     if not flight then
-        self:SetScript("OnUpdate", nil)
+        StopWatching()
     elseif not UnitOnTaxi("player") then
-        self:SetScript("OnUpdate", nil)
         Landed()
     end
 end
--- after the click the game takes a moment to put you on the taxi: wait for it (5 seconds at most)
+local function InTheAir()
+    watcher:RegisterEvent("PLAYER_CONTROL_GAINED")
+    if not flying then flying = C_Timer.NewTicker(0.25, Watch) end
+end
+
+-- after the click the game takes a moment to put you on the taxi: wait for it (5 seconds at most).
+-- Every frame, for that moment only: the flight is timed from the frame it starts on.
 local function WaitForTaxi(self, elapsed)
     waited = waited + elapsed
     if UnitOnTaxi("player") then
+        self:SetScript("OnUpdate", nil)
         TakeOff()
-        waited = 0
-        self:SetScript("OnUpdate", WhileFlying)
+        InTheAir()
     elseif waited > 5 then
         self:SetScript("OnUpdate", nil)
         pending = nil
     end
 end
 
-hooksecurefunc("TakeTaxiNode", function(i)
+local function Wanted() return YR.Option("flightTimer") end
+local part
+
+-- A flight asked for at the flight master. The hook can't be taken off again once it is on: it is
+-- put on the first time the timer is on, and with the timer off it returns at once.
+local function OnTakeTaxi(i)
+    if not (part and part.on and watcher) or not YR.Option("flightTimer") then return end
     local from
     for j = 1, NumTaxiNodes() do
         if TaxiNodeGetType(j) == "CURRENT" then from = TaxiNodeName(j) end
@@ -411,11 +458,9 @@ hooksecurefunc("TakeTaxiNode", function(i)
         map = GetTaxiMapID and GetTaxiMapID() or 0, rxp = rxp }
     waited = 0
     watcher:SetScript("OnUpdate", WaitForTaxi)
-end)
+end
 
-watcher:RegisterEvent("PLAYER_CONTROL_GAINED")
-watcher:RegisterEvent("PLAYER_ENTERING_WORLD")
-watcher:SetScript("OnEvent", function(_, event)
+local function OnEvent(_, event)
     if event == "PLAYER_CONTROL_GAINED" then
         if flight and not UnitOnTaxi("player") then Landed() end
     elseif event == "PLAYER_ENTERING_WORLD" then
@@ -427,17 +472,42 @@ watcher:SetScript("OnEvent", function(_, event)
             flight.started = GetTime() - (time() - (now.at or time()))
             flight.total, flight.guess = Expected(flight)
             if YR.Option("flightTimer") then ShowBar(true) end
-            waited = 0
-            watcher:SetScript("OnUpdate", WhileFlying)
+            InTheAir()
         elseif now and not UnitOnTaxi("player") then
             YippRouteDB.flightNow = nil
         end
     end
-end)
+end
+
+local hooked
+local function Begin(p)
+    watcher = p.frame
+    if not hooked then
+        hooked = true
+        hooksecurefunc("TakeTaxiNode", OnTakeTaxi)
+    end
+end
+
+-- Turned off in the air: the flight is let go, unlearned (half a flight is not the route's time).
+-- The sample bar (/headstart flight) is not a flight of the timer's: it is left to run out.
+local function End()
+    StopWatching()
+    pending = nil
+    if flight and flight.key ~= "" then
+        flight = nil
+        YippRouteDB.flightNow = nil
+        ShowBar(false)
+    end
+end
+
+-- Free while off (YR.Part, Core.lua). On: only a loading screen is listened for (a reload in the air);
+-- the rest is from the click at the flight master to the landing.
+part = YR.Part(Wanted, { "PLAYER_ENTERING_WORLD" }, OnEvent, { start = Begin, stop = End })
 
 -- The setting: off hides a bar that is showing; on shows it if you are in the air.
 function YR:SetFlightTimer(on)
     YippRouteDB.flightTimer = on
+    YR.ApplyParts()
     ShowBar(on and flight ~= nil)
 end
 

@@ -214,17 +214,27 @@ end
 
 -- The page is refreshed whenever the window is; walking every route each time is the costly part, so
 -- the answer is kept until something it rests on changes: your level, the routes, a quest handed in.
-local kept, keptFor
-local watch = CreateFrame("Frame")
-watch:RegisterEvent("QUEST_TURNED_IN")
-watch:SetScript("OnEvent", function() kept = nil end)
+-- Hand-ins are listened for only while there is an answer to throw away: the frame is made the first
+-- time the page has one, and stops listening once it has forgotten it.
+local kept, keptFor, watch
+local function Forget(self)
+    kept = nil
+    self:UnregisterEvent("QUEST_TURNED_IN")
+end
 
 function YR.RefreshWherePage()
     if not ui.who then return end
     local level = UnitLevel("player")
     local race, class = UnitRace("player"), UnitClass("player")
     local stamp = level .. ":" .. #(YR.shipped or {}) .. ":" .. tostring(YR.RoutesOn()) .. ":" .. tostring(race) .. tostring(class)
-    if not kept or keptFor ~= stamp then kept, keptFor = YR.WhereNext(level), stamp end
+    if not kept or keptFor ~= stamp then
+        kept, keptFor = YR.WhereNext(level), stamp
+        if not watch then
+            watch = CreateFrame("Frame")
+            watch:SetScript("OnEvent", Forget)
+        end
+        watch:RegisterEvent("QUEST_TURNED_IN")
+    end
     local list = kept
     ui.who:SetText(("Level %d %s %s. From the quests the game says this character has handed in, whether or not it followed a route."):format(
         level, race or "", class or ""))

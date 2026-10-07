@@ -226,12 +226,17 @@ function YR.ItemFromText(text)
     return tonumber(text:match("item:(%d+)") or text:match("^%s*(%d+)%s*$"))
 end
 
+local function Buy() YR.Restock(false) end
+local function AtVendor()
+    if not YR.Option("restock") or IsShiftKeyDown() then return end
+    -- A moment for the vendor's list to arrive; Shift was read above, while the key is down.
+    C_Timer.After(0.3, Buy)
+end
+
+-- A vendor's window opening is listened for only while restocking is on.
+local declared
 function YR.StartRestock()
-    local f = CreateFrame("Frame")
-    f:RegisterEvent("MERCHANT_SHOW")
-    f:SetScript("OnEvent", function()
-        if not YR.Option("restock") or IsShiftKeyDown() then return end
-        -- A moment for the vendor's list to arrive; Shift was read above, while the key is down.
-        C_Timer.After(0.3, function() YR.Restock(false) end)
-    end)
+    if declared then return end
+    declared = true
+    YR.Part(function() return YR.Option("restock") end, { "MERCHANT_SHOW" }, AtVendor)
 end

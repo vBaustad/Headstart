@@ -94,7 +94,7 @@ function MakeMeter()
     rawset(w, "GetSessionTimerFontString", function() return timer end)
     rawset(w, "GetMinimizeContainer", function() return New() end)
     -- the game's own layout: the session button back where the game has it
-    rawset(w, "RefreshLayout", function() session:ClearAllPoints() session:SetPoint("LEFT", nil, "LEFT", 100, 0) end)
+    rawset(w, "RefreshLayout", function() if STILL then return end session:ClearAllPoints() session:SetPoint("LEFT", nil, "LEFT", 100, 0) end)
     rawset(w, "blizzard", true)
     WINDOW = w
     DamageMeter = New()
@@ -155,6 +155,14 @@ def run():
     # the game lays the window out again: we go over it
     g.WINDOW.RefreshLayout(g.WINDOW)
     check(pts(P.session)[1] == "RIGHT" and pts(P.session)[4] == -59, "the game lays it out again: put in order again")
+    # nothing moved (the window minimised, or showing something else): the bar isn't laid out again
+    lua.execute("STILL = true SESSION_POINTS = rawget(PIECES.session, 'points')")
+    g.WINDOW.RefreshLayout(g.WINDOW)
+    check(lua.eval("rawequal(SESSION_POINTS, rawget(PIECES.session, 'points'))"),
+          "the game redraws with every piece where we put it: none is placed again")
+    YR.DamageSkinApply()
+    check(not lua.eval("rawequal(SESSION_POINTS, rawget(PIECES.session, 'points'))"), "a setting changed: everything again")
+    lua.execute("STILL = nil")
 
     YR.SetDamageSkin("blizzard")
     check(abs(raw(P.typeDrop.TypeName, "colour")[2] - 0.82) < 0.01 and pts(P.minimize)[1] == "RIGHT", "Blizzard, tidied: the same order, the title in gold")

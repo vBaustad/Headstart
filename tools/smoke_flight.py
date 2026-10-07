@@ -31,6 +31,8 @@ function Obj.IsShown(self) return rawget(self, "_shown") ~= false end
 function Obj.SetShown(self, on) rawset(self, "_shown", on and true or false) end
 function Obj.SetScript(self, what, fn) rawset(self, "_" .. what, fn) end
 function Obj.RegisterEvent(self, e) rawset(self, "_ev", rawget(self, "_ev") or {}) self._ev[e] = true end
+function Obj.UnregisterEvent(self, e) if rawget(self, "_ev") then self._ev[e] = nil end end
+function Obj.UnregisterAllEvents(self) rawset(self, "_ev", nil) end
 function Obj.SetText(self, t) rawset(self, "_text", t) end
 function Obj.GetText(self) return rawget(self, "_text") or "" end
 function Obj.SetValue(self, v) rawset(self, "_value", v) end
@@ -40,12 +42,40 @@ function Obj.GetTop() return 600 end
 function CreateFrame(_, name) local f = setmetatable({}, Obj) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 UIParent = CreateFrame()
 function Fire(event) for _, f in ipairs(FRAMES) do if rawget(f, "_ev") and f._ev[event] and rawget(f, "_OnEvent") then f._OnEvent(f, event) end end end
+-- A frame of dt seconds: the OnUpdates, then each ticker whose time has come (once a frame at most,
+-- as in the game).
+TICKERS = {}
 function Tick(dt) NOW = NOW + dt; CLOCK = CLOCK + dt
-    for _, f in ipairs(FRAMES) do local u = rawget(f, "_OnUpdate") if u then u(f, dt) end end end
+    for _, f in ipairs(FRAMES) do local u = rawget(f, "_OnUpdate") if u then u(f, dt) end end
+    local live = {}
+    for _, t in ipairs(TICKERS) do if not t.dead then live[#live + 1] = t end end
+    TICKERS = live
+    for _, t in ipairs(live) do
+        if not t.dead then
+            t.acc = t.acc + dt
+            if t.acc >= t.every then t.acc = 0 t.fn() end
+        end
+    end
+end
+function Ticking() local n = 0 for _, t in ipairs(TICKERS) do if not t.dead then n = n + 1 end end return n end
+-- what still runs or listens besides the bar's own drawing: tickers, OnUpdates, PLAYER_CONTROL_GAINED
+function Running()
+    local n = Ticking()
+    for _, f in ipairs(FRAMES) do
+        if f ~= HeadstartFlightFrame and rawget(f, "_OnUpdate") then n = n + 1 end
+        if rawget(f, "_ev") and f._ev.PLAYER_CONTROL_GAINED then n = n + 1 end
+    end
+    return n
+end
 function GetTime() return NOW end
 function time() return math.floor(CLOCK) end
 floor = math.floor
-C_Timer = { After = function() end }
+C_Timer = { After = function() end,
+    NewTicker = function(every, fn)
+        local t = { every = every, fn = fn, acc = 0, Cancel = function(self) self.dead = true end }
+        table.insert(TICKERS, t)
+        return t
+    end }
 HOOKS = {}
 function hooksecurefunc(name, fn) HOOKS[name] = fn end
 ONTAXI = false
@@ -74,7 +104,11 @@ strtrim = function(s) return s end
         chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
         chunk("Headstart", YR)
+    # the timer comes on at the login (YR.Part): nothing listens, and the taxi isn't hooked, before it
     g = lua.globals()
+    hooked_before = g.HOOKS.TakeTaxiNode is not None
+    YR.partsReady = True
+    YR.ApplyParts()
     bad = 0
 
     def check(ok, what):
@@ -96,7 +130,10 @@ strtrim = function(s) return s end
         lua.execute("Tick(1); ONTAXI = false; Fire('PLAYER_CONTROL_GAINED')")
         return texts, mid
 
+    check(not hooked_before and g.HOOKS.TakeTaxiNode is not None, "the taxi is hooked when the timer comes on, not before")
     texts, _ = fly(2, 60)
+    check(g.Running() == 0,
+          "on the ground again: nothing ticks, nothing is counted each frame, losing control isn't listened for")
     check(texts and texts[0] == "0:00" and "timing it" in texts[3], f"first flight counts up while it learns: {texts}")
     check(texts and texts[1] == "Ironforge" and texts[2] == "Thelsamar", f"from and to, without the zone: {texts}")
     check(not g.HeadstartFlightFrame.IsShown(g.HeadstartFlightFrame), "the bar goes on landing")
@@ -132,11 +169,13 @@ strtrim = function(s) return s end
     g.HOOKS.TakeTaxiNode(2)
     lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(20)")
     YR2 = lua.table()
-    lua.execute("for i = #FRAMES, 1, -1 do FRAMES[i] = nil end; HeadstartFlightFrame = nil; NOW = 5000")
+    lua.execute("for i = #FRAMES, 1, -1 do FRAMES[i] = nil end; TICKERS = {}; HeadstartFlightFrame = nil; NOW = 5000")
     for f in ("Core.lua", "Style.lua", "Flight.lua"):
         chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
         chunk("Headstart", YR2)
+    YR2.partsReady = True
+    YR2.ApplyParts()
     lua.execute("Fire('PLAYER_ENTERING_WORLD'); Tick(0.2)")
     bar = g.HeadstartFlightFrame
     left = bar and bar.time.GetText(bar.time)
@@ -180,6 +219,8 @@ strtrim = function(s) return s end
     g.HOOKS.TakeTaxiNode(2)
     lua.execute("Tick(0.5); ONTAXI = true; Tick(1)")
     check(not bar.IsShown(bar), "Flight timer off: no bar")
+    check(g.Running() == 0,
+          "Flight timer off: nothing runs during the flight")
     lua.execute("ONTAXI = false; Fire('PLAYER_CONTROL_GAINED')")
     return bad
 

@@ -1,9 +1,13 @@
 -- Level splits: this character's playing time from level 1, level by level, against your best run.
 --   YippRouteDB.splits.runs[key] = { name, class, race, elapsed, xp, levels = { [level] = seconds played } }
 -- The time is the server's own /played: asked for at login and after every level, counted on locally
--- in between. So every character is timed, the clock never stops while you are logged in, and a crash
--- or a disconnect can't lose time. The server also says how long you have been at this level, which
--- gives the level's start even on a character the splits never saw before.
+-- in between. So the clock never stops while you are logged in, and a crash or a disconnect can't lose
+-- time. The server also says how long you have been at this level, which gives the level's start even
+-- on a character the splits never saw before.
+--
+-- A part (Core.lua): a character is timed while the box is shown (showSplits) or the XP bar is on (it
+-- shows XP an hour and time played from here). With neither, nothing here runs: no /played asked at
+-- the login, no clock, no events, and no record made for the character.
 --
 --   XP/hr: 15.5k   1.2k / 2.8k        over the last 10 minutes of play; this level's XP of what it takes
 --   Ding: 4 min                       at that rate
@@ -20,7 +24,8 @@ local TICK = 0.5
 local RATE_WINDOW = 600          -- XP/hour over the last 10 minutes of play
 local FONT = "Fonts\\FRIZQT__.TTF"
 local TOP, ROW_H = 56, 16        -- set by Layout from the text size
-local key, rec, frame, last, ticker
+local key, rec, frame, last
+local part                       -- the part: on while the box or the XP bar wants this character timed
 local synced = false             -- the server has told us this character's /played
 local lastXP, lastMax, lastLevel
 local rate = {}                  -- { play seconds, XP since level 1 } every few seconds, for XP/hour
@@ -79,6 +84,25 @@ local function DB()
     return YippRouteDB.splits
 end
 
+-- The runs, for reading: none is not a reason to start a saved table (the log's clean-up asks at every
+-- login, splits on or not).
+local NO_RUNS = {}
+local function Runs()
+    local db = YippRouteDB.splits
+    return db and db.runs or NO_RUNS
+end
+
+-- This character's record: the one being timed, else the saved one if it has one (the splits may be
+-- off: Stop run and Resume still mark it). Never makes one.
+local function Guid() return UnitGUID("player") .. "" end       -- a secret GUID errors here: no record
+local function Mine()
+    if rec then return rec end
+    local db = YippRouteDB.splits
+    if not (db and db.runs) then return nil end
+    local ok, guid = pcall(Guid)
+    return ok and db.runs[guid] or nil
+end
+
 local function Top(run)
     local top = 1
     for lvl in pairs(run.levels) do if lvl > top then top = lvl end end
@@ -98,7 +122,7 @@ end
 -- with every level timed come first; a partial one only when there is nothing else.
 local function Best()
     local best, bestTop, bestTime, bestFull
-    for k, r in pairs(DB().runs) do
+    for k, r in pairs(Runs()) do
         local top = Top(r)
         local t = r.levels[top] or r.elapsed
         local full = Complete(r)
@@ -107,7 +131,7 @@ local function Best()
             best, bestTop, bestTime, bestFull = k, top, t, full
         end
     end
-    return best and DB().runs[best]
+    return best and Runs()[best]
 end
 YR.SplitsBest = Best   -- for the tests
 
@@ -147,7 +171,7 @@ YR.SplitsCounts = Counts   -- for the tests
 
 local function Fastest()
     local levels, segs, any = {}, {}, false
-    for k, r in pairs(DB().runs) do
+    for k, r in pairs(Runs()) do
         if k ~= key and not r.noBest and type(r.levels) == "table" and Counts(k, r) then
             for lvl, t in pairs(r.levels) do
                 if lvl > 1 then
@@ -163,16 +187,39 @@ local function Fastest()
 end
 YR.SplitsFastest = Fastest   -- for the tests
 
--- The best run changes when somebody dings or a run is deleted, not twice a second: the box's clock
--- works from a copy at most ten seconds old. Anything but the clock's own tick asks afresh.
-local best, bestAt
-local function FastestKept(fresh)
-    local now = GetTime()
-    if fresh or not bestAt or now - bestAt > 10 then
-        best, bestAt = Fastest(), now
-        return best, true
+--- The characters ("Name-Realm") whose run holds the best time to some level among the runs of their
+--- class: the fastest runs, the ones the splits compare with whichever character you're on. Their
+--- run logs are never cleared away as old (Log.lua).
+function YR.SplitsBestRuns()
+    local at, who, out = {}, {}, {}
+    for _, r in pairs(Runs()) do
+        if not r.noBest and type(r.levels) == "table" and r.name then
+            for lvl, t in pairs(r.levels) do
+                local slot = (r.class or "?") .. lvl
+                if lvl > 1 and (not at[slot] or t < at[slot]) then at[slot], who[slot] = t, r.name end
+            end
+        end
     end
-    return best, false
+    for _, name in pairs(who) do out[name] = true end
+    return out
+end
+
+--- A character's race as the splits know it (nil for one they never timed).
+function YR.SplitsRaceOf(char)
+    for _, r in pairs(Runs()) do
+        if r.name == char and r.race then return r.race end
+    end
+end
+
+-- What to beat changes when you ding, a run is deleted or "compare with" is set, not while the clock
+-- runs (nobody else's run moves while you are logged in): the clock's own tick works from the copy,
+-- and anything else that draws the box (a ding, a setting, the box shown, the server's answer) asks
+-- afresh. The copy used to be thrown away every ten seconds, which laid the whole box out again each
+-- time with nothing changed.
+local best, bestKnown = nil, false
+local function FastestKept(fresh)
+    if fresh or not bestKnown then best, bestKnown = Fastest(), true end
+    return best
 end
 
 local function XPRate()
@@ -275,16 +322,19 @@ local function Layout()
     SetRow(0, "", GREY .. "level|r", GREY .. "total|r", GREY .. "vs best|r", GREY .. "± level|r")
 end
 
--- tick: the clock's own twice-a-second call. Then only what a clock changes is done: the three lines
--- at the top and the level in progress. The levels already reached, the columns' widths and the
--- box's height are worked out again when something else asked (a ding, a setting, the box shown) or
--- the best run was read afresh.
+-- tick: the clock's own call. Then only what a clock changes is done: the three lines at the top and
+-- the level in progress. The levels already reached, the columns' widths and the box's height are
+-- worked out again when something else asked (a ding, a setting, the box shown).
+-- shownSec: the second the box was last drawn for; stale: XP came in since. The clock (Tick) draws
+-- again only when one of the two says the text would differ.
 local listedRows = 0
+local shownSec, stale = nil, false
 local function Refresh(tick)
     if not (frame and frame:IsShown()) then return end
     local run = rec
-    local pb, reread = FastestKept(not tick)
-    local full = not tick or reread
+    shownSec, stale = rec and floor(rec.elapsed + 0.5) or 0, false
+    local pb = FastestKept(not tick)
+    local full = not tick
     local n = 0
     if run and not synced then
         frame.xph:SetText("")
@@ -354,18 +404,27 @@ local function Refresh(tick)
     frame:SetHeight(TOP + (n + 1) * ROW_H)
 end
 
+-- Twice a second: the time is counted on, and every five seconds of play a sample for XP/hour is
+-- kept (the pair that falls out of the ten minutes is the one written next). The box shows whole
+-- seconds, so it is drawn again only when the second it shows has changed, or XP came in - not at all
+-- while it is hidden, the run is stopped or the server hasn't answered.
+local spare
 local function Tick()
     local now = GetTime()
     if rec and last and not rec.stopped then
         rec.elapsed = rec.elapsed + (now - last)
         local newest = rate[#rate]
         if not newest or rec.elapsed - newest[1] >= 5 then
-            rate[#rate + 1] = { rec.elapsed, rec.xp or 0 }
-            while rate[1] and rec.elapsed - rate[1][1] > RATE_WINDOW do table.remove(rate, 1) end
+            local pair = spare or {}
+            spare = nil
+            pair[1], pair[2] = rec.elapsed, rec.xp or 0
+            rate[#rate + 1] = pair
+            while rate[1] and rec.elapsed - rate[1][1] > RATE_WINDOW do spare = table.remove(rate, 1) end
         end
     end
     last = now
-    Refresh(true)
+    if not (frame and frame:IsShown()) then return end
+    if stale or (rec and floor(rec.elapsed + 0.5) or 0) ~= shownSec then Refresh(true) end
 end
 
 -- The position is kept as pixels from the screen's top-left corner, which the settings show and set.
@@ -432,15 +491,28 @@ local function Build()
     Layout()
 end
 
-function YR:ShowSplits(on)
-    YippRouteDB.showSplits = on
-    if on then
+-- The box as the setting says: built the first time it is shown.
+local function SyncBox()
+    if part and part.on and YR.Option("showSplits") then
         if not frame then Build() end
         frame:Show()
         Refresh()
     elseif frame then
         frame:Hide()
     end
+end
+
+-- Whether this character is to be timed: for the box, or for the XP bar's XP an hour and time played.
+local function Wanted()
+    return (YR.Option("showSplits") or (YR.XPBarOn ~= nil and YR.XPBarOn() and YR.QoLOn())) and true or false
+end
+
+function YR:ShowSplits(on)
+    YippRouteDB.showSplits = on
+    if not (part and YR.partsReady) then return end         -- before the login: it comes on there
+    -- at once, not a frame later: the box alone when the timing stays as it is (the XP bar keeps it
+    -- on, say), else the part comes on or goes off
+    if part.on == Wanted() then SyncBox() else YR.ApplyParts() end
 end
 
 -- Runs from before the splits existed, rebuilt once from the run log's position samples: play time
@@ -477,9 +549,11 @@ local function ImportLogs()
 end
 
 -- /played without the two lines it prints in chat: the chat windows stop listening until the answer
--- is in, then listen again.
+-- is in, then listen again. Only while the part is on: with it off nobody would hear the answer, and
+-- the chat windows would stay deaf to /played.
 local muted = {}
 local function AskPlayed()
+    if not (part and part.on) then return end
     for i = 1, NUM_CHAT_WINDOWS or 10 do
         local cf = _G["ChatFrame" .. i]
         if cf and cf:IsEventRegistered("TIME_PLAYED_MSG") then
@@ -495,13 +569,15 @@ local function Unmute()
     wipe(muted)
 end
 
--- Every character is timed: one seen before carries on, any other starts a record now.
-function YR:StartSplits()
+-- The part comes on (and YR:StartSplits again, for another character in the tests or after a reset):
+-- a character seen before carries on, any other starts a record now.
+local function Begin()
+    if not (part and part.on) then return end
     ImportLogs()
     local name = UnitFullName("player")
-    local ok, guid = pcall(function() return UnitGUID("player") .. "" end)
+    local ok, guid = pcall(Guid)
     if not name or name == UNKNOWNOBJECT or name == "Unknown" or not ok then
-        C_Timer.After(2, function() YR:StartSplits() end)
+        C_Timer.After(2, Begin)
         return
     end
     key = guid
@@ -518,44 +594,24 @@ function YR:StartSplits()
     wipe(rate)
     lastXP, lastMax, lastLevel = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
     last = GetTime()
-    ticker = ticker or C_Timer.NewTicker(TICK, Tick)
-    if YR.Option("showSplits") then YR:ShowSplits(true) end
+    SyncBox()
 end
 
--- Stop run: the clock and the levels stop here, and the run log ends (until Resume). A stopped run
--- still counts as a run to beat unless the player says it shouldn't (noBest: a missed quest, say).
-function YR:StopRun()
-    if rec and not rec.stopped then rec.stopped = time() end
-    if YR.StopLog then YR:StopLog() end
-    Refresh()
+-- The part goes off: the box away, the chat windows hear /played again, and the character is let go
+-- (its record stays saved; the server's /played sets the clock right when it is timed again).
+local function End()
+    Unmute()
+    if frame then frame:Hide() end
+    key, rec, last, synced = nil, nil, nil, false
+    wipe(rate)
 end
 
-function YR:ResumeRun()
-    if rec and rec.stopped then
-        rec.stopped, rec.resuming = nil, true
-        last = GetTime()
-        AskPlayed()
-    end
-    if YR.ResumeLog then YR:ResumeLog() end
-    Refresh()
+-- A setting changed and the part stays on: the box may have been turned on or off.
+local function Again()
+    if YR.Option("showSplits") ~= (frame ~= nil and frame:IsShown()) then SyncBox() end
 end
 
-function YR:RunStopped() return rec and rec.stopped ~= nil or false end
-function YR:RunCounts() return not (rec and rec.noBest) end
-function YR:SetRunCounts(on) if rec then rec.noBest = not on or nil end Refresh() end
-
-function YR:ResetSplits()
-    if key then DB().runs[key] = nil end
-    rec = nil
-    YR.Print("splits for this character cleared.")
-    YR:StartSplits()
-end
-
-local f = CreateFrame("Frame")
-f:RegisterEvent("PLAYER_LEVEL_UP")
-f:RegisterEvent("PLAYER_XP_UPDATE")
-f:RegisterEvent("TIME_PLAYED_MSG")
-f:SetScript("OnEvent", function(_, event, level, atLevel)
+local function OnEvent(_, event, level, atLevel)
     if event == "TIME_PLAYED_MSG" then
         -- level is the total here, atLevel the time at this level: the server's word replaces our count
         Unmute()
@@ -580,6 +636,7 @@ f:SetScript("OnEvent", function(_, event, level, atLevel)
             if gained > 0 then rec.xp = (rec.xp or 0) + gained end
         end
         lastXP, lastMax, lastLevel = xp, UnitXPMax("player"), lvl
+        stale = true                         -- the box's XP line: drawn at the clock's next tick
         return
     end
     if rec and not rec.stopped then
@@ -590,4 +647,63 @@ f:SetScript("OnEvent", function(_, event, level, atLevel)
         YR.Print(("level %d at %s%s"):format(level, Clock(rec.elapsed), theirs and ("  " .. Delta(rec.elapsed - theirs)) or ""))
     end
     Refresh()
-end)
+end
+
+--- Called once as Headstart loads: says what the splits need. Nothing is made or asked until the
+--- part comes on at the login - and never, for a character that has neither the box nor the XP bar.
+function YR:StartSplits()
+    if not part then
+        part = YR.Part(Wanted, { "PLAYER_LEVEL_UP", "PLAYER_XP_UPDATE", "TIME_PLAYED_MSG" }, OnEvent,
+            { start = Begin, stop = End, again = Again, tick = Tick, every = TICK })
+    elseif part.on then
+        Begin()
+    end
+end
+
+-- Stop run: the clock and the levels stop here, and the run log ends (until Resume). A stopped run
+-- still counts as a run to beat unless the player says it shouldn't (noBest: a missed quest, say).
+-- These work on the character's saved record with the splits off too (Mine): the This run page stops
+-- and resumes a run whether or not its time is on screen.
+function YR:StopRun()
+    local r = Mine()
+    if r and not r.stopped then r.stopped = time() end
+    if YR.StopLog then YR:StopLog() end
+    Refresh()
+end
+
+function YR:ResumeRun()
+    local r = Mine()
+    if r and r.stopped then
+        -- resuming: the server's next answer leaves out the time the run was stopped (asked now while
+        -- the character is timed, else when it next is)
+        r.stopped, r.resuming = nil, true
+        last = GetTime()
+        AskPlayed()
+    end
+    if YR.ResumeLog then YR:ResumeLog() end
+    Refresh()
+end
+
+function YR:RunStopped()
+    local r = Mine()
+    if r then return r.stopped ~= nil end
+    return YR.LogStopped ~= nil and YR.LogStopped() or false       -- never timed: the log knows
+end
+function YR:RunCounts()
+    local r = Mine()
+    return not (r and r.noBest)
+end
+function YR:SetRunCounts(on)
+    local r = Mine()
+    if r then r.noBest = not on or nil end
+    Refresh()
+end
+
+function YR:ResetSplits()
+    local ok, guid = pcall(Guid)
+    local db = YippRouteDB.splits
+    if ok and db and db.runs then db.runs[guid] = nil end
+    rec = nil
+    YR.Print("splits for this character cleared.")
+    YR:StartSplits()
+end

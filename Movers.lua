@@ -15,12 +15,18 @@ local movers = {}
 
 local function Saved() YippRouteDB.moved = YippRouteDB.moved or {} return YippRouteDB.moved end
 
+-- (A window we once hooked calls this at every SetPoint of Blizzard's for good: with its option off
+-- that is two reads and out.)
 local function Place(m)
-    local frame = m.frame()
     if m.placing then return end        -- our own SetPoint, come back through the hook
-    local on = m.on()
-    if m.handle then m.handle:SetShown(on) end
-    if not frame or not on then return end
+    local on = m.on() and true or false
+    if m.handle and m.shown ~= on then
+        m.shown = on
+        m.handle:SetShown(on)
+    end
+    if not on then return end
+    local frame = m.frame()
+    if not frame then return end
     if not m.handle then
         -- the first time it's on and the window exists: the strip to drag by, and the hooks. Not in a
         -- fight: the talent window is protected there, and making it movable would be blocked (the
@@ -60,7 +66,7 @@ local function Place(m)
         end
         h:SetScript("OnDragStart", Start)
         h:SetScript("OnDragStop", Stop)
-        m.handle, m.stop = h, Stop
+        m.handle, m.stop, m.shown = h, Stop, true
         for _, part in pairs(m.parts and m.parts(frame) or {}) do
             if type(part) == "table" and part.RegisterForDrag and part.HookScript then
                 part:RegisterForDrag("LeftButton")
@@ -87,6 +93,7 @@ end
 --- it can be dragged by as well (its empty parts).
 function YR.Mover(key, frame, on, left, right, back, parts)
     movers[key] = { key = key, frame = frame, on = on, left = left or 60, right = right or 30, back = back, parts = parts }
+    if YR.partsReady then YR.SettingChanged() end      -- a window to look after: the fights are listened for
     return movers[key]
 end
 
@@ -130,12 +137,12 @@ end
 local function Size(key)
     local frame = SIZED[key] and SIZED[key]()
     if type(frame) ~= "table" or not frame.SetScale then return false end
+    local want = YR.QoLOn() and YR.WindowScale(key) / 100 or 1
+    if want == 1 and not sizeSet[key] then return true end          -- never asked for: never touched, never hooked
     if not sizeHooked[key] and frame.HookScript then
         sizeHooked[key] = true
         frame:HookScript("OnShow", function() Size(key) end)
     end
-    local want = YR.QoLOn() and YR.WindowScale(key) / 100 or 1
-    if want == 1 and not sizeSet[key] then return true end          -- never asked for: never touched
     if InCombatLockdown() and frame.IsProtected and frame:IsProtected() then return true end
     if math.abs((frame:GetScale() or 1) - want) > 0.001 then frame:SetScale(want) end
     sizeSet[key] = want ~= 1 or nil
@@ -149,6 +156,7 @@ function YR.SetWindowScale(key, percent)
     YippRouteDB.windowScale[key] = percent ~= 100 and percent or nil
     sizeSet[key] = sizeSet[key] or true          -- back to 100 puts Blizzard's size on again
     Size(key)
+    YR.SettingChanged()
 end
 
 --- Every sized window as its setting says (login, the end of a fight, the main switch).
@@ -156,32 +164,62 @@ function YR.WindowScaleApply()
     for key in pairs(SIZED) do Size(key) end
 end
 
+-- Wanted while a window is to be moved or has a size of ours: none of the events below otherwise.
+local function Wanted()
+    for _, m in pairs(movers) do if m.on() then return true end end
+    if YR.QoLOn() then
+        for key in pairs(SIZED) do if YR.WindowScale(key) ~= 100 then return true end end
+    end
+    return false
+end
+
+-- The social window and the group finder load when first opened: addons loading are listened for only
+-- while one of them has a size set and isn't there yet.
+local function Loads(frame)
+    local waiting = false
+    for key in pairs(SIZED) do
+        if not Size(key) and YR.WindowScale(key) ~= 100 then waiting = true end
+    end
+    if waiting then frame:RegisterEvent("ADDON_LOADED") else frame:UnregisterEvent("ADDON_LOADED") end
+end
+
+local function Everything(p)
+    for key in pairs(movers) do YR.MoverPlace(key) end
+    Loads(p.frame)
+end
+
+local function OnEvent(self, event)
+    if event == "PLAYER_REGEN_DISABLED" then
+        -- a fight begins with a window on the cursor: let go of it now, while that's still allowed
+        -- (this comes just before the lockdown), or it would stay on the cursor through the fight
+        for _, m in pairs(movers) do if m.moving and m.stop then m.stop() end end
+        return
+    end
+    if event == "ADDON_LOADED" then
+        Loads(self)
+        return
+    end
+    for key in pairs(movers) do YR.MoverPlace(key) end
+    YR.WindowScaleApply()
+end
+
+local declared
 function YR.StartMovers()
+    if declared then return end
+    declared = true
     YR.Mover("bag", function() return _G.ContainerFrameCombinedBags end,
         function() return YippRouteDB.moveBag == true and YR.QoLOn() end, 50, 30)
     YR.Mover("reagentBag", function() return _G.ContainerFrame6 end,
         function() return YippRouteDB.moveReagentBag == true and YR.QoLOn() end, 50, 30)
     -- A window opened in a fight is left where Blizzard put it; when the fight ends every window of
     -- ours is put where you left it.
-    local f = CreateFrame("Frame")
-    f:RegisterEvent("PLAYER_ENTERING_WORLD")
-    f:RegisterEvent("PLAYER_REGEN_ENABLED")
-    f:RegisterEvent("ADDON_LOADED")          -- the social window and the group finder load when first opened
-    f:RegisterEvent("PLAYER_REGEN_DISABLED")
-    f:SetScript("OnEvent", function(self, event)
-        if event == "PLAYER_REGEN_DISABLED" then
-            -- a fight begins with a window on the cursor: let go of it now, while that's still allowed
-            -- (this comes just before the lockdown), or it would stay on the cursor through the fight
-            for _, m in pairs(movers) do if m.moving and m.stop then m.stop() end end
-            return
-        end
-        if event == "ADDON_LOADED" then
-            local all = true
-            for key in pairs(SIZED) do if not Size(key) then all = false end end
-            if all then self:UnregisterEvent("ADDON_LOADED") end
-            return
-        end
-        for key in pairs(movers) do YR.MoverPlace(key) end
-        YR.WindowScaleApply()
-    end)
+    YR.Part(Wanted, { "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED" }, OnEvent, {
+        start = Everything,
+        again = function(p) Loads(p.frame) end,          -- a size set or taken off: whether a window is waited for
+        -- off: the strips to drag by go, and a window of another size gets Blizzard's back
+        stop = function()
+            for key in pairs(movers) do YR.MoverPlace(key) end
+            YR.WindowScaleApply()
+        end,
+    })
 end

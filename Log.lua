@@ -18,7 +18,7 @@ local _, YR = ...
 local SAMPLE = 2
 local HEARTBEAT = 30
 local HEARTHSTONE = 8690
-local run, ticker
+local run               -- this character's log while recording is on; nil while it is off
 local complete = {}      -- questID -> true once its objectives were done (to log that moment once)
 local lastXP, lastMax, lastLevel, turnedInAt
 local lastGuide, lastStep
@@ -70,6 +70,7 @@ end
 local ScanCompletions, questsDirty
 
 local function Sample()
+    if not run then return end          -- recording is on, but the character's name isn't known yet
     -- the quest log changed since the last sample: read once here, not on every one of a burst of
     -- its events (each objective tick, each loot, each zone line fires several)
     if questsDirty then
@@ -161,15 +162,18 @@ end
 
 local NPC_WINDOWS = { MERCHANT_SHOW = "vendor", TRAINER_SHOW = "trainer", TAXIMAP_OPENED = "flight" }
 
-local events = CreateFrame("Frame")
 -- Your own loot, from the chat line the game prints ("You receive loot: [item]x2."): the patterns
--- come from the game's own strings, so they work in any language.
-local LOOT_PATTERNS = {}
-for _, s in ipairs({ LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_SELF, LOOT_ITEM_PUSHED_SELF_MULTIPLE, LOOT_ITEM_PUSHED_SELF }) do
-    if type(s) == "string" then
-        LOOT_PATTERNS[#LOOT_PATTERNS + 1] = "^" .. s:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1")
-            :gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)") .. "$"
+-- come from the game's own strings, so they work in any language. Made the first time recording is on.
+local LOOT_PATTERNS, SKILL_UP = {}, nil
+local function Pattern(s)
+    return "^" .. s:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1"):gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)") .. "$"
+end
+local function MakePatterns()
+    for _, s in ipairs({ LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_SELF, LOOT_ITEM_PUSHED_SELF_MULTIPLE, LOOT_ITEM_PUSHED_SELF }) do
+        if type(s) == "string" then LOOT_PATTERNS[#LOOT_PATTERNS + 1] = Pattern(s) end
     end
+    -- "Your skill in %s has increased to %d."
+    SKILL_UP = type(ERR_SKILL_UP_SI) == "string" and Pattern(ERR_SKILL_UP_SI)
 end
 local QUEST_ITEM = Enum and Enum.ItemClass and Enum.ItemClass.Questitem or 12
 
@@ -187,10 +191,8 @@ local function Looted(msg)
     end
 end
 
--- "Your skill in %s has increased to %d." Only professions (the ones a player can unlearn): weapon
--- and defense skill-ups come every few swings and say nothing about the route.
-local SKILL_UP = type(ERR_SKILL_UP_SI) == "string" and ("^" .. ERR_SKILL_UP_SI:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1")
-    :gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)") .. "$")
+-- Skill-ups: only professions (the ones a player can unlearn). Weapon and defense skill-ups come
+-- every few swings and say nothing about the route.
 
 local function Profession(name)
     for i = 1, GetNumSkillLines and GetNumSkillLines() or 0 do
@@ -204,7 +206,7 @@ local function SkillUp(msg)
     if name and Profession(name) then Add("skill", nil, { name = name, rank = tonumber(rank) }) end
 end
 
-events:SetScript("OnEvent", function(_, event, a, b, c)
+local function OnEvent(_, event, a, b, c)
     if not run or run.stopped then return end
     if event == "PLAYER_LOGOUT" then FlushHeld() return end
     -- a quest event with the log still unread: read it first, so a completion is written before the
@@ -258,24 +260,31 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
         if event == "TRAINER_SHOW" then trainerOpen = true end
         Add(NPC_WINDOWS[event], nil, { npc = Npc() })
     end
-end)
+end
 
--- What was bought, and from whom: the buy goes through BuyMerchantItem, which is not protected.
-hooksecurefunc("BuyMerchantItem", function(index, quantity)
+-- What was bought, and from whom: the buy goes through BuyMerchantItem, which is not protected. A hook
+-- can't be taken off again: it is put on the first time recording is on (Begin), and with recording
+-- off (no run) it returns at once.
+local function Bought(index, quantity)
     if not run or run.stopped then return end
     local link = GetMerchantItemLink(index)
     local item = link and tonumber(link:match("item:(%d+)"))
     if item then
         Add("buy", nil, { item = item, count = quantity or 1, name = C_Item.GetItemNameByID(item), npc = Npc() })
     end
-end)
+end
 
+-- Everything the log listens for, only while recording is on (the part below). PLAYER_LOGOUT: the spot
+-- you logged out on, its last sample too. The "spell learned" event has a different name in the modern
+-- and the Classic API: whichever exists is the one that registers.
 local EVENTS = { "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "QUEST_LOG_UPDATE", "PLAYER_XP_UPDATE",
     "PLAYER_LEVEL_UP", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST", "PLAYER_REGEN_DISABLED",
     "PLAYER_REGEN_ENABLED", "ZONE_CHANGED_NEW_AREA", "MERCHANT_SHOW", "TRAINER_SHOW", "TRAINER_CLOSED",
-    "TAXIMAP_OPENED", "CHAT_MSG_LOOT", "CHAT_MSG_SKILL" }
+    "TAXIMAP_OPENED", "CHAT_MSG_LOOT", "CHAT_MSG_SKILL", "PLAYER_LOGOUT",
+    "LEARNED_SPELL_IN_SKILL_LINE", "LEARNED_SPELL_IN_TAB", { "UNIT_SPELLCAST_SUCCEEDED", "player" } }
 
--- What was sold, and whether the route still needed it (Needs.lua warns about that).
+-- What was sold, and whether the route still needed it (Needs.lua warns about that). Needs.lua's hook
+-- calls this only while the log says it is listening (YR.SellsWatched, in Begin and End).
 YR:WatchSells(function(item, count)
     if run and not run.stopped then
         Add("sell", nil, { item = item, count = count, name = C_Item.GetItemNameByID(item), need = YR.RouteNeed(item) })
@@ -298,13 +307,19 @@ function YR:ResumeLog()
         Add("resume")
     end
 end
--- the "spell learned" event has a different name in the modern and the Classic API: whichever exists
-local LEARNED = { "LEARNED_SPELL_IN_SKILL_LINE", "LEARNED_SPELL_IN_TAB" }
+
+--- Whether this character's log was ended with Stop run (asked by the This run page, splits on or not).
+function YR.LogStopped()
+    local r = run or (YippRouteDB.runs and YippRouteDB.runs[YR.CharKey()])
+    return r ~= nil and r.stopped ~= nil
+end
 
 -- ---------------------------------------------------------------------------
--- Cleaning up: every character's log is in the account's saved file, loaded on every character.
+-- Cleaning up. This character's log is in its own saved file; another character's may still be in the
+-- account's, packed (RunStore.lua): what is said of it here comes from what was noted when it was packed.
 -- ---------------------------------------------------------------------------
 local function LastActive(r)
+    if r.packed then return r.last or r.started or 0 end      -- another character's, packed (RunStore.lua)
     local t = r.started or 0
     local tr, ev = r.track, r.ev
     if type(tr) == "table" and tr[#tr] then t = math.max(t, tr[#tr][1] or 0) end
@@ -318,8 +333,8 @@ function YR.LogSummary()
     local out = {}
     for key, r in pairs(YippRouteDB.runs or {}) do
         if type(r) == "table" then
-            local samples = type(r.track) == "table" and #r.track or 0
-            local events = type(r.ev) == "table" and #r.ev or 0
+            local samples = r.packed and (r.samples or 0) or (type(r.track) == "table" and #r.track or 0)
+            local events = r.packed and (r.events or 0) or (type(r.ev) == "table" and #r.ev or 0)
             -- measured on a real saved file: about 60 bytes a sample, 100 an event
             out[#out + 1] = { key = key, samples = samples, events = events, last = LastActive(r),
                 kb = math.floor((samples * 60 + events * 100) / 1024 + 0.5) }
@@ -341,12 +356,23 @@ function YR.DeleteLog(key)
     return true
 end
 
---- Delete the logs of characters not played for this many days (never this character's). Returns how many.
+--- How old a run log may get, in days of its character not being played: 30 unless you set another
+--- number, 0 for never (Headstart, Levelling, Route settings).
+function YR.LogKeepDays()
+    local days = tonumber(YippRouteDB.logKeepDays)
+    return days and math.max(0, days) or 30
+end
+
+--- Delete the logs of characters not played for this many days. Returns how many. Never deleted: this
+--- character's, a fastest run's (one that holds the best time to some level in the splits) and a run
+--- a route of your own was saved from. Those are the ones still used: to beat, and to save again.
 function YR.PruneLogs(days)
     if not (days and days > 0) then return 0 end
     local cut, me, n = time() - days * 86400, YR.CharKey(), 0
+    local best = YR.SplitsBestRuns and YR.SplitsBestRuns() or {}
     for key, r in pairs(YippRouteDB.runs or {}) do
-        if key ~= me and type(r) == "table" and LastActive(r) < cut then
+        if key ~= me and type(r) == "table" and LastActive(r) < cut and not best[key]
+                and not (YR.MyRouteFrom and YR.MyRouteFrom(key)) then
             YippRouteDB.runs[key] = nil
             n = n + 1
         end
@@ -374,21 +400,30 @@ function YR.DropIdleTracks()
     return n
 end
 
-function YR:StartLog()
-    -- a brand-new character is "Unknown" for its first moments: wait for the real name, or every new
-    -- character's run lands under the same key (and the clean-up below can't tell which log is yours)
+-- Looking after the saved logs, once a login, recording on or not (a log kept from when it was on
+-- still takes the room). On an account with no logs there is nothing to do, and nothing is written.
+local tidied = false
+local function Tidy()
+    if tidied then return end
+    -- a brand-new character is "Unknown" for its first moments: wait for the real name, or the clean-up
+    -- below can't tell which log is yours
     local name = UnitFullName("player")
     if not name or name == UNKNOWNOBJECT or name == "Unknown" then
-        C_Timer.After(2, function() YR:StartLog() end)
+        C_Timer.After(2, Tidy)
         return
     end
-    -- old logs, recording on or not (a log kept from when it was on still takes the room)
-    local pruned = YR.PruneLogs(YippRouteDB.logKeepDays)
-    if pruned > 0 then
-        YR.Print(("deleted the run logs of %d character%s not played for %d days."):format(pruned,
-            pruned == 1 and "" or "s", YippRouteDB.logKeepDays))
+    tidied = true
+    -- this character's log from its own file, and what the account's file still holds packed small
+    local packed = YR.RunsAttach()
+    if packed > 0 then
+        YR.Print(("packed the run logs of %d other character%s: they take a third of the memory now, and each moves to its own character's file the next time that character logs in."):format(packed, packed == 1 and "" or "s"))
     end
-    if not YippRouteDB.trackSlimmed then
+    local pruned = YR.PruneLogs(YR.LogKeepDays())
+    if pruned > 0 then
+        YR.Print(("deleted the run logs of %d character%s not played for %d days (kept: the fastest runs and any a route of yours was saved from). Headstart, Levelling, Route settings sets the days; 0 keeps them all."):format(pruned,
+            pruned == 1 and "" or "s", YR.LogKeepDays()))
+    end
+    if not YippRouteDB.trackSlimmed and next(YippRouteDB.runs) then
         for _, r in pairs(YippRouteDB.runs) do if type(r.track) == "table" then YR.SlimTrack(r.track) end end
         YippRouteDB.trackSlimmed = 1
     end
@@ -396,27 +431,54 @@ function YR:StartLog()
     if dropped > 0 then
         YR.Print(("routes are off: dropped %d old position samples of your other characters' run logs (their events stay; nothing of this character's)."):format(dropped))
     end
-    if not YR.Option("logging") then return end
+end
+
+-- Recording is a part (Core.lua): its frame, its events and the sample every two seconds exist only
+-- while "Record runs" is on, and go again the moment it is turned off.
+local part, hooked
+
+-- Recording comes on: this character's log, made now if it has none.
+local function Begin()
+    if not (part and part.on) or run then return end
+    -- a brand-new character is "Unknown" for its first moments: wait for the real name, or every new
+    -- character's run lands under the same key
+    local name = UnitFullName("player")
+    if not name or name == UNKNOWNOBJECT or name == "Unknown" then
+        C_Timer.After(2, Begin)
+        return
+    end
+    if not hooked then
+        hooked = true
+        MakePatterns()
+        hooksecurefunc("BuyMerchantItem", Bought)
+    end
+    YR.RunsAttach()
     local key = YR.CharKey()
     YippRouteDB.runs[key] = YippRouteDB.runs[key] or { started = time(), ev = {}, track = {} }
     run = YippRouteDB.runs[key]
+    YR.SettingChanged()         -- (its file is written at logout only while there is a log: RunStore.lua)
     lastRow, lastKept, held = nil, nil, nil
-    for _, e in ipairs(EVENTS) do events:RegisterEvent(e) end
-    events:RegisterEvent("PLAYER_LOGOUT")      -- the spot you logged out on: its last sample too
-    for _, e in ipairs(LEARNED) do pcall(events.RegisterEvent, events, e) end
-    events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
     lastXP, lastMax, lastLevel = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
-    ticker = ticker or C_Timer.NewTicker(SAMPLE, Sample)
+    YR.SellsWatched(true)
+end
+
+-- Recording goes off: the sample held back is written, and the hooks have no run to write to.
+local function End()
+    FlushHeld()
+    run = nil
+    YR.SellsWatched(false)
+end
+
+function YR:StartLog()
+    Tidy()
+    if part then return end
+    part = YR.Part(function() return YR.Option("logging") end, EVENTS, OnEvent,
+        { start = Begin, stop = End, tick = Sample, every = SAMPLE })
 end
 
 function YR:SetLogging(on)
     YippRouteDB.logging = on
-    if on then
-        YR:StartLog()
-    else
-        events:UnregisterAllEvents()
-        if ticker then ticker:Cancel() ticker = nil end
-    end
+    if YR.partsReady then YR.ApplyParts() end       -- now, not a frame later: it starts or stops at once
     YR.Print("logging " .. (on and "on" or "off") .. ".")
 end
 

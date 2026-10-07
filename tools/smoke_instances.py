@@ -22,6 +22,8 @@ FRAMES, AFTER = {}, {}
 local F = {}
 F.__index = F
 function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
+function F:UnregisterEvent(e) if self.ev then self.ev[e] = nil end end
+function F:UnregisterAllEvents() self.ev = nil end
 function F:SetScript(_, fn) self.fn = fn end
 function CreateFrame(kind, name)
     if kind == "Button" then
@@ -83,6 +85,9 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
         chunk("Headstart", YR)
     YR.Style = lua.eval("STYLE")
     YR.StartInstances()
+    # the tracker comes on at the login (YR.Part): nothing listens before it
+    YR.partsReady = True
+    YR.ApplyParts()
     g = lua.globals()
     g.YR_CHARKEY = YR.CharKey
     g.key_restore = YR.CharKey
@@ -110,7 +115,7 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
     hud = lambda: g.HeadstartInstanceHud
     shown = lua.eval("function(o) return rawget(o, 'shown') == true end")
     text = lua.eval("function(o) return rawget(o, 'text') end")
-    check(not shown(hud()), "on screen: nothing while you've no instance this hour")
+    check(hud() is None, "on screen: nothing while you've no instance this hour - the icon isn't even made")
     g.YippRouteDB.instanceHudAlways = True
     YR.InstanceHudApply()
     check(shown(hud()) and text(hud().count) == "0/5", f"'Show it always': the icon, 0/5 ({text(hud().count)})")
@@ -157,7 +162,9 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
     YR2.Open = YR.Open
     YR2.Style = YR.Style
     lua.execute("for i = #FRAMES, 1, -1 do FRAMES[i] = nil end")      # the old module's frame is gone too
+    YR2.Part = YR.Part
     YR2.StartInstances()
+    YR.ApplyParts()
     lua.execute("Fire('PLAYER_ENTERING_WORLD')")
     check(counts()[0] == 3, "a reload inside: the run carries on, not counted again")
     go_out(60)

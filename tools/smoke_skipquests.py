@@ -26,11 +26,19 @@ C_QuestLog = {
     SetAbandonQuest = function() end,
     AbandonQuest = function() table.insert(ABANDONED, selected); LOG[selected] = nil end,
 }
-local handler
-function CreateFrame()
-    return { RegisterEvent = function() end, SetScript = function(_, _, f) handler = f end }
-end
-function FIRE(event, a, b) handler(nil, event, a, b) end
+-- frames that hear only what they registered for: SkipQuests is a part (Core.lua's YR.Part), with a
+-- frame and events only while the routes and its option are on
+FRAMES = {}
+local F = {}
+F.__index = F
+function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
+function F:UnregisterEvent(e) if self.ev then self.ev[e] = nil end end
+function F:UnregisterAllEvents() self.ev = nil end
+function F:SetScript(_, fn) self.fn = fn end
+function CreateFrame() local f = setmetatable({}, F) table.insert(FRAMES, f) return f end
+function FIRE(event, a, b) for _, f in ipairs(FRAMES) do if f.ev and f.ev[event] and f.fn then f.fn(f, event, a, b) end end end
+SlashCmdList = {}
+YippRouteDB = {}
 function OFFER(id, wait)                 -- the quest window opens; accepted `wait` seconds later
     QID = id
     FIRE("QUEST_DETAIL")
@@ -41,12 +49,19 @@ function OFFER(id, wait)                 -- the quest window opens; accepted `wa
 end
 ''')
     YR = lua.table()
+    load = lua.eval("function(c, n) return assert(loadstring(c, n)) end")
+    load(open(os.path.join(ROOT, "Core.lua"), encoding="utf-8").read(), "Core.lua")("Headstart", YR)
     YR.RoutesOn = lua.eval("function() return ROUTES end")
     YR.Print = lua.eval("function(msg) table.insert(PRINTS, msg) end")
     lua.execute("OPTION = true")
     YR.Option = lua.eval("function(key) return key == 'skipQuests' and OPTION end")
-    chunk =lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
-        open(os.path.join(ROOT, "SkipQuests.lua"), encoding="utf-8").read(), "SkipQuests.lua")
+    source = load(open(os.path.join(ROOT, "SkipQuests.lua"), encoding="utf-8").read(), "SkipQuests.lua")
+    YR.partsReady = True             # the login: what is wanted comes on
+
+    def chunk(*args):                # the file loaded (again), and the login after it
+        source(*args)
+        YR.ApplyParts()
+
     chunk("Headstart", YR)
     g = lua.globals()
     bad = 0
@@ -81,6 +96,11 @@ end
     lua.execute("HeadstartSkipQuests = nil; FRAMES_MADE = 0; local make = CreateFrame; CreateFrame = function(...) FRAMES_MADE = FRAMES_MADE + 1 return make(...) end")
     chunk("Headstart", YR)
     check(g.FRAMES_MADE == 0, "no routes addon, no list: it listens to nothing")
+    listening = lua.eval("function() local n = 0 for _, f in ipairs(FRAMES) do if f.ev and (f.ev.QUEST_DETAIL or f.ev.QUEST_ACCEPTED) then n = n + 1 end end return n end")
+    check(listening() == 0, "and with the routes or the option off, no quest event is listened for")
+    lua.execute("OPTION = true")
+    YR.ApplyParts()
+    check(listening() > 0, "the option back on: listening again, without a /reload")
     return bad
 
 

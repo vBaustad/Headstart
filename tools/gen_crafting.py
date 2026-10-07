@@ -42,15 +42,19 @@ def main():
         "YR.Crafting = {",
         f'    build = "{build}",',
         "    professions = { " + ", ".join(str(x) for x in lines) + " },",
-        "    -- [recipeItemID] = { professionLine, skillToLearn, recipeSpellID }",
+        "    -- [recipeItemID] = recipeSpellID * 1000000 + skillToLearn * 1000 + professionLine: one number, not a",
+        "    -- table an item (there are seventeen hundred of them, built at every login). Read with YR.CraftRecipe.",
         "    recipeItems = {",
     ]
     for item in sorted(recipe_items):
         p, l, s = recipe_items[item]
-        out.append(f"        [{item}] = {{ {p}, {l}, {s} }},")
-    out += ["    },", "    -- [itemID] = { professionLine, ... }: every profession with a recipe that uses it", "    reagents = {"]
+        assert p < 1000 and l < 1000, (item, p, l)
+        out.append(f"        [{item}] = {s * 1000000 + l * 1000 + p},")
+    out += ["    },", "    -- [itemID] = the professions with a recipe that uses it, as bits: bit i (1, 2, 4...) is professions[i].",
+            "    -- Read with YR.CraftUsers.", "    reagents = {"]
+    bit = {line: 2 ** i for i, line in enumerate(lines)}
     for item in sorted(reagents):
-        out.append(f"        [{item}] = {{ " + ", ".join(str(p) for p in sorted(reagents[item])) + " },")
+        out.append(f"        [{item}] = {sum(bit[p] for p in reagents[item])},")
     out += ["    },", "}", ""]
     open(OUT, "w", encoding="utf-8", newline="\n").write("\n".join(out))
     print(f"{len(recipe_items)} recipe items, {len(reagents)} reagents, build {build}")

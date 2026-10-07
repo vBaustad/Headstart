@@ -73,6 +73,8 @@ end
 -- its tooltip; the aura itself carries a name, an icon and a timer and nothing else. Read once per
 -- application and kept, because UNIT_AURA fires far more often than a buff changes.
 local statCache = {}
+local STAT_TRIES = 10   -- re-asks for a tooltip that was not ready yet, then stops asking
+local RETRY_EVERY = 2   -- seconds between attempts while the last reading could not be taken
 
 --- WoW's own markup out of a tooltip line. The pluralisation form "|4minute:minutes;" carries a
 --- COLON, and the rule below uses a colon to recognise a stat - which is exactly how
@@ -140,12 +142,21 @@ end
 local function Scan()
     if AurasBlocked() then return nil end
     local nearby, benefits, settled, buffs = false, false, false, {}
+    local statsPending = false
+    local missed = 0
     for i = 1, 60 do
         if not IndexSecret(i) then
             local ok, id, name, icon, duration, expires = pcall(ReadAura, i)
-            if not ok then return nil end
-            if id == nil and name == nil then break end
-            if id == NEARBY then
+            if not ok then
+                -- ONE unreadable index is not a reason to throw the whole reading away. It used to
+                -- be: a single aura the per-index check did not catch made every scan fail, so the
+                -- HUD sat dimmed on its last reading until something unrelated fired an event.
+                -- Skipping it can under-report a camp buff for one pass; refusing to read anything
+                -- under-reports every buff until you leave.
+                missed = missed + 1
+            elseif id == nil and name == nil then
+                break
+            elseif id == NEARBY then
                 nearby = true
             elseif RANK[id] then
                 if id == BENEFITS then benefits = true end
@@ -153,20 +164,32 @@ local function Scan()
                 local timed = (duration and duration > 0) and expires or nil
                 -- Kept per buff with the moment this application ends, so a refresh re-reads the
                 -- tooltip and a redraw does not - and one entry per buff, not one per refresh.
+                -- A FAILED read is NOT cached as "this buff has no stats". The tooltip is not
+                -- always ready the first time we ask - least of all on the pass that runs at
+                -- login - and treating that silence as an answer left the buff with no stats for
+                -- its whole hour. A /reload appeared to fix it because it emptied this table.
                 local was = statCache[id]
                 if not was or was.expires ~= timed then
-                    was = { expires = timed, stats = ReadStats(i) or false }
+                    was = { expires = timed, tries = 0 }
                     statCache[id] = was
                 end
+                if was.stats == nil and was.tries < STAT_TRIES then
+                    was.stats = ReadStats(i)
+                    if was.stats == nil then
+                        was.tries = was.tries + 1
+                        -- Still worth asking again: tell the caller so something comes back round.
+                        if was.tries < STAT_TRIES then statsPending = true end
+                    end
+                end
                 buffs[#buffs + 1] = { id = id, name = name, icon = icon, duration = duration,
-                    index = i, expires = timed, stats = was.stats or nil }
+                    index = i, expires = timed, stats = was.stats }
             end
         end
     end
     table.sort(buffs, function(l, r) return RANK[l.id] < RANK[r.id] end)
     -- carrying: the camp gave us something that is still running, wherever we have walked to since.
     return { nearby = nearby, benefits = benefits, settled = settled,
-        carrying = #buffs > 0, buffs = buffs }
+        carrying = #buffs > 0, buffs = buffs, missed = missed, statsPending = statsPending }
 end
 
 -- The last thing we managed to read, kept across a fight so the HUD does not vanish at the pull.
@@ -654,38 +677,114 @@ local function Build()
     end
 
     statRows, buffRows = {}, {}
-    -- Nothing fires an event as time passes, so the numbers and the colour draining out of the
-    -- fire both come from here - twice a second, and only while the HUD is actually up.
-    local elapsed = 0
-    hud:SetScript("OnUpdate", function(_, dt)
-        elapsed = elapsed + dt
-        if elapsed < 0.5 then return end
-        elapsed = 0
-        Tick()
-    end)
     hud:Hide()
 end
 
 -- ---------------------------------------------------------------------------
 -- Keeping it current
 -- ---------------------------------------------------------------------------
+-- Nothing fires an event as time passes, so the numbers and the colour draining out of the fire come
+-- from a clock, twice a second. It exists only while something on the HUD moves with time: a buff
+-- with an end, or a reading that has to be asked for again. The grey resting fire has neither, and
+-- that is what is on screen most of the time.
+local CLOCK_EVERY = 0.5
+local RETRY_TICKS = RETRY_EVERY / CLOCK_EVERY
+local clock, retry = nil, 0
+
+local function Moves()
+    if not (hud and hud:IsShown()) then return false end
+    -- A reading we could not take does not fix itself. Nothing fires an event while you stand still
+    -- at a camp, so without this the HUD stays dimmed on its last reading until something unrelated
+    -- happens. The same goes for a tooltip that was not ready. But not in a fight: every aura is
+    -- secret there, a retry cannot do better than the reading we have, and PLAYER_REGEN_ENABLED
+    -- takes a fresh one (and looks at this again) the moment it ends.
+    if (stale or state.statsPending) and not InCombatLockdown() then return true end
+    if not YR.Option("campLocked") then return false end       -- the preview's times stand still
+    local main = MainBuff(state)
+    if main and main.expires then return true end
+    if YR.Option("campList") then
+        for _, b in ipairs(state.buffs) do
+            if b.expires then return true end
+        end
+    end
+    return false
+end
+
+local function OnClock()
+    if stale or state.statsPending then
+        retry = retry + 1
+        if retry >= RETRY_TICKS then
+            retry = 0
+            -- Asked through AurasBlocked, not InCombatLockdown, so this and the scan cannot come to
+            -- different views of whether a reading is possible.
+            if not AurasBlocked() then YR.RefreshCamp(true) end
+        end
+    else
+        retry = 0
+    end
+    Tick()
+    if clock and not Moves() then
+        clock:Cancel()
+        clock = nil
+    end
+end
+
+--- The clock runs exactly while something moves (see Moves). Asked after every reading and redraw.
+local function Clock()
+    if Moves() then
+        if not clock then
+            retry = 0
+            clock = C_Timer.NewTicker(CLOCK_EVERY, OnClock)
+        end
+    elseif clock then
+        clock:Cancel()
+        clock = nil
+    end
+end
+
+--- Two readings that put the same thing on screen. A camp refreshes Welcoming Campfire and the game
+--- tells us about auras all the time, and most of those readings change nothing the HUD draws: the
+--- time left is written by the clock, not by Draw.
+local function Same(a, b)
+    if a.nearby ~= b.nearby or a.benefits ~= b.benefits or a.settled ~= b.settled then return false end
+    local l, r = a.buffs, b.buffs
+    if #l ~= #r then return false end
+    for i = 1, #l do
+        local x, y = l[i], r[i]
+        if x.id ~= y.id or x.expires ~= y.expires or x.stats ~= y.stats or x.icon ~= y.icon or x.name ~= y.name then
+            return false
+        end
+    end
+    return true
+end
+
 --- Read the auras again and redraw. Safe to call as often as you like; the reading is debounced.
---- onAura: called for a change in your auras. In a fight they can't be read, and they change all the
---- time: once the HUD has said its reading is old, nothing new can be drawn until the fight ends.
+--- onAura: called for a change in your auras (or by the clock, asking again). In a fight they can't
+--- be read, and they change all the time: once the HUD has said its reading is old, nothing new can
+--- be drawn until the fight ends. And a reading that shows what is already drawn is not drawn again.
+local drawn, aside = false, false       -- drawn at all; and whether Campfire's own HUD had ours step aside then
 function YR.RefreshCamp(onAura)
     if not (YippRouteDB and YR.Option("camp")) then
         if hud then hud:Hide() end
+        drawn = false
+        Clock()
         return
     end
     if not hud then Build() end
     local fresh = Scan()
+    local same = false
     if fresh then
+        same = onAura and drawn and not stale and Same(fresh, state) and aside == YR.CampfireShowsCamp()
         state, stale = fresh, false
     else
-        if stale and onAura then return end
+        if stale and onAura then Clock() return end
         stale = true        -- keep the last reading; say it is old rather than call it empty
     end
-    Draw()
+    if not same then
+        Draw()
+        drawn, aside = true, YR.CampfireShowsCamp()
+    end
+    Clock()
 end
 
 -- UNIT_AURA comes in bursts (a camp hands out several auras at once), so one read per burst.
@@ -704,8 +803,6 @@ local function OursAmong(added)
     return false
 end
 local function Later(_, event, _, info)
-    -- nothing to draw: nothing to read (turning the icon on reads at once, SetOption)
-    if not YR.Option("camp") then return end
     if event == "UNIT_AURA" then
         -- in a fight the auras can't be read: the reading is taken when it ends
         if InCombatLockdown() then return end
@@ -720,9 +817,11 @@ local function Later(_, event, _, info)
     C_Timer.After(0.2, Read)
 end
 
+-- A setting of the HUD: every part is looked at, so the icon comes on (or goes) at once, and one
+-- that stays on is read and drawn again (the part's `again`). Before the login nothing is on yet.
 local function SetOption(key, on)
     YippRouteDB[key] = on and true or false
-    YR.RefreshCamp()
+    YR.ApplyParts()
 end
 
 --- Show the campfire icon, or never.
@@ -760,13 +859,14 @@ function YR.CampDebug()
     end
 end
 
+-- The icon listens only while it is on (YR.Part, Core.lua). Both edges of a fight: one to dim it and
+-- stop trusting the reading, one to take a fresh one. The login's own reading is taken when the part
+-- comes on; entering the world takes another, when the auras are surely there.
+local EVENTS = { { "UNIT_AURA", "player" }, "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_ENTERING_WORLD" }
+local function Wanted() return YR.Option("camp") end
+local function Fresh() YR.RefreshCamp() end
+local part
 function YR.StartCamp()
-    local f = CreateFrame("Frame")
-    f:RegisterUnitEvent("UNIT_AURA", "player")
-    -- Both edges of a fight: one to dim it and stop trusting the reading, one to take a fresh one.
-    f:RegisterEvent("PLAYER_REGEN_DISABLED")
-    f:RegisterEvent("PLAYER_REGEN_ENABLED")
-    f:RegisterEvent("PLAYER_ENTERING_WORLD")
-    f:SetScript("OnEvent", Later)
-    YR.RefreshCamp()
+    if part then return end
+    part = YR.Part(Wanted, EVENTS, Later, { start = Fresh, again = Fresh, stop = Fresh })
 end

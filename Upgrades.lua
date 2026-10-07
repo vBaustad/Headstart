@@ -74,15 +74,17 @@ local function Quality(link)
     return q
 end
 
+local function Red(c)
+    return type(c) == "table" and (c.r or 0) > 0.9 and (c.g or 1) < 0.3 and (c.b or 1) < 0.3
+end
+
 --- Red text anywhere on the item's tooltip: the game saying you can't wear it.
 local function Unwearable(bag, slot)
     if not (C_TooltipInfo and C_TooltipInfo.GetBagItem) then return false end
     local ok, data = pcall(C_TooltipInfo.GetBagItem, bag, slot)
     if not (ok and data and data.lines) then return true end    -- can't tell: don't offer it
     for _, line in ipairs(data.lines) do
-        for _, c in ipairs({ line.leftColor, line.rightColor }) do
-            if type(c) == "table" and (c.r or 0) > 0.9 and (c.g or 1) < 0.3 and (c.b or 1) < 0.3 then return true end
-        end
+        if Red(line.leftColor) or Red(line.rightColor) then return true end
     end
     return false
 end
@@ -301,6 +303,7 @@ end
 -- level or talents change.
 local checked = {}
 local waiting = false      -- bags changed in a fight: looked through when it ends
+local found = {}           -- [slot] = the best new upgrade for it, in the walk under way (emptied for each)
 --- Look at every item again (a setting that weighs them changed).
 function YR.UpgradesForget() wipe(checked) end
 
@@ -309,7 +312,7 @@ function YR.ScanUpgrades()
     if not YR.Option("upgrades") then return end
     if InCombatLockdown() then waiting = true return end
     waiting = false
-    local found = {}      -- [slot] = the best new upgrade for it
+    wipe(found)
     for bag = 0, NUM_BAG_SLOTS or 4 do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             -- the link alone: the full item info is a new table for every slot of every bag
@@ -344,45 +347,46 @@ function YR.ScanUpgrades()
     ShowNext()
 end
 
-function YR.StartUpgrades()
-    local f = CreateFrame("Frame")
-    local pending = false
-    local function Scan() pending = false YR.ScanUpgrades() end
-    local function Later()
-        -- off: nothing is set going at all (this is every loot, every bag change)
-        if pending or not YR.Option("upgrades") then return end
-        pending = true
-        C_Timer.After(0.5, Scan)
-    end
-    for _, e in ipairs({ "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_REGEN_ENABLED" }) do
-        pcall(f.RegisterEvent, f, e)
-    end
-    for _, e in ipairs({ "PLAYER_LEVEL_UP", "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE" }) do
-        pcall(f.RegisterEvent, f, e)
-    end
-    f:SetScript("OnEvent", function(_, event)
-        -- A ding can make an item you were told was too high a level wearable: look at all of them again.
-        if event == "PLAYER_LEVEL_UP" then
-            wipe(told)
+local pending = false
+local function Scan() pending = false YR.ScanUpgrades() end
+local function Again() if win and win:IsShown() and win.u and not Recheck(win.u) then win:Hide() end end
+local function Later()
+    if pending then return end
+    pending = true
+    C_Timer.After(0.5, Scan)
+end
+
+local function OnEvent(_, event)
+    -- A ding can make an item you were told was too high a level wearable: look at all of them again.
+    if event == "PLAYER_LEVEL_UP" then
+        wipe(told)
+        wipe(checked)
+        C_Timer.After(1, Later)
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        local u = equipAfterFight
+        equipAfterFight = nil
+        if u and InBags(u.link) then Equip(u) end
+        ShowNext()
+        if waiting then Later() end
+    elseif event == "TRAIT_CONFIG_UPDATED" or event == "PLAYER_TALENT_UPDATE" then
+        wipe(checked)       -- another role weighs the same items differently
+    else
+        if event == "PLAYER_EQUIPMENT_CHANGED" then
             wipe(checked)
-            C_Timer.After(1, Later)
-        elseif event == "PLAYER_REGEN_ENABLED" then
-            local u = equipAfterFight
-            equipAfterFight = nil
-            if u and InBags(u.link) then Equip(u) end
-            ShowNext()
-            if waiting then Later() end
-        elseif event == "TRAIT_CONFIG_UPDATED" or event == "PLAYER_TALENT_UPDATE" then
-            wipe(checked)       -- another role weighs the same items differently
-        else
-            if event == "PLAYER_EQUIPMENT_CHANGED" then
-                wipe(checked)
-                -- what the window offers may be what you just put on, or beaten by it: looked at again
-                C_Timer.After(0.5, function()
-                    if win and win:IsShown() and win.u and not Recheck(win.u) then win:Hide() end
-                end)
-            end
-            Later()
+            -- what the window offers may be what you just put on, or beaten by it: looked at again
+            if win and win:IsShown() then C_Timer.After(0.5, Again) end
         end
-    end)
+        Later()
+    end
+end
+
+-- Off, nothing is listened for at all (this is every loot, every bag change). Turned off with gear
+-- changes behind it nobody heard of: what was looked at is forgotten when it comes on again.
+local declared
+function YR.StartUpgrades()
+    if declared then return end
+    declared = true
+    YR.Part(function() return YR.Option("upgrades") end, { "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED",
+        "PLAYER_REGEN_ENABLED", "PLAYER_LEVEL_UP", "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE" }, OnEvent,
+        { start = function() wipe(checked) end })
 end

@@ -9,14 +9,14 @@
 ## OptionalDeps: RXPGuides, AutoFeed, Headstart_Routes
 ## IconTexture: Interface\Icons\INV_Misc_Map_01
 ## SavedVariables: YippRouteDB, YippSetupDB
-## SavedVariablesPerCharacter: YippSetupCharDB
+## SavedVariablesPerCharacter: YippSetupCharDB, HeadstartChatLog, HeadstartLootLog, HeadstartRunLog, HeadstartRunLogKept
 ## AddonCompartmentFunc: Headstart_OnAddonCompartmentClick
 
-Data\QuestIDs.lua
 Core.lua
 Scan.lua
 Needs.lua
 Shopping.lua
+RunStore.lua
 Log.lua
 DeathSkip.lua
 SkipQuests.lua
@@ -45,7 +45,10 @@ DamageSkin.lua
 Movers.lua
 TalentFade.lua
 BarHide.lua
+ChatLog.lua
+LootFeed.lua
 Swing.lua
+Recap.lua
 PartyQuests.lua
 QuickGroup.lua
 Data\Consumables.lua
@@ -57,10 +60,4 @@ Guides.lua
 Group.lua
 Style.lua
 Step.lua
-Data\SpellLevels.lua
-Setup.lua
-SetupUI.lua
-Data\PlannerSpells.lua
-Planner.lua
 WhereNext.lua
-Editor.lua

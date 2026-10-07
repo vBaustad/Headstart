@@ -172,30 +172,34 @@ end
 -- ---------------------------------------------------------------------------
 local me             -- the last snapshot that could be read (out of combat)
 
+-- (Read after every change to your stats - a buff, a piece of gear: a function of its own, not one
+-- made for each read.)
+local function ReadNumbers()
+    local base, pos, neg = UnitAttackPower("player")
+    local rbase, rpos, rneg = UnitRangedAttackPower("player")
+    local sp, heal = 0, Num(GetSpellBonusHealing and GetSpellBonusHealing()) or 0
+    local scrit = 0
+    for school = 2, 7 do
+        sp = math.max(sp, Num(GetSpellBonusDamage(school)) or 0)
+        scrit = math.max(scrit, Num(GetSpellCritChance(school)) or 0)
+    end
+    local _, armor = UnitArmor("player")
+    local s = {
+        level = Num(UnitLevel("player")) or 1,
+        ap = (Num(base) or 0) + (Num(pos) or 0) + (Num(neg) or 0),
+        rap = (Num(rbase) or 0) + (Num(rpos) or 0) + (Num(rneg) or 0),
+        crit = Num(GetCritChance()) or 0, rcrit = Num(GetRangedCritChance and GetRangedCritChance()) or 0,
+        sp = sp, heal = heal, scrit = scrit,
+        hp = Num(UnitHealthMax("player")) or 100, armor = Num(armor) or 0,
+        spi = Num(select(2, UnitStat("player", 5))) or 0,
+    }
+    return s
+end
+
 --- Your numbers now, from the game. Kept from the last time they could be read.
 function YR.SimSnapshot()
     if InCombatLockdown() and me then return me end
-    local ok, snap = pcall(function()
-        local base, pos, neg = UnitAttackPower("player")
-        local rbase, rpos, rneg = UnitRangedAttackPower("player")
-        local sp, heal = 0, Num(GetSpellBonusHealing and GetSpellBonusHealing()) or 0
-        local scrit = 0
-        for school = 2, 7 do
-            sp = math.max(sp, Num(GetSpellBonusDamage(school)) or 0)
-            scrit = math.max(scrit, Num(GetSpellCritChance(school)) or 0)
-        end
-        local _, armor = UnitArmor("player")
-        local s = {
-            level = Num(UnitLevel("player")) or 1,
-            ap = (Num(base) or 0) + (Num(pos) or 0) + (Num(neg) or 0),
-            rap = (Num(rbase) or 0) + (Num(rpos) or 0) + (Num(rneg) or 0),
-            crit = Num(GetCritChance()) or 0, rcrit = Num(GetRangedCritChance and GetRangedCritChance()) or 0,
-            sp = sp, heal = heal, scrit = scrit,
-            hp = Num(UnitHealthMax("player")) or 100, armor = Num(armor) or 0,
-            spi = Num(select(2, UnitStat("player", 5))) or 0,
-        }
-        return s
-    end)
+    local ok, snap = pcall(ReadNumbers)
     if ok and snap then me = snap end
     return me
 end
@@ -384,7 +388,11 @@ end
 -- Your role is read off the talent tree (every node of it), so it's kept on its own, for longer than
 -- the answers: only talents, a level or the role setting change it - not every loot.
 local memo, memoRole, roleKept = {}, nil, nil
+local listening = false     -- the events that keep the answers true are listened for (YR.StartSim)
 function YR.SimCompareKept(link)
+    -- with the tooltip line and the upgrades both off nothing says when an answer has gone stale:
+    -- then each is worked out when asked for, and none is kept
+    if not listening then return YR.SimCompare(link) end
     local set = YippRouteDB and YippRouteDB.simRole
     if set ~= memoRole then wipe(memo) memoRole, roleKept = set, nil end
     local c = memo[link]
@@ -409,8 +417,12 @@ local function Wearing(link)
     return worn[link] == true
 end
 
+-- The line on an item's tooltip. The game can't be told to stop calling this once it has been asked
+-- to, so with the line turned off it is one test and out.
+local tipOn = false
 local function OnTooltip(tooltip)
-    if not YR.Option("simTooltip") or tooltip ~= GameTooltip and tooltip ~= ItemRefTooltip then return end
+    if not tipOn then return end
+    if tooltip ~= GameTooltip and tooltip ~= ItemRefTooltip then return end
     local ok, _, link = pcall(tooltip.GetItem, tooltip)
     if not (ok and link) then return end
     if Wearing(link) then return end           -- what you wear already
@@ -427,27 +439,60 @@ end
 --- Drop the item stats kept (a new item's text arrives later than its link, and gear changes).
 function YR.SimForget() wipe(cache) wipe(memo) worn = nil end
 
-function YR.StartSim()
-    if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
+local pending = false
+local function Read() pending = false YR.SimSnapshot() wipe(memo) end
+
+local function OnEvent(_, event, unit)
+    if event == "UNIT_STATS" and unit ~= "player" then return end
+    if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_ENTERING_WORLD" then worn = nil end
+    if event == "TRAIT_CONFIG_UPDATED" or event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_LEVEL_UP"
+        or event == "PLAYER_ENTERING_WORLD" then
+        roleKept = nil
+    end
+    if event == "PLAYER_EQUIPMENT_CHANGED" then YR.SimForget() else wipe(memo) end
+    if event == "BAG_UPDATE_DELAYED" or pending then return end   -- bags: only the off hands to pair with
+    -- your numbers are read ahead for what shows them (asked for with both off, they're read then)
+    pending = true
+    C_Timer.After(0.2, Read)
+end
+
+-- The tooltip line follows its own setting; the game is asked to call us the first time it is on.
+local tipAsked
+local function Tooltip()
+    tipOn = YR.Option("simTooltip")
+    if tipOn and not tipAsked and TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum
+        and Enum.TooltipDataType then
+        tipAsked = true
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnTooltip)
     end
-    local f = CreateFrame("Frame")
-    for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_LEVEL_UP",
-        "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE", "BAG_UPDATE_DELAYED" }) do
-        pcall(f.RegisterEvent, f, e)
-    end
-    if not pcall(f.RegisterUnitEvent, f, "UNIT_STATS", "player") then pcall(f.RegisterEvent, f, "UNIT_STATS") end
-    local pending = false
-    f:SetScript("OnEvent", function(_, event, unit)
-        if event == "UNIT_STATS" and unit ~= "player" then return end
-        if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PLAYER_ENTERING_WORLD" then worn = nil end
-        if event == "TRAIT_CONFIG_UPDATED" or event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_LEVEL_UP"
-            or event == "PLAYER_ENTERING_WORLD" then
+end
+
+-- Your gear, bags, stats, level and talents are listened for only while something shows what the sim
+-- works out: the tooltip line, or the upgrades (Upgrades.lua).
+local declared
+function YR.StartSim()
+    if declared then return end
+    declared = true
+    YR.Part(function() return YR.Option("simTooltip") or YR.Option("upgrades") end,
+        { "PLAYER_ENTERING_WORLD", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_REGEN_ENABLED", "PLAYER_LEVEL_UP",
+            "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE", "BAG_UPDATE_DELAYED" }, OnEvent, {
+        start = function(p)
+            local f = p.frame
+            if not pcall(f.RegisterUnitEvent, f, "UNIT_STATS", "player") then pcall(f.RegisterEvent, f, "UNIT_STATS") end
+            -- nothing was listened for until now: whatever was kept may be stale, and your numbers
+            -- are read ahead as after any change
+            YR.SimForget()
             roleKept = nil
-        end
-        if event == "PLAYER_EQUIPMENT_CHANGED" then YR.SimForget() else wipe(memo) end
-        if event == "BAG_UPDATE_DELAYED" or pending then return end   -- bags: only the off hands to pair with
-        pending = true
-        C_Timer.After(0.2, function() pending = false YR.SimSnapshot() wipe(memo) end)
-    end)
+            listening = true
+            Tooltip()
+            if not pending then
+                pending = true
+                C_Timer.After(0.2, Read)
+            end
+        end,
+        again = Tooltip,
+        stop = function()
+            listening, tipOn = false, false
+        end,
+    })
 end

@@ -43,9 +43,10 @@ local function Friendly(unit, name, guid)
         end
         -- The guild roster by name, for the escort question.
         if name and IsInGuild() then
+            local short = Ambiguate(name, "none")       -- once, not for each of a few hundred guildies
             for i = 1, GetNumGuildMembers() do
                 local full = GetGuildRosterInfo(i)
-                if full and Ambiguate(full, "none") == Ambiguate(name, "none") then return true end
+                if full and Ambiguate(full, "none") == short then return true end
             end
         end
         return false

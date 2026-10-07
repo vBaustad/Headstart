@@ -22,6 +22,7 @@ local F = {}
 F.__index = F
 function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
 function F:SetScript(_, fn) self.fn = fn end
+function F:UnregisterAllEvents() self.ev = nil end
 function F:SetAlpha(a) self.alpha = a self.sets = (self.sets or 0) + 1 end
 function F:GetAlpha() return self.alpha or 1 end
 function F:IsMouseOver() return self.over or false end
@@ -80,9 +81,11 @@ function print() end
 COMBAT = false
 function InCombatLockdown() return COMBAT end
 TICKERS = 0
-C_Timer = { NewTicker = function(_, fn) TICKERS = TICKERS + 1 TICK = fn return { Cancel = function() TICKERS = TICKERS - 1 TICK = nil end } end }
+-- "a setting changed" is looked at a frame later in the game: here the test says when (YR.ApplyParts)
+C_Timer = { After = function() end, NewTicker = function(_, fn) TICKERS = TICKERS + 1 TICK = fn return { Cancel = function() TICKERS = TICKERS - 1 TICK = nil end } end }
 CALLBACKS = {}
-EventRegistry = { RegisterCallback = function(_, name, fn) CALLBACKS[name] = fn end }
+EventRegistry = { RegisterCallback = function(_, name, fn) CALLBACKS[name] = fn end,
+    UnregisterCallback = function(_, name) CALLBACKS[name] = nil end }
 BAG1, BAG2, DEAD = New(), New(), New()
 DEAD.mouse = false
 BagsBar = New({ BAG1, BAG2, DEAD })
@@ -96,6 +99,8 @@ MicroMenuContainer = New({ New({ MICRO }) })
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
         chunk("Headstart", YR)
     YR.StartBarHide()
+    YR.partsReady = True             # the login: what is wanted comes on
+    YR.ApplyParts()
     g = lua.globals()
     bad = 0
 
@@ -108,13 +113,16 @@ MicroMenuContainer = New({ New({ MICRO }) })
     check(g.BagsBar.sets is None and g.MicroMenuContainer.sets is None and g.TICKERS == 0,
           "as Blizzard has them: neither bar is touched, and nothing runs")
     YR.SetBarHide("bagBar", "hide")
+    YR.ApplyParts()
     check(g.BagsBar.alpha == 0 and g.BAG1.mouse is False and g.BAG2.mouse is False and g.TICKERS == 0,
           "bag bar hidden: see-through, its buttons out of the mouse's way, and still nothing running")
     check(g.MicroMenuContainer.sets is None, "the micro menu is left alone")
     YR.SetBarHide("bagBar", "show")
+    YR.ApplyParts()
     check(g.BagsBar.alpha == 1 and g.BAG1.mouse is True and g.DEAD.mouse is False,
           "back to Blizzard's: shown, its buttons clickable again - and one that never took the mouse still doesn't")
     YR.SetBarHide("microMenu", "hover")
+    YR.ApplyParts()
     check(g.MicroMenuContainer.alpha == 0 and g.MICRO.mouse is not False and g.TICKERS == 1,
           "micro menu under the mouse: see-through, its buttons still there, and one ticker running")
     lua.execute("MicroMenuContainer.over = true TICK()")
@@ -130,6 +138,7 @@ MicroMenuContainer = New({ New({ MICRO }) })
     check(g.MicroMenuContainer.alpha == 0, "Edit Mode closed: as you picked")
     lua.execute("COMBAT = true")
     YR.SetBarHide("microMenu", "hide")
+    YR.ApplyParts()
     check(g.MicroMenuContainer.alpha == 0 and g.MICRO.mouse is not False and g.TICKERS == 0,
           "hidden in a fight: see-through at once, the buttons' mouse left for after; the ticker stopped")
     lua.execute("COMBAT = false Fire('PLAYER_REGEN_ENABLED')")
@@ -138,6 +147,7 @@ MicroMenuContainer = New({ New({ MICRO }) })
     check(g.ChatFrame1ButtonFrame.shown is not False and g.ChatFrame1ButtonFrame.width is None, "the chat's buttons are left alone until asked")
     g.YippRouteDB.chatStrip = "slim"
     YR.BarHideApply()
+    YR.ApplyParts()
     check(g.ChatFrame1ButtonFrame.width == 18 and g.ChatFrame1ButtonFrame.shown is not False
           and list(g.ChatFrameMenuButton.size.values()) == [18, 18] and g.MENU_ART.alpha == 0 and g.ICONS >= 1,
           "slim: the strip at 18 wide, the chat menu button small with our icon in place of its art")
@@ -147,6 +157,7 @@ MicroMenuContainer = New({ New({ MICRO }) })
     check(abs(g.QuickJoinToastButton.scale - 18 / 32) < 0.001, "and the social button over it is made small to fit")
     g.YippRouteDB.chatStrip = "hide"
     YR.BarHideApply()
+    YR.ApplyParts()
     check(g.ChatFrame1ButtonFrame.shown is False and g.ChatFrame2ButtonFrame.shown is False and g.ChatFrame1ButtonFrame.width == 29
           and list(g.ChatFrameMenuButton.size.values()) == [32, 32] and g.MENU_ART.alpha == 1,
           "hidden: every window's strip is gone, and the button is as Blizzard had it")
@@ -159,14 +170,17 @@ MicroMenuContainer = New({ New({ MICRO }) })
           "the game shows the strip again: hidden again - the social button is its own switch")
     g.YippRouteDB.chatSocialHide = True
     YR.BarHideApply()
+    YR.ApplyParts()
     check(g.QuickJoinToastButton.shown is False, "the social button hidden")
     g.YippRouteDB.chatStrip, g.YippRouteDB.chatSocialHide = None, None
     YR.BarHideApply()
+    YR.ApplyParts()
     check(g.ChatFrame1ButtonFrame.shown is True and g.QuickJoinToastButton.shown is True and g.ChatFrame2ButtonFrame.shown is True,
           "off: the ones we hid are back")
     check(list(g.ChatFrame1.clamp.values()) == [-35, 0, 20, -10], "and the chat window's limit is Edit Mode's own again")
     g.YippRouteDB.qolOff = True
     YR.BarHideApply()
+    YR.ApplyParts()
     check(g.MicroMenuContainer.alpha == 1 and g.MICRO.mouse is True, "quality of life off: Blizzard's own again")
     return bad
 

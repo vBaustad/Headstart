@@ -29,7 +29,9 @@
 --   and Shift-click lists every rank. A button kept at a rank shows it (R3) and is saved the way a
 --   copied main saves one (id = that rank, down = true).
 -- The icons come from the game's data (Data/PlannerSpells.lua), so spells you don't know yet have one.
-local ADDON, YR = ...
+-- (part of the Headstart_Setup addon, loaded by Headstart while Character setup is on: an addon of its
+-- own has a table of its own, so Headstart's is taken from HeadstartNS)
+local YR = _G.HeadstartNS
 local YS = YR.Setup
 local S = YR.Style
 
@@ -635,7 +637,7 @@ local function Save(thenApply)
         from = YS.PlayerKey() .. " (plan)", class = Class(), maxLevel = 60, scanned = time(),
         slots = keep, planned = true,        -- bars only: the interface is the account's (YS:SharedUI)
     })
-    YR.Print(("saved your %s plan: %d buttons. It's the %s layout now (Headstart, QoL, Bars & setup)."):format(
+    YR.Print(("saved your %s plan: %d buttons. It's the %s layout now (Headstart, Character setup)."):format(
         Class():lower(), n, Class():lower()))
     if YS.Refresh then YS:Refresh() end
     if YR.RefreshWindow then YR:RefreshWindow() end

@@ -57,7 +57,12 @@ function YR.SwingDB()
     return db
 end
 
-function YR.SwingOn() return YR.QoLOn() and YR.SwingDB().on == true end
+--- On or off, read as it is saved: asking must not fill the settings of a swing timer that is off
+--- with its defaults (YR.SwingDB does that, for the bars themselves).
+function YR.SwingOn()
+    local db = YippRouteDB.swing
+    return YR.QoLOn() and type(db) == "table" and db.on == true
+end
 -- Our own bars are the ones showing / Blizzard's are, dressed.
 local function Own() return YR.SwingOn() and YR.SwingDB().style == "own" end
 local function Dressed() return YR.SwingOn() and YR.SwingDB().style ~= "own" end
@@ -83,6 +88,9 @@ local bars = {}             -- [swing type] = the bar
 local swings = {}           -- [swing type] = { start, length } of the swing on its way
 local far = {}              -- [swing type] = true while the target is out of reach
 local inCombat, editing, hunter = false, false, false
+local laid                  -- which bars the stack was last laid out for (nil: lay it out again)
+local ticking = false       -- our OnUpdate is on the holder
+local SET = { 1, 2, 4 }     -- a hand's place in `laid`
 local hidden = {}           -- [a frame of Blizzard's] = the alpha it had
 local Dress, DressTint, DressLength
 
@@ -122,7 +130,11 @@ local function Paint(bar, db, now)
     local elapsed = s and (now - s.start) or 0
     local running = s ~= nil and elapsed < length
     if not running then elapsed = length end
-    bar:SetMinMaxValues(0, length > 0 and length or 1)
+    -- the swing's length is the same from frame to frame: told to the bar only when it's another
+    if bar.span ~= length then
+        bar.span = length
+        bar:SetMinMaxValues(0, length > 0 and length or 1)
+    end
     bar:SetValue(length > 0 and elapsed or 1)
     bar.spark:SetShown(db.spark and running)
     if running and db.spark then
@@ -150,33 +162,52 @@ local function Tick()
         if bar:IsShown() and Paint(bar, db, now) then running = true end
     end
     if not running then
+        ticking = false
         holder:SetScript("OnUpdate", nil)
         YR.SwingLayout()         -- the last swing ran out: which bars stay is decided again
     end
 end
 
 --- Which bars show, stacked from the top, and whether anything has to be drawn each frame.
+--- This runs at every swing, and almost every swing finds the same bars up as the one before: they
+--- are anchored, coloured and the holder sized only when which bars show is different (a setting
+--- that moves them says so through Look, the reach of your target colours its bar by itself).
 function YR.SwingLayout()
     if not holder then return end
     local db, now = YR.SwingDB(), GetTime()
     local on = Own() and not editing
-    local n, running = 0, false
+    local set = 0
+    for i, hand in ipairs(HANDS) do
+        local want = on and Wanted(hand, db, now) or false
+        bars[hand.type].want = want
+        if want then set = set + SET[i] end
+    end
+    if set ~= laid then
+        laid = set
+        local n = 0
+        for _, hand in ipairs(HANDS) do
+            local bar = bars[hand.type]
+            bar:SetShown(bar.want)
+            if bar.want then
+                bar:ClearAllPoints()
+                bar:SetPoint("TOPLEFT", holder, "TOPLEFT", db.icon and db.h + 2 or 0, -n * (db.h + db.gap))
+                bar:SetPoint("RIGHT", holder, "RIGHT")
+                Colour(bar, db)
+                n = n + 1
+            end
+        end
+        holder:SetShown(n > 0)
+        holder:SetHeight(math.max(1, n) * (db.h + db.gap) - db.gap)
+    end
+    local running = false
     for _, hand in ipairs(HANDS) do
         local bar = bars[hand.type]
-        local want = on and Wanted(hand, db, now)
-        bar:SetShown(want)
-        if want then
-            bar:ClearAllPoints()
-            bar:SetPoint("TOPLEFT", holder, "TOPLEFT", db.icon and db.h + 2 or 0, -n * (db.h + db.gap))
-            bar:SetPoint("RIGHT", holder, "RIGHT")
-            Colour(bar, db)
-            if Paint(bar, db, now) then running = true end
-            n = n + 1
-        end
+        if bar.want and Paint(bar, db, now) then running = true end
     end
-    holder:SetShown(n > 0)
-    holder:SetHeight(math.max(1, n) * (db.h + db.gap) - db.gap)
-    holder:SetScript("OnUpdate", running and Tick or nil)
+    if running ~= ticking then
+        ticking = running
+        holder:SetScript("OnUpdate", running and Tick or nil)
+    end
 end
 
 local function Icons()
@@ -190,6 +221,7 @@ end
 -- The look: what only a setting changes.
 local function Look()
     local db = YR.SwingDB()
+    laid = nil                      -- the bars' size and place may be different: stacked again
     holder:SetWidth(db.w)
     holder:ClearAllPoints()
     if db.pos then holder:SetPoint("TOPLEFT", UIParent, "TOPLEFT", db.pos[1], db.pos[2])
@@ -417,16 +449,28 @@ local function RangeChecks()
     end
 end
 
---- After a setting changed (or the main switch): built, sized, placed and shown as it is now.
-function YR.SwingApply()
-    if Own() or holder then
-        Build()
-        Look()
-    end
+-- Built, sized, placed and shown as it is now - or, with the timer off, everything put back.
+local function Apply()
+    if holder then Look() elseif Own() then Build() end
     TheirBars()
     Dress()
     RangeChecks()
     YR.SwingLayout()
+end
+
+-- Free while off (YR.Part, Core.lua, declared in YR.StartSwing): `part.on` is whether it's on now.
+local part, frame
+
+--- After a setting changed (or the main switch). Turned on or off: every part is looked at, and
+--- coming on or going off does the rest. Still on: as it is now. Still off: nothing to do, and the
+--- settings of a timer that is off aren't read (reading fills them in).
+function YR.SwingApply()
+    local on = part and part.on or false
+    if on ~= YR.SwingOn() then
+        YR.ApplyParts()
+    elseif on then
+        Apply()
+    end
 end
 
 function YR.SwingResetPosition()
@@ -534,51 +578,87 @@ function YR.SwingTest()
     return true
 end
 
-function YR.StartSwing()
+local function OnEvent(_, event, a, b, c)
+    if event == "PLAYER_SWING" then
+        if holder and Own() then
+            YR.SwingStart(b, a)
+        elseif Dressed() then
+            DressLength(b, a)
+        end
+    elseif event == "PLAYER_SWING_RANGE_UPDATE" then
+        if not YR.SwingOn() or type(a) ~= "number" or issecretvalue(a) or a < MAIN or a > RANGED then return end
+        local out = c == true and b == false
+        if far[a] ~= out then
+            far[a] = out
+            if Dressed() then
+                DressTint(a)
+            elseif holder and bars[a]:IsShown() then
+                Colour(bars[a], YR.SwingDB())
+            end
+        end
+    elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+        inCombat = event == "PLAYER_REGEN_DISABLED"
+        YR.SwingLayout()
+    elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+        if holder then Icons() YR.SwingLayout() end
+        if Dressed() then Dress() end
+    elseif event == "ADDON_LOADED" then
+        if a == "Blizzard_SwingTimer" then
+            frame:UnregisterEvent("ADDON_LOADED")
+            Apply()
+        end
+    else
+        inCombat = UnitAffectingCombat("player") and true or false
+        Apply()
+    end
+end
+
+local function EditModeEnter()
+    editing = true
+    TheirBars()
+    YR.SwingLayout()
+end
+local function EditModeExit()
+    editing = false
+    TheirBars()
+    Dress()
+    YR.SwingLayout()
+end
+
+-- Coming on: what the events would have told us had we been listening (a fight, Edit Mode open),
+-- Edit Mode's two callbacks, and Blizzard's swing bars loading - where they haven't yet.
+local function Begin(p)
+    frame = p.frame
     local _, class = UnitClass("player")
     hunter = class == "HUNTER"
-    local f = CreateFrame("Frame")
-    for _, event in ipairs({ "PLAYER_SWING", "PLAYER_SWING_RANGE_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_DISABLED",
-        "PLAYER_REGEN_ENABLED", "PLAYER_EQUIPMENT_CHANGED", "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED" }) do
-        pcall(f.RegisterEvent, f, event)
-    end
-    f:SetScript("OnEvent", function(_, event, a, b, c)
-        if event == "PLAYER_SWING" then
-            if holder and Own() then
-                YR.SwingStart(b, a)
-            elseif Dressed() then
-                DressLength(b, a)
-            end
-        elseif event == "PLAYER_SWING_RANGE_UPDATE" then
-            if not YR.SwingOn() or type(a) ~= "number" or issecretvalue(a) or a < MAIN or a > RANGED then return end
-            local out = c == true and b == false
-            if far[a] ~= out then
-                far[a] = out
-                if Dressed() then
-                    DressTint(a)
-                elseif holder and bars[a]:IsShown() then
-                    Colour(bars[a], YR.SwingDB())
-                end
-            end
-        elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
-            inCombat = event == "PLAYER_REGEN_DISABLED"
-            YR.SwingLayout()
-        elseif event == "PLAYER_EQUIPMENT_CHANGED" then
-            if holder then Icons() YR.SwingLayout() end
-            if Dressed() then Dress() end
-        elseif event == "ADDON_LOADED" then
-            if a == "Blizzard_SwingTimer" then
-                f:UnregisterEvent("ADDON_LOADED")
-                YR.SwingApply()
-            end
-        else
-            inCombat = UnitAffectingCombat("player") and true or false
-            YR.SwingApply()
-        end
-    end)
+    inCombat = UnitAffectingCombat("player") and true or false
+    local manager = _G.EditModeManagerFrame
+    editing = type(manager) == "table" and manager.IsShown ~= nil and manager:IsShown() and true or false
     local registry = _G.EventRegistry
     if type(registry) == "table" and registry.RegisterCallback then
-        registry:RegisterCallback("EditMode.Enter", function() editing = true TheirBars() YR.SwingLayout() end, f)
-        registry:RegisterCallback("EditMode.Exit", function() editing = false TheirBars() Dress() YR.SwingLayout() end, f)
+        registry:RegisterCallback("EditMode.Enter", EditModeEnter, frame)
+        registry:RegisterCallback("EditMode.Exit", EditModeExit, frame)
     end
+    if _G[BLIZZARD[1]] == nil then frame:RegisterEvent("ADDON_LOADED") end
+    Apply()
+end
+
+-- Going off: the callbacks taken back, and Apply (which finds the timer off) puts Blizzard's bars back
+-- as they were and takes ours away.
+local function End()
+    local registry = _G.EventRegistry
+    if type(registry) == "table" and registry.UnregisterCallback then
+        registry:UnregisterCallback("EditMode.Enter", frame)
+        registry:UnregisterCallback("EditMode.Exit", frame)
+    end
+    editing = false
+    Apply()
+end
+
+local EVENTS = { "PLAYER_SWING", "PLAYER_SWING_RANGE_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_DISABLED",
+    "PLAYER_REGEN_ENABLED", "PLAYER_EQUIPMENT_CHANGED", "EDIT_MODE_LAYOUTS_UPDATED" }
+
+function YR.StartSwing()
+    if part then return end
+    part = YR.Part(YR.SwingOn, EVENTS, OnEvent, { start = Begin, stop = End, again = Apply })
 end

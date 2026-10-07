@@ -30,6 +30,13 @@ local TRIES = 4                                -- ticks a stack may sit unmoved 
 local bankOpen = false
 local run                                      -- the deposit in progress, or nil
 local button
+local part                                     -- what listens for the bank (YR.StartBank)
+local asked                                    -- a deposit asked for by hand while nothing listened
+
+-- Blizzard's bank window on screen now (for when nobody was listening as it opened).
+local function Showing()
+    return BankFrame and BankFrame.IsShown and BankFrame:IsShown() and true or false
+end
 
 -- ---------------------------------------------------------------------------
 -- What goes
@@ -39,6 +46,23 @@ function YR.BankMats()
     local v = YippRouteDB and YippRouteDB.bankMats
     if v == "all" or v == "off" then return v end
     return "mine"
+end
+
+--- A recipe item's number (Data/Crafting.lua) taken apart: profession line, skill to learn it, its spell.
+function YR.CraftRecipe(packed)
+    return packed % 1000, math.floor(packed / 1000) % 1000, math.floor(packed / 1000000)
+end
+
+--- Whether one of the professions that use a reagent (its bits, Data/Crafting.lua) is among `have`
+--- ([skill line] = rank): bit i stands for the i-th of YR.Crafting.professions.
+function YR.CraftUsers(bits, have)
+    local lines = YR.Crafting.professions
+    for i = 1, #lines do
+        if bits % 2 == 1 and have[lines[i]] then return true end
+        bits = math.floor(bits / 2)
+        if bits == 0 then return false end
+    end
+    return false
 end
 
 --- This character's professions: [skill line] = rank. Asked per skill line, like Skillwright:
@@ -120,7 +144,7 @@ function YR.StashReason(item, have, mats, recipes)
     local recipe = C.recipeItems[item]
     if class == RECIPE or recipe then
         if not recipes or not recipe then return nil end                    -- a recipe we know nothing of stays
-        local line, skill, spell = recipe[1], recipe[2], recipe[3]
+        local line, skill, spell = YR.CraftRecipe(recipe)
         if Known(spell) then return nil end
         local rank = have[line]
         if not rank or rank < (skill or 0) then return "recipes" end
@@ -132,9 +156,7 @@ function YR.StashReason(item, have, mats, recipes)
     if mode == "off" or not (class == TRADE_GOODS or (users and REAGENT_CLASS[class])) then return nil end
     if class == TRADE_GOODS and IN_USE[subclass] then return nil end
     if mode == "mine" then
-        for _, line in ipairs(users or {}) do
-            if have[line] then return nil end
-        end
+        if users and YR.CraftUsers(users, have) then return nil end
         if KeptBy("SkillwrightReagents", item) then return nil end
     end
     return "mats"
@@ -233,6 +255,12 @@ end
 --- Walk the bags and bank what the settings pick. `loud`: say so when there was nothing to move
 --- (the button), rather than staying quiet (opening the bank).
 function YR.DepositToBank(loud)
+    -- asked for by hand (/headstart bank) with the button and the automation both off, at an open bank:
+    -- the bank is listened for from here until it closes
+    if not bankOpen and not run and part and not part.on and Showing() then
+        asked = true
+        YR.ApplyParts()
+    end
     if run or not bankOpen then return end
     if InCombatLockdown() then
         if loud then YR.Print("not in combat.") end
@@ -272,35 +300,41 @@ local function Button()
     return button
 end
 
-local function Opened()
+-- A bag addon that draws its own bank (Baganator, EllesmereUI Bags) keeps Blizzard's bank
+-- window out of sight, and our button with it. Then the button stands by itself at the top
+-- of the screen while the bank is open. Looked at a moment on: Blizzard shows its window
+-- just after it says the bank opened.
+local function Stand()
+    local b = button
+    if not b or not bankOpen then return end
+    local own = BankFrame and BankFrame.IsVisible and BankFrame:IsVisible()
+    b:SetParent(own and BankFrame or UIParent)
+    b:ClearAllPoints()
+    if own then
+        b:SetPoint("TOPRIGHT", BankFrame, "BOTTOMRIGHT", 0, -2)
+    else
+        b:SetPoint("TOP", UIParent, "TOP", 0, -140)
+        b:SetFrameStrata("HIGH")
+    end
+    b:SetShown(YR.Option("bankButton"))
+end
+local function Auto() YR.DepositToBank(false) end
+
+-- quiet: the bank was open already when we began to listen (a setting turned on at the bank): the
+-- button, but nothing is sent off by itself.
+local function Opened(quiet)
     if bankOpen then return end
     bankOpen = true
     local b = Button()
     if b then
         b:SetShown(YR.Option("bankButton"))
-        -- A bag addon that draws its own bank (Baganator, EllesmereUI Bags) keeps Blizzard's bank
-        -- window out of sight, and our button with it. Then the button stands by itself at the top
-        -- of the screen while the bank is open. Looked at a moment on: Blizzard shows its window
-        -- just after it says the bank opened.
-        C_Timer.After(0.2, function()
-            if not bankOpen then return end
-            local own = BankFrame and BankFrame.IsVisible and BankFrame:IsVisible()
-            b:SetParent(own and BankFrame or UIParent)
-            b:ClearAllPoints()
-            if own then
-                b:SetPoint("TOPRIGHT", BankFrame, "BOTTOMRIGHT", 0, -2)
-            else
-                b:SetPoint("TOP", UIParent, "TOP", 0, -140)
-                b:SetFrameStrata("HIGH")
-            end
-            b:SetShown(YR.Option("bankButton"))
-        end)
+        C_Timer.After(0.2, Stand)
     end
     -- Shift as the bank opens: keep everything this time. Read now, not later: by the first tick
     -- the key may be up.
-    if YR.Option("bankAuto") and not IsShiftKeyDown() then
+    if not quiet and YR.Option("bankAuto") and not IsShiftKeyDown() then
         -- A moment for the bank's own slots to arrive, so a full bank is seen as full.
-        C_Timer.After(0.3, function() YR.DepositToBank(false) end)
+        C_Timer.After(0.3, Auto)
     end
 end
 
@@ -308,31 +342,48 @@ local function Closed()
     bankOpen = false
     if button and button:GetParent() == UIParent then button:Hide() end      -- standing by itself: gone with the bank
     if run then Finish("the bank closed before the rest went") end
+    if asked then
+        asked = nil
+        YR.SettingChanged()
+    end
 end
 
 --- The bank window button on or off (Settings, QoL).
 function YR.SetBankButton(on)
     YippRouteDB.bankButton = on and true or false
     if button then button:SetShown(on and bankOpen) end
+    YR.SettingChanged()
+end
+
+-- The bank is listened for only while its button or the automation is on (or a deposit was asked
+-- for by hand, until that bank closes).
+local function Wanted() return asked or YR.Option("bankButton") or YR.Option("bankAuto") or false end
+
+local BANKER = Enum and Enum.PlayerInteractionType and Enum.PlayerInteractionType.Banker
+local function OnEvent(_, event, kind)
+    if event == "BANKFRAME_OPENED" then Opened()
+    elseif event == "BANKFRAME_CLOSED" then Closed()
+    elseif BANKER and kind == BANKER then
+        if event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" then Opened() else Closed() end
+    end
 end
 
 function YR.StartBank()
-    local f = CreateFrame("Frame")
+    if part then return end
     -- The bank's own events and the newer interaction events: both, because which ones this
     -- client sends is not something to bet on, and Opened/Closed ignore a second telling.
-    -- RegisterEvent errors on an event the client doesn't know, hence the pcall.
-    for _, e in ipairs({ "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "PLAYER_INTERACTION_MANAGER_FRAME_SHOW",
-        "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" }) do
-        pcall(f.RegisterEvent, f, e)
-    end
-    local BANKER = Enum and Enum.PlayerInteractionType and Enum.PlayerInteractionType.Banker
-    f:SetScript("OnEvent", function(_, event, kind)
-        if event == "BANKFRAME_OPENED" then Opened()
-        elseif event == "BANKFRAME_CLOSED" then Closed()
-        elseif BANKER and kind == BANKER then
-            if event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" then Opened() else Closed() end
-        end
-    end)
+    -- (An event the client doesn't know is passed over: YR.Part registers through pcall.)
+    part = YR.Part(Wanted, { "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "PLAYER_INTERACTION_MANAGER_FRAME_SHOW",
+        "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" }, OnEvent, {
+        -- turned on at an open bank: the button is there at once
+        start = function() if Showing() then Opened(true) end end,
+        -- the button follows its own switch while the bank stays listened for
+        again = function() if button and bankOpen then button:SetShown(YR.Option("bankButton")) end end,
+        stop = function()
+            Closed()
+            if button then button:Hide() end
+        end,
+    })
 end
 
 function YR.BankIsOpen() return bankOpen end

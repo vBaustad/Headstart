@@ -21,6 +21,13 @@ local ADDON, YR = ...
 local HOUR, DAY, WEEK = 3600, 86400, 7 * 86400
 local cur                  -- the run you're in now
 local xpLast, xpMaxLast, levelLast
+local frame                -- the frame the tracker listens on, once it has been on (YR.Part)
+
+-- XP only matters while you're inside: listened for from going in until coming out.
+local function WatchXP(on)
+    if not frame then return end
+    if on then frame:RegisterEvent("PLAYER_XP_UPDATE") else frame:UnregisterEvent("PLAYER_XP_UPDATE") end
+end
 
 local function Now() return GetServerTime and GetServerTime() or time() end
 
@@ -140,6 +147,7 @@ local function Leave()
     cur.money = (cur.money or 0) + (GetMoney() - (cur.money0 or GetMoney()))
     cur.money0 = nil
     cur = nil
+    WatchXP(false)
 end
 
 local function Prune()
@@ -194,6 +202,7 @@ local function Check()
             Announce()
         end
         xpLast, xpMaxLast, levelLast = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
+        WatchXP(true)
     else
         Leave()
     end
@@ -228,8 +237,8 @@ end
 local RESET = Pattern(INSTANCE_RESET_SUCCESS)
 local TOO_MANY = TRANSFER_ABORT_TOO_MANY_INSTANCES
 
--- Every system message and every red error line comes through here (errors pour in during a fight):
--- nothing is done with tracking off, and an error line is only ever compared with the one sentence.
+-- Every system message comes through here, and of the red error lines only the one sentence (the
+-- listener lets no other through): nothing is done with tracking off.
 local function OnMessage(msg, errorLine)
     if type(msg) ~= "string" or (issecretvalue and issecretvalue(msg)) then return end
     if not YR.Option("instanceTrack") then return end
@@ -327,7 +336,7 @@ local function State(hour, day, perHour, perDay)
     return (hour >= perHour or day >= perDay) and "full" or hour == perHour - 1 and "near" or "ok"
 end
 
-local function HudPaint()
+local function Paint()
     if not hud then return end
     local mode = YR.InstanceHudMode()
     if mode == "off" or not YR.Option("instanceTrack") then hud:SetShown(false) return end
@@ -370,9 +379,49 @@ local function HudPaint()
         for i, row in ipairs(hud.rows) do row:SetShown(mode == "log" and i <= n) end
         if mode == "icon" then hud:SetSize(34, 34) else hud:SetSize(270, 20 + 14 * n) end
     end
+    -- what on it moves with the clock: the wait for a slot, and the time in the run you're in
+    hud.live = wait ~= nil or cur ~= nil
     if GameTooltip:IsOwned(hud) then HudTooltip(hud) end
 end
-YR.InstanceHudPaint = HudPaint
+
+-- The time in the run and the wait for a slot tick on without events, and so does the tooltip while
+-- it's up ("12:40 ago"): a clock runs, once a second, only while one of those is on screen. With none
+-- of them (the count alone, or the log of runs you've left) a second changes nothing: it's drawn
+-- again once, when a counted run turns an hour or a day old.
+local ticker, hovering, dueAt = nil, false, nil
+local function Tick() YR.InstanceHudPaint() end
+local function Due()
+    if not dueAt or Now() < dueAt then return end          -- an older appointment: there's a later one
+    dueAt = nil
+    if hud and hud:IsShown() then YR.InstanceHudPaint() end
+end
+local function Pace()
+    local shown = hud ~= nil and hud:IsShown()
+    if shown and (rawget(hud, "live") == true or hovering) then
+        if not ticker then ticker = C_Timer.NewTicker(1, Tick) end
+        return
+    end
+    if ticker then
+        ticker:Cancel()
+        ticker = nil
+    end
+    local till = kept.till
+    if shown and till and till < math.huge and dueAt ~= till then
+        dueAt = till
+        C_Timer.After(math.max(1, till - Now() + 1), Due)
+    end
+end
+
+local function HudEnter(self)
+    hovering = true
+    HudTooltip(self)
+    Pace()
+end
+local function HudLeave()
+    hovering = false
+    GameTooltip:Hide()
+    Pace()
+end
 
 local function HudBuild()
     if hud then return end
@@ -388,8 +437,8 @@ local function HudBuild()
         YippRouteDB.instanceHudPos = { math.floor(self:GetLeft() + 0.5), math.floor(self:GetTop() - UIParent:GetTop() + 0.5) }
     end)
     hud:SetScript("OnClick", function() if YR.ToggleWindow then YR:ToggleWindow("instances") end end)
-    hud:SetScript("OnEnter", HudTooltip)
-    hud:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    hud:SetScript("OnEnter", HudEnter)
+    hud:SetScript("OnLeave", HudLeave)
     hud.icon = hud:CreateTexture(nil, "ARTWORK")
     hud.icon:SetAllPoints()
     hud.icon:SetTexture(ICON)
@@ -419,9 +468,22 @@ local function HudBuild()
     else hud:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 20, -220) end
 end
 
+-- Is there anything for it to show? The frame isn't made before there is.
+local function HudWanted()
+    if YR.InstanceHudMode() == "off" or not YR.Option("instanceTrack") then return false end
+    if YippRouteDB.instanceHudAlways == true or cur ~= nil then return true end
+    return (YR.InstanceCounts()) > 0
+end
+
+local function HudPaint()
+    if not hud and HudWanted() then HudBuild() end
+    Paint()
+    Pace()
+end
+YR.InstanceHudPaint = HudPaint
+
 --- After a setting changed.
 function YR.InstanceHudApply()
-    HudBuild()
     HudPaint()
 end
 
@@ -433,21 +495,50 @@ function YR.InstanceHudResetPosition()
     end
 end
 
-function YR.StartInstances()
-    local f = CreateFrame("Frame")
-    for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "PLAYER_XP_UPDATE", "CHAT_MSG_SYSTEM",
-        "UI_ERROR_MESSAGE" }) do
-        pcall(f.RegisterEvent, f, e)
+-- Going somewhere: looked at half a second on, once (a loading screen and a new zone come together).
+local soon = false
+local function Look()
+    soon = false
+    Check()                                 -- Check paints the icon too
+end
+local function Soon()
+    if soon then return end
+    soon = true
+    C_Timer.After(0.5, Look)
+end
+
+-- Red error lines pour in during a fight ("Not enough rage", "Out of range"...), and one of them is
+-- the game refusing an instance. No narrower event says that here, so they are listened for - but
+-- each costs one comparison with that sentence and nothing else, and where the client hasn't got
+-- the sentence they aren't listened for at all.
+local function OnEvent(_, event, a, b)
+    if event == "UI_ERROR_MESSAGE" then
+        if not (issecretvalue and issecretvalue(b)) and b == TOO_MANY then OnMessage(b, true) end
+    elseif event == "PLAYER_XP_UPDATE" then XPTick()
+    elseif event == "CHAT_MSG_SYSTEM" then OnMessage(a)
+    else Soon()
     end
-    f:SetScript("OnEvent", function(_, event, a, b)
-        if event == "PLAYER_XP_UPDATE" then XPTick()
-        elseif event == "CHAT_MSG_SYSTEM" then OnMessage(a)
-        elseif event == "UI_ERROR_MESSAGE" then OnMessage(b, true)
-        else
-            HudBuild()
-            C_Timer.After(0.5, Check)           -- Check paints the icon too
-        end
-    end)
-    -- the time in the run and the wait for a slot tick on without events
-    C_Timer.NewTicker(1, function() if hud and (hud:IsShown() or cur) then HudPaint() end end)
+end
+
+local EVENTS = { "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "CHAT_MSG_SYSTEM" }
+if type(TOO_MANY) == "string" then EVENTS[#EVENTS + 1] = "UI_ERROR_MESSAGE" end
+
+local function Wanted() return YR.Option("instanceTrack") end
+-- Coming on: where you are is looked at (turned on while inside one, or the login - entering the
+-- world looks again). Going off inside one ends the run there, as walking out would.
+local function Begin(p)
+    frame = p.frame
+    Soon()
+    HudPaint()
+end
+local function End()
+    Leave()
+    HudPaint()
+end
+
+-- Free while off (YR.Part, Core.lua): nothing is listened for and no icon is made with the tracker off.
+local part
+function YR.StartInstances()
+    if part then return end
+    part = YR.Part(Wanted, EVENTS, OnEvent, { start = Begin, stop = End, again = HudPaint })
 end

@@ -1,0 +1,14 @@
+## Interface: 16001
+## Title: Headstart: character setup
+## Notes: Headstart's character setup: the bar planner, and a main's bars, macros and interface put on a new character. Headstart loads it while Character setup is on (Headstart, Character setup); off, nothing of it is in memory.
+## Author: vBaustad
+## Group: Headstart
+## X-License: CC BY-NC-SA 4.0
+## LoadOnDemand: 1
+## RequiredDeps: Headstart
+
+SpellLevels.lua
+Setup.lua
+SetupUI.lua
+PlannerSpells.lua
+Planner.lua

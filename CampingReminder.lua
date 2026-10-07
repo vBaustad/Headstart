@@ -89,39 +89,52 @@ local function Check(arriving)
 end
 YR.CampingCheck = Check   -- for tests
 
--- Bags, the quest log and skills fire all the time: listened to only while this character is on one
--- of the two quests with the reminder on (looked at again on taking or losing a quest, a loading screen
--- and a new subzone), so every other character pays nothing for it.
-local NOISY = { "BAG_UPDATE_DELAYED", "QUEST_LOG_UPDATE", "SKILL_LINES_CHANGED" }
+-- Free while off (YR.Part, Core.lua): with the routes or the reminder off nothing is listened for.
+-- With them on, only taking or losing a quest and a loading screen - and, where they could have
+-- changed without either, a new zone. Bags, the quest log, skills and every new subzone fire all the
+-- time: those are listened to only while this character is on one of the two quests, so every other
+-- character pays nothing for it.
+local NOISY = { "BAG_UPDATE_DELAYED", "QUEST_LOG_UPDATE", "SKILL_LINES_CHANGED", "ZONE_CHANGED" }
 local pending, armed = false, false
-local f = CreateFrame("Frame")
+local part
+local function Wanted()
+    return (not YR.RoutesOn or YR.RoutesOn()) and YR.Option("campReminder") and true or false
+end
 local function Arm()
-    local want = (not YR.RoutesOn or YR.RoutesOn()) and YR.Option("campReminder")
-        and (OnQuest(BS_QUEST) or OnQuest(MINING_QUEST)) or false
+    local f = part and part.on and part.frame
+    if not f then return end
+    local want = Wanted() and (OnQuest(BS_QUEST) or OnQuest(MINING_QUEST)) or false
     if want == armed then return end
     armed = want
     for _, e in ipairs(NOISY) do
         if want then f:RegisterEvent(e) else f:UnregisterEvent(e) end
     end
 end
-f:RegisterEvent("ZONE_CHANGED")
-f:RegisterEvent("PLAYER_ENTERING_WORLD")
-f:RegisterEvent("QUEST_ACCEPTED")
-f:RegisterEvent("QUEST_REMOVED")
-f:SetScript("OnEvent", function(_, event)
-    if event == "QUEST_ACCEPTED" or event == "QUEST_REMOVED" or event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED" then
-        Arm()
-        -- the quest log isn't there yet in the first moments after logging in
-        if event == "PLAYER_ENTERING_WORLD" then C_Timer.After(5, Arm) end
-    end
+local function Settled()
+    pending = false
+    Check(false)
+end
+local function OnEvent(_, event)
     if event == "ZONE_CHANGED" then
+        Arm()
         local sub = GetSubZoneText and GetSubZoneText()
         if sub == "Kharanos" or sub == "Thelsamar" then Check(true) end
         return
+    end
+    if event == "QUEST_ACCEPTED" or event == "QUEST_REMOVED" or event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+        Arm()
+        -- the quest log isn't there yet in the first moments after logging in
+        if event == "PLAYER_ENTERING_WORLD" then C_Timer.After(5, Arm) end
     end
     if not armed then return end
     -- bags and the quest log fire in bursts: look once they settle
     if pending then return end
     pending = true
-    C_Timer.After(1, function() pending = false Check(false) end)
-end)
+    C_Timer.After(1, Settled)
+end
+part = YR.Part(Wanted, { "PLAYER_ENTERING_WORLD", "QUEST_ACCEPTED", "QUEST_REMOVED", "ZONE_CHANGED_NEW_AREA" }, OnEvent, {
+    start = Arm,
+    -- going off takes every event away (the noisy ones too): nothing is armed any more
+    stop = function() armed = false end,
+    again = Arm,
+})

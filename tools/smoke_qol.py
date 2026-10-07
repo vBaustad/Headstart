@@ -24,6 +24,8 @@ function Obj.Hide(self) rawset(self, "_shown", false) local h = rawget(self, "_O
 function Obj.IsShown(self) return rawget(self, "_shown") ~= false end
 function Obj.SetScript(self, what, fn) rawset(self, "_" .. what, fn) end
 function Obj.RegisterEvent(self, e) rawset(self, "_ev", rawget(self, "_ev") or {}) self._ev[e] = true end
+function Obj.UnregisterEvent(self, e) local ev = rawget(self, "_ev") if ev then ev[e] = nil end end
+function Obj.UnregisterAllEvents(self) rawset(self, "_ev", nil) end
 function Obj.SetText(self, t) rawset(self, "_text", t) end
 function CreateFrame(_, name) local f = setmetatable({}, Obj) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 UIParent = CreateFrame()
@@ -109,7 +111,7 @@ function GetSpellBonusHealing() return STATS.heal end
 function GetSpellCritChance() return STATS.scrit end
 function UnitHealthMax() return STATS.hp end
 function UnitArmor() return STATS.armor, STATS.armor end
-function UnitStat(_, i) return STATS.spi, STATS.spi end
+function UnitStat(_, i) if i == 5 then return STATS.spi, STATS.spi end return 10 + i, 10 + i end
 TABS = nil          -- { points tab 1, tab 2, tab 3 }
 C_ClassTalents = { GetActiveConfigID = function() return 1 end }
 TIPS = {}
@@ -215,6 +217,8 @@ def run():
 
     # ---- Restock -------------------------------------------------------------------------------
     YR.StartRestock()
+    YR.partsReady = True             # the login: what is wanted comes on
+    YR.ApplyParts()
     mage = YR.RestockData.MAGE
     rune = next(mage[i] for i in range(1, len(mage) + 1) if mage[i][1] == 17031)
     teleport = rune[3][1][1]
@@ -339,6 +343,8 @@ def run():
     lua.execute("SERVICES = { { 'Holy Strike', 'Rank 1', 100 }, { 'Divine Protection', 'Rank 1', 150 } }")
     YR.TrainerService = lua.eval("function(i) return SERVICES[i][1], SERVICES[i][2], 'available' end")   # Trainer.lua's
     YR.StartReminders()
+    YR.partsReady = True             # the login: what is wanted comes on
+    YR.ApplyParts()
     g.Fire("TRAINER_SHOW")
     line = YR.TrainerLine(6)
     check(line and "Holy Strike 1" in line and "about" in line, f"the trainer line names spells and a price: {line}")
@@ -356,18 +362,46 @@ def run():
     lua.execute("RunAfter()")
     check(g.SHOTS == 1 and not any("talent" in p for p in prints()), "settings off: no screenshot, no talent line")
 
+    # a ding as chat used to tell it: what the event says, and for what it doesn't say (spirit) the
+    # difference from what you had
+    lua.execute("""SAID = {} DEFAULT_CHAT_FRAME = { AddMessage = function(_, text, r, g, b) SAID[#SAID + 1] = text .. (r == 1 and g == 1 and b == 0 and "" or " NOT YELLOW") end }
+        MANA = 100 function UnitPowerMax() return MANA end""")
+    YR.ApplyParts()
+    lua.execute("STATS.hp, STATS.spi, MANA = 519, 41, 115")
+    g.Fire("PLAYER_LEVEL_UP", 14, 19, 15, 0, 0, 1, 0, 2, 0)
+    lua.execute("RunAfter()")
+    said = list(g.SAID.values())
+    check(said == ["You have gained 19 hit points and 15 mana.", "Your Strength increases by 1.", "Your Stamina increases by 2.",
+                   "Your Spirit increases by 1."], f"a ding: health and mana, then each stat that went up, in yellow ({said})")
+    lua.execute("SAID = {} STATS.hp = 540")
+    g.Fire("PLAYER_LEVEL_UP", 15, 0, 0, 0, 0, 0, 0, 0, 0)
+    lua.execute("RunAfter()")
+    check(list(g.SAID.values()) == ["You have gained 21 hit points."], f"the event saying nothing: what you gained is worked out ({list(g.SAID.values())})")
+    g.YippRouteDB.levelUpStats = False
+    YR.ApplyParts()
+    lua.execute("SAID = {} STATS.hp = 600")
+    g.Fire("PLAYER_LEVEL_UP", 16, 60, 0, 0, 0, 0, 0, 0, 0)
+    lua.execute("RunAfter()")
+    check(len(g.SAID) == 0, "turned off: not a line")
+
     # durability: once under the line, again only after a repair; "repair here" coming into town
     lua.execute("PRINTS = {} DUR = { [1] = { 50, 100 }, [5] = { 20, 100 } }")
+    lua.execute("READS = 0 local get = GetInventoryItemDurability"
+                " GetInventoryItemDurability = function(slot) READS = READS + 1 return get(slot) end")
     g.Fire("UPDATE_INVENTORY_DURABILITY")
     g.Fire("UPDATE_INVENTORY_DURABILITY")
+    check(g.READS == 0, "wear is looked at a moment after it is told, not at each piece's event")
+    lua.execute("RunAfter()")
+    check(g.READS == 18, f"two pieces' events at once: one look at the eighteen slots ({g.READS})")
     check(sum("down to 20%" in p for p in prints()) == 1, f"warned once at 20%: {prints()}")
     lua.execute("RESTING = true")
     g.Fire("PLAYER_UPDATE_RESTING")
     check(any("repair while you're here" in p for p in prints()), "coming into town under 50%: repair here")
     lua.execute("RESTING = false PRINTS = {} DUR = { [5] = { 100, 100 } }")
     g.Fire("UPDATE_INVENTORY_DURABILITY")
-    lua.execute("DUR = { [5] = { 10, 100 } }")
+    lua.execute("RunAfter() DUR = { [5] = { 10, 100 } }")
     g.Fire("UPDATE_INVENTORY_DURABILITY")
+    lua.execute("RunAfter()")
     check(sum("down to 10%" in p for p in prints()) == 1, "after a repair it warns again")
 
     # ---- Upgrades ----------------------------------------------------------------------------
@@ -384,6 +418,8 @@ def run():
         BAGS = { [1] = { "|Hitem:101|h[Green Vest]|h" }, [2] = { "|Hitem:102|h" }, [3] = { "|Hitem:103|h", true },
                  [4] = { "|Hitem:104|h" } }''')
     YR.StartUpgrades()
+    YR.partsReady = True             # the login: what is wanted comes on
+    YR.ApplyParts()
     YR.ScanUpgrades()
     told = prints()
     check(any("Green Vest" in p for p in told), f"the better green vest is mentioned: {told}")
@@ -501,6 +537,8 @@ def run():
     g.COUNT[cons[2863][7][1]] = 3        # Coarse Stone
     g.COUNT[cons[2862][7][1]] = 2        # Rough Stone
     YR.StartCraftRemind()
+    YR.partsReady = True             # the login: what is wanted comes on
+    YR.ApplyParts()
     YR.CheckCrafts()
     said = prints()
     check(len(said) == 1 and "make 3 Item2863" in said[0] and "no sharpening stones" in said[0],
@@ -546,6 +584,9 @@ def run():
 
     # ---- Quick group --------------------------------------------------------------------------
     YR.StartQuickGroup()
+    # the bar, the whispered word and the invites come on at the login (YR.Part): nothing listens before
+    YR.partsReady = True
+    YR.ApplyParts()
     gbar = g.HeadstartGroupBar
     check(gbar is not None and gbar.IsShown(gbar), "the Invite / Leave bar shows")
     def invited():
@@ -701,6 +742,8 @@ def run():
     end''')
     g.GameTooltip = tip("|Hitem:201|h")
     YR.StartSim()
+    YR.partsReady = True             # the login: what is wanted comes on
+    YR.ApplyParts()
     for i in range(1, len(g.POSTCALLS) + 1):
         g.POSTCALLS[i](g.GameTooltip)
     tl = [g.GameTooltip.lines[i] for i in range(1, len(g.GameTooltip.lines) + 1)]
@@ -710,11 +753,13 @@ def run():
         g.POSTCALLS[i](g.GameTooltip)
     check(len(g.GameTooltip.lines) == 0, "not on what you wear already")
     g.YippRouteDB.simTooltip = False
+    YR.ApplyParts()                  # as the settings window does after a change
     g.GameTooltip = tip("|Hitem:201|h")
     for i in range(1, len(g.POSTCALLS) + 1):
         g.POSTCALLS[i](g.GameTooltip)
     check(len(g.GameTooltip.lines) == 0, "tooltip line off: nothing")
     g.YippRouteDB.simTooltip = None
+    YR.ApplyParts()
     line = YR.SimLine(lua.eval('{ pct = 0, tough = 4, role = "melee", word = "DPS" }'))
     check(line == "+4.0% toughness", f"armor only: no '+0.0% DPS' in front ({line})")
     line = YR.SimLine(lua.eval('{ pct = 0, tough = 0, role = "melee", word = "DPS" }'))

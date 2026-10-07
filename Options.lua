@@ -4,19 +4,26 @@ local _, YR = ...
 
 function YR:BuildOptions()
     if not (Settings and Settings.RegisterCanvasLayoutCategory) then return end
-    local S = YR.Style
+    -- The game's list of addons needs a panel to name: a bare one. What's on it is made the first time
+    -- it is shown - most sessions never open it.
     local panel = CreateFrame("Frame")
-    local title = S.Text(panel, 20)
-    title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("Headstart")
-    local note = S.Text(panel, 13, S.C.muted)
-    note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
-    note:SetText("Quality of life, routes, this run, sharing and settings are in Headstart's own window.")
-    -- Settings stays open (closing it from addon code is forbidden); our window sits above it
-    local open = S.Button(panel, "Open Headstart", function()
-        YR:ToggleWindow("settings")
-    end, "primary")
-    open:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -14)
+    local built
+    panel:SetScript("OnShow", function()
+        if built then return end
+        built = true
+        local S = YR.Style
+        local title = S.Text(panel, 20)
+        title:SetPoint("TOPLEFT", 16, -16)
+        title:SetText("Headstart")
+        local note = S.Text(panel, 13, S.C.muted)
+        note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
+        note:SetText("Quality of life, routes, this run, sharing and settings are in Headstart's own window.")
+        -- Settings stays open (closing it from addon code is forbidden); our window sits above it
+        local open = S.Button(panel, "Open Headstart", function()
+            YR:ToggleWindow("settings")
+        end, "primary")
+        open:SetPoint("TOPLEFT", note, "BOTTOMLEFT", 0, -14)
+    end)
     local category = Settings.RegisterCanvasLayoutCategory(panel, "Headstart")
     Settings.RegisterAddOnCategory(category)
 end
@@ -41,8 +48,7 @@ local function FollowCursor()
     Place()
 end
 
-function YR:BuildMinimapButton()
-    if button or not Minimap then return end
+local function Build()
     button = CreateFrame("Button", "HeadstartMinimapButton", Minimap)
     button:SetSize(31, 31)
     button:SetFrameStrata("MEDIUM")
@@ -85,10 +91,17 @@ function YR:BuildMinimapButton()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
     Place()
-    YR:ShowMinimapButton(YR.Option("minimapButton"))
+end
+
+--- The button, at the login: made only when it is to be shown (turned off, there is no button at all
+--- until it is turned on again).
+function YR:BuildMinimapButton()
+    if button or not Minimap or not YR.Option("minimapButton") then return end
+    YR:ShowMinimapButton(true)
 end
 
 function YR:ShowMinimapButton(on)
     YippRouteDB.minimapButton = on
+    if on and not button and Minimap then Build() end
     if button then button:SetShown(on) end
 end

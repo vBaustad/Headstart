@@ -166,29 +166,38 @@ function YR.RefreshGroupBar()
     bar:Show()
 end
 
-function YR.SetGroupBar(on) YippRouteDB.groupBar = on and true or false YR.RefreshGroupBar() end
-function YR.SetGroupBarLocked(on) YippRouteDB.groupBarLocked = on and true or false YR.RefreshGroupBar() end
+-- The bar's settings: every part is looked at, so the bar comes on with its events (or goes with them)
+-- at once, and one that stays on is drawn again.
+function YR.SetGroupBar(on) YippRouteDB.groupBar = on and true or false YR.ApplyParts() end
+function YR.SetGroupBarLocked(on) YippRouteDB.groupBarLocked = on and true or false YR.ApplyParts() end
 
+-- Free while off (YR.Part, Core.lua). Three parts, each listening only while it has something to do:
+-- your target and the group changing only repaint the bar; whispers are read only while a whispered
+-- word invites; an invite is looked at only while invites are accepted for you. The key bindings and
+-- the slash commands need none of them.
+local function BarOn() return YR.Option("groupBar") end
+local function WhisperOn() return YR.WhisperInvite() ~= "off" end
+local function AcceptOn() return YR.AcceptInvites() ~= "off" end
+
+local function OnWhisperEvent(_, _, a, b, ...)
+    -- During chat lockdown whispers arrive as secret values, which can't be read: skip them.
+    if issecretvalue and (issecretvalue(a) or issecretvalue(b)) then return end
+    local guid = select(10, ...)          -- arg12: the sender's GUID
+    pcall(OnWhisper, a, b, guid)
+end
+local function OnInviteEvent(_, _, a, _, ...)
+    local guid = select(5, ...)           -- arg7: inviterGUID
+    OnInvite(a, guid)
+end
+
+local started
 function YR.StartQuickGroup()
-    local f = CreateFrame("Frame")
-    for _, e in ipairs({ "PLAYER_TARGET_CHANGED", "GROUP_ROSTER_UPDATE", "PARTY_LEADER_CHANGED", "CHAT_MSG_WHISPER",
-        "PARTY_INVITE_REQUEST" }) do
-        pcall(f.RegisterEvent, f, e)
-    end
-    f:SetScript("OnEvent", function(_, event, a, b, ...)
-        if event == "CHAT_MSG_WHISPER" then
-            -- During chat lockdown whispers arrive as secret values, which can't be read: skip them.
-            if issecretvalue and (issecretvalue(a) or issecretvalue(b)) then return end
-            local guid = select(10, ...)          -- arg12: the sender's GUID
-            pcall(OnWhisper, a, b, guid)
-        elseif event == "PARTY_INVITE_REQUEST" then
-            local guid = select(5, ...)           -- arg7: inviterGUID
-            OnInvite(a, guid)
-        else
-            Paint()
-        end
-    end)
-    YR.RefreshGroupBar()
+    if started then return end
+    started = true
+    YR.Part(BarOn, { "PLAYER_TARGET_CHANGED", "GROUP_ROSTER_UPDATE", "PARTY_LEADER_CHANGED" }, Paint,
+        { start = YR.RefreshGroupBar, stop = YR.RefreshGroupBar, again = YR.RefreshGroupBar })
+    YR.Part(WhisperOn, { "CHAT_MSG_WHISPER" }, OnWhisperEvent)
+    YR.Part(AcceptOn, { "PARTY_INVITE_REQUEST" }, OnInviteEvent)
 end
 
 -- Key bindings (Bindings.xml)

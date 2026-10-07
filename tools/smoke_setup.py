@@ -141,7 +141,8 @@ function RXP.GetGuideTable(group, name) return group == "Headstart Launch (A)" a
 function RXP:LoadGuideTable(group, name) self.loaded = group .. "|" .. name end
 ''')
 YS = lua.table()
-for f in ("Style.lua", "Data/SpellLevels.lua", "Setup.lua", "SetupUI.lua"):
+lua.globals().HeadstartNS = YS            # the setup addon takes Headstart's table from this
+for f in ("Style.lua", "Headstart_Setup/SpellLevels.lua", "Headstart_Setup/Setup.lua", "Headstart_Setup/SetupUI.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
         open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("Headstart", YS)
@@ -604,6 +605,19 @@ lua.execute("Fresh(); BAR[1] = { kind = 'mount', id = 77 }")
 plan, now = YS.PlanStart()
 ok = plan[1] is not None and plan[1].kind == "other" and now[1] is not None and now[1].kind == "other"
 print(("ok  " if ok else "FAIL"), "a mount on a slot the saved layout has a spell for: the planner keeps the mount there")
+bad += not ok
+# the interface alone: no button and no macro is touched, and its undo undoes only that
+lua.execute("""Fresh(); BAR[50] = { kind = 'spell', id = 635 } MACROS[121] = { 'Mine', 1, '/dance' }
+    YippSetupCharDB.backup, YippSetupCharDB.uiBackup = nil, nil""")
+bars_before = dict((k, v.id) for k, v in g.BAR.items())
+YS.ApplyInterface(YS)
+ok = dict((k, v.id) for k, v in g.BAR.items()) == bars_before and g.MACROS[121] is not None and g.YippSetupCharDB.uiBackup is not None
+print(("ok  " if ok else "FAIL"), "Apply interface: every button and macro is as it was, and a copy to undo is kept")
+bad += not ok
+YS.CopyInterface(YS)            # saves the interface, and says so, without reading a bar
+YS.Undo(YS)
+ok = dict((k, v.id) for k, v in g.BAR.items()) == bars_before and g.YippSetupCharDB.uiBackup is None
+print(("ok  " if ok else "FAIL"), "its undo leaves the bars alone too")
 bad += not ok
 g.SlashCmdList.YIPPSETUP("debug")
 print("ok  ", "/ysetup debug prints without an error")

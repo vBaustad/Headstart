@@ -177,29 +177,120 @@ local function CheckDurability(cameToTown)
 end
 
 -- ---------------------------------------------------------------------------
-function YR.StartReminders()
-    local f = CreateFrame("Frame")
-    for _, e in ipairs({ "PLAYER_LEVEL_UP", "PLAYER_LOGIN", "TRAINER_SHOW", "UPDATE_INVENTORY_DURABILITY",
-        "PLAYER_UPDATE_RESTING" }) do
-        pcall(f.RegisterEvent, f, e)
+-- Each reminder listens only while it is on: the ding for the screenshot and the two lines, your
+-- gear's wear and coming into a town for the durability lines, the trainer's window for the prices.
+local function Leveling()
+    return YR.Option("levelShot") or YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("levelUpStats")
+end
+
+local DingLines              -- (the lines a ding used to write in chat: further down)
+local dinged
+local function Shot() Screenshot() end
+local function Ding() Remind(dinged) end
+local function OnLevel(_, _, level, ...)
+    if DingLines and YR.Option("levelUpStats") then DingLines(...) end
+    -- The new spells and talent point are in place a moment after the event, and the ding
+    -- animation is worth waiting for in the screenshot.
+    dinged = level
+    if YR.Option("levelShot") then C_Timer.After(1.5, Shot) end
+    C_Timer.After(2, Ding)
+end
+
+-- ---------------------------------------------------------------------------
+-- A ding as chat used to tell it: "You have gained 19 hit points. Your Strength increases by 1." Forever
+-- only says "Congratulations, you have reached Level 2!".
+--   The ding's event carries what you gained (health, power, strength, agility, stamina, intellect).
+--   Spirit isn't in it, and should a number come as nothing, what you had is remembered from the
+--   login and from the ding before, and the difference said instead. The lines are written a moment
+--   after the ding, in the yellow of the game's own, in the game's own words where it still has them.
+--   Account option levelUpStats (on unless turned off): lines in chat, nothing else.
+-- ---------------------------------------------------------------------------
+local STAT_NAMES = { "Strength", "Agility", "Stamina", "Intellect", "Spirit" }
+local had = {}                  -- what you had: [1..5] the five stats, hp, mp
+local gain = {}                 -- what the ding's event said: [1..4], hp, mp
+
+local function Readable(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) and v or nil end
+
+local function Have(into)
+    for i = 1, 5 do
+        local ok, base = pcall(UnitStat, "player", i)
+        into[i] = ok and Readable(base) or nil
     end
-    local resting = IsResting and IsResting()
-    f:SetScript("OnEvent", function(_, event, level)
-        if event == "PLAYER_LEVEL_UP" then
-            -- The new spells and talent point are in place a moment after the event, and the ding
-            -- animation is worth waiting for in the screenshot.
-            if YR.Option("levelShot") then C_Timer.After(1.5, function() Screenshot() end) end
-            C_Timer.After(2, function() Remind(level) end)
-        elseif event == "PLAYER_LOGIN" then
-            C_Timer.After(8, function() Remind() CheckDurability(false) end)
-        elseif event == "TRAINER_SHOW" then
-            ReadTrainer()
-        elseif event == "UPDATE_INVENTORY_DURABILITY" then
-            CheckDurability(false)
-        elseif event == "PLAYER_UPDATE_RESTING" then
-            local now = IsResting()
-            if now and not resting then CheckDurability(true) end
-            resting = now
+    local ok, health = pcall(UnitHealthMax, "player")
+    into.hp = ok and Readable(health) or nil
+    local got, mana = pcall(UnitPowerMax, "player", 0)
+    into.mp = got and Readable(mana) or nil
+end
+
+local now = {}
+local function SayDing()
+    Have(now)
+    local chat = DEFAULT_CHAT_FRAME
+    if not (chat and chat.AddMessage) then return end
+    -- what the event said, else the difference from what you had
+    local function Up(key)
+        local said = gain[key]
+        if said and said > 0 then return said end
+        if now[key] and had[key] and now[key] > had[key] then return now[key] - had[key] end
+        return 0
+    end
+    local hp, mp = Up("hp"), Up("mp")
+    if hp > 0 and mp > 0 then
+        chat:AddMessage((_G.LEVEL_UP_HEALTH_MANA or "You have gained %d hit points and %d mana."):format(hp, mp), 1, 1, 0)
+    elseif hp > 0 then
+        chat:AddMessage((_G.LEVEL_UP_HEALTH or "You have gained %d hit points."):format(hp), 1, 1, 0)
+    end
+    for i = 1, 5 do
+        local up = Up(i)
+        if up > 0 then
+            chat:AddMessage((_G.LEVEL_UP_STAT or "Your %s increases by %d."):format(_G["SPELL_STAT" .. i .. "_NAME"] or STAT_NAMES[i], up), 1, 1, 0)
         end
-    end)
+    end
+    for k, v in pairs(now) do had[k] = v end
+end
+
+local function OnDingStats(hp, mp, _, _, str, agi, sta, int)
+    gain.hp, gain.mp, gain[1], gain[2], gain[3], gain[4] = Readable(hp), Readable(mp), Readable(str), Readable(agi), Readable(sta), Readable(int)
+    C_Timer.After(0.4, SayDing)         -- your new numbers are in place a moment after the event
+end
+DingLines = OnDingStats
+YR.LevelUpLines = SayDing               -- for the tests
+
+local resting
+-- wear comes a piece at a time (a death is eight of these at once): one look for the lot
+local wearSoon = false
+local function Wear() wearSoon = false CheckDurability(false) end
+local function OnWear(_, event)
+    if event == "UPDATE_INVENTORY_DURABILITY" then
+        if wearSoon then return end
+        wearSoon = true
+        C_Timer.After(0.5, Wear)
+    else
+        local now = IsResting()
+        if now and not resting then CheckDurability(true) end
+        resting = now
+    end
+end
+
+-- Once, eight seconds after the login - and only with a reminder on. This is asked the first time at
+-- the login and never says yes again, so turning a reminder on later doesn't set it off.
+local asked
+local function AtLogin()
+    if asked then return false end
+    asked = true
+    return Leveling() or YR.Option("durability")
+end
+local function Greet() Remind() CheckDurability(false) end
+
+local declared
+function YR.StartReminders()
+    if declared then return end
+    declared = true
+    -- (what you have is noted as this comes on and whenever a setting changes: the lines need a "before")
+    local function Note() if YR.Option("levelUpStats") then Have(had) end end
+    YR.Part(Leveling, { "PLAYER_LEVEL_UP" }, OnLevel, { start = Note, again = Note })
+    YR.Part(function() return YR.Option("durability") end, { "UPDATE_INVENTORY_DURABILITY", "PLAYER_UPDATE_RESTING" }, OnWear,
+        { start = function() resting = IsResting and IsResting() end })
+    YR.Part(function() return YR.Option("remindTrainer") end, { "TRAINER_SHOW" }, ReadTrainer)
+    YR.Part(AtLogin, nil, nil, { start = function() C_Timer.After(8, Greet) end })
 end

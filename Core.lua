@@ -45,12 +45,13 @@ function YR.SetQoLOn(on)
     local was = YR.QoLOn()
     YippRouteDB.qolOff = (not on) and true or nil
     if (on and true or false) == was then return end
-    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply", "BarHideApply", "SwingApply", "WindowScaleApply" }) do
+    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply", "BarHideApply", "SwingApply", "WindowScaleApply", "RecapApply", "ChatLogApply", "LootFeedApply" }) do
         if YR[apply] then pcall(YR[apply]) end
     end
     for _, key in ipairs({ "bag", "reagentBag", "talents" }) do
         if YR.MoverPlace then pcall(YR.MoverPlace, key) end
     end
+    YR.ApplyParts()
     YR.Print(on and "quality of life on: /reload to bring everything back."
         or "quality of life off: /reload to take everything off the screen.")
 end
@@ -148,6 +149,7 @@ local OTHERS = {
         { "Naowh Forever", function() return Loaded("NaowhForever") end },
     },
     whisperSound = { { "EllesmereUI", function() return Loaded("EllesmereUIChat") end } },
+    lootFeed = { { "Naowh Forever", function() return Loaded("NaowhForever") end } },
 }
 
 --- The other addon that does what this option does, with that feature on (its name), else nil.
@@ -174,7 +176,8 @@ function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 -- screen or changes one of Blizzard's windows. Nobody should find those out by installing Headstart.
 -- What stays on is seen and harmless: tooltips, the flight timer, the camp icon, lines in chat.
 local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true,
-    groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true }
+    groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true,
+    deathRecap = true, chatLog = true, lootFeed = true }
 YR.STARTS_OFF = STARTS_OFF
 
 --- What an option is before you've set it: on, unless it starts off or another addon does the same.
@@ -198,6 +201,75 @@ function YR.Option(key)
     return YR.OptionSet(key)
 end
 
+-- ---------------------------------------------------------------------------
+-- Free while off. A part of Headstart (the camp icon, the swing timer, the loot feed...) listens for
+-- the game's events only while it is wanted: its frame is not made, nothing is registered, no ticker
+-- runs and no hook does work until its setting is on - and all of that is taken away again when it is
+-- turned off. tools/smoke_idle.py counts it: a login with everything off leaves nothing running.
+--   YR.Part(want, events, handler, opt) says what a part needs:
+--     want()    whether it is wanted now (its options; cheap, asked only when a setting changes)
+--     events    { "EVENT", { "UNIT_EVENT", "player" }, ... }
+--     handler   function(frame, event, ...)
+--     opt.start called when it comes on (after its events are registered): build, draw, read
+--     opt.stop  called when it goes off: hide, cancel
+--     opt.tick, opt.every   a function called every so many seconds, only while it is on
+--   YR.ApplyParts() looks at every part: at login, and whenever a setting changed (every control of the
+--   settings window says so through Style's Changed, and the slash commands that change a setting).
+-- ---------------------------------------------------------------------------
+local parts, partsSoon = {}, false
+function YR.Part(want, events, handler, opt)
+    local p = { want = want, events = events or {}, handler = handler, opt = opt or {}, on = false }
+    parts[#parts + 1] = p
+    return p
+end
+
+local function PartOn(p)
+    if not p.frame and (p.handler or #p.events > 0) then
+        p.frame = CreateFrame("Frame")
+        p.frame:SetScript("OnEvent", p.handler)
+    end
+    for _, e in ipairs(p.events) do
+        if type(e) == "table" then
+            pcall(p.frame.RegisterUnitEvent, p.frame, unpack(e))
+        else
+            pcall(p.frame.RegisterEvent, p.frame, e)
+        end
+    end
+    if p.opt.tick and not p.ticker then p.ticker = C_Timer.NewTicker(p.opt.every or 1, p.opt.tick) end
+    if p.opt.start then p.opt.start(p) end
+end
+
+local function PartOff(p)
+    if p.frame then p.frame:UnregisterAllEvents() end
+    if p.ticker then
+        p.ticker:Cancel()
+        p.ticker = nil
+    end
+    if p.opt.stop then p.opt.stop(p) end
+end
+
+function YR.ApplyParts()
+    partsSoon = false
+    if not YR.partsReady then return end            -- before the login: nothing is on yet
+    for _, p in ipairs(parts) do
+        local want = p.want() and true or false
+        if want ~= p.on then
+            p.on = want
+            if want then PartOn(p) else PartOff(p) end
+        elseif want and p.opt.again then
+            p.opt.again(p)                          -- still on, and a setting changed: as it is now
+        end
+    end
+end
+
+--- A setting changed: every part is looked at once this frame is done (a slider being dragged says so
+--- many times).
+function YR.SettingChanged()
+    if partsSoon then return end
+    partsSoon = true
+    C_Timer.After(0, YR.ApplyParts)
+end
+
 -- "Name-Realm". Asked for in loops (once per logged run, per bag item...), so the string is made
 -- once and handed out again while the name and realm are the same.
 local keyName, keyRealm, key
@@ -209,12 +281,79 @@ function YR.CharKey()
     return made
 end
 
+-- The window (the settings and the route editor) is an addon of its own, Headstart_Options: load on
+-- demand, so its two hundred kilobytes of code are read the first time the window is asked for and
+-- not at every login. The list of quest IDs /headstart scan asks about is in it too. An addon of its
+-- own has a table of its own: ours is handed over as HeadstartNS. Until it's loaded these stand in
+-- for the window's functions; loading replaces them (and sets YR.windowLoaded).
+HeadstartNS = YR
+function YR.LoadWindow()
+    if YR.windowLoaded then return true end
+    local ok, why = false, nil
+    if C_AddOns and C_AddOns.LoadAddOn then ok, why = C_AddOns.LoadAddOn("Headstart_Options") end
+    if YR.windowLoaded then return true end
+    YR.Print("the window is in the addon \"Headstart: window\" (the folder Headstart_Options), which "
+        .. ((not ok and why == "DISABLED") and "is turned off: turn it on in the AddOns list and /reload."
+            or "couldn't be loaded" .. (why and (" (" .. tostring(why) .. ")") or "") .. ": install Headstart again, both folders."))
+    return false
+end
+function YR:RefreshWindow() end              -- no window yet: nothing to draw again
+
+-- Character setup (the bar planner, a main's bars, macros and interface on a new character) is an
+-- addon of its own too, Headstart_Setup: loaded at login while Character setup is on, and the moment
+-- it is turned on. Off (a new install starts so) none of it is read, no first-login window comes up
+-- and no button is ever placed for you. Account option setupOn.
+function YR.SetupOn() return YippRouteDB.setupOn == true end
+function YR.SetupLoaded() return type(YR.Setup) == "table" and YR.Setup.Start ~= nil end
+--- The setup addon read in, and started. Returns whether it is there. say: tell in chat why not.
+function YR.LoadSetup(say)
+    if YR.setupStarted then return true end
+    local ok, why = true, nil
+    if not YR.SetupLoaded() then
+        ok = false
+        if C_AddOns and C_AddOns.LoadAddOn then ok, why = C_AddOns.LoadAddOn("Headstart_Setup") end
+    end
+    if not YR.SetupLoaded() then
+        if say then
+            YR.Print("Character setup is in the addon \"Headstart: character setup\" (the folder Headstart_Setup), which "
+                .. ((not ok and why == "DISABLED") and "is turned off: turn it on in the AddOns list and /reload."
+                    or "couldn't be loaded" .. (why and (" (" .. tostring(why) .. ")") or "") .. ": install Headstart again, every folder."))
+        end
+        return false
+    end
+    YR.setupStarted = true
+    -- its spell tables hold all nine classes and only yours is read: the other eight are let go
+    local _, class = UnitClass("player")
+    for _, name in ipairs({ "PlannerSpells", "PlannerGeneral" }) do
+        local t = YR[name]
+        if class and type(t) == "table" and t[class] ~= nil then
+            for other in pairs(t) do if other ~= class then t[other] = nil end end
+        end
+    end
+    YR.Setup.Start(YR.freshChar)
+    return true
+end
+function YR.SetSetupOn(on)
+    local was = YR.SetupOn()
+    YippRouteDB.setupOn = on and true or false
+    if on then
+        YR.LoadSetup(true)
+    elseif was then
+        YR.Print("Character setup off: /reload to take it out of memory. Nothing more is placed on your bars.")
+    end
+end
+function YR:ToggleWindow(page) if YR.LoadWindow() then YR:ToggleWindow(page) end end
+function YR:ToggleSettings() if YR.LoadWindow() then YR:ToggleSettings() end end
+function YR:ShowSettingsTab(key) if YR.LoadWindow() then YR:ShowSettingsTab(key) end end
+function Headstart_OnAddonCompartmentClick() YR:ToggleWindow() end
+
 SLASH_HEADSTART1 = "/headstart"
 SLASH_HEADSTART2 = "/yroute"   -- its name before it was Headstart
 SlashCmdList.HEADSTART = function(msg)
     local cmd, arg = strsplit(" ", strtrim(msg or ""):lower(), 2)
     if cmd == "scan" then
-        if arg == "stop" then YR:StopScan() else YR:StartScan() end
+        -- the quest IDs it asks about are in the window's addon
+        if arg == "stop" then YR:StopScan() elseif YR.LoadWindow() then YR:StartScan() end
     elseif cmd == "log" then
         YR:SetLogging(arg ~= "off")
     elseif cmd == "splits" then
@@ -243,11 +382,22 @@ SlashCmdList.HEADSTART = function(msg)
         end
         YR:RefreshWindow()
     elseif cmd == "plan" then
-        YR.OpenPlanner()
+        if YR.SetupOn() and YR.LoadSetup(true) then YR.OpenPlanner()
+        elseif not YR.SetupOn() then YR.Print("Character setup is off: turn it on in /headstart, Character setup.") end
     elseif cmd == "inv" or cmd == "invite" then
         YR.InviteTarget()
     elseif cmd == "instances" or cmd == "inst" then
         YR:ToggleWindow("instances")
+    elseif cmd == "perf" then
+        -- what Headstart costs, by the game's own count (the code for it is in the window's addon)
+        if YR.LoadWindow() then YR.Perf() end
+    elseif cmd == "loot" then
+        YR.LootLogToggle()
+    elseif cmd == "chat" then
+        YR.ChatLogToggle()
+    elseif cmd == "death" then
+        if arg == "debug" then YR.RecapDebug()
+        elseif not YR.RecapShow() then YR.Print("no death of this character has been noted yet.") end
     elseif cmd == "gear" then
         YR.UseGearSet(arg)
     elseif cmd == "trinkets" then
@@ -282,10 +432,12 @@ SlashCmdList.HEADSTART = function(msg)
             .. " /headstart camp (unlock|lock|always|debug) - the campfire icon; /headstart bank - bank mats now; /headstart mail - mail them to your alt;"
             .. " /headstart routes on|off - Headstart routes in RestedXP; /headstart inv - invite your target; /headstart leave - leave the group; /headstart plan - plan your bars;"
             .. " /headstart restock - buy what you keep at this vendor; /headstart trainer - what's new at the trainer;"
-            .. " /headstart upgrades - look through your bags for better gear")
+            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game")
     else
         YR:ToggleWindow()
     end
+    -- a command may have changed a setting: what listens only while wanted is looked at again
+    if YR.partsReady then YR.SettingChanged() end
 end
 
 -- Defaults changed to "off until you turn it on" (see STARTS_OFF). An account that had Headstart
@@ -294,8 +446,12 @@ end
 local WAS_ON = { "restock", "bankAuto", "levelShot", "trinketBar", "groupBar", "upgrades", "talentMove", "talentFadeSlider" }
 function YR.Latch(fresh)
     local db = YippRouteDB
-    if db.quiet then return end
-    db.quiet = 1
+    local was = tonumber(db.quiet) or 0
+    if was >= 2 then return end
+    db.quiet = 2
+    -- 2: Character setup became something you turn on. An account that had Headstart keeps it on.
+    if not fresh and db.setupOn == nil then db.setupOn = true end
+    if was >= 1 then return end
     if fresh then
         db.welcome = true
         return
@@ -318,18 +474,37 @@ SlashCmdList.HEADSTARTSETTINGS = function() YR:ToggleSettings() end
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
 local started
-f:SetScript("OnEvent", function(_, _, name)
+f:SetScript("OnEvent", function(_, event, name)
+    if event == "PLAYER_LOGIN" then
+        f:UnregisterEvent("PLAYER_LOGIN")
+        YR.partsReady = true
+        YR.ApplyParts()
+        return
+    end
+    -- The window's addon has just been read in, its saved file with it: what /headstart scan found
+    -- lives there now (it was two megabytes in the account's file, read at every login).
+    if name == "Headstart_Options" and type(YippRouteDB) == "table" and YippRouteDB.scan ~= nil then
+        _G.HeadstartScanDB = type(_G.HeadstartScanDB) == "table" and _G.HeadstartScanDB or {}
+        if _G.HeadstartScanDB.scan == nil then _G.HeadstartScanDB.scan = YippRouteDB.scan end
+        YippRouteDB.scan = nil
+    end
     YR.EllesmereForget()             -- an addon loaded: what EllesmereUI has may be different now
+    if started and YR.partsReady then YR.SettingChanged() end      -- and so may what of ours is wanted
     if name ~= ADDON or started then return end
     started = true
     local fresh = YippRouteDB == nil
     YippRouteDB = YippRouteDB or {}
     YippRouteDB.runs = YippRouteDB.runs or {}
     YR.Latch(fresh)
+    -- the saved tables every part keeps this character's and the classes' things in
+    YR.freshChar = YippSetupCharDB == nil        -- this character's first login with Headstart
+    YippSetupDB = YippSetupDB or {}
+    YippSetupCharDB = YippSetupCharDB or {}
+    if YR.SetupOn() then YR.LoadSetup() end
     -- The spell tables hold all nine classes and only yours is ever read: the other eight are let go
-    -- (some three thousand small tables). SpellLevels stays whole: Bars & setup shows any class.
+    -- (some three thousand small tables). The setup addon's tables are trimmed where it is loaded (YR.LoadSetup).
     local _, class = UnitClass("player")
-    for _, name in ipairs({ "TrainerSpells", "PlannerSpells", "PlannerGeneral", "RestockData" }) do
+    for _, name in ipairs({ "TrainerSpells", "RestockData" }) do
         local t = YR[name]
         if class and type(t) == "table" and t[class] ~= nil then
             for other in pairs(t) do if other ~= class then t[other] = nil end end
@@ -338,6 +513,7 @@ f:SetScript("OnEvent", function(_, _, name)
     YR:RegisterGuides()
     YR:RegisterExtras()
     YR:StartLog()
+    YR.StartRunStore()
     YR:HookTooltips()
     YR:StartSplits()
     YR:StartGroup()
@@ -358,8 +534,25 @@ f:SetScript("OnEvent", function(_, _, name)
     YR.StartTalentFade()
     YR.StartBarHide()
     YR.StartSwing()
+    YR.StartRecap()
+    YR.StartChatLog()
+    YR.StartLootFeed()
     YR.StartCraftRemind()
     YR.StartQuickGroup()
+    if YR.Style then YR.Style.Changed = YR.SettingChanged end
     YR:BuildMinimapButton()
     YR:BuildOptions()   -- last: Blizzard's options API is the part most likely to differ on this client
+    -- every part that is wanted comes on at the login proper, when every other addon is in too (what
+    -- another addon does decides some of our defaults) and the character can be asked about
+    -- scan results still in the account's file: the window's addon is loaded once, a little after the
+    -- login, so they move to its file (after that this never runs again)
+    if YippRouteDB.scan ~= nil then
+        C_Timer.After(10, function() if YippRouteDB.scan ~= nil and not InCombatLockdown() then YR.LoadWindow() end end)
+    end
+    if IsLoggedIn and IsLoggedIn() then
+        YR.partsReady = true
+        YR.ApplyParts()
+    else
+        f:RegisterEvent("PLAYER_LOGIN")
+    end
 end)

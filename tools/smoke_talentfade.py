@@ -36,6 +36,10 @@ function Obj:GetEffectiveScale() return 1 end
 CURSOR = { 5000, 5000 }
 function GetCursorPosition() return CURSOR[1], CURSOR[2] end
 function Obj:RegisterEvent(e) rawset(self, "ev", rawget(self, "ev") or {}) self.ev[e] = true end
+function Obj:UnregisterEvent(e) local ev = rawget(self, "ev") if ev then ev[e] = nil end end
+function Obj:UnregisterAllEvents() rawset(self, "ev", nil) end
+-- "a setting changed" is looked at a frame later in the game: here the test says when (YR.ApplyParts)
+C_Timer = { After = function() end }
 function Obj:SetScript(w, fn) rawset(self, "_" .. w, fn) end
 function Obj:HookScript(w, fn)
     local old = rawget(self, "hook" .. w)
@@ -98,6 +102,8 @@ end
 
     g.YippRouteDB.talentFade = 60
     YR.StartTalentFade()
+    YR.partsReady = True             # the login: what is wanted comes on
+    YR.ApplyParts()
     YR.TalentFadeApply()
     check(g.SLIDERS == 0, "Blizzard's window not loaded yet: nothing built, no error")
     lua.execute("Window() Fire('ADDON_LOADED', 'Some_Other_Addon')")
@@ -210,11 +216,13 @@ end
     # the bags: nothing at all until their option is on, then the same, each on its own
     lua.execute("ContainerFrameCombinedBags, ContainerFrame6 = New(), New()")
     YR.StartMovers()
+    YR.ApplyParts()
     # window sizes: untouched until set; set, it's sized as it shows; back to 100 is Blizzard's again
     lua.execute("SocialUIFrame = New() Fire('PLAYER_ENTERING_WORLD')")
     raw = lua.eval("rawget")
     check(raw(g.SocialUIFrame, "scale") is None, "window sizes: a window is never touched until you set a size")
     YR.SetWindowScale("social", 80)
+    YR.ApplyParts()                  # as the settings window does after a change
     check(abs(raw(g.SocialUIFrame, "scale") - 0.8) < 0.001 and g.YippRouteDB.windowScale.social == 80, "social window at 80 percent")
     lua.execute("SocialUIFrame:SetScale(1) rawget(SocialUIFrame, 'hookOnShow')(SocialUIFrame)")
     check(abs(raw(g.SocialUIFrame, "scale") - 0.8) < 0.001, "Blizzard sizes it again as it opens: ours goes back on")
@@ -226,6 +234,7 @@ end
     touched = lua.eval("function(f) return rawget(f, 'hookOnShow') ~= nil or rawget(f, 'SetPoint') ~= nil end")
     check(not touched(g.ContainerFrameCombinedBags) and not touched(g.ContainerFrame6), "bags, options off: neither window is touched")
     g.YippRouteDB.moveBag = True
+    YR.ApplyParts()                  # as the settings window does after a change
     lua.execute("COMBAT = true")
     YR.MoverPlace("bag")
     check(not touched(g.ContainerFrameCombinedBags), "turned on in a fight: the window isn't made movable there (it would be blocked)")

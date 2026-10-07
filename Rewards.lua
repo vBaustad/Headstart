@@ -143,8 +143,9 @@ YR.RewardHasGreen = HasGreen   -- for the tests
 
 local function Choose(tries)
     local n = GetNumQuestChoices()
+    if n < 2 or IsShiftKeyDown() then return end           -- no choice to make (most quests), or yours
     local db = YR:RewardSettings()
-    if n < 2 or IsShiftKeyDown() or UnitLevel("player") > db.maxLevel or not db.on then return end
+    if UnitLevel("player") > db.maxLevel or not db.on then return end
     local items, values, kinds = {}, {}, {}
     for i = 1, n do
         local _, _, _, _, isUsable, itemID = GetQuestItemInfo("choice", i)
@@ -191,23 +192,58 @@ local function Choose(tries)
     end
 end
 
--- A reward you picked by hand is remembered for that quest.
-hooksecurefunc("GetQuestReward", function(index)
-    if picking or not index or GetNumQuestChoices() < 2 then return end
+-- Your class's settings as YR:RewardSettings would give them, without making them: whether rewards
+-- are picked at all, and up to which level. (Asked at the login and when a setting changes.) This is
+-- quality of life: with that main switch off nothing is picked.
+local function Set()
+    if not YR.QoLOn() then return false end
+    local _, class = UnitClass("player")
+    local all = YippRouteDB.rewardClasses
+    local db = all and all[class or "WARRIOR"]
+    if db then return db.on ~= false, db.maxLevel end
+    local old = YippRouteDB.rewards
+    return YippRouteDB.pickRewards ~= false, old and old.maxLevel or 10
+end
+local function Picking() return (Set()) end
+-- (a character past the level limit has nothing picked for it: it doesn't listen for quests either)
+local function PickingNow()
+    local on, maxLevel = Set()
+    return on and (UnitLevel("player") or 1) <= (tonumber(maxLevel) or 10)
+end
+
+-- A reward you picked by hand is remembered for that quest. The hook is put on the first time picking
+-- is on (it can't be taken off again), and comes straight back out while picking is off.
+local learning = false
+local function Learn(index)
+    if not learning or picking or not index or GetNumQuestChoices() < 2 then return end
     local name, _, _, _, _, itemID = GetQuestItemInfo("choice", index)
     local db = YR:RewardSettings()
     if itemID and db.remember then
         db.chosen[GetQuestID()] = { item = itemID, name = name, title = GetTitleText() }
     end
-end)
+end
+local learnHooked
+YR.Part(Picking, nil, nil, {
+    start = function()
+        learning = true
+        if not learnHooked then
+            learnHooked = true
+            hooksecurefunc("GetQuestReward", Learn)
+        end
+    end,
+    stop = function() learning = false end,
+})
 
-local f = CreateFrame("Frame")
-f:RegisterEvent("QUEST_COMPLETE")
-f:RegisterEvent("PLAYER_LOGIN")
-f:SetScript("OnEvent", function(_, event)
-    if event == "PLAYER_LOGIN" then return YR:HookQuestWindows() end
-    Choose(10)
-end)
+YR.Part(PickingNow, { "QUEST_COMPLETE" }, function() Choose(10) end)
+
+-- The quest windows are hooked for RestedXP's sake alone (see below): once, with RestedXP loaded and
+-- quality of life on.
+local windowsHooked
+YR.Part(function() return type(_G.RXP) == "table" and YR.QoLOn() end, nil, nil, { start = function()
+    if windowsHooked then return end
+    windowsHooked = true
+    YR:HookQuestWindows()
+end })
 
 -- RestedXP acts on the same events as these windows, after them (Blizzard's frames were there first):
 -- switching one of its settings off when a window opens, back on the next frame, keeps it out of that
@@ -225,13 +261,14 @@ function YR:HookQuestWindows()
         local frame = _G[name]
         if frame and frame.HookScript then
             frame:HookScript("OnShow", function()
-                if IsShiftKeyDown() then Pause("enableQuestAutomation") end
+                if IsShiftKeyDown() and YR.QoLOn() then Pause("enableQuestAutomation") end
             end)
         end
     end
     local reward = _G.QuestFrameRewardPanel
     if reward and reward.HookScript then
         reward:HookScript("OnShow", function()
+            if not YR.QoLOn() then return end
             local db = YR:RewardSettings()
             if db.on and db.greenStop and HasGreen() then Pause("enableQuestRewardAutomation") end
         end)

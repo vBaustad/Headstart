@@ -12,6 +12,14 @@
 --
 -- Per character: YippSetupCharDB.role ("solo", "Duo A", "Duo B", "Trio A", "Trio B", "Trio C").
 -- Account options (Settings, Route): groupShare, groupAccept, groupPanel, all on unless turned off.
+--
+-- Two parts (Core.lua), so that none of it costs anything while it isn't used:
+--   * the party's steps (the hello, the step messages, the panel): only with the routes on. Alone, it
+--     listens for the group changing and nothing else; the addon channel and the step check every few
+--     seconds are there only while you are in a group (the check also while you play a group role, for
+--     the route's version for that role).
+--   * sharing and accepting quests: only while one of its options is on (the two for the route's
+--     quests, with the routes on; PartyQuests.lua's two, for any quest).
 local ADDON, YR = ...
 
 local PREFIX = "Headstart"
@@ -26,9 +34,12 @@ function YR:Role()
     return (YippSetupCharDB and YippSetupCharDB.role) or "solo"
 end
 
+local version               -- read from the .toc once: it is asked for with every hello, sent or heard
 local function Version()
-    local v = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(ADDON, "Version")
-    return v or "0"
+    if not version then
+        version = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(ADDON, "Version")) or "0"
+    end
+    return version
 end
 
 -- "0.9.0-beta2" -> comparable numbers; a release sorts after its betas
@@ -46,8 +57,12 @@ local function Newer(v, than)
     return false
 end
 
+local function Grouped()
+    return IsInGroup ~= nil and IsInGroup() or false
+end
+
 local function Send(msg)
-    if not (IsInGroup and IsInGroup()) then return end
+    if not Grouped() then return end
     local channel = (IsInGroup(LE_PARTY_CATEGORY_INSTANCE or 2) and "INSTANCE_CHAT") or "PARTY"
     pcall(C_ChatInfo.SendAddonMessage, PREFIX, msg, channel)
 end
@@ -60,9 +75,24 @@ local function Current()
     return guide, step
 end
 
-function YR:SayHello()
+local share, quests          -- the two parts (see the top of the file), declared by YR:StartGroup
+
+-- The hello: version, role and step, to the party. Only with the routes on and in a group; the text
+-- isn't made otherwise.
+local helloSoon = false
+local function Hello()
+    helloSoon = false
+    if not (share and share.on and Grouped()) then return end
     local guide, step = Current()
     Send(("H\t%s\t%s\t%s\t%s"):format(Version(), YR:Role(), guide or "", step or 0))
+end
+function YR:SayHello() Hello() end
+
+-- A group forming fires the roster event several times in a second or two: one hello for all of them.
+local function HelloSoon()
+    if helloSoon or not Grouped() then return end
+    helloSoon = true
+    C_Timer.After(2, Hello)
 end
 
 -- the step each of you is on, when it changes (checked every few seconds)
@@ -74,7 +104,25 @@ local function WatchStep()
         local newRoute = guide ~= lastGuide
         lastGuide, lastStep = guide, step
         if newRoute and YR.LoadRoleGuide and YR:Role() ~= "solo" then YR:LoadRoleGuide(true) end
-        Send(("S\t%s\t%s"):format(guide or "", step or 0))
+        if Grouped() then Send(("S\t%s\t%s"):format(guide or "", step or 0)) end
+    end
+end
+
+-- What is only needed in a group: the addon channel (it carries every addon's messages, all session)
+-- and the step check. Looked at when the group changes, the role changes, and as the part comes on.
+local stepTicker
+local function Sync()
+    local frame = share and share.on and share.frame
+    local grouped = frame and Grouped() or false
+    if frame then
+        if grouped then frame:RegisterEvent("CHAT_MSG_ADDON") else frame:UnregisterEvent("CHAT_MSG_ADDON") end
+    end
+    local watch = grouped or (frame and YR:Role() ~= "solo") or false
+    if watch and not stepTicker then
+        stepTicker = C_Timer.NewTicker(3, WatchStep)
+    elseif not watch and stepTicker then
+        stepTicker:Cancel()
+        stepTicker = nil
     end
 end
 
@@ -150,9 +198,9 @@ function YR.RouteQuestTitle(title)
 end
 
 local function Share(questID)
-    if not (IsInGroup and IsInGroup()) or sharedToMe[questID] then return end
-    -- The route's quests (groupShare), or every quest (shareAll, PartyQuests.lua).
-    if not ((YR.Option("groupShare") and YR.RouteQuest(questID)) or YR.ShareAll()) then return end
+    if not Grouped() or sharedToMe[questID] then return end
+    -- The route's quests (groupShare, with the routes on), or every quest (shareAll, PartyQuests.lua).
+    if not ((YR.RoutesOn() and YR.Option("groupShare") and YR.RouteQuest(questID)) or YR.ShareAll()) then return end
     if C_QuestLog.IsPushableQuest and not C_QuestLog.IsPushableQuest(questID) then return end
     pcall(C_QuestLog.SetSelectedQuest, questID)
     pcall(QuestLogPushQuest)
@@ -164,43 +212,68 @@ local function FromPlayer()
     return ok and isPlayer or false
 end
 
-local f = CreateFrame("Frame")
-f:SetScript("OnEvent", function(_, event, a, b, c, d)
+local function IsMe(sender)
+    local me = UnitName("player")
+    return sender == me or Ambiguate(sender, "short") == me
+end
+
+-- The party's steps: with the routes on.
+local function OnShare(_, event, a, b, _, d)
     if event == "CHAT_MSG_ADDON" then
         if a == PREFIX and type(b) == "string" and type(d) == "string" then
-            local ok, me = pcall(function() return d == UnitName("player") or Ambiguate(d, "short") == UnitName("player") end)
+            local ok, me = pcall(IsMe, d)
             if not (ok and me) then Heard(d, b) end
         end
-    elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
-        YR:SayHello()
+    else        -- GROUP_ROSTER_UPDATE, PLAYER_ENTERING_WORLD
+        Sync()
+        HelloSoon()
         if YR.RefreshParty then YR:RefreshParty() end
-    elseif event == "QUEST_DETAIL" then
+    end
+end
+
+local panel         -- the party panel (below)
+
+-- Sharing and accepting: while one of its options is on.
+local function RouteAccept() return YR.RoutesOn() and YR.Option("groupAccept") end
+
+local function OnQuest(_, event, a, b)
+    if event == "QUEST_DETAIL" then
         local id = GetQuestID and GetQuestID()
         if id and FromPlayer() then
             sharedToMe[id] = true
-            if (YR.Option("groupAccept") and YR.RouteQuest(id) and not IsShiftKeyDown())
+            if (RouteAccept() and YR.RouteQuest(id) and not IsShiftKeyDown())
                 or YR.AcceptSharedBy("npc") then
                 AcceptQuest()
             end
         end
     elseif event == "QUEST_ACCEPT_CONFIRM" then
         -- a party member started an escort: join it, if it's one of the route's
-        if ConfirmAcceptQuest and ((YR.Option("groupAccept") and YR.RouteQuestTitle(b))
+        if ConfirmAcceptQuest and ((RouteAccept() and YR.RouteQuestTitle(b))
             or YR.AcceptSharedBy(nil, a)) then
             ConfirmAcceptQuest()
         end
     elseif event == "QUEST_ACCEPTED" then
-        C_Timer.After(0.5, function() Share(a) end)
+        -- alone there is nobody to share with: nothing is set up for later
+        if Grouped() then C_Timer.After(0.5, function() Share(a) end) end
     end
-end)
+end
 
 function YR:StartGroup()
-    if C_ChatInfo then pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX) end
-    for _, e in ipairs({ "CHAT_MSG_ADDON", "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD", "QUEST_DETAIL",
-        "QUEST_ACCEPT_CONFIRM", "QUEST_ACCEPTED" }) do
-        f:RegisterEvent(e)
-    end
-    C_Timer.NewTicker(3, WatchStep)
+    if share then return end
+    share = YR.Part(function() return YR.RoutesOn() end, { "GROUP_ROSTER_UPDATE", "PLAYER_ENTERING_WORLD" }, OnShare, {
+        start = function()
+            if C_ChatInfo then pcall(C_ChatInfo.RegisterAddonMessagePrefix, PREFIX) end
+            Sync()
+        end,
+        stop = function()
+            Sync()
+            if panel then panel:Hide() end
+        end,
+    })
+    quests = YR.Part(function()
+        return YR.ShareAll() or YR.AcceptFrom() ~= "off"
+            or (YR.RoutesOn() and (YR.Option("groupShare") or YR.Option("groupAccept"))) or false
+    end, { "QUEST_DETAIL", "QUEST_ACCEPT_CONFIRM", "QUEST_ACCEPTED" }, OnQuest)
 end
 
 function YR:SetRole(role)
@@ -208,6 +281,7 @@ function YR:SetRole(role)
     YR:RegisterRole(role)
     YR:SayHello()
     YR:LoadRoleGuide()
+    Sync()              -- a group role keeps the step check going outside a group too
 end
 
 -- Switch RestedXP to this role's version of the route it has open (or back to the solo one).
@@ -234,8 +308,14 @@ function YR:LoadRoleGuide(quiet)
 end
 
 -- The party panel: who in the party runs Headstart, as which role, and the step each is on.
-local panel
+local function ByRole(a, b) return (a.p.role or "") < (b.p.role or "") end
+
 function YR:RefreshParty()
+    -- nobody heard from (every group change asks, alone too): nothing to list, nothing made
+    if next(party) == nil then
+        if panel then panel:Hide() end
+        return
+    end
     local members = {}
     for name, p in pairs(YR:Party()) do members[#members + 1] = { name = name, p = p } end
     if #members == 0 or not YR.Option("groupPanel") then
@@ -248,8 +328,9 @@ function YR:RefreshParty()
         panel:SetPoint("TOPLEFT", HeadstartSplitsFrame or UIParent, "BOTTOMLEFT", 0, -8)
         panel.lines = {}
     end
-    table.sort(members, function(a, b) return (a.p.role or "") < (b.p.role or "") end)
-    local mine = { name = UnitName("player"), p = { role = YR:Role(), guide = lastGuide, step = lastStep } }
+    table.sort(members, ByRole)
+    local guide, step = Current()       -- as it is now: the step check may not have run since you joined
+    local mine = { name = UnitName("player"), p = { role = YR:Role(), guide = guide, step = step } }
     table.insert(members, 1, mine)
     for i, m in ipairs(members) do
         local fs = panel.lines[i]

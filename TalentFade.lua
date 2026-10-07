@@ -18,6 +18,7 @@
 local ADDON, YR = ...
 
 local slider
+local faded         -- a fade of ours is on Blizzard's textures now
 local LIGHTS_UP_TO = 50      -- Blizzard's moving lights play up to this much see-through, and stop past it
 local LIGHTS = { "Clouds1", "Clouds2", "AirParticlesClose", "AirParticlesFar", "OverlayBackgroundRight", "OverlayBackgroundMid" }
 
@@ -25,14 +26,27 @@ function YR.TalentFade()
     return math.max(0, math.min(100, tonumber(YippRouteDB.talentFade) or 0))
 end
 
--- The textures that make the background: the talent page's, and the window's own behind it.
+-- The textures that make the background: the talent page's, and the window's own behind it. Listed
+-- once per talent page (this is asked each time the window opens and closes).
+local page, window, listed
 local function Parts()
     local frame = _G.PlayerSpellsFrame
     local talents = frame and frame.TalentsFrame
     if not talents then return nil end
-    return { talents.Background, talents.ClassBackground, talents.BackgroundBorder, talents.DividerHorizontalLeft,
-        talents.DividerHorizontalRight, talents.DividerVerticalLeft, talents.DividerVerticalRight },
-        { frame.Bg, frame.TopTileStreaks }, talents
+    if listed ~= talents then
+        listed = talents
+        page = { talents.Background, talents.ClassBackground, talents.BackgroundBorder, talents.DividerHorizontalLeft,
+            talents.DividerHorizontalRight, talents.DividerVerticalLeft, talents.DividerVerticalRight }
+        window = { frame.Bg, frame.TopTileStreaks }
+    end
+    return page, window, talents
+end
+
+-- Wanted while any of it is set: moving the window, the sliders on it, a fade or a size of ours.
+-- Until then nothing of Blizzard's is hooked and nothing is listened for.
+local function Wanted()
+    return YR.Option("talentMove") or YR.Option("talentFadeSlider")
+        or (YR.QoLOn() and (YR.TalentFade() > 0 or YR.TalentScale() ~= 100)) or false
 end
 
 function YR.TalentScale()
@@ -42,10 +56,19 @@ end
 -- The window at your size while the talent page is the one open, at Blizzard's (1) otherwise. Never
 -- touched while the setting is 100 and we haven't changed it.
 local scaled
+local late          -- the size was to be set in a fight: done when it ends
+local part          -- what listens for us (YR.StartTalentFade)
 local function Scale()
     local frame = _G.PlayerSpellsFrame
     local talents = frame and frame.TalentsFrame
-    if type(talents) ~= "table" or InCombatLockdown() then return end
+    if type(talents) ~= "table" then return end
+    if InCombatLockdown() then
+        -- the end of a fight is listened for only now, with something held back by this one
+        late = true
+        if part and part.frame then part.frame:RegisterEvent("PLAYER_REGEN_ENABLED") end
+        return
+    end
+    late = nil
     local want = talents:IsShown() and YR.QoLOn() and YR.TalentScale() / 100 or 1
     if want == 1 and not scaled then return end
     scaled = want ~= 1
@@ -88,18 +111,91 @@ local function Lights(talents, off)
     end
 end
 
+-- The see-through slider and the size buttons on the talent page: made the first time their option is
+-- on with the window there (it starts off).
+-- A dark plate behind a group of controls: with the window seen through, the world is behind them,
+-- and grey words on a bright sky can't be read.
+local function Plate(f)
+    local plate = f:CreateTexture(nil, "BACKGROUND")
+    plate:SetPoint("TOPLEFT", -8, 5)
+    plate:SetPoint("BOTTOMRIGHT", 8, -5)
+    plate:SetColorTexture(0.03, 0.04, 0.06, 0.82)
+    local edge = f:CreateTexture(nil, "BORDER")
+    edge:SetPoint("TOPLEFT", plate, "TOPLEFT", 0, 0)
+    edge:SetPoint("TOPRIGHT", plate, "TOPRIGHT", 0, 0)
+    edge:SetHeight(1)
+    edge:SetColorTexture(1, 1, 1, 0.12)
+end
+
+local function Controls(talents)
+    local S = YR.Style
+    slider = CreateFrame("Frame", nil, talents)
+    slider:SetSize(250, 24)
+    slider:SetPoint("BOTTOMLEFT", talents, "BOTTOMLEFT", 16, 8)
+    slider:SetFrameLevel(talents:GetFrameLevel() + 1000)
+    Plate(slider)
+    local label = S.Text(slider, 11, S.C.text)
+    label:SetPoint("LEFT")
+    label:SetText("See-through")
+    local bar = S.Slider(slider, 0, 100, 5, YR.TalentFade, YR.SetTalentFade, 170)
+    bar:SetPoint("LEFT", label, "RIGHT", 8, 0)
+    -- and its size, bottom right: taps, not a slider (the window changes size under the mouse, so a
+    -- knob would run from it). 5 at a time to go far, 1 at a time to get it just so.
+    local size = CreateFrame("Frame", nil, slider)
+    size:SetSize(230, 24)
+    size:SetPoint("BOTTOMRIGHT", talents, "BOTTOMRIGHT", -16, 8)
+    Plate(size)
+    local sizeLabel = S.Text(size, 11, S.C.text)
+    sizeLabel:SetPoint("LEFT")
+    sizeLabel:SetText("Size")
+    local value = S.Text(size, 12, S.C.text)
+    local prev = sizeLabel
+    for _, step in ipairs({ -5, -1, 0, 1, 5 }) do
+        if step == 0 then
+            value:SetPoint("LEFT", prev, "RIGHT", 6, 0)
+            value:SetWidth(40)
+            value:SetJustifyH("CENTER")
+            prev = value
+        else
+            local b = S.Button(size, (step > 0 and "+" or "") .. step, function()
+                YR.SetTalentScale(YR.TalentScale() + step)
+            end, nil, 30)
+            b:SetHeight(20)
+            b:SetPoint("LEFT", prev, "RIGHT", 6, 0)
+            prev = b
+        end
+    end
+    function size:Refresh() value:SetText(YR.TalentScale() .. "%") end
+    function slider:Refresh() bar:Refresh() size:Refresh() end
+end
+
 --- The fade put on the window (and taken off the window's own fill when the talent page isn't the one open,
 --- so the spellbook keeps its background).
+local live          -- something of ours may be on the window: it is gone over once more when all is off
 function YR.TalentFadeApply()
+    local wanted = Wanted()
+    -- all of it off and nothing of ours on the window (it still calls this as it opens and closes,
+    -- once hooked): nothing read, nothing touched
+    if not wanted and not live and not late then return end
     local page, window, talents = Parts()
     if not page then return end
+    live = wanted
     local alpha = YR.QoLOn() and 1 - YR.TalentFade() / 100 or 1
-    for _, t in pairs(page) do if type(t) == "table" and t.SetAlpha then t:SetAlpha(alpha) end end
+    local open = talents.IsShown and talents:IsShown()
+    -- no fade, and none before it: Blizzard's textures are left as they are (this runs each time the
+    -- window opens and closes)
+    local fade = alpha < 1 or faded
+    if fade then
+        for _, t in pairs(page) do if type(t) == "table" and t.SetAlpha then t:SetAlpha(alpha) end end
+    end
     Scale()
     YR.MoverPlace("talents")            -- the size changes with the page: the corner stays where you left it
-    local open = talents.IsShown and talents:IsShown()
-    for _, t in pairs(window) do if type(t) == "table" and t.SetAlpha then t:SetAlpha(open and alpha or 1) end end
+    if fade then
+        for _, t in pairs(window) do if type(t) == "table" and t.SetAlpha then t:SetAlpha(open and alpha or 1) end end
+        faded = alpha < 1
+    end
     Lights(talents, open and alpha < 1 - LIGHTS_UP_TO / 100)
+    if not slider and YR.Option("talentFadeSlider") then Controls(talents) end
     if slider then
         slider:SetShown(YR.Option("talentFadeSlider"))
         slider:Refresh()
@@ -123,6 +219,7 @@ function YR.SetTalentScale(v)
     end
     YippRouteDB.talentScale = math.max(50, math.min(150, tonumber(v) or 100))
     Scale()
+    YR.SettingChanged()
     local after = before and frame:GetScale() or nil
     if after and after ~= before.s then
         local ui = UIParent:GetEffectiveScale() or 1
@@ -141,6 +238,7 @@ end
 function YR.SetTalentFade(v)
     YippRouteDB.talentFade = math.max(0, math.min(100, tonumber(v) or 0))
     YR.TalentFadeApply()
+    YR.SettingChanged()
 end
 
 -- Moved by its title bar (Movers.lua does the moving)
@@ -149,8 +247,10 @@ function YR.TalentResetPosition() YR.MoverReset("talents") end
 
 local hooked
 local function Hook()
-    local _, _, talents = Parts()
-    if hooked or not talents then return end
+    if hooked then return end
+    local frame = _G.PlayerSpellsFrame
+    local talents = frame and frame.TalentsFrame
+    if not talents then return end
     hooked = true
     if YippRouteDB.talentPos then          -- where it was kept before Movers.lua
         YippRouteDB.moved = YippRouteDB.moved or {}
@@ -162,58 +262,47 @@ local function Hook()
         -- sheet the talents sit on
         function(frame) return { frame, frame.TalentsFrame, frame.TalentsFrame and frame.TalentsFrame.ButtonsParent } end)
     YR.MoverPlace("talents")
-    local S = YR.Style
-    slider = CreateFrame("Frame", nil, talents)
-    slider:SetSize(250, 24)
-    slider:SetPoint("BOTTOMLEFT", talents, "BOTTOMLEFT", 16, 8)
-    slider:SetFrameLevel(talents:GetFrameLevel() + 1000)
-    local label = S.Text(slider, 11, S.C.sub)
-    label:SetPoint("LEFT")
-    label:SetText("See-through")
-    local bar = S.Slider(slider, 0, 100, 5, YR.TalentFade, YR.SetTalentFade, 170)
-    bar:SetPoint("LEFT", label, "RIGHT", 8, 0)
-    -- and its size, bottom right: taps, not a slider (the window changes size under the mouse, so a
-    -- knob would run from it). 5 at a time to go far, 1 at a time to get it just so.
-    local size = CreateFrame("Frame", nil, slider)
-    size:SetSize(230, 24)
-    size:SetPoint("BOTTOMRIGHT", talents, "BOTTOMRIGHT", -16, 8)
-    local sizeLabel = S.Text(size, 11, S.C.sub)
-    sizeLabel:SetPoint("LEFT")
-    sizeLabel:SetText("Size")
-    local value = S.Text(size, 12, S.C.text)
-    local prev = sizeLabel
-    for _, step in ipairs({ -5, -1, 0, 1, 5 }) do
-        if step == 0 then
-            value:SetPoint("LEFT", prev, "RIGHT", 6, 0)
-            value:SetWidth(40)
-            value:SetJustifyH("CENTER")
-            prev = value
-        else
-            local b = S.Button(size, (step > 0 and "+" or "") .. step, function()
-                YR.SetTalentScale(YR.TalentScale() + step)
-            end, nil, 30)
-            b:SetHeight(20)
-            b:SetPoint("LEFT", prev, "RIGHT", 6, 0)
-            prev = b
-        end
-    end
-    function size:Refresh() value:SetText(YR.TalentScale() .. "%") end
-    function slider:Refresh() bar:Refresh() size:Refresh() end
     talents:HookScript("OnShow", YR.TalentFadeApply)
     talents:HookScript("OnHide", YR.TalentFadeApply)
+end
+
+-- Blizzard's window loads when first opened: until it is there (and hooked) addons loading are
+-- listened for, and not after. The end of a fight only while a fight held the size back (Scale).
+local function OnEvent(self, event, name)
+    if event == "PLAYER_REGEN_ENABLED" then
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        -- the size isn't set in a fight: a window opened in one gets it when the fight ends
+        if late then YR.TalentFadeApply() end
+        return
+    end
+    if event == "ADDON_LOADED" and name ~= "Blizzard_PlayerSpells" then return end
+    Hook()
+    if hooked then
+        self:UnregisterEvent("ADDON_LOADED")
+        self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        YR.TalentFadeApply()
+    end
+end
+
+local function Start(p)
+    Hook()
+    if not hooked then
+        p.frame:RegisterEvent("ADDON_LOADED")
+        p.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    end
+    if late then p.frame:RegisterEvent("PLAYER_REGEN_ENABLED") end
     YR.TalentFadeApply()
 end
 
 function YR.StartTalentFade()
-    local f = CreateFrame("Frame")
-    f:RegisterEvent("ADDON_LOADED")
-    f:RegisterEvent("PLAYER_ENTERING_WORLD")
-    f:RegisterEvent("PLAYER_REGEN_ENABLED")
-    f:SetScript("OnEvent", function(_, event, name)
-        if event == "ADDON_LOADED" and name ~= "Blizzard_PlayerSpells" then return end
-        -- the size isn't set in a fight: a window opened in one gets it when the fight ends
-        if event == "PLAYER_REGEN_ENABLED" then YR.TalentFadeApply() return end
-        Hook()
-    end)
-    Hook()
+    if part then return end
+    part = YR.Part(Wanted, nil, OnEvent, {
+        start = Start,
+        again = YR.TalentFadeApply,
+        -- off: Blizzard's own look, size and place back (after the fight, when one holds the size)
+        stop = function(p)
+            YR.TalentFadeApply()
+            if late then p.frame:RegisterEvent("PLAYER_REGEN_ENABLED") end
+        end,
+    })
 end

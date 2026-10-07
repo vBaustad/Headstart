@@ -18,6 +18,7 @@ local F = {}
 F.__index = F
 function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
 function F:UnregisterEvent(e) if self.ev then self.ev[e] = nil end end
+function F:UnregisterAllEvents() self.ev = nil end
 function F:SetScript(_, fn) self.fn = fn end
 function CreateFrame() local f = setmetatable({}, F) table.insert(FRAMES, f) return f end
 function Fire(e) for _, f in ipairs(FRAMES) do if f.ev and f.ev[e] and f.fn then f.fn(f, e) end end end
@@ -61,6 +62,9 @@ function GetTime() return NOW end
     check(tuple(YR.CampingNeed(12)) == (10, 3), f"from 12: no rods, 3 stones, 5 bracers: {tuple(YR.CampingNeed(12))}")
 
     listening = lua.eval("function(e) for _, f in ipairs(FRAMES) do if f.ev and f.ev[e] then return true end end return false end")
+    # the reminder comes on at the login (YR.Part): nothing listens before it
+    YR.partsReady = True
+    YR.ApplyParts()
     lua.execute("Fire('PLAYER_ENTERING_WORLD')")
     check(not listening("BAG_UPDATE_DELAYED") and not listening("QUEST_LOG_UPDATE"),
           "on neither quest: bags and the quest log aren't listened to at all")

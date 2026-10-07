@@ -12,41 +12,47 @@
 --   turned off), whisperGap (seconds between two sounds, 2).
 local ADDON, YR = ...
 
--- The game's own, by SOUNDKIT name, with what we call each. In the order they're listed.
-local KIT = {
-    { "TELL_MESSAGE", "Whisper (the game's own)" },
-    { "RAID_WARNING", "Raid warning" },
-    { "READY_CHECK", "Ready check" },
-    { "ALARM_CLOCK_WARNING_1", "Alarm 1" },
-    { "ALARM_CLOCK_WARNING_2", "Alarm 2" },
-    { "ALARM_CLOCK_WARNING_3", "Alarm 3" },
-    { "UI_BNET_TOAST", "Battle.net toast" },
-    { "IG_PLAYER_INVITE", "Group invite" },
-    { "PVP_THROUGH_QUEUE", "Queue ready" },
-    { "LFG_ROLE_CHECK", "Role check" },
-    { "LFG_REWARDS", "Dungeon reward" },
-    { "MAP_PING", "Map ping" },
-    { "AUCTION_WINDOW_OPEN", "Auction bell" },
-    { "AUCTION_WINDOW_CLOSE", "Auction bell, closing" },
-    { "LOOT_WINDOW_COIN_SOUND", "Coins" },
-    { "MONEY_FRAME_OPEN", "Money bag" },
-    { "IG_QUEST_LIST_COMPLETE", "Quest complete" },
-    { "IG_QUEST_LIST_OPEN", "Quest log" },
-    { "IG_BACKPACK_OPEN", "Backpack" },
-    { "IG_MAINMENU_OPEN", "Menu open" },
-    { "IG_CHARACTER_INFO_TAB", "Page tab" },
-    { "IG_ABILITY_PAGE_TURN", "Page turn" },
-    { "ACHIEVEMENT_MENU_OPEN", "Achievement window" },
-    { "UI_RAID_BOSS_WHISPER_WARNING", "Boss whisper" },
-    { "RAID_BOSS_EMOTE_WARNING", "Boss emote" },
-    { "UI_EPICLOOT_TOAST", "Epic loot" },
-    { "UI_LEGENDARY_LOOT_TOAST", "Legendary loot" },
-    { "UI_WORLDQUEST_COMPLETE", "World quest complete" },
-    { "UI_GROUP_FINDER_RECEIVE_APPLICATION", "Group finder application" },
-    { "UI_PROFESSIONS_NEW_RECIPE_LEARNED_TOAST", "Recipe learned" },
-    { "UI_CLASS_TALENT_APPLY_CHANGES", "Talents applied" },
-    { "GS_CHARACTER_SELECTION_CREATE_NEW", "Character screen chime" },
-}
+-- The game's own, by SOUNDKIT name, with what we call each. In the order they're listed. Only the
+-- settings' list and the name of the picked sound read it, so it is made the first time one of them asks.
+local KIT
+local function Kit()
+    if KIT then return KIT end
+    KIT = {
+        { "TELL_MESSAGE", "Whisper (the game's own)" },
+        { "RAID_WARNING", "Raid warning" },
+        { "READY_CHECK", "Ready check" },
+        { "ALARM_CLOCK_WARNING_1", "Alarm 1" },
+        { "ALARM_CLOCK_WARNING_2", "Alarm 2" },
+        { "ALARM_CLOCK_WARNING_3", "Alarm 3" },
+        { "UI_BNET_TOAST", "Battle.net toast" },
+        { "IG_PLAYER_INVITE", "Group invite" },
+        { "PVP_THROUGH_QUEUE", "Queue ready" },
+        { "LFG_ROLE_CHECK", "Role check" },
+        { "LFG_REWARDS", "Dungeon reward" },
+        { "MAP_PING", "Map ping" },
+        { "AUCTION_WINDOW_OPEN", "Auction bell" },
+        { "AUCTION_WINDOW_CLOSE", "Auction bell, closing" },
+        { "LOOT_WINDOW_COIN_SOUND", "Coins" },
+        { "MONEY_FRAME_OPEN", "Money bag" },
+        { "IG_QUEST_LIST_COMPLETE", "Quest complete" },
+        { "IG_QUEST_LIST_OPEN", "Quest log" },
+        { "IG_BACKPACK_OPEN", "Backpack" },
+        { "IG_MAINMENU_OPEN", "Menu open" },
+        { "IG_CHARACTER_INFO_TAB", "Page tab" },
+        { "IG_ABILITY_PAGE_TURN", "Page turn" },
+        { "ACHIEVEMENT_MENU_OPEN", "Achievement window" },
+        { "UI_RAID_BOSS_WHISPER_WARNING", "Boss whisper" },
+        { "RAID_BOSS_EMOTE_WARNING", "Boss emote" },
+        { "UI_EPICLOOT_TOAST", "Epic loot" },
+        { "UI_LEGENDARY_LOOT_TOAST", "Legendary loot" },
+        { "UI_WORLDQUEST_COMPLETE", "World quest complete" },
+        { "UI_GROUP_FINDER_RECEIVE_APPLICATION", "Group finder application" },
+        { "UI_PROFESSIONS_NEW_RECIPE_LEARNED_TOAST", "Recipe learned" },
+        { "UI_CLASS_TALENT_APPLY_CHANGES", "Talents applied" },
+        { "GS_CHARACTER_SELECTION_CREATE_NEW", "Character screen chime" },
+    }
+    return KIT
+end
 
 local CHANNELS = { Master = true, SFX = true, Dialog = true }
 
@@ -68,7 +74,7 @@ function YR.WhisperSounds()
     local list = { { "off", "None" } }
     local kit = _G.SOUNDKIT
     if type(kit) == "table" then
-        for _, e in ipairs(KIT) do
+        for _, e in ipairs(Kit()) do
             if kit[e[1]] ~= nil then list[#list + 1] = { "kit:" .. e[1], e[2] } end
         end
     end
@@ -91,7 +97,7 @@ function YR.WhisperSoundName(key)
     if type(key) ~= "string" then return "None" end
     local kind, name = key:match("^(%a+):(.+)$")
     if kind == "kit" then
-        for _, e in ipairs(KIT) do if e[1] == name then return e[2] end end
+        for _, e in ipairs(Kit()) do if e[1] == name then return e[2] end end
     elseif kind == "lsm" then
         return name
     end
@@ -119,19 +125,26 @@ function YR.PlayWhisperSound(key)
     return false
 end
 
+-- A whisper came in. The two kinds of whisper are two parts, so each is listened for only while it
+-- is to make a sound: none of it while no sound is picked.
+local last = 0
+local function Heard()
+    local key = YippRouteDB.whisperSound
+    if not key then return end
+    -- a burst of whispers is one sound
+    local now = GetTime()
+    if now - last < (tonumber(YippRouteDB.whisperGap) or 2) then return end
+    last = now
+    YR.PlayWhisperSound(key)
+end
+
+local function Wanted() return YippRouteDB.whisperSound and YR.QoLOn() and true or false end
+local function WantedBNet() return Wanted() and YippRouteDB.whisperBNet ~= false end
+
+local declared
 function YR.StartWhisper()
-    local f = CreateFrame("Frame")
-    pcall(f.RegisterEvent, f, "CHAT_MSG_WHISPER")
-    pcall(f.RegisterEvent, f, "CHAT_MSG_BN_WHISPER")
-    local last = 0
-    f:SetScript("OnEvent", function(_, event)
-        local key = YippRouteDB.whisperSound
-        if not key or not YR.QoLOn() then return end
-        if event == "CHAT_MSG_BN_WHISPER" and YippRouteDB.whisperBNet == false then return end
-        -- a burst of whispers is one sound
-        local now = GetTime()
-        if now - last < (tonumber(YippRouteDB.whisperGap) or 2) then return end
-        last = now
-        YR.PlayWhisperSound(key)
-    end)
+    if declared then return end
+    declared = true
+    YR.Part(Wanted, { "CHAT_MSG_WHISPER" }, Heard)
+    YR.Part(WantedBNet, { "CHAT_MSG_BN_WHISPER" }, Heard)
 end

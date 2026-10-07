@@ -14,11 +14,11 @@ local AUTO = 1          -- seconds from the quest window opening to accepted: fa
 
 local shown = {}        -- quest ID -> when its window opened
 local dropped = {}      -- quest ID -> true once dropped this session
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("QUEST_DETAIL")
-frame:RegisterEvent("QUEST_ACCEPTED")
-frame:SetScript("OnEvent", function(_, event, arg1, arg2)
-    if not YR.RoutesOn() or not YR.Option("skipQuests") then return end
+-- A part (Core.lua): with the routes or the option off no frame is made and no quest event listened for.
+local function Wanted() return YR.RoutesOn() and YR.Option("skipQuests") end
+
+YR.Part(Wanted, { "QUEST_DETAIL", "QUEST_ACCEPTED" }, function(_, event, arg1, arg2)
+    if not Wanted() then return end
     if event == "QUEST_DETAIL" then
         local id = GetQuestID()
         if id and YR.SKIP_QUESTS[id] then shown[id] = GetTime() end

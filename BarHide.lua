@@ -25,6 +25,7 @@ local quiet = {}        -- [bar key] = { button = true } whose mouse we turned o
 local shown = {}        -- [bar key] = the alpha we last set (nil: never touched)
 local editing = false
 local ticker
+local late = false      -- something couldn't be done in a fight: done when it ends
 
 function YR.BarHideMode(key)
     local v = YippRouteDB[key]
@@ -38,7 +39,7 @@ end
 
 -- The bar's buttons take the mouse, or don't. Only the ones we turned off are turned on again.
 local function Mouse(key, frame, on)
-    if InCombatLockdown() then return false end
+    if InCombatLockdown() then late = true return false end
     local off = quiet[key]
     if on then
         if off then
@@ -100,7 +101,7 @@ local SLIM, STRIP = 18, 29
 local gone, hooked = {}, {}          -- gone[frame] = true for the ones we hid that the game wanted shown
 local slimmed = {}                   -- [strip] = true while it is slim
 local sized = {}                     -- [frame] = the size or scale it had, while it is made small
-local faces = setmetatable({}, { __mode = "k" })     -- [button] = { size, alphas, icon }
+local faces = setmetatable({}, { __mode = "k" })     -- [button] = { size, alphas, icon, regions, count }
 
 function YR.ChatStripMode()
     local v = YippRouteDB.chatStrip
@@ -110,12 +111,16 @@ local function Hidden(key) return YR.QoLOn() and YippRouteDB[key] == true end
 
 -- Hidden, and kept hidden; or shown again if it was us who hid it.
 local function Keep(f, hide, still)
-    if type(f) ~= "table" or not f.Hide or (f.IsProtected and f:IsProtected() and InCombatLockdown()) then return end
+    if type(f) ~= "table" or not f.Hide then return end
+    if f.IsProtected and f:IsProtected() and InCombatLockdown() then late = true return end
     if hide then
         if not hooked[f] and f.HookScript then
             hooked[f] = true
             f:HookScript("OnShow", function(self)
-                if still() and not (self.IsProtected and self:IsProtected() and InCombatLockdown()) then gone[self] = true self:Hide() end
+                if not still() then return end
+                if self.IsProtected and self:IsProtected() and InCombatLockdown() then late = true return end
+                gone[self] = true
+                self:Hide()
             end)
         end
         if f:IsShown() then gone[f] = true f:Hide() end
@@ -127,8 +132,15 @@ end
 
 -- Every piece of Blizzard's art on the button made clear. Its flashing light (something new in a
 -- channel) is left to flash.
+-- This runs each time the button is pointed at, left or pressed: its pieces are listed once, and
+-- again only when Blizzard has given it one more.
 local function Sweep(button, k)
-    for _, region in ipairs({ button:GetRegions() }) do
+    local count = select("#", button:GetRegions())
+    if count ~= k.count then
+        k.count = count
+        k.regions = { button:GetRegions() }
+    end
+    for _, region in ipairs(k.regions) do
         if region ~= k.icon and region ~= button.Flash and region.IsObjectType and region:IsObjectType("Texture") then
             if k.alphas[region] == nil then k.alphas[region] = region:GetAlpha() end
             if region:GetAlpha() ~= 0 then region:SetAlpha(0) end
@@ -236,6 +248,7 @@ end
 
 --- As the options are now (after one changed, a reload, a fight, Edit Mode).
 function YR.BarHideApply()
+    late = false
     ChatButtons()
     local hover = false
     for key in pairs(BARS) do
@@ -252,27 +265,61 @@ function YR.BarHideApply()
         ticker:Cancel()
         ticker = nil
     end
+    if YR.ChatLogApply and YR.ChatLogOn and YR.ChatLogOn() then YR.ChatLogApply() end      -- its button sits on the strip
 end
 
 function YR.SetBarHide(key, mode)
     if not BARS[key] then return end
     YippRouteDB[key] = MODES[mode] and mode or nil
     YR.BarHideApply()
+    YR.SettingChanged()
 end
 
+-- Wanted while a bar is under the mouse or hidden, or any of the chat's buttons is slim or hidden.
+-- With all of it as Blizzard has it nothing is listened for: no event, nothing from Edit Mode.
+local function Wanted()
+    if not YR.QoLOn() then return false end
+    for key in pairs(BARS) do
+        if YR.BarHideMode(key) ~= "show" then return true end
+    end
+    return YR.ChatStripMode() ~= "show" or YippRouteDB.chatTTSHide == true or YippRouteDB.chatSocialHide == true
+end
+
+local function OnEvent(_, event)
+    -- the end of a fight: only what the fight held back (most fights hold back nothing)
+    if event == "PLAYER_REGEN_ENABLED" and not late then return end
+    YR.BarHideApply()
+end
+local function EditEnter() editing = true YR.BarHideApply() end
+local function EditExit() editing = false YR.BarHideApply() end
+
+local declared
 function YR.StartBarHide()
     -- the one switch there was first: everything hidden
     if YippRouteDB.chatButtonsHide == true then
         YippRouteDB.chatStrip, YippRouteDB.chatTTSHide, YippRouteDB.chatSocialHide = "hide", true, true
     end
     YippRouteDB.chatButtonsHide = nil
-    local f = CreateFrame("Frame")
-    f:RegisterEvent("PLAYER_ENTERING_WORLD")
-    f:RegisterEvent("PLAYER_REGEN_ENABLED")
-    f:SetScript("OnEvent", function() YR.BarHideApply() end)
-    local registry = _G.EventRegistry
-    if type(registry) == "table" and registry.RegisterCallback then
-        registry:RegisterCallback("EditMode.Enter", function() editing = true YR.BarHideApply() end, f)
-        registry:RegisterCallback("EditMode.Exit", function() editing = false YR.BarHideApply() end, f)
-    end
+    if declared then return end
+    declared = true
+    YR.Part(Wanted, { "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED" }, OnEvent, {
+        start = function(p)
+            local registry = _G.EventRegistry
+            if type(registry) == "table" and registry.RegisterCallback then
+                registry:RegisterCallback("EditMode.Enter", EditEnter, p.frame)
+                registry:RegisterCallback("EditMode.Exit", EditExit, p.frame)
+            end
+            YR.BarHideApply()
+        end,
+        -- off: Edit Mode is let go of, and whatever is still ours on the bars is put back
+        stop = function(p)
+            local registry = _G.EventRegistry
+            if type(registry) == "table" and registry.UnregisterCallback then
+                registry:UnregisterCallback("EditMode.Enter", p.frame)
+                registry:UnregisterCallback("EditMode.Exit", p.frame)
+            end
+            editing = false
+            YR.BarHideApply()
+        end,
+    })
 end

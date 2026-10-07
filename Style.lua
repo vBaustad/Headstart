@@ -25,6 +25,10 @@ S.C = {
     gold    = { 1.00, 0.80, 0.30, 1 },
 }
 
+--- Called after any control of ours changed a setting (Core.lua puts YR.SettingChanged here: the parts
+--- of Headstart that listen only while they are wanted are looked at again).
+function S.Changed() end
+
 local function Set(tex, color) tex:SetColorTexture(color[1], color[2], color[3], color[4] or 1) end
 S.Set = Set
 
@@ -266,7 +270,7 @@ function S.Toggle(parent, label, get, set, note)
         knob:ClearAllPoints()
         knob:SetPoint("LEFT", track, "LEFT", on and 18 or 2, 0)
     end
-    b:SetScript("OnClick", function() set(not get()) b:Refresh() end)
+    b:SetScript("OnClick", function() set(not get()) b:Refresh() S.Changed() end)
     b:Refresh()
     return b
 end
@@ -290,7 +294,7 @@ function S.Input(parent, opts)
     box:SetScript("OnEditFocusGained", function() border:Color(S.C.accent) Hint() end)
     box:SetScript("OnEditFocusLost", function()
         border:Color(S.C.line) Hint()
-        if opts.onCommit then opts.onCommit(box:GetText()) end
+        if opts.onCommit then opts.onCommit(box:GetText()) S.Changed() end
     end)
     box:SetScript("OnEnterPressed", box.ClearFocus)
     box:SetScript("OnEscapePressed", box.ClearFocus)
@@ -378,7 +382,7 @@ function S.OpenMenu(anchor, options, onPick, width, side)
         item.label:SetPoint("RIGHT", -8, 0)
         item:SetScript("OnEnter", function() hi:SetColorTexture(unpack(S.C.accentD)) end)
         item:SetScript("OnLeave", function() hi:SetColorTexture(1, 1, 1, 0) end)
-        item:SetScript("OnClick", function(self) CloseMenu() menu.onPick(self.value) end)
+        item:SetScript("OnClick", function(self) CloseMenu() menu.onPick(self.value) S.Changed() end)
         menu.items[i] = item
     end
     -- rows past this menu's length stay in the pool, hidden, for the next long menu
@@ -451,7 +455,7 @@ function S.Stepper(parent, get, set, min, max, step, width)
     local input
     local function Apply(v)
         v = tonumber(v)
-        if v then set(math.max(min, math.min(max, v))) end
+        if v then set(math.max(min, math.min(max, v))) S.Changed() end
         input:SetValue(get())
     end
     -- Shift-click moves ten steps at a time
@@ -621,7 +625,7 @@ function S.Switch(parent, get, set)
         knob:ClearAllPoints()
         knob:SetPoint("LEFT", on and 18 or 2, 0)
     end
-    b:SetScript("OnClick", function() set(not get()) b:Refresh() end)
+    b:SetScript("OnClick", function() set(not get()) b:Refresh() S.Changed() end)
     b:Refresh()
     return b
 end
@@ -657,13 +661,14 @@ function S.Slider(parent, min, max, step, get, set, width)
     local function Nudge(dir)
         local n = IsShiftKeyDown() and 10 or 1
         set(Clamp(get() + dir * n * step))
+        S.Changed()
         f:Refresh()
     end
     local plus = S.IconButton(f, "plus", function() Nudge(1) end, "+" .. step .. "  (Shift: +" .. step * 10 .. ")", S.C.sub, 22)
     plus:SetPoint("RIGHT")
     local box = S.Input(f, { width = 52, numeric = true, onCommit = function(t)
         local v = tonumber(t)
-        if v then set(Clamp(v)) end
+        if v then set(Clamp(v)) S.Changed() end
         f:Refresh()
     end })
     box:SetPoint("RIGHT", plus, "LEFT", -2, 0)
@@ -680,6 +685,7 @@ function S.Slider(parent, min, max, step, get, set, width)
         if busy then return end
         v = Clamp(v)
         set(v)
+        S.Changed()
         Show(v)
     end)
     function f:Refresh()
@@ -715,7 +721,7 @@ function S.TextArea(parent, width, height, opts)
     box:SetScript("OnEditFocusGained", function() border:Color(S.C.accent) Hint() end)
     box:SetScript("OnEditFocusLost", function()
         border:Color(S.C.line) Hint()
-        if opts.onCommit then opts.onCommit((box:GetText():gsub("\n", " "))) end
+        if opts.onCommit then opts.onCommit((box:GetText():gsub("\n", " "))) S.Changed() end
     end)
     box:SetScript("OnEnterPressed", box.ClearFocus)
     box:SetScript("OnEscapePressed", box.ClearFocus)

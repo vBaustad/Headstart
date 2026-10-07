@@ -108,10 +108,12 @@ StaticPopupDialogs["HEADSTART_BUY_LATER"] = {
 
 local function AtVendor()
     if not YR.Option("buyLater") or IsShiftKeyDown() or not GetMerchantNumItems then return end
+    local wanted = YR.ShoppingList()
+    if #wanted == 0 then return end             -- nothing on the list: the vendor's goods aren't read
     local money = GetMoney()
     for i = 1, GetMerchantNumItems() do
         local id = GetMerchantItemID(i)
-        for _, e in ipairs(YR.ShoppingList()) do
+        for _, e in ipairs(wanted) do
             if id == e.item and YR.ShoppingWanted(e) then
                 local cost = YR.MerchantInfo(i) or e.price      -- Restock.lua: C_MerchantFrame on Forever
                 if money >= cost then
@@ -127,16 +129,22 @@ end
 
 -- Money changes once per item sold: look once it settles, not twenty times for twenty sales.
 local pending = false
-local f = CreateFrame("Frame")
-f:RegisterEvent("PLAYER_LOGIN")
-f:RegisterEvent("PLAYER_MONEY")
-f:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-f:RegisterEvent("MERCHANT_SHOW")
-f:SetScript("OnEvent", function(_, event)
-    if event == "MERCHANT_SHOW" then
-        C_Timer.After(0.2, AtVendor)
-    elseif not pending then
-        pending = true
-        C_Timer.After(0.5, function() pending = false Check() end)
-    end
-end)
+local function Settled()
+    pending = false
+    Check()
+end
+
+-- A part (Core.lua): only with the routes and the option on is money, gear or a vendor listened for.
+-- And then nothing is done while the list is empty (a class or race the routes have no such buy for).
+YR.Part(function() return YR.RoutesOn() and YR.Option("buyLater") end,
+    { "PLAYER_MONEY", "PLAYER_EQUIPMENT_CHANGED", "MERCHANT_SHOW" },
+    function(_, event)
+        if #YR.ShoppingList() == 0 then return end
+        if event == "MERCHANT_SHOW" then
+            C_Timer.After(0.2, AtVendor)
+        elseif not pending then
+            pending = true
+            C_Timer.After(0.5, Settled)
+        end
+    end,
+    { start = function() C_Timer.After(0.5, Check) end })       -- at the login: can you afford one already?

@@ -119,13 +119,18 @@ local BORDER = {
     blizzard = { edgeSize = 12, insets = { left = 3, right = 3, top = 3, bottom = 3 } },
 }
 
--- Before RestedXP draws: the border's size for our look, or RestedXP's own back
+local BORDERED = { "edge", "guideName" }
+local bordered          -- a border size of ours is on RestedXP's window now
+
+-- Before RestedXP draws: the border's size for our look, or RestedXP's own back. With no look picked
+-- and none of our sizes on it, RestedXP's borders aren't read.
 local function Borders()
+    local mode = YR.RXPSkinMode()
+    if mode == "off" and not bordered then return end
     local rxp = Rxp()
     local backdrop = rxp and rxp.RXPFrame and rxp.RXPFrame.backdrop
     if type(backdrop) ~= "table" then return end
-    local mode = YR.RXPSkinMode()
-    for _, key in ipairs({ "edge", "guideName" }) do
+    for _, key in ipairs(BORDERED) do
         local b = backdrop[key]
         if type(b) == "table" then
             original = original or {}
@@ -134,6 +139,7 @@ local function Borders()
             b.edgeSize, b.insets = want.edgeSize, want.insets
         end
     end
+    bordered = BORDER[mode] ~= nil
 end
 
 -- Blizzard's own art by its atlas name, where this client has it (Forever swaps its bronze in behind
@@ -423,7 +429,8 @@ local function SlimBar(frame)
     bar:SetFrameLevel((old.GetFrameLevel and old:GetFrameLevel() or 1) + 5)
     local busy
     local function FromTheirs()
-        if busy then return end
+        -- (RestedXP's bar says so at every step of a scroll, for good: ours out of sight needs none of it)
+        if busy or not bar:IsShown() then return end
         busy = true
         pcall(function()
             local lo, hi = old:GetMinMaxValues()
@@ -527,7 +534,16 @@ end
 -- edge, in the panel's colour. RestedXP sets a box's backdrop again when the theme changes, which
 -- brings its own edge back by itself; ours is only ever hidden.
 
+-- No look picked, and nothing of ours left on RestedXP's windows to take off again (none since
+-- login, or the last one taken off whole: see Paint): its redraws and step changes are let pass
+-- without a look at them.
+local everOn = false
+
 local function StepBoxes()
+    if not everOn then
+        if YR.RXPSkinMode() == "off" then return end
+        everOn = true
+    end
     local rxp = Rxp()
     local steps = rxp and type(rxp.RXPFrame) == "table" and rxp.RXPFrame.CurrentStepFrame
     local pool = type(steps) == "table" and steps.framePool
@@ -544,7 +560,11 @@ local function StepBoxes()
                 box.headstartPanel = ours
             end
             if ours then
-                if panel then ours:SetAtlas(panel) end
+                -- the same art as the last step change: not set again on every box
+                if panel and rawget(box, "headstartArt") ~= panel then
+                    box.headstartArt = panel
+                    ours:SetAtlas(panel)
+                end
                 ours:SetShown(panel and true or false)
             end
             local fill = rawget(box, "headstartFill")
@@ -652,6 +672,10 @@ local function SmallWindow(frame, mode, accent)
 end
 
 function YR.RXPSkinSmallWindows()
+    if not everOn then
+        if YR.RXPSkinMode() == "off" then return end
+        everOn = true
+    end
     local rxp = Rxp()
     if not rxp then return end
     local v2 = rxp.v2 and rxp.v2.IsGuideWindowEnabled and rxp.v2:IsGuideWindowEnabled()
@@ -667,10 +691,14 @@ end
 local painted
 
 local function Paint()
+    local mode = YR.RXPSkinMode()
+    if not everOn then
+        if mode == "off" then return end
+        everOn = true
+    end
     local rxp = Rxp()
     local frame = rxp and rxp.RXPFrame
     if type(frame) ~= "table" then return end
-    local mode = YR.RXPSkinMode()
     -- RestedXP's new window (v2) draws itself from the theme: nothing of ours goes over it
     local v2 = rxp.v2 and rxp.v2.IsGuideWindowEnabled and rxp.v2:IsGuideWindowEnabled()
     StepBoxes()
@@ -682,6 +710,9 @@ local function Paint()
             ScrollBar(frame, "off")
             Layout(frame, "off")
         end
+        -- no look any more, and the step boxes, the small windows and the window itself have just
+        -- been gone over: nothing of ours is left on them
+        if mode == "off" then everOn = false end
         return
     end
     painted = true
@@ -785,33 +816,16 @@ local function Redraw()
     Paint()
 end
 
---- Pick a look: "headstart", "blizzard" or "off" (back to the RestedXP theme you had).
-function YR.SetRXPSkin(mode)
-    local rxp = Rxp()
-    local profile = rxp and rxp.settings and rxp.settings.profile
-    if not profile then return false end
-    if profile.activeTheme ~= HEADSTART and profile.activeTheme ~= BLIZZARD then YippRouteDB.rxpSkinPrev = profile.activeTheme end
-    Register()
-    profile.activeTheme = mode == "headstart" and HEADSTART or mode == "blizzard" and BLIZZARD
-        or YippRouteDB.rxpSkinPrev or "RXP Blue"
-    Redraw()
-    return true
-end
-
---- After a colour changed: the themes made again with it, and the window drawn again.
-function YR.RXPSkinApply()
-    if not Register() then return end
-    if YR.RXPSkinMode() ~= "off" then Redraw() end
-end
-
-function YR.RXPSkinAvailable() return Rxp() ~= nil end
-
-function YR.StartRXPSkin()
+-- Going over RestedXP's drawing means hooks on what draws: its redraws, its step changes, its two
+-- small windows. A hook can't be taken off again, so they are put on the first time one of our looks
+-- is on - RestedXP with a theme of its own is never hooked there - and each comes straight back out
+-- while no look is picked (everOn).
+local hooksOn
+local function Hooks()
+    if hooksOn then return end
     local rxp = Rxp()
     if not rxp then return end
-    Register()
-    -- RestedXP picks its theme, then draws: the border's size goes in between, our colours after
-    if type(rxp.LoadActiveTheme) == "function" then hooksecurefunc(rxp, "LoadActiveTheme", Borders) end
+    hooksOn = true
     if type(rxp.RenderFrame) == "function" then hooksecurefunc(rxp, "RenderFrame", Paint) end
     if type(rxp.SetupGuideWindow) == "function" then hooksecurefunc(rxp, "SetupGuideWindow", Paint) end
     -- the boxes of the steps you're on are made (and their edges set) each time the step changes
@@ -826,5 +840,57 @@ function YR.StartRXPSkin()
     if type(rxp.RXPFrame) == "table" and type(rxp.RXPFrame.UpdateVisuals) == "function" then
         hooksecurefunc(rxp.RXPFrame, "UpdateVisuals", Paint)
     end
-    if YR.RXPSkinMode() ~= "off" then Redraw() end
+end
+
+-- RestedXP picks its theme, then draws: the border's size goes in between, our colours after. This
+-- one hook is there from the start (RestedXP comes here only when it loads a theme): it is how a look
+-- of ours picked in RestedXP's own list is noticed. The draw that theme was loaded for is under way
+-- and was not hooked when it began, so the first going-over is asked for a moment later.
+local function ThemeLoading()
+    if not hooksOn and YR.RXPSkinMode() ~= "off" then
+        Hooks()
+        if hooksOn then C_Timer.After(0, Paint) end
+    end
+    Borders()
+end
+
+--- Pick a look: "headstart", "blizzard" or "off" (back to the RestedXP theme you had).
+function YR.SetRXPSkin(mode)
+    local rxp = Rxp()
+    local profile = rxp and rxp.settings and rxp.settings.profile
+    if not profile then return false end
+    if profile.activeTheme ~= HEADSTART and profile.activeTheme ~= BLIZZARD then YippRouteDB.rxpSkinPrev = profile.activeTheme end
+    Register()
+    profile.activeTheme = mode == "headstart" and HEADSTART or mode == "blizzard" and BLIZZARD
+        or YippRouteDB.rxpSkinPrev or "RXP Blue"
+    if YR.RXPSkinMode() ~= "off" then Hooks() end
+    Redraw()
+    return true
+end
+
+--- After a colour changed: the themes made again with it, and the window drawn again.
+function YR.RXPSkinApply()
+    if not Register() then return end
+    if YR.RXPSkinMode() ~= "off" then
+        Hooks()
+        Redraw()
+    end
+end
+
+function YR.RXPSkinAvailable() return Rxp() ~= nil end
+
+-- No part of ours listens for anything here. With RestedXP loaded our two themes are handed to it
+-- (they are in its theme list, and it needs them there to load one that is its own choice), and
+-- everything else waits for one of them to be picked.
+local started
+function YR.StartRXPSkin()
+    local rxp = Rxp()
+    if not rxp or started then return end
+    started = true
+    Register()
+    if type(rxp.LoadActiveTheme) == "function" then hooksecurefunc(rxp, "LoadActiveTheme", ThemeLoading) end
+    if YR.RXPSkinMode() ~= "off" then
+        Hooks()
+        Redraw()
+    end
 end

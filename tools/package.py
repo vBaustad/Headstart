@@ -25,6 +25,9 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             if f in SKIP_FILES:
                 continue
             full = os.path.join(folder, f)
-            z.write(full, os.path.join("Headstart", os.path.relpath(full, ROOT)))
+            rel = os.path.relpath(full, ROOT)
+            # the window's addon is a folder of its own beside Headstart's (as .pkgmeta's move-folders does)
+            top = "" if rel.split(os.sep)[0] in ("Headstart_Options", "Headstart_Setup") else "Headstart"
+            z.write(full, os.path.join(top, rel))
             n += 1
 print(out, n, "files")

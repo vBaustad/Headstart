@@ -12,3 +12,8 @@ ignore:
   - "CHANGELOG.md"
   - "tools"
   - "dist"
+
+# the window is an addon of its own (load on demand): its folder goes beside Headstart's
+move-folders:
+  Headstart/Headstart_Options: Headstart_Options
+  Headstart/Headstart_Setup: Headstart_Setup

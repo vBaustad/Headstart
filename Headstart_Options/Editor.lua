@@ -8,7 +8,11 @@
 --              This run: what this character did; "Add to route" makes any of it a step of the open
 --              route. Share: the open route as text, or paste one in.
 --   QoL        the settings pages (Find a setting at the top), Instances among them.
-local _, YR = ...
+--
+-- This file is the Headstart_Options addon: load on demand, loaded by Headstart the first time the
+-- window is asked for (YR.LoadWindow, Core.lua), so none of it is in memory for someone who never
+-- opens it. An addon of its own has a table of its own: Headstart's is handed over as HeadstartNS.
+local YR = _G.HeadstartNS
 local S = YR.Style
 
 local W, H, SIDE, HEAD = 1140, 680, 180, 48
@@ -20,16 +24,6 @@ local LIST_W, ROW = 480, 24
 local win, pages, current
 local edit = { key = nil, header = nil, steps = nil, parsed = {}, dirty = false, sel = nil, line = nil, filter = "" }
 local ui = {}
-
-StaticPopupDialogs["HEADSTART_RELOAD"] = {
-    text = "Headstart: reload so RestedXP gets the changed route?",
-    button1 = "Reload",
-    button2 = "Later",
-    OnAccept = function() ReloadUI() end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
 
 StaticPopupDialogs["HEADSTART_DELETE_LOG"] = {
     text = "Headstart: delete the run log of %s? This can't be undone.",
@@ -1012,7 +1006,14 @@ end
 
 local function RefreshRun()
     win.subtitle:SetText("")
-    run.actions = YR:RunActions()
+    -- the list is made from the whole log (a table and two texts an event): made again only when the
+    -- log has another event in it, or is another log (deleted and begun again)
+    local log = YippRouteDB.runs and YippRouteDB.runs[YR.CharKey()]
+    local ev = log and log.ev
+    if not run.actions or run.madeOf ~= ev or run.madeAt ~= (ev and #ev or 0) then
+        run.madeOf, run.madeAt = ev, ev and #ev or 0
+        run.actions = YR:RunActions()
+    end
     run.hint:SetText(("%d actions. Click one for its details; Add to route puts it in %s, after step %s."):format(#run.actions,
         edit.key and YR.GuideName(edit.key) or "the open route", edit.sel or "-"))
     -- follow the newest actions, but don't jump away from where you were reading
@@ -1238,11 +1239,16 @@ local function RowPage(page, controls, bottom)
             r.infoBtn.icon:SetVertexColor(unpack((r.infoBtn:IsMouseOver() or S.IsPinned(r)) and S.C.accent or S.C.muted))
         end
     end
-    local wait = 0
+    local wait, atX, atY, atScroll = 0, nil, nil, nil
     area:SetScript("OnUpdate", function(_, elapsed)
         wait = wait - (elapsed or 1)          -- twenty looks a second are plenty for a highlight
         if wait > 0 then return end
         wait = 0.05
+        -- the mouse where it was and the page where it was: the same row as last time
+        local x, y = GetCursorPosition()
+        local scroll = area.GetVerticalScroll and area:GetVerticalScroll() or 0
+        if x == atX and y == atY and scroll == atScroll then return end
+        atX, atY, atScroll = x, y, scroll
         local now
         if area:IsMouseOver() then
             for _, r in ipairs(rows) do
@@ -1258,7 +1264,7 @@ local function RowPage(page, controls, bottom)
     end)
     area:SetScript("OnHide", function()
         S.Unpin()
-        hot = nil
+        hot, atX = nil, nil
         for _, r in ipairs(rows) do Paint(r) end
     end)
     function L.Row(label, control, tip)
@@ -1473,15 +1479,16 @@ local function BuildRouteSettings(page)
     end)
     function pick:Refresh() self:SetValue("Pick a character...") end
     plainRow("Delete a character's log", pick, "Asks first. This character's log starts again from now")
-    plainRow("Delete logs not played for (days)", S.Stepper(c, function() return YippRouteDB.logKeepDays or 0 end,
-        function(v) YippRouteDB.logKeepDays = v > 0 and v or nil end, 0, 365, 5, 110),
-        "At login, the logs of characters you haven't played for this many days are deleted (never this"
-        .. " character's). 0 keeps them all")
+    plainRow("Delete logs not played for (days)", S.Stepper(c, YR.LogKeepDays,
+        function(v) YippRouteDB.logKeepDays = math.max(0, v) end, 0, 365, 5, 110),
+        "At login, the logs of characters you haven't played for this many days are deleted. Never this"
+        .. " character's, a fastest run's (one the level splits compare with) or one a route of yours was"
+        .. " saved from. 30 unless you set another number; 0 keeps them all")
     local scan = S.Button(c, "Delete", function()
         if YR.DeleteScan() then YR.Print("deleted the quest scan.") end
         YR:RefreshWindow()
     end, nil, 90)
-    function scan:Refresh() self:SetEnabled(YippRouteDB.scan ~= nil) end
+    function scan:Refresh() self:SetEnabled(type(_G.HeadstartScanDB) == "table" and _G.HeadstartScanDB.scan ~= nil) end
     plainRow("The quest scan's results", scan, "What /headstart scan read (quest XP, objectives) for the route data."
         .. " Only needed until it's been taken out of the saved file")
 
@@ -1716,12 +1723,21 @@ local function BuildSetup(page)
     local undo = S.Button(L.c, "Undo", function() YS:Undo() end, nil, 90)
     function undo:Refresh()
         local char = _G.YippSetupCharDB          -- this character's saved table (Setup.lua fills it at login)
-        self:SetEnabled(type(char) == "table" and char.backup ~= nil)
+        self:SetEnabled(type(char) == "table" and (char.backup ~= nil or char.uiBackup ~= nil))
     end
     Row("Undo the last Set up", undo, "Puts this character's bars, macros and game settings back as they were before the last"
         .. " Set up layout (a copy is kept each time). Buttons a layout can't hold - a mount, a toy - can't be put back by an addon")
 
-    Section("Interface", nil, { icon = 134063 })
+    Section("Interface", "chat, Edit Mode, settings: without touching a single button", { icon = 134063 })
+    local copyUI = S.Button(L.c, "Copy interface", function() YS:CopyInterface() end, nil, 130)
+    Row("Save this character's interface", copyUI, "Its chat windows and tabs, Edit Mode layout, game settings, which bars show"
+        .. " and the camera - for every class. The bars saved for the class are left as they are (Copy this layout, at the"
+        .. " top, saves both)")
+    local applyUI = S.Button(L.c, "Apply interface", function() YS:ApplyInterface() end, "primary", 130)
+    function applyUI:Refresh() self:SetEnabled(YS:SharedUI() ~= nil) end
+    Row("Put the saved interface on this character", applyUI, "Only the interface, by the switches below: no action button and no"
+        .. " macro is touched. The game settings it changes can be undone (Undo the last Set up); chat windows and the Edit"
+        .. " Mode layout can't be put back by an addon")
     Row("Game settings", Sw("settings"), "Auto loot, interact on click, nameplates, raid frames, map coordinates,"
         .. " camera distance and the rest of the list")
     Row("Edit Mode layout", Sw("editMode"), "Left alone anyway when a UI suite like ElvUI or EllesmereUI is loaded")
@@ -2080,6 +2096,9 @@ local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
         Row("New spells at the trainer", S.Switch(c, Opt("remindTrainer"), function(on) YippRouteDB.remindTrainer = on end),
             "At a ding (and at login): what your class trainer has for you now, and about what it costs. Prices"
             .. " are remembered from your trainer visits (/headstart trainer)")
+        Row("Classic ding information", S.Switch(c, Opt("levelUpStats"), function(on) YippRouteDB.levelUpStats = on end),
+            "As chat used to tell it: \"You have gained 19 hit points. Your Strength increases by 1.\" Forever only"
+            .. " says you reached the level. Lines in chat, a moment after the ding")
         Row("Talent points to spend", S.Switch(c, Opt("remindTalents"), function(on) YippRouteDB.remindTalents = on end),
             "At a ding (and at login), when you have points you haven't spent")
         Row("Durability warning", S.Switch(c, Opt("durability"), function(on) YippRouteDB.durability = on end),
@@ -2103,6 +2122,78 @@ local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
         Section("Screenshots", nil, { icon = 134441 })
         Row("Screenshot at every ding", S.Switch(c, Opt("levelShot"), function(on) YippRouteDB.levelShot = on end),
             "Saved in your Screenshots folder, a moment after the ding so the animation is in it")
+        Section("When you die", "what happened, under the Release button", { icon = 237274,
+            master = { Opt("deathRecap"), function(on) YippRouteDB.deathRecap = on YR.RecapApply() end } })
+        Row("What it shows", S.Text(c, 12, S.C.muted),
+            "The killing blow at the top: its picture, its name, who, and how much. Under it the last things that"
+            .. " happened to you, each a bar as long as the hit was hard - the hardest in large gold letters, crits"
+            .. " and crushing blows marked, heals and dodges between them - and what you took this fight by spell."
+            .. " Who and with what comes from the game once the fight is over. Nothing is shown or said while a"
+            .. " fight is on. Where the game keeps the numbers secret (it may in instances and battlegrounds) it"
+            .. " says how many hits were hidden")
+        Row("Lines shown", S.Stepper(c, function() return math.max(3, math.min(12, tonumber(YippRouteDB.deathRows) or 8)) end,
+            function(v) YippRouteDB.deathRows = v end, 3, 12, 1, 110), "The last this many things that happened to you")
+        Row("Say what killed me in chat too", S.Switch(c, function() return YippRouteDB.deathChat == true end,
+            function(on) YippRouteDB.deathChat = on end), "One line, to yourself only")
+        local last = S.Button(c, "Open", function()
+            if not YR.RecapShow() then YR.Print("no death of this character has been noted yet.") end
+        end, nil, 90)
+        Row("The last death", last, "Also /headstart death. Kept for this character until the next one")
+        Row("See what it looks like", S.Button(c, "Preview", function() YR.RecapSample() end, nil, 90),
+            "A made-up death, to see the panel without dying for it")
+end)
+
+local BuildLoot = QoLPage("loot", function(L, c, Section, Row, Opt)
+        local function Sw(key)
+            return S.Switch(c, function() return YippRouteDB[key] ~= false end, function(on) YippRouteDB[key] = on end)
+        end
+        Section("Loot feed", "what you just got, in a few lines that fade", { icon = 133784,
+            master = { Opt("lootFeed"), function(on) YippRouteDB.lootFeed = on YR.LootFeedApply() end } })
+        Row("Items", Sw("lootItems"), "Each with its icon and name in its quality's colour. The same item again within the"
+            .. " feed's time is one line with a higher count")
+        local QUALITY = { { 0, "Everything" }, { 1, "Common (white) and better" }, { 2, "Uncommon (green) and better" },
+            { 3, "Rare (blue) and better" } }
+        local quality
+        quality = S.Dropdown(c, 220, QUALITY, function(v)
+            YippRouteDB.lootQuality = v > 0 and v or nil
+            quality:Refresh()
+        end)
+        function quality:Refresh()
+            local now = tonumber(YippRouteDB.lootQuality) or 0
+            for _, o in ipairs(QUALITY) do if o[1] == now then self:SetValue(o[2]) end end
+        end
+        Row("  Items shown", quality, "What is left out of the feed is still in the log")
+        Row("Coins", Sw("lootMoney"), "Money you loot, and your share of a group's")
+        Row("Experience", Sw("lootXP"), "Kills in a row add up on one line")
+        Row("Reputation", Sw("lootRep"))
+        Row("Seconds a line stays", S.Stepper(c, function() return math.max(2, math.min(15, tonumber(YippRouteDB.lootSeconds) or 4)) end,
+            function(v) YippRouteDB.lootSeconds = v end, 2, 15, 1, 110))
+        Row("Lock in place", S.Switch(c, function() return YippRouteDB.lootLock ~= false end, function(on)
+            YippRouteDB.lootLock = on
+            YR.LootFeedApply()
+        end), "Unlocked, the feed's place shows in blue: drag it where you want it")
+        Row("See it", S.Button(c, "Sample", function()
+            if not YR.LootFeedSample() then YR.Print("turn the loot feed on first.") end
+        end, nil, 90), "A few made-up lines on the feed")
+        Row("Back where it started", S.Button(c, "Reset", function() YR.LootFeedResetPosition() end, nil, 90))
+
+        Section("Loot log", "what you got, and what a session is worth", { icon = 133785 })
+        Row("The log", S.Button(c, "Open", function() YR.LootLogToggle() end, nil, 90),
+            "Also /headstart loot. Every item and reputation gain with its time, and this session's sums: money looted,"
+            .. " what your loot is worth at a vendor, experience - and each of them an hour. Kept while the loot feed is on")
+        local count = S.Text(c, 12, S.C.sub)
+        function count:Refresh() self:SetText(("%d entries"):format(YR.LootLogCount())) end
+        Row("Kept now", count, "The newest 800, for this character")
+        StaticPopupDialogs["HEADSTART_CLEAR_LOOTLOG"] = {
+            text = "Headstart: forget every entry of this character's loot log?",
+            button1 = "Forget them",
+            button2 = "Cancel",
+            OnAccept = function() YR.LootLogClear() YR:RefreshWindow() end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+        }
+        Row("Empty the log", S.Button(c, "Empty", function() StaticPopup_Show("HEADSTART_CLEAR_LOOTLOG") end, nil, 90), "Asks first")
 end)
 
 local BuildGear = QoLPage("gear", function(L, c, Section, Row, Opt)
@@ -2385,10 +2476,16 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         tex = S.Dropdown(c, 170, TEX, function(v) Set("texture")(v) tex:Refresh() end)
         function tex:Refresh() for _, o in ipairs(TEX) do if o[1] == db().texture then self:SetValue(o[2]) end end end
         Row("Texture", tex)
-        Row("XP colour", Swatch(c, "xpColor"))
+        Row("Gradient", S.Switch(c, Get("gradient"), Set("gradient")), "Your XP runs from one colour to another along the bar."
+            .. " Off: the first colour alone")
+        Row("XP colour", Swatch(c, "xpColor"), "Your XP while you have no rested XP")
+        Row("  runs to", Swatch(c, "xpColor2"), "The colour at the front of your XP, with the gradient on")
+        Row("XP colour, rested", Swatch(c, "xpRestedColor"), "Your XP while you have rested XP, as Blizzard's bar turns blue")
+        Row("  runs to", Swatch(c, "xpRestedColor2"), "The colour at the front of your XP while rested, with the gradient on")
         Row("Completed quests colour", Swatch(c, "questColor"), "After your XP: the XP of the quests in your log that are done"
             .. " and not handed in yet - where you'll be once you hand them in")
-        Row("Rested colour", Swatch(c, "restColor"), "After that: the rested XP, double XP for kills until it's used")
+        Row("Rested XP ahead", Swatch(c, "restColor"), "How far your rested XP reaches from where you are (double XP for kills until it's used). Behind the"
+            .. " completed quests: it shows where it reaches past them")
         Row("Background", S.Slider(c, 0, 100, 5, function() return math.floor(db().bgAlpha * 100 + 0.5) end,
             function(v) Set("bgAlpha")(v / 100) end, 260), "How dark the empty part is, in percent")
         local TICKS = { { 0, "None" }, { 10, "Every tenth" }, { 20, "Every twentieth" }, { 4, "Quarters" } }
@@ -2399,7 +2496,7 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         Row("Text size", S.Slider(c, 8, 20, 1, Get("font"), Set("font"), 260))
 
         Section("Words", "what the bar says, written your way", { icon = 134327 })
-        local TOKENS = "{level} {xp} {max} {left} {pct} {rested} {restedpct} {rate} {ding} {mobs} {kill} {played}"
+        local TOKENS = "{level} {xp} {max} {left} {pct} {pctq} {rested} {restedpct} {rate} {ding} {mobs} {kill} {played}"
             .. " {levelplayed} {session} {quest} {questpct} {quests}"
         local function TextRow(label, key)
             local box = S.Input(c, { width = 320, onCommit = function(t) Set(key)(t) end })
@@ -2407,12 +2504,17 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
             Row(label, box, "Write anything, with these filled in: " .. TOKENS .. ". {rate} is XP an hour, {ding} the"
                 .. " time to ding at that rate, {mobs} the kills to ding (by your last kills' XP), {played} and"
                 .. " {levelplayed} your played time in all and this level, {session} since you logged in, {quest}"
-                .. " {questpct} {quests} the XP, share of the level and number of your quests done and not handed in."
+                .. " {questpct} {quests} the XP, share of the level and number of your quests done and not handed in,"
+                .. " {pctq} your percent once they are."
                 .. " Empty: nothing")
         end
         TextRow("Left", "left")
         TextRow("Middle", "center")
         TextRow("Right", "right")
+        Row("A line over the bar", S.Switch(c, Get("over"), Set("over")), "Three more texts, just over the bar")
+        TextRow("Over, left", "left0")
+        TextRow("Over, middle", "center0")
+        TextRow("Over, right", "right0")
         Row("A line under the bar", S.Switch(c, Get("under"), Set("under")), "Three more texts, just under the bar")
         TextRow("Under, left", "left2")
         TextRow("Under, middle", "center2")
@@ -2420,8 +2522,8 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         Row("Only while the mouse is over it", S.Switch(c, Get("textHover"), Set("textHover")))
         Row("Back to the first words", S.Button(c, "Reset", function()
             local d = YR.XPBAR_DEFAULT
-            for _, k in ipairs({ "left", "center", "right", "left2", "center2", "right2" }) do db()[k] = d[k] end
-            db().under = true
+            for _, k in ipairs({ "left", "center", "right", "left0", "center0", "right0", "left2", "center2", "right2" }) do db()[k] = d[k] end
+            db().under, db().over = true, true
             YR.XPBarApply()
             YR:RefreshWindow()
         end, nil, 90))
@@ -2817,6 +2919,44 @@ local BuildChat = QoLPage("chat", function(L, c, Section, Row, Opt)
             YR.BarHideApply()
         end), "The friends button over the chat, with the number of friends online. Your key for the social window still works")
 
+        Section("Chat log", "read back, search and copy what chat said - earlier sessions too", { icon = 134939,
+            master = { Opt("chatLog"), function(on) YippRouteDB.chatLog = on YR.ChatLogApply() end } })
+        Row("What it does", S.Text(c, 12, S.C.muted),
+            "Every line your chat windows show is kept (not the combat log's), for this character. A window of its"
+            .. " own shows them large, each in its colour, as text you can mark with the mouse and copy. Pick one"
+            .. " chat window or all, and search. A line the game keeps secret isn't kept")
+        Row("The log", S.Button(c, "Open", function() YR.ChatLogOpen() end, nil, 90), "Also /headstart chat, and the button by the chat")
+        Row("A button by the chat", S.Switch(c, function() return YippRouteDB.chatLogButton ~= false end, function(on)
+            YippRouteDB.chatLogButton = on
+            YR.ChatLogApply()
+        end), "A small button on the strip of buttons beside the chat, over the chat menu's, which opens the log")
+        Row("Old text back in the chat", S.Switch(c, function() return YippRouteDB.chatLogRestore ~= false end,
+            function(on) YippRouteDB.chatLogRestore = on end),
+            "A login or a reload leaves the chat windows empty: the last lines each of them showed are put back, so"
+            .. " you can scroll up in chat as if you had never left. The log's window is then for searching and copying")
+        Row("  Lines put back, a window", S.Stepper(c, YR.ChatLogRestoreLines, function(v) YippRouteDB.chatLogRestoreLines = v end,
+            10, 500, 10, 110))
+        Row("Lines kept", S.Stepper(c, YR.ChatLogMax, function(v) YippRouteDB.chatLogMax = v end, 200, 5000, 100, 110),
+            "The newest this many; older ones go. Shift-click moves a thousand at a time")
+        Row("Keep it between sessions", S.Switch(c, function() return YippRouteDB.chatLogKeep ~= false end,
+            function(on) YippRouteDB.chatLogKeep = on end),
+            "On: what was said before you logged out is still there next time, with a line where each session began."
+            .. " Off: the log starts empty at every login")
+        local count = S.Text(c, 12, S.C.sub)
+        function count:Refresh() self:SetText(("%d lines"):format(YR.ChatLogCount())) end
+        Row("Kept now", count)
+        StaticPopupDialogs["HEADSTART_CLEAR_CHATLOG"] = {
+            text = "Headstart: forget every line of this character's chat log?",
+            button1 = "Forget them",
+            button2 = "Cancel",
+            OnAccept = function() YR.ChatLogClear() YR:RefreshWindow() end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+        }
+        Row("Empty the log", S.Button(c, "Empty", function() StaticPopup_Show("HEADSTART_CLEAR_CHATLOG") end, nil, 90),
+            "Asks first. This character's only")
+
         Section("Whisper sound", "a sound of your choice when someone whispers you", { icon = 133469 })
         local sound
         sound = S.Dropdown(c, 240, YR.WhisperSounds, function(v)
@@ -2887,7 +3027,7 @@ local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
             YR:RefreshWindow()
         end, nil, 90))
 
-        Section("Bag windows", "moved where you want them", { icon = 134400 })
+        Section("Bag windows", "moved where you want them", { icon = "Interface\\Icons\\INV_Misc_Bag_09" })
         Row("Move the combined bag", S.Switch(c, function() return YippRouteDB.moveBag == true end, function(on)
             YippRouteDB.moveBag = on
             YR.MoverPlace("bag")
@@ -2950,6 +3090,12 @@ local BuildStart = QoLPage("start", function(L, c, Section, Row, Opt)
             "A campfire on screen while a camp is near or its buff runs. Page: Camps & flights")
         Row("Flight timer", Key("flightTimer", function(on) YR:SetFlightTimer(on) end),
             Tip("flightTimer", "A bar while you fly: where to, and the time left. Page: Camps & flights"))
+        Row("Loot feed", Key("lootFeed", function() YR.LootFeedApply() end),
+            Tip("lootFeed", "What you just got - items, money, experience, reputation - as a few lines that fade, and a log with what a session is worth. Page: Loot"))
+        Row("Chat log", Key("chatLog", function() YR.ChatLogApply() end),
+            "What chat said, kept - earlier sessions too - in a window to read back, search and copy text from. A small button by the chat opens it. Page: Chat")
+        Row("What happened, when you die", Key("deathRecap", function() YR.RecapApply() end),
+            "A panel under the Release button: the killing blow, and the last hits on you as bars, the hardest in large letters. Page: Reminders")
         Row("Instance tracker", Key("instanceTrack", function() if YR.InstanceHudApply then YR.InstanceHudApply() end end),
             Tip("instanceTrack", "Counts the dungeons you go into against the hourly and daily limit. Page: Instances"))
 
@@ -2972,6 +3118,11 @@ local BuildStart = QoLPage("start", function(L, c, Section, Row, Opt)
         Row("Move the talent window by dragging", Key("talentMove", function() YR.TalentPlace() end),
             Tip("talentMove", "It opens where you left it. Page: Bars & windows"))
 
+        Row("Character setup", S.Switch(c, function() return YR.SetupOn() end, function(on)
+            YR.SetSetupOn(on)
+            YR:RefreshWindow()
+        end), "The bar planner, and a main's bars, macros and interface put on a new character: a window comes up on a"
+            .. " new character's first login, and spells go onto your bars as you learn them. Its own tab at the top")
         Section("Already on", "seen and harmless; each has a switch on its page", { icon = 134327 })
         Row("What runs from the start", S.Text(c, 12, S.C.muted),
             "Lines on item tooltips (what a quest still needs, what an item would do for you), one quiet line in chat when the"
@@ -2987,7 +3138,7 @@ end)
 --   Character       you and your group: invites, reminders, the trainer, a character's bars
 -- Each page says what is on it under its name (its sections, as links: PageHead).
 local CATEGORIES = {
-    { key = "start", label = "Get started", build = BuildStart, refresh = QoLRefresh("start"), icon = 134400,
+    { key = "start", label = "Get started", build = BuildStart, refresh = QoLRefresh("start"), icon = "Interface\\Icons\\INV_Misc_Lantern_01",
       scope = "Every character on this account",
       desc = "Headstart starts quiet: turn on what you want here. Each has its own page with all its choices." },
     { group = "On screen" },
@@ -3006,8 +3157,8 @@ local CATEGORIES = {
     { group = "Game interface" },
     { key = "chat", label = "Chat", build = BuildChat, refresh = QoLRefresh("chat"), icon = "Interface\\Icons\\INV_Misc_Note_01",
       status = function() return YippRouteDB.chatStrip ~= nil or YippRouteDB.chatTTSHide == true or YippRouteDB.chatSocialHide == true
-          or YippRouteDB.whisperSound ~= nil end, scope = "Every character on this account",
-      desc = "The buttons beside the chat slim or hidden, and a sound when someone whispers you." },
+          or YippRouteDB.whisperSound ~= nil or YR.Option("chatLog") end, scope = "Every character on this account",
+      desc = "The buttons beside the chat slim or hidden, a log of chat to read back and copy from, and a sound when someone whispers you." },
     { key = "windows", label = "Bars & windows", build = BuildWindows, refresh = QoLRefresh("windows"), icon = 136243,
       status = function() return YR.TalentFade() > 0 or YR.Option("talentMove") or YippRouteDB.moveBag == true or YippRouteDB.moveReagentBag == true
           or YippRouteDB.bagBar ~= nil or YippRouteDB.microMenu ~= nil
@@ -3039,14 +3190,14 @@ local CATEGORIES = {
       status = function() return YR.Option("groupBar") end, scope = "Every character on this account",
       desc = "Into a group for a kill and out again, and quests shared and accepted without the clicking." },
     { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134327,
-      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") end, scope = "Every character on this account",
+      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") or YR.Option("deathRecap") or YR.Option("levelUpStats") end, scope = "Every character on this account",
       desc = "One quiet line when there is something to do: the trainer, talents, repairs, things to make." },
     { key = "trainer", label = "Trainer", build = BuildTrainer, refresh = function() trainer.refresh() end, icon = 133741,
       status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
       desc = "Your class spells learned as the trainer opens, the ones you choose, as your gold allows." },
-    { key = "character", label = "Bars & setup", build = BuildSetup, refresh = RefreshSetup, icon = 134166,
-      scope = function() return "Every " .. (CLASS_NAME[ViewClass()] or "character") .. "; chat and Edit Mode for all" end,
-      desc = "Plan your action bars, and put a main's bars, macros and interface on a new character." },
+    { key = "loot", label = "Loot", build = BuildLoot, refresh = QoLRefresh("loot"), icon = 133784,
+      status = function() return YR.Option("lootFeed") end, scope = "Every character; the log per character",
+      desc = "What you just got as a few lines on screen, and a log of it with what a session is worth." },
 }
 -- Older names for a page ("qol" was the one long page; the skins and the talent window had their own).
 local CATEGORY_ALIAS = { qol = "xpbar", main = "xpbar", skins = "rxpskin", talentwin = "windows" }
@@ -3071,10 +3222,12 @@ local function MasterRow(side, width, label, get, set, tip)
     return r
 end
 
-local function ShowTab(key)
+-- quiet: the caller draws the window itself afterwards
+local function ShowTab(key, quiet)
     key = CATEGORY_ALIAS[key] or key
     if key ~= "start" then YippRouteDB.welcome = nil end
     settings.tab = key
+    if quiet then return end
     for _, t in ipairs(CATEGORIES) do
         if t.key then
             t.frame:SetShown(t.key == key)
@@ -3259,8 +3412,9 @@ local function BuildSettings(page)
         BuildAllSettings()
         local found = {}
         for _, e in ipairs(settings.index) do
-            local hay = (e.label .. " " .. (e.tip or "") .. " " .. LabelOf(e.key)):lower()
-            if hay:find(text, 1, true) then found[#found + 1] = e end
+            -- what a setting is found by is the same at every keystroke: put together once
+            e.hay = e.hay or (e.label .. " " .. (e.tip or "") .. " " .. LabelOf(e.key)):lower()
+            if e.hay:find(text, 1, true) then found[#found + 1] = e end
         end
         results.head:SetText(#found == 0 and ("Nothing matches \"" .. text .. "\"")
             or ("%d setting%s"):format(#found, #found == 1 and "" or "s"))
@@ -3415,6 +3569,92 @@ local function RefreshRoutePage()
 end
 
 -- ---------------------------------------------------------------------------
+-- A tab that is switched off: what it is, and its switch. Nothing else of the tab is shown.
+--   o: icon, title, text, get(), set(on), state() (the line under the title), reload() (whether to
+--   offer a reload now)
+-- ---------------------------------------------------------------------------
+local function OffCard(page, o)
+    local f = CreateFrame("Frame", nil, page)
+    f:SetSize(600, 250)
+    f:SetPoint("CENTER", 0, 30)
+    S.Rounded(f, "BACKGROUND", "round"):SetVertexColor(unpack(S.C.card))
+    S.Rounded(f, "BORDER", "roundline"):SetVertexColor(unpack(S.C.lineHi))
+    local icon = S.Icon(f, o.icon, 40)
+    icon:SetPoint("TOPLEFT", 24, -24)
+    local title = S.Text(f, 18)
+    title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 14, -1)
+    title:SetText(o.title)
+    local state = S.Text(f, 12, S.C.muted)
+    state:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+    local sw = S.Switch(f, o.get, function(on) o.set(on) YR:RefreshWindow() end)
+    sw:SetPoint("TOPRIGHT", -24, -32)
+    local body = S.Text(f, 13, S.C.sub)
+    body:SetPoint("TOPLEFT", 24, -86)
+    body:SetPoint("RIGHT", -24, 0)
+    body:SetWordWrap(true)
+    body:SetJustifyV("TOP")
+    body:SetSpacing(3)
+    body:SetText(o.text)
+    local reload = S.Button(f, "Reload UI", function() ReloadUI() end, "primary", 110)
+    reload:SetPoint("BOTTOMRIGHT", -24, 20)
+    function f:Refresh()
+        sw:Refresh()
+        state:SetText(o.state())
+        reload:SetShown(o.reload ~= nil and o.reload() and true or false)
+    end
+    return f
+end
+
+-- Levelling with the routes off: only that.
+local routesOff
+local routesWere                -- the routes switch as it was when the window was made (a change takes a reload)
+local function BuildRoutesOff(page)
+    routesOff = OffCard(page, { icon = "Interface\\Icons\\INV_Misc_Map_01", title = "Levelling routes",
+        text = "Your routes loaded into RestedXP, what they need kept in your bags and bought for you, runs recorded"
+            .. " and saved as routes of your own, a route editor, and the level splits.\n\nOff, none of it runs and"
+            .. " nothing of it is on your screen. For the whole account; turning it on or off takes a /reload.",
+        get = function() return YR.RoutesOn() end, set = YR.SetRoutesOn,
+        state = function() return YR.RoutesOn() and "On - reload to load the routes" or "Off" end,
+        reload = function() return YR.RoutesOn() ~= routesWere end })
+end
+
+-- Character setup: its own tab. On: the page. Off (or its addon not there): only the switch.
+local SETUP_PAGE = { icon = 134166, label = "Character setup",
+    scope = function() return "Every " .. (CLASS_NAME[ViewClass()] or "character") .. "; chat and Edit Mode for all" end,
+    desc = "Plan your action bars, and put a main's bars, macros and interface on a new character." }
+local setupTab = {}
+local function BuildSetupPage(page)
+    setupTab.head = PageHead(page)
+    setupTab.inner = CreateFrame("Frame", nil, page)
+    setupTab.inner:SetPoint("TOPLEFT", 0, -TITLE_H)
+    setupTab.inner:SetPoint("BOTTOMRIGHT")
+    setupTab.off = OffCard(page, { icon = 134166, title = "Character setup",
+        text = "The bar planner: every spell your class will ever have, dragged onto your bars, each going in as it is"
+            .. " learned. And Set up: a main's action bars, macros, key bindings, chat windows and Edit Mode layout put"
+            .. " on a new character in one go - with an undo.\n\nOff, none of it is loaded: no window on a new"
+            .. " character's first login, and no button is ever placed on your bars for you.",
+        get = function() return YR.SetupOn() end, set = YR.SetSetupOn,
+        state = function()
+            if YR.SetupOn() and not YR.SetupLoaded() then return "On, but the Headstart_Setup folder isn't there or is turned off" end
+            return YR.SetupOn() and "On" or "Off"
+        end })
+end
+
+local function RefreshSetupPage()
+    win.subtitle:SetText("")
+    local on = YR.SetupOn() and YR.SetupLoaded()
+    if on and not setupTab.built then
+        setupTab.built = true
+        BuildSetup(setupTab.inner)
+    end
+    setupTab.head(SETUP_PAGE)
+    setupTab.inner:SetShown(on)
+    setupTab.off:SetShown(not on)
+    setupTab.off:Refresh()
+    if on then RefreshSetup() end
+end
+
+-- ---------------------------------------------------------------------------
 -- The window: two tabs at the top, QoL and Levelling, each with its own menu down the left
 -- ---------------------------------------------------------------------------
 -- tab: which top tab a page is under. nav: shown in Levelling's menu (the routes page is opened from
@@ -3429,7 +3669,9 @@ local PAGES = {
       refresh = function() win.subtitle:SetText("") end },
     { key = "route", tab = "levelling", nav = true, label = "Route settings", icon = 134269, build = BuildRoutePage,
       refresh = RefreshRoutePage },
+    { key = "routesoff", tab = "levelling", build = BuildRoutesOff, refresh = function() win.subtitle:SetText("") routesOff:Refresh() end },
     { key = "settings", tab = "qol", build = BuildSettings, refresh = RefreshSettings },
+    { key = "setup", tab = "setup", build = BuildSetupPage, refresh = RefreshSetupPage },
 }
 local PAGE_TAB = {}
 for _, p in ipairs(PAGES) do PAGE_TAB[p.key] = p.tab end
@@ -3437,18 +3679,28 @@ local lastLevelling          -- the Levelling page last shown, for coming back t
 function YR.WindowTab() return PAGE_TAB[current] end      -- for the tests
 
 local function Show(key)
+    if key == "character" then key = "setup" end        -- its name while it was a QoL page
+    -- Levelling with the routes off is one page: the switch
+    if PAGE_TAB[key] == "levelling" and not YR.RoutesOn() then key = "routesoff" end
     if not PAGE_TAB[key] then           -- a QoL page by its own name ("instances", "camps", ...)
-        ShowTab(key)
+        ShowTab(key, true)
         key = "settings"
     end
     current = key
     local tab = PAGE_TAB[key]
-    if tab == "levelling" then lastLevelling = key end
+    if tab == "levelling" and key ~= "routesoff" then lastLevelling = key end
     S.CloseMenu()
     ui.sideL:SetShown(tab == "levelling")
+    ui.levelBody:SetShown(YR.RoutesOn())
     ui.sideQ:SetShown(tab == "qol")
+    ui.sideS:SetShown(tab == "setup")
     for name, b in pairs(ui.topTabs) do b:Select(name == tab) end
     for _, p in ipairs(PAGES) do
+        -- a page is made the first time it is shown (the route editor and QoL with the window)
+        if p.key == key and not p.built then
+            p.built = true
+            p.build(pages[p.key])
+        end
         pages[p.key]:SetShown(p.key == key)
         if p.button then p.button:Select(p.key == key) end
     end
@@ -3458,9 +3710,8 @@ end
 -- Open QoL on one of its pages ("camps", "bags", ..., "character", "trainer"), or Route settings ("route").
 function YR:ShowSettingsTab(key)
     settings.viewClass = nil          -- this character's class
-    if key == "route" then YR:ToggleWindow("route") return end
-    YR:ToggleWindow("settings")
-    ShowTab(key)
+    if key == "route" or key == "setup" or key == "character" then YR:ToggleWindow(key) return end
+    YR:ToggleWindow(CATEGORY_ALIAS[key] or key or "settings")
 end
 
 -- The two tabs: one switch in the middle of the title bar, the half that's showing filled in. Each
@@ -3497,9 +3748,9 @@ local function Segment(parent, label, icon)
 end
 
 -- Both halves in their track, centred in the title bar (head). Returns { levelling = , qol = }.
-local function TopTabs(head, onLevelling, onQoL)
+local function TopTabs(head, onLevelling, onQoL, onSetup)
     local track = CreateFrame("Frame", nil, head)
-    track:SetSize(SEG_W * 2 + 6, SEG_H + 6)
+    track:SetSize(SEG_W * 3 + 6, SEG_H + 6)
     track:SetPoint("CENTER", head, "CENTER", 0, 0)
     track:SetFrameLevel(head:GetFrameLevel() + 2)      -- over the bar you drag the window by
     S.Rounded(track, "BACKGROUND", "round"):SetVertexColor(unpack(S.C.field))
@@ -3508,9 +3759,12 @@ local function TopTabs(head, onLevelling, onQoL)
     qol:SetPoint("LEFT", 3, 0)
     qol:SetScript("OnClick", onQoL)
     local levelling = Segment(track, "Levelling", "Interface\\Icons\\INV_Misc_Map_01")
-    levelling:SetPoint("RIGHT", -3, 0)
+    levelling:SetPoint("LEFT", qol, "RIGHT", 0, 0)
     levelling:SetScript("OnClick", onLevelling)
-    return { levelling = levelling, qol = qol }, track
+    local setupSeg = Segment(track, "Character setup", 134166)
+    setupSeg:SetPoint("RIGHT", -3, 0)
+    setupSeg:SetScript("OnClick", onSetup)
+    return { levelling = levelling, qol = qol, setup = setupSeg }, track
 end
 
 local function NavButton(parent, label, icon, y, indent)
@@ -3638,7 +3892,7 @@ local function Build()
     local track
     ui.topTabs, track = TopTabs(win.title:GetParent(),
         function() Show(lastLevelling or ((YR.RoutesOn() and #YR.shipped > 0) and "routes" or "route")) end,
-        function() Show("settings") end)
+        function() Show("settings") end, function() Show("setup") end)
     win.subtitle:SetPoint("RIGHT", track, "LEFT", -16, 0)
     win.subtitle:SetJustifyH("LEFT")
     win.subtitle:SetWordWrap(false)
@@ -3656,7 +3910,21 @@ local function Build()
         return f
     end
     local side = Side(SIDE, S.C.side)
-    ui.sideL, ui.sideQ = side, Side(NAV_W, S.C.side)
+    ui.sideL, ui.sideQ, ui.sideS = side, Side(NAV_W, S.C.side), Side(NAV_W, S.C.side)
+    routesWere = YR.RoutesOn()
+    -- Character setup's side: its switch, and what the tab is
+    local setupRow = MasterRow(ui.sideS, NAV_W, "Character setup", function() return YR.SetupOn() end, YR.SetSetupOn,
+        "On: the bar planner, and a main's bars, macros and interface on a new character. Off: none of it is"
+        .. " loaded, and nothing is ever placed on your bars for you. For the whole account")
+    setupRow:SetPoint("TOPLEFT", 12, -12)
+    local setupSays = S.Text(ui.sideS, 12, S.C.muted)
+    setupSays:SetPoint("TOPLEFT", 16, -58)
+    setupSays:SetWidth(NAV_W - 32)
+    setupSays:SetWordWrap(true)
+    setupSays:SetJustifyV("TOP")
+    setupSays:SetSpacing(3)
+    setupSays:SetText("Bars are per class: plan them, or copy them from a character that has them.\n\nThe interface"
+        .. " - chat windows, Edit Mode, game settings - is shared by every class.\n\n/headstart plan opens the planner.")
     pages = {}
     ui.routeTabs = {}
     -- The routes switch, Levelling's pages, then every route in a list that scrolls (more routes than room)
@@ -3665,6 +3933,10 @@ local function Build()
         .. " Off: none of that. For the whole account; takes a /reload (/headstart routes on|off)")
     routes:SetPoint("TOPLEFT", 12, -12)
     local y = -50
+    -- everything under the switch sits on a frame of its own: with the routes off only the switch shows
+    side = CreateFrame("Frame", nil, side)
+    side:SetAllPoints()
+    ui.levelBody = side
     for _, p in ipairs(PAGES) do
         if p.nav then
             p.button = NavButton(side, p.label, p.icon, y)
@@ -3777,10 +4049,15 @@ local function Build()
     ui.LayoutRoutes()
     for _, p in ipairs(PAGES) do
         local page = CreateFrame("Frame", nil, win)
-        page:SetPoint("TOPLEFT", p.tab == "qol" and NAV_W or SIDE, -HEAD)
+        page:SetPoint("TOPLEFT", p.tab == "levelling" and SIDE or NAV_W, -HEAD)
         page:SetPoint("BOTTOMRIGHT")
-        p.build(page)
         pages[p.key] = page
+        -- the route editor (a route is opened in it below) and QoL (its menu) with the window; Where
+        -- next, This run, Share and Route settings the first time each is shown
+        if p.key == "routes" or p.key == "settings" then
+            p.built = true
+            p.build(page)
+        end
     end
     local version = S.Text(win, 11, S.C.muted)
     version:SetPoint("RIGHT", win.close, "LEFT", -12, 0)
@@ -3829,6 +4106,4 @@ function YR:ToggleWindow(page)
     Show(page or current or "settings")
 end
 
-function Headstart_OnAddonCompartmentClick()
-    YR:ToggleWindow()
-end
+YR.windowLoaded = true          -- the window's functions above have taken the place of Core.lua's stand-ins

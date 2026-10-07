@@ -181,6 +181,11 @@ for l in open(os.path.join(ROUTES, "Headstart_Routes.toc"), encoding="utf-8"):
 # every file the .toc loads, in its order
 TOC = [l.strip().replace(chr(92), "/") for l in open(os.path.join(ROOT, "Headstart.toc"), encoding="utf-8")
        if l.strip().endswith(".lua") and not l.startswith("#")]
+# and the window's addon (Headstart_Options, load on demand in the game), loaded after it
+for sub in ("Headstart_Setup", "Headstart_Options"):
+    TOC += [sub + "/" + l.strip().replace(chr(92), "/")
+            for l in open(os.path.join(ROOT, sub, sub + ".toc"), encoding="utf-8")
+            if l.strip().endswith(".lua") and not l.startswith("#")]
 for f in TOC:
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("Headstart", YR)
@@ -188,6 +193,7 @@ YR.QUEST_IDS = lua.eval("{ route = { 179 }, new = { 96628, 5 }, rest = { 99999 }
 g = lua.globals()
 g.YippRouteDB = lua.table(routes=True)   # the routes switch on, as for anyone who turned it on
 g.Fire("ADDON_LOADED", "Headstart")
+g.Fire("PLAYER_LOGIN")           # the login: every part that is wanted comes on (the log, the splits, the group...)
 
 bad = 0
 def check(ok, what):
@@ -199,7 +205,8 @@ def check(ok, what):
 g.SlashCmdList.HEADSTART("scan")
 for _ in range(80):              # 8 seconds of ticks, answering whatever was asked
     g.RunTickers(); g.Answer(); g.NOW += 0.1
-s = g.YippRouteDB.scan
+s = g.HeadstartScanDB.scan         # the window addon's own saved file, not the account's
+check(g.YippRouteDB.scan is None, "what the scan found is not in the account's file (read at every login)")
 check(s.quests[179] and s.quests[179].t == "Dwarven Outfitters" and s.quests[179].xp == 80 and s.quests[179].m == 35, "179: name, XP and money")
 check(s.quests[179] and s.quests[179].obj[1][3] == 8, "179: objective count")
 check(s.quests[96628] and s.quests[96628].xp == 450 and s.quests[96628].ql == 5, "96628 (new in Forever): XP and level")
@@ -508,6 +515,31 @@ n = YR.PruneLogs(30)
 g.CLOCK -= 40 * 86400
 check(g.YippRouteDB.runs["Gone-Realm"] is None and g.YippRouteDB.runs["Tester-Realm"] is not None,
       f"30 days: the old logs go ({n}), never this character's")
+# old logs that are still used are kept: a fastest run's, and one a route of your own was saved from
+lua.execute('''KEEP_SPLITS, KEEP_MINE, KEEP_DAYS = YippRouteDB.splits, YippRouteDB.myRoutes, YippRouteDB.logKeepDays
+    YippRouteDB.runs["Fast-Realm"] = { started = 10, ev = {}, track = {} }
+    YippRouteDB.runs["Slow-Realm"] = { started = 10, ev = {}, track = {} }
+    YippRouteDB.runs["Source-Realm"] = { started = 10, ev = {}, track = {} }
+    YippRouteDB.splits = { runs = {
+        a = { name = "Fast-Realm", class = "MAGE", race = "Gnome", levels = { [2] = 100, [3] = 300 } },
+        b = { name = "Slow-Realm", class = "MAGE", race = "Gnome", levels = { [2] = 200, [3] = 500 } },
+        c = { name = "Source-Realm", class = "MAGE", race = "Human", levels = { [2] = 900 } } } }
+    YippRouteDB.myRoutes = { human = { parts = {}, from = "Source-Realm" } }''')
+check(YR.LogKeepDays() == 30, "never set: logs go after 30 days unplayed")
+g.CLOCK += 40 * 86400
+n = YR.PruneLogs(YR.LogKeepDays())
+check(n == 1 and g.YippRouteDB.runs["Slow-Realm"] is None, f"an old log nothing uses goes ({n})")
+check(g.YippRouteDB.runs["Fast-Realm"] is not None, "the fastest run's log is kept, however old")
+check(g.YippRouteDB.runs["Source-Realm"] is not None, "and the log a route of your own was saved from")
+lua.execute('''YippRouteDB.runs["Slow-Realm"] = { started = 10, ev = {}, track = {} }
+    YippRouteDB.myRoutes = { dwarfgnome = { parts = {} } }''')
+check(YR.PruneLogs(30) == 1 and g.YippRouteDB.runs["Slow-Realm"] is not None and g.YippRouteDB.runs["Source-Realm"] is None,
+      "a route saved before its source was kept: every log of that race stays, the others go")
+g.YippRouteDB.logKeepDays = 0
+check(YR.LogKeepDays() == 0 and YR.PruneLogs(YR.LogKeepDays()) == 0, "0 days set: never deleted")
+g.CLOCK -= 40 * 86400
+lua.execute('''YippRouteDB.splits, YippRouteDB.myRoutes, YippRouteDB.logKeepDays = KEEP_SPLITS, KEEP_MINE, KEEP_DAYS
+    for _, k in ipairs({ "Fast-Realm", "Slow-Realm", "Source-Realm" }) do YippRouteDB.runs[k] = nil end''')
 lua.execute('''YippRouteDB.runs["Old-Realm"] = { track = { {0,1,0,0,1,0} } }''')
 # The run to beat has a time for every level: a faster one first seen part-way (only a level-8 total)
 # would leave every "vs best" cell empty.
@@ -1144,4 +1176,18 @@ import smoke_wherenext
 bad += smoke_wherenext.run()
 import smoke_noroutes
 bad += smoke_noroutes.run()
+import smoke_window
+bad += smoke_window.run()
+import smoke_recap
+bad += smoke_recap.run()
+import smoke_chatlog
+bad += smoke_chatlog.run()
+import smoke_lootfeed
+bad += smoke_lootfeed.run()
+import smoke_runstore
+bad += smoke_runstore.run()
+import smoke_idle
+bad += smoke_idle.run()
+import smoke_pins
+bad += smoke_pins.run()
 sys.exit(1 if bad else 0)

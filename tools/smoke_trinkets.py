@@ -23,12 +23,24 @@ FRAMES, AFTER, TICKS = {}, {}, {}
 local F = {}
 F.__index = F
 function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
+function F:UnregisterEvent(e) if self.ev then self.ev[e] = nil end end
+function F:UnregisterAllEvents() self.ev = nil end
 function F:SetScript(_, fn) self.fn = fn end
 function CreateFrame() local f = setmetatable({}, F) table.insert(FRAMES, f) return f end
 function Fire(e) for _, f in ipairs(FRAMES) do if f.ev and f.ev[e] and f.fn then f.fn(f, e) end end end
 C_Timer = { After = function(_, fn) table.insert(AFTER, fn) end,
-            NewTicker = function(_, fn) table.insert(TICKS, fn) return { Cancel = function() end } end }
-function Tick() for _, fn in ipairs(TICKS) do fn() end end
+            NewTicker = function(_, fn)
+                local t = { fn = fn, Cancel = function(self) self.dead = true end }
+                table.insert(TICKS, t)
+                return t
+            end }
+-- A second passes. A setting changed just before it is one the settings window would have told the
+-- addon about (YR.ApplyParts): the swaps tick only while one of them is on.
+function Tick()
+    if APPLY then APPLY() end
+    for _, t in ipairs(TICKS) do if not t.dead then t.fn() end end
+end
+function Ticking() local n = 0 for _, t in ipairs(TICKS) do if not t.dead then n = n + 1 end end return n end
 SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return s end
@@ -91,7 +103,11 @@ C_EquipmentSet = {
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
         chunk("Headstart", YR)
     YR.StartTrinkets()
+    # what is on comes on at the login (YR.Part), and again whenever a setting changes
+    YR.partsReady = True
+    YR.ApplyParts()
     g = lua.globals()
+    g.APPLY = YR.ApplyParts
     g.BAGS_CHANGED = YR.TrinketBagsChanged
 
     def ex(code):
@@ -115,6 +131,8 @@ C_EquipmentSet = {
     YR.TrinketDB().order[2] = 3
     ex("Tick()")
     check(g.WORN[13] == 1 and g.EQUIPS == 0, "swaps are off until you turn them on: nothing changes")
+    check(g.Ticking() == 0 and not any(f.ev and len(list(f.ev)) > 0 for f in list(g.FRAMES.values())[1:]),
+          "and with the bar and every swap off nothing ticks and nothing is listened for")
     ex("MOUNTED = true BAG[3] = 11122 Tick() MOUNTED = false BAG[3] = nil CD[1] = nil")
     check(g.WORN[14] == 2, "no Carrot either until you turn it on")
     g.YippRouteDB.trinketAuto = True
@@ -190,6 +208,7 @@ C_EquipmentSet = {
     g.YippRouteDB.trinketMount = False
     ex("MOUNTED = true Tick()")
     check(g.WORN[14] == 2, "turned off: no Carrot")
+    check(g.Ticking() == 0, "the last swap turned off: the second isn't counted any more")
     ex("MOUNTED = false")
 
     # how many buttons: one per trinket you have (worn or in your bags), at most two; off: always two
@@ -219,6 +238,8 @@ C_EquipmentSet = {
     check(g.USED_SET is None, "in a fight: not yet")
     ex("COMBAT = false Fire('PLAYER_REGEN_ENABLED')")
     check(g.USED_SET == 7, "the fight ends: the set goes on")
+    check(not any(f.ev and f.ev["PLAYER_REGEN_ENABLED"] for f in g.FRAMES.values()),
+          "and with nothing waiting any more the end of a fight isn't listened for")
     YR.UseGearSet("nothing")
     check(any("You have: 1 Tank, 2 Fishing" in str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1)),
           "an unknown set: chat lists the ones you have")

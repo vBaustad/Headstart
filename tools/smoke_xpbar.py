@@ -29,7 +29,13 @@ function Obj:SetShown(on) rawset(self, "shown", on) end
 function Obj:IsShown() return rawget(self, "shown") ~= false end
 function Obj:IsMouseOver() return false end
 function Obj:SetText(t) rawset(self, "text", t) end
+function Obj:SetVertexColor(r) rawset(self, "red", r) rawset(self, "to", nil) end
+function Obj:SetGradient(_, a, b) rawset(self, "red", a.r) rawset(self, "to", b.r) end
+function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
+function Obj:SetWidth(w) rawset(self, "width", w) end
 function Obj:RegisterEvent(e) rawset(self, "ev", rawget(self, "ev") or {}) self.ev[e] = true end
+function Obj:UnregisterEvent(e) if rawget(self, "ev") then self.ev[e] = nil end end
+function Obj:UnregisterAllEvents() rawset(self, "ev", nil) end
 function Obj:SetScript(w, fn) rawset(self, "_" .. w, fn) end
 function Obj:CreateTexture() return setmetatable({}, Obj) end
 function Obj:CreateFontString() return setmetatable({}, Obj) end
@@ -38,7 +44,7 @@ function Fire(e, ...) for _, f in ipairs(FRAMES) do if rawget(f, "ev") and f.ev[
 UIParent = CreateFrame()
 MainStatusTrackingBarContainer = CreateFrame()
 SecondaryStatusTrackingBarContainer = CreateFrame()
-C_Timer = { After = function(_, fn) end, NewTicker = function(_, fn) TICK = fn return {} end }
+C_Timer = { After = function(_, fn) end, NewTicker = function(_, fn) TICK = fn return { Cancel = function() end } end }
 SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return s end
@@ -76,6 +82,9 @@ function print() end
     YR.SplitsXPRate = lua.eval("function() return 6000 end")
     YR.SplitsPlayed = lua.eval("function() return 7200, 900 end")
     YR.StartXPBar()
+    # the bar comes on at the login (YR.Part): nothing of it exists before
+    YR.partsReady = True
+    YR.ApplyParts()
     g = lua.globals()
     g.XPBARVALUES = YR.XPBarValues
     bad = 0
@@ -87,17 +96,54 @@ function print() end
 
     f = YR.XPBarFormat
     db = YR.XPBarDB()
-    check(db.left == "Level {level}" and db.center == "{xp} / {max}" and db.right == "{pct}%" and db.under is True
-          and db.left2 == "Time to Level: {ding}", "the first words: level, XP, percent, and a line under the bar")
+    check(db.left == "Level {level}" and db.center == "{xp} / {max} ({left})" and db.right == "{pct}% ({pctq}%)" and db.under is True
+          and db.over is True and db.left0 == "Time this level: {levelplayed}" and db.left2 == "Leveling in: {ding} ({rate} XP/Hour)",
+          "the first words: level, XP, percent, a line over the bar and one under it")
+    check(f("{pct} {pctq}") == "25.0 40.0", f"percent, and percent with the quests done ({f('{pct} {pctq}')})")
     check(f("{quest} {questpct} {quests}") == "600 15.0 2",
           f"quests done and not handed in: 600 XP, 15.0% of the level, 2 of them ({f('{quest} {questpct} {quests}')})")
     check(f("{rate}") == "6.0k", f"XP an hour, short ({f('{rate}')})")
-    check(f("Level {level}: {xp} / {max} ({pct}%)") == "Level 18: 1000 / 4000 (25.0%)",
+    check(f("Level {level}: {xp} / {max} ({pct}%) {left}") == "Level 18: 1,000 / 4,000 (25.0%) 3,000",
           f"tokens filled in: {f('Level {level}: {xp} / {max} ({pct}%)')}")
     check(f("{nonsense} stays") == "{nonsense} stays", "an unknown token is left as written")
     check(f("{ding}") == "30m 00s", f"time to ding: 3000 left at 6000 an hour ({f('{ding}')})")
     check(f("{played} / {levelplayed}") == "2h 0m / 15m 00s", f"played time: {f('{played} / {levelplayed}')}")
     check(f("{rested}") == "600 rested" and f("{restedpct}") == "15%", "rested, and as a share of the level")
+    # your XP's colour: Blizzard's way round - blue only while there is rested XP
+    lua.execute("for _, fr in ipairs(FRAMES) do if rawget(fr, 'fill') then FILL = fr.fill end end")
+    lua.execute("Fire('UPDATE_EXHAUSTION')")
+    blue = lua.eval("rawget(FILL, 'red')")
+    lua.execute("RESTED = 0 Fire('UPDATE_EXHAUSTION')")
+    purple = lua.eval("rawget(FILL, 'red')")
+    lua.execute("RESTED = nil Fire('UPDATE_EXHAUSTION')")
+    none = lua.eval("rawget(FILL, 'red')")
+    lua.execute("RESTED = 600 Fire('UPDATE_EXHAUSTION')")
+    check(abs(blue - 0.09) < 0.01 and abs(purple - 0.47) < 0.01 and abs(none - 0.47) < 0.01 and abs(lua.eval("rawget(FILL, 'red')") - 0.09) < 0.01,
+          f"your XP is blue while rested, purple with none ({blue}, {purple})")
+    check(abs(lua.eval("rawget(FILL, 'to')") - 0.25) < 0.01, "a gradient: it runs to the second colour")
+    db.gradient = False
+    YR.XPBarApply()
+    check(lua.eval("rawget(FILL, 'to')") is None and abs(lua.eval("rawget(FILL, 'red')") - 0.09) < 0.01, "gradient off: the first colour alone")
+    db.gradient = True
+    YR.XPBarApply()
+    lua.execute("for _, fr in ipairs(FRAMES) do if rawget(fr, 'text') and type(fr.text) == 'table' and rawget(fr.text, 'left0') then TEXT = fr.text end end")
+    check(lua.eval("rawget(TEXT.left0, 'text')") == "Time this level: 15m 00s", "the line over the bar")
+    db.over = False
+    YR.XPBarApply()
+    check(lua.eval("rawget(TEXT.left0, 'text')") == "", "the line over the bar off: nothing there")
+    db.over = True
+    YR.XPBarApply()
+    # rested reaches on from your XP (600 of 4000 on a 600 wide bar: 90), behind the quests' part (also 90)
+    lua.execute("for _, fr in ipairs(FRAMES) do if rawget(fr, 'rest') then BAR = fr end end")
+    check(lua.eval("rawget(BAR.spark, 'shown') == false"), "where the quests' part follows your XP: no spark over the seam")
+    both = lua.eval("rawget(BAR.rest, 'width') == 90 and rawget(BAR.quest, 'width') == 90")
+    lua.execute("RESTED = 2000 Fire('UPDATE_EXHAUSTION')")
+    more = lua.eval("rawget(BAR.rest, 'width') == 300 and rawget(BAR.quest, 'width') == 90")
+    lua.execute("QUESTS[1].done = false QUESTS[4].done = false NOW = NOW + 20 Fire('QUEST_LOG_UPDATE') XPBARVALUES() Fire('UPDATE_EXHAUSTION')")
+    check(lua.eval("rawget(BAR.spark, 'shown') == true"), "no quests done: the spark at the front of your XP")
+    alone = lua.eval("rawget(BAR.rest, 'width') == 300 and rawget(BAR.quest, 'shown') == false")
+    lua.execute("QUESTS[1].done = true QUESTS[4].done = true RESTED = 600 NOW = NOW + 20 Fire('QUEST_LOG_UPDATE') XPBARVALUES() Fire('UPDATE_EXHAUSTION')")
+    check(both and more and alone, f"rested reaches on from your XP, behind the quests' part ({both}, {more}, {alone})")
     # kills: XP with no quest handed in just before; the quest's XP doesn't count
     lua.execute("Fire('PLAYER_ENTERING_WORLD')")
     lua.execute("XP = 1100 Fire('PLAYER_XP_UPDATE') XP = 1200 Fire('PLAYER_XP_UPDATE')")
@@ -180,7 +226,17 @@ function print() end
     # the look before this one, untouched by you, takes the new one; what you changed stays
     g.YippRouteDB.xpbar = lua.eval("{ h = 14, font = 11, left = 'mine', xpColor = { 0.58, 0.0, 0.55, 1 } }")
     db = YR.XPBarDB()
-    check(db.h == 22 and db.font == 13 and abs(db.xpColor[1] - 0.09) < 0.01, f"old first values take the new look ({db.h}, {db.font})")
+    check(db.h == 22 and db.font == 13 and abs(db.xpColor[1] - 0.47) < 0.01, f"old first values take the new look ({db.h}, {db.font})")
+    g.YippRouteDB.xpbar = lua.eval("{ look = 2, xpColor = { 0.09, 0.47, 0.85, 1 }, restColor = { 0.55, 0.3, 0.9, 0.6 }, questColor = { 0, 1, 0, 1 } }")
+    db = YR.XPBarDB()
+    check(abs(db.xpColor[1] - 0.47) < 0.01 and abs(db.xpRestedColor[1] - 0.09) < 0.01 and abs(db.restColor[1] - 0.3) < 0.01 and db.questColor[2] == 1,
+          "the look where blue meant nothing: untouched colours take Blizzard's way round, a colour you picked stays")
+    g.YippRouteDB.xpbar = lua.eval("{ look = 3, xpColor = { 0.58, 0.0, 0.55, 1 }, center = '{xp} / {max}', right = 'my own', left2 = 'Time to Level: {ding}' }")
+    db = YR.XPBarDB()
+    check(abs(db.xpColor[1] - 0.47) < 0.01 and db.center == "{xp} / {max} ({left})" and db.right == "my own" and db.left2.startswith("Leveling in"),
+          "the look before the gradient: untouched words and colour take the new ones, words you wrote stay")
+    g.YippRouteDB.xpbar = lua.eval("{ left = 'mine' }")
+    db = YR.XPBarDB()
     check(db.left == "mine", "words you wrote yourself are kept")
     # defaults: a new install starts quiet and is shown Get started; an account that had Headstart
     # before keeps everything as it was

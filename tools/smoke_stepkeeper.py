@@ -47,6 +47,10 @@ function RXP:LoadGuide(guide)
     RXP.SetStep(SAVED)
 end
 function hooksecurefunc(t, k, f) local o = t[k] t[k] = function(...) local r = { o(...) } f(...) return unpack(r) end end
+-- the place is written down on the frame after a step is set: NextFrame() is that frame
+LATER = {}
+C_Timer = { After = function(_, fn) LATER[#LATER + 1] = fn end }
+function NextFrame() local l = LATER LATER = {} for _, fn in ipairs(l) do fn() end end
 ''')
     YR = lua.table()
     lua.execute(r'''
@@ -89,7 +93,10 @@ end
     guide = lua.eval('{ name = "05-11 Test", steps = { {}, {}, {}, {}, {}, {}, {}, {} } }')
     g.TEXT = OLD
     g.RXP.LoadGuide(g.RXP, guide)
-    g.RXP.SetStep(4)                      # a non-Hunter's 4th step: hand in the troggs
+    for n in (2, 3, 4):                   # RestedXP skips on to the 4th step: a set for each on the way
+        g.RXP.SetStep(n)                  # a non-Hunter's 4th step: hand in the troggs
+    check(len(g.LATER) == 1, f"a chain of steps set in one frame is written down once, after it: {len(g.LATER)}")
+    g.NextFrame()
     place = g.YippRouteDB.place["Tester-Realm"]
     check(place and place.n == 4 and "the troggs" in place.text, f"remembers the step itself: {place and place.n}")
     g.SAVED = 4
@@ -103,6 +110,7 @@ end
     check(g.RXPCData.currentStep == 2 and len(g.PRINTS) == 1, "nothing changed: left alone, nothing said")
     # a step whose wording changed is found by its quests
     g.RXP.SetStep(3)
+    g.NextFrame()
     g.SAVED = 3
     g.TEXT = NEW.replace(".complete 6,1 --spies", ".complete 6,1 --the Dark Iron spies").replace("step\n    .accept 1 >> A\n", "step\n    .accept 1 >> A\nstep\n    .accept 9 >> new\n")
     g.RXP.LoadGuide(g.RXP, guide)

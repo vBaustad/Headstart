@@ -266,12 +266,38 @@ end
 -- ---------------------------------------------------------------------------
 -- One window in one look
 -- ---------------------------------------------------------------------------
-local function Skin(window)
+-- force: a setting changed (a look, a colour), a login, a new window: everything again. Without it
+-- this is the game having minimised the window or changed what it shows, which moves none of the top
+-- bar's pieces: when every piece we placed is still where we put it, only the minimise button's face
+-- can be another, and the rest is left as it is. One of them moved (the game laid the bar out again),
+-- or a place the game keeps secret: everything again.
+local function Skin(window, force)
     local mode = YR.DamageSkinMode()
     local k = kept[window]
+    local small = window.IsMinimized and window:IsMinimized() and true or false
+    if not force and k and k.on and k.mode == mode and k.placed and #k.placed > 0 then
+        local still = true
+        for _, b in ipairs(k.placed) do
+            local points = b.GetNumPoints and b:GetNumPoints()
+            local to
+            if not (issecretvalue and issecretvalue(points)) and points == 1 then to = select(2, b:GetPoint(1)) end
+            if to == nil or (issecretvalue and issecretvalue(to)) or not rawequal(to, k.over) then
+                still = false
+                break
+            end
+        end
+        if still then
+            if k.small ~= small then
+                k.small = small
+                Face(k, k.minimize, small and "plus" or "minus", k.flat)
+            end
+            return
+        end
+    end
     if mode == "off" then
         if k and k.on then
             k.on = false
+            k.mode = nil
             PutBack(k)
             if k.art then ShowArt(k.art, false) end
             local p = Pieces(window)
@@ -294,6 +320,7 @@ local function Skin(window)
     local reset = ResetButton(window, k)
     reset:Show()
     local at = -PAD
+    local placed = {}
     for _, b in ipairs({ p.minimize, p.settings, reset, p.session, p.typeDrop }) do
         if type(b) == "table" and b.ClearAllPoints then
             if not rawequal(b, reset) then Remember(k, b) end
@@ -301,6 +328,9 @@ local function Skin(window)
                 b:ClearAllPoints()
                 b:SetSize(BUTTON, BUTTON)
                 b:SetPoint("RIGHT", over, "RIGHT", at, 0)
+                if placed and b.GetPoint then placed[#placed + 1] = b end
+            else
+                placed = nil            -- one couldn't be placed (a fight): everything again next time
             end
             at = at - BUTTON - GAP
         end
@@ -329,7 +359,7 @@ local function Skin(window)
     local accent = mode == "headstart" and YR.DamageSkinAccent() or nil
     -- the three buttons in one flat colour: the accent, or the Blizzard look's bronze
     local flat = accent or BRONZE
-    local small = window.IsMinimized and window:IsMinimized()
+    k.mode, k.small, k.over, k.minimize, k.flat, k.placed = mode, small, over, p.minimize, flat, placed
     Face(k, p.minimize, small and "plus" or "minus", flat)
     Face(k, p.settings, "gear", flat)
     Face(k, reset, "reset", flat)
@@ -362,12 +392,12 @@ end
 local hooked = setmetatable({}, { __mode = "k" })
 local busy, faulted
 
-local function After(window)
+local function After(window, force)
     if busy then return end
     local k = kept[window]
     if YR.DamageSkinMode() == "off" and not (k and k.on) then return end
     busy = true
-    local ok, err = pcall(Skin, window)
+    local ok, err = pcall(Skin, window, force)
     busy = false
     -- a fault of ours must not break the meter, but it must not vanish either: said once
     if not ok and not faulted then
@@ -377,35 +407,44 @@ local function After(window)
 end
 
 --- Every window in the look that's picked (after a setting changed, a login, a new window).
+--- A window is hooked the first time a look is on it (a hook can't be taken off again: with no look
+--- picked it comes straight back out, see After).
 function YR.DamageSkinApply()
+    local off = YR.DamageSkinMode() == "off"
     for _, window in ipairs(Windows()) do
-        if not hooked[window] then
+        if not hooked[window] and not off then
             hooked[window] = true
             for _, method in ipairs({ "RefreshLayout", "SetMinimized", "SetDamageMeterType" }) do
-                if type(window[method]) == "function" then hooksecurefunc(window, method, After) end
+                -- (its own arguments are not ours: SetMinimized's would be read as "force")
+                if type(window[method]) == "function" then hooksecurefunc(window, method, function(w) After(w) end) end
             end
         end
-        After(window)
+        After(window, true)
     end
 end
 
 function YR.SetDamageSkin(mode)
     YippRouteDB.dmgSkin = (mode == "headstart" or mode == "blizzard") and mode or nil
     YR.DamageSkinApply()
+    YR.SettingChanged()
 end
 
 --- Whether the game's damage meter is there to skin.
 function YR.DamageSkinAvailable() return #Windows() > 0 end
 
+-- The meter loading, the login and a change of Edit Mode layout are listened for only while a look
+-- is picked.
+local function OnEvent(_, event, name)
+    if event == "ADDON_LOADED" and name ~= "Blizzard_DamageMeter" then return end
+    C_Timer.After(0.2, YR.DamageSkinApply)
+end
+
+local declared
 function YR.StartDamageSkin()
-    local f = CreateFrame("Frame")
-    for _, e in ipairs({ "PLAYER_ENTERING_WORLD", "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED" }) do
-        pcall(f.RegisterEvent, f, e)
-    end
-    f:SetScript("OnEvent", function(_, event, name)
-        if event == "ADDON_LOADED" and name ~= "Blizzard_DamageMeter" then return end
-        -- nothing to do, and nothing looked for, while no look is picked
-        if YR.DamageSkinMode() == "off" then return end
-        C_Timer.After(0.2, YR.DamageSkinApply)
-    end)
+    if declared then return end
+    declared = true
+    YR.Part(function() return YR.DamageSkinMode() ~= "off" end,
+        { "PLAYER_ENTERING_WORLD", "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED" }, OnEvent,
+        -- off (the look, or all of quality of life): the meter as the game has it
+        { stop = YR.DamageSkinApply })
 end

@@ -24,11 +24,17 @@ local told = {}        -- [kind] = true until you have some again
 
 local function Count(item) return C_Item.GetItemCount(item) or 0 end
 
+-- This runs a second after every change to your bags: the tables it fills are made once and emptied.
+local WEAPONS = { 16, 17 }
+local kinds, have, best, entries = {}, {}, {}, {}
+local function Empty(t) for k in pairs(t) do t[k] = nil end end
+
 --- The kinds worth thinking about for you right now.
 local function Kinds()
-    local out = {}
+    local out = kinds
+    Empty(out)
     if not YR.Option("craftRemind") then return out end
-    for _, slot in ipairs({ 16, 17 }) do
+    for _, slot in ipairs(WEAPONS) do
         local id = GetInventoryItemID("player", slot)
         if id then
             local _, _, _, _, _, class, subclass = C_Item.GetItemInfoInstant(id)
@@ -56,7 +62,23 @@ local function Known(spell)
     end
     return yes
 end
-function YR.CraftForget() known = {} end
+-- Whether you know any recipe of a kind (no First Aid: no bandages to count), kept as long.
+local can = {}
+local function Can(kind)
+    local yes = can[kind]
+    if yes == nil then
+        yes = false
+        for _, e in ipairs(YR.Consumables or {}) do
+            if e[6] == kind and Known(e[1]) then yes = true break end
+        end
+        can[kind] = yes
+    end
+    return yes
+end
+function YR.CraftForget()
+    for k in pairs(known) do known[k] = nil end
+    for k in pairs(can) do can[k] = nil end
+end
 
 --- How many times the mats in your bags make this recipe.
 local function Makes(e)
@@ -67,8 +89,13 @@ end
 
 --- What you could make of each kind you have too few of:
 --- [kind] = { item, times, total, have, profession }. The best recipe whose mats you carry.
+--- (The table and its rows are used again by the next call: read them, don't keep them.)
 function YR.CraftChances()
-    local kinds, have, best = Kinds(), {}, {}
+    Kinds()
+    Empty(have)
+    Empty(best)
+    -- a kind you know no recipe of is nothing you could make: its items aren't counted at all
+    for kind in pairs(kinds) do if not Can(kind) then kinds[kind] = nil end end
     if next(kinds) == nil then return best end          -- none of the three kinds is on: nothing to count
     for _, e in ipairs(YR.Consumables or {}) do
         local kind = e[6]
@@ -80,8 +107,11 @@ function YR.CraftChances()
         if kinds[kind] and (have[kind] or 0) < below and Known(e[1]) then
             local times = Makes(e)
             if times > 0 and (not best[kind] or e[3] > best[kind].rank) then
-                best[kind] = { item = e[4], times = times, total = times * e[5], have = have[kind] or 0,
-                    rank = e[3], profession = PROFESSION[e[2]] }
+                local b = entries[kind]
+                if not b then b = {} entries[kind] = b end
+                b.item, b.times, b.total, b.have = e[4], times, times * e[5], have[kind] or 0
+                b.rank, b.profession = e[3], PROFESSION[e[2]]
+                best[kind] = b
             end
         end
     end
@@ -105,22 +135,50 @@ function YR.CheckCrafts()
     end
 end
 
+-- One look a second after the last change, however many came.
+local pending = false
+local function Check() pending = false YR.CheckCrafts() end
+local function Later()
+    if pending then return end
+    pending = true
+    C_Timer.After(1, Check)
+end
+
+-- Your bags, your weapons and the end of a fight are only worth hearing about while there is something
+-- you could make: a character with none of the recipes (most, at first) listens for none of them, until
+-- a spell is learned.
+local BAGS = { "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_REGEN_ENABLED" }
+local watching = false
+local function AnyCan()
+    return (YR.Option("craftStones") and (Can("sharpening") or Can("weightstone")))
+        or (YR.Option("craftOils") and Can("oil")) or (YR.Option("craftBandages") and Can("bandage")) or false
+end
+local function Watch(frame)
+    local want = AnyCan()
+    if want == watching then return end
+    watching = want
+    for _, e in ipairs(BAGS) do
+        if want then pcall(frame.RegisterEvent, frame, e) else pcall(frame.UnregisterEvent, frame, e) end
+    end
+end
+
+local function OnEvent(frame, event)
+    if event == "LEARNED_SPELL_IN_TAB" or event == "LEARNED_SPELL_IN_SKILL_LINE" or event == "PLAYER_ENTERING_WORLD" then
+        YR.CraftForget()
+        Watch(frame)
+    end
+    if watching then Later() end
+end
+
+local declared
 function YR.StartCraftRemind()
-    local f = CreateFrame("Frame")
-    local pending = false
-    local function Check() pending = false YR.CheckCrafts() end
-    local function Later()
-        -- off: nothing is set going at all (this is every loot, every bag change)
-        if pending or not YR.Option("craftRemind") then return end
-        pending = true
-        C_Timer.After(1, Check)
-    end
-    for _, e in ipairs({ "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED", "PLAYER_REGEN_ENABLED", "LEARNED_SPELL_IN_TAB",
-        "PLAYER_ENTERING_WORLD" }) do
-        pcall(f.RegisterEvent, f, e)
-    end
-    f:SetScript("OnEvent", function(_, event)
-        if event == "LEARNED_SPELL_IN_TAB" or event == "PLAYER_ENTERING_WORLD" then YR.CraftForget() end
-        Later()
-    end)
+    if declared then return end
+    declared = true
+    -- (the newer name of "learned a spell" is asked for too: a client has one or the other)
+    YR.Part(function() return YR.Option("craftRemind") end,
+        { "LEARNED_SPELL_IN_TAB", "LEARNED_SPELL_IN_SKILL_LINE", "PLAYER_ENTERING_WORLD" }, OnEvent, {
+            start = function(p) Watch(p.frame) end,
+            again = function(p) Watch(p.frame) end,           -- one of the three kinds turned on or off
+            stop = function() watching = false end,
+        })
 end

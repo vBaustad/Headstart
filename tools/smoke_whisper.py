@@ -21,6 +21,7 @@ FRAMES = {}
 local F = {}
 F.__index = F
 function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
+function F:UnregisterAllEvents() self.ev = nil end
 function F:SetScript(_, fn) self.fn = fn end
 function CreateFrame() local f = setmetatable({}, F) table.insert(FRAMES, f) return f end
 function Fire(e, ...) for _, f in ipairs(FRAMES) do if f.ev and f.ev[e] and f.fn then f.fn(f, e, ...) end end end
@@ -42,6 +43,9 @@ function PlaySound(id, channel) PLAYED[#PLAYED + 1] = { "kit", id, channel } ret
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
         chunk("Headstart", YR)
     YR.StartWhisper()
+    # the login: from here on a part listens only while it is wanted, looked at again when a setting changes
+    YR.partsReady = True
+    YR.ApplyParts()
     g = lua.globals()
     bad = 0
 
@@ -56,6 +60,7 @@ function PlaySound(id, channel) PLAYED[#PLAYED + 1] = { "kit", id, channel } ret
     lua.execute("Fire('CHAT_MSG_WHISPER', 'secret', 'someone')")
     check(len(g.PLAYED) == 0, "nothing picked: a whisper plays nothing")
     g.YippRouteDB.whisperSound = "kit:RAID_WARNING"
+    YR.ApplyParts()            # as the settings window does after a change
     lua.execute("Fire('CHAT_MSG_WHISPER')")
     last = lambda: g.PLAYED[len(g.PLAYED)]
     check(len(g.PLAYED) == 1 and last()[2] == 8959 and last()[3] == "Master", "a whisper: the picked sound, on Master")
@@ -64,12 +69,14 @@ function PlaySound(id, channel) PLAYED[#PLAYED + 1] = { "kit", id, channel } ret
     lua.execute("NOW = NOW + 3 Fire('CHAT_MSG_BN_WHISPER')")
     check(len(g.PLAYED) == 2, "a Battle.net whisper three seconds on: played")
     g.YippRouteDB.whisperBNet = False
+    YR.ApplyParts()            # as the settings window does after a change
     lua.execute("NOW = NOW + 3 Fire('CHAT_MSG_BN_WHISPER')")
     check(len(g.PLAYED) == 2, "Battle.net whispers turned off: not played")
     g.YippRouteDB.whisperChannel = "SFX"
     lua.execute("NOW = NOW + 3 Fire('CHAT_MSG_WHISPER')")
     check(last()[3] == "SFX", "another channel picked: played on it")
     g.YippRouteDB.whisperSound = "kit:NOT_A_SOUND"
+    YR.ApplyParts()            # as the settings window does after a change
     check(YR.PlayWhisperSound() is False, "a sound this client doesn't have: not played, and says so")
     # LibSharedMedia loaded by another addon: its sounds are in the list and play as files
     lua.execute("""
@@ -79,8 +86,10 @@ function PlaySoundFile(file, channel) PLAYED[#PLAYED + 1] = { 'file', file, chan
 """)
     check(keys()[-2:] == ["lsm:Airhorn", "lsm:Bell"], f"LibSharedMedia loaded: its sounds too, by name, without its 'None' ({keys()[-2:]})")
     g.YippRouteDB.whisperSound = "lsm:Bell"
+    YR.ApplyParts()            # as the settings window does after a change
     check(YR.PlayWhisperSound() is True and last()[2] == "Interface/Bell.ogg" and YR.WhisperSoundName() == "Bell", "one of them picked: its file is played")
     g.YippRouteDB.qolOff = True
+    YR.ApplyParts()            # as the settings window does after a change
     n = len(g.PLAYED)
     lua.execute("NOW = NOW + 3 Fire('CHAT_MSG_WHISPER')")
     check(len(g.PLAYED) == n, "quality of life off: nothing played")

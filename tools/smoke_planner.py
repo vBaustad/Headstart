@@ -80,8 +80,9 @@ def run():
     lua.execute(FAKE)
     YR = lua.table()
     lua.globals().YR_T = YR
+    lua.globals().HeadstartNS = YR        # the setup addon takes Headstart's table from this
     load = lua.eval("function(c, n) return assert(loadstring(c, n)) end")
-    for f in ("Style.lua", "Data/SpellLevels.lua"):
+    for f in ("Style.lua", "Headstart_Setup/SpellLevels.lua"):
         load(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)("Headstart", YR)
     # Setup.lua's side, as the planner uses it
     lua.execute('''
@@ -109,7 +110,7 @@ def run():
         MAX_ACCOUNT_MACROS = 120
         function GetNumMacros() return 1, 1 end
         function GetMacroInfo(i) local m = MACROS[i] if m then return m[1], m[2], m[3] end end''')
-    for f in ("Data/TrainerSpells.lua", "Data/PlannerSpells.lua", "Planner.lua"):
+    for f in ("Data/TrainerSpells.lua", "Headstart_Setup/PlannerSpells.lua", "Headstart_Setup/Planner.lua"):
         load(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)("Headstart", YR)
     g = lua.globals()
     bad = 0

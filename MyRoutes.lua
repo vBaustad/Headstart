@@ -136,7 +136,7 @@ end
 local GRIND_KILLS, GRIND_SECONDS, GRIND_AREA = 10, 180, 5
 
 function YR.RunToSteps(char)
-    local run = YippRouteDB.runs and YippRouteDB.runs[char or YR.CharKey()]
+    local run = YippRouteDB.runs and YR.RunUnpack(YippRouteDB.runs[char or YR.CharKey()])
     local ev = run and run.ev or {}
     local titles, objectives = {}, {}
     for _, e in ipairs(ev) do
@@ -340,7 +340,7 @@ local function QuestsOf(step)
 end
 
 function YR.RunToRouteSteps(char)
-    local run = YippRouteDB.runs and YippRouteDB.runs[char or YR.CharKey()]
+    local run = YippRouteDB.runs and YR.RunUnpack(YippRouteDB.runs[char or YR.CharKey()])
     local ev = run and run.ev or {}
     if not YR.CharSteps then return nil end
     local keyOf = {}
@@ -545,9 +545,27 @@ function YR.SaveRunAsRoute(char, race)
             shipped[k] = nil
         end
     end
-    Mine()[g.slug] = { parts = saved }
+    Mine()[g.slug] = { parts = saved, from = char }          -- from: whose run log it was made of
     YR.ShipMyRoutes()
     return #steps, #saved, names[1], g.label
+end
+
+--- Whether a saved route was made from this character's run log: such a log is never cleared away as
+--- old (Log.lua). A route saved before its source was kept doesn't say whose log it was: then any
+--- character of that race could be it (and one whose race isn't known), and all of those are kept.
+function YR.MyRouteFrom(char)
+    for slug, m in pairs(Mine()) do
+        if slug == char then return true end              -- a first-version route, kept under the character
+        if type(m) == "table" and m.parts then
+            if m.from then
+                if m.from == char then return true end
+            else
+                local race = YR.SplitsRaceOf and YR.SplitsRaceOf(char)
+                if not race or Group(race).slug == slug then return true end
+            end
+        end
+    end
+    return false
 end
 
 -- This race's own routes gone (and their edits); with a first-version one of this character's too.
@@ -572,6 +590,17 @@ function YR.DeleteMyRoutes(race)
     end
     return gone
 end
+
+-- (asked here and by the window, after a route is saved or changed)
+StaticPopupDialogs["HEADSTART_RELOAD"] = {
+    text = "Headstart: reload so RestedXP gets the changed route?",
+    button1 = "Reload",
+    button2 = "Later",
+    OnAccept = function() ReloadUI() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
 
 StaticPopupDialogs["HEADSTART_DELETE_MY_ROUTE"] = {
     text = "Headstart: delete your %s route? This can't be undone (your run log stays: you can save it again).",

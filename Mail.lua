@@ -20,6 +20,22 @@ local PER_LETTER = ATTACHMENTS_MAX_SEND or 12
 local mailOpen = false
 local run
 local button
+local part              -- what listens for the mailbox (YR.StartMail)
+local asked             -- a send asked for by hand while nothing listened
+
+-- Blizzard's mail window on screen now (for when nobody was listening as it opened).
+local function Showing()
+    local frame = _G.MailFrame
+    return type(frame) == "table" and frame.IsShown and frame:IsShown() and true or false
+end
+
+-- The game says a refused letter on screen, in red, and nothing more - so the screen's errors are
+-- read. Only while a letter is on its way: they come all the time in play, and none of the rest is ours.
+local function Errors(on)
+    local f = part and part.frame
+    if not f then return end
+    if on then f:RegisterEvent("UI_ERROR_MESSAGE") else f:UnregisterEvent("UI_ERROR_MESSAGE") end
+end
 
 local function Key()
     return (GetRealmName() or "?") .. "-" .. (UnitFactionGroup("player") or "?")
@@ -144,6 +160,7 @@ local function Finish(note)
     local r = run
     run = nil
     if not r then return end
+    Errors(false)
     if r.sent > 0 then
         YR.Print(("mailed %d stack%s to %s (%d letter%s, %s postage)%s"):format(r.sent, r.sent == 1 and "" or "s",
             r.to, r.letters, r.letters == 1 and "" or "s", Coins(r.postage), note and (" - " .. note) or "."))
@@ -193,6 +210,7 @@ local function NextLetter()
         return Finish("not enough money for the postage")
     end
     r.pending = { count = inLetter, price = price }
+    Errors(true)
     SendMail(r.to, ("Headstart: %d for you"):format(inLetter), "")
     -- the game doesn't always answer a refused letter (a name it won't take says so on screen, nothing
     -- more): no word in 10 seconds, and it stops instead of waiting for ever
@@ -207,6 +225,12 @@ end
 
 --- Send what the settings pick. `loud`: say so when there's nothing to send (the button).
 function YR.MailToAlt(loud)
+    -- asked for by hand (/headstart mail) with the button and the automation both off, at an open
+    -- mailbox: the mailbox is listened for from here until it closes
+    if not mailOpen and not run and part and not part.on and Showing() then
+        asked = true
+        YR.ApplyParts()
+    end
     if run or not mailOpen then return end
     if InCombatLockdown() then if loud then YR.Print("not in combat.") end return end
     local to = YR.MailRecipient()
@@ -266,40 +290,68 @@ end
 function YR.SetMailButton(on)
     YippRouteDB.mailButton = on and true or false
     Refresh()
+    YR.SettingChanged()
 end
 
-function YR.MailIsOpen() return mailOpen end
+--- At an open mailbox? (With nothing of ours listening for it, Blizzard's window is asked.)
+function YR.MailIsOpen() return mailOpen or (part ~= nil and not part.on and Showing()) end
+
+-- The mailbox is listened for only while the button or sending as it opens is on (or a send was
+-- asked for by hand, until that mailbox closes).
+local function Wanted()
+    return asked or YR.Option("mailButton") or (YippRouteDB.mailAuto == true and YR.QoLOn()) or false
+end
+
+local function Auto() YR.MailToAlt(false) end
+
+local function Closed()
+    mailOpen = false
+    if run then Finish("the mailbox closed before the rest went") end
+    if button then button:Hide() end
+    if asked then
+        asked = nil
+        YR.SettingChanged()
+    end
+end
+
+local function OnEvent(_, event, ...)
+    if event == "MAIL_SHOW" then
+        if mailOpen then return end
+        mailOpen = true
+        Refresh()
+        if YippRouteDB.mailAuto == true and YR.QoLOn() and not IsShiftKeyDown() then
+            C_Timer.After(0.5, Auto)
+        end
+    elseif event == "MAIL_CLOSED" then
+        Closed()
+    elseif event == "MAIL_SEND_SUCCESS" and run and run.pending then
+        run.sent = run.sent + run.pending.count
+        run.letters = run.letters + 1
+        run.postage = run.postage + run.pending.price
+        run.pending = nil
+        Errors(false)
+        C_Timer.After(0.5, NextLetter)
+    elseif (event == "MAIL_FAILED" or (event == "UI_ERROR_MESSAGE" and run and run.pending)) and run then
+        local msg = select(2, ...)
+        if event == "UI_ERROR_MESSAGE" and not (type(msg) == "string" and (msg == ERR_FULL_NAME_REQUIRED
+            or msg:lower():find("mail") or msg:lower():find("name"))) then return end
+        ClearLetter()
+        Finish("the game refused the letter - " .. run.to .. " needs to be the full name (name and surname),"
+            .. " on this realm and faction. Set it in Headstart, QoL, Bank & mail")
+    end
+end
 
 function YR.StartMail()
-    local f = CreateFrame("Frame")
-    for _, e in ipairs({ "MAIL_SHOW", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED", "UI_ERROR_MESSAGE" }) do
-        pcall(f.RegisterEvent, f, e)
-    end
-    f:SetScript("OnEvent", function(_, event, ...)
-        if event == "MAIL_SHOW" then
-            if mailOpen then return end
-            mailOpen = true
-            Refresh()
-            if YippRouteDB.mailAuto == true and YR.QoLOn() and not IsShiftKeyDown() then
-                C_Timer.After(0.5, function() YR.MailToAlt(false) end)
+    if part then return end
+    part = YR.Part(Wanted, { "MAIL_SHOW", "MAIL_CLOSED", "MAIL_SEND_SUCCESS", "MAIL_FAILED" }, OnEvent, {
+        -- turned on at an open mailbox: the button is there at once (and nothing is sent by itself)
+        start = function()
+            if Showing() and not mailOpen then
+                mailOpen = true
+                Refresh()
             end
-        elseif event == "MAIL_CLOSED" then
-            mailOpen = false
-            if run then Finish("the mailbox closed before the rest went") end
-            if button then button:Hide() end
-        elseif event == "MAIL_SEND_SUCCESS" and run and run.pending then
-            run.sent = run.sent + run.pending.count
-            run.letters = run.letters + 1
-            run.postage = run.postage + run.pending.price
-            run.pending = nil
-            C_Timer.After(0.5, NextLetter)
-        elseif (event == "MAIL_FAILED" or (event == "UI_ERROR_MESSAGE" and run and run.pending)) and run then
-            local msg = select(2, ...)
-            if event == "UI_ERROR_MESSAGE" and not (type(msg) == "string" and (msg == ERR_FULL_NAME_REQUIRED
-                or msg:lower():find("mail") or msg:lower():find("name"))) then return end
-            ClearLetter()
-            Finish("the game refused the letter - " .. run.to .. " needs to be the full name (name and surname),"
-                .. " on this realm and faction. Set it in Headstart, QoL, Bank & mail")
-        end
-    end)
+        end,
+        again = function() if mailOpen then Refresh() end end,
+        stop = Closed,
+    })
 end

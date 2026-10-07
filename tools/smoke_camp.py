@@ -41,7 +41,10 @@ function CreateFrame(_, name) local f = setmetatable({}, Obj) table.insert(FRAME
 UIParent = CreateFrame()
 function Fire(event, ...) for _, f in ipairs(FRAMES) do if rawget(f, "_ev") and f._ev[event] and rawget(f, "_OnEvent") then f._OnEvent(f, event, ...) end end end
 function GetTime() return NOW end
-C_Timer = { After = function(_, fn) table.insert(AFTER, fn) end }
+TICKERS = {}
+C_Timer = { After = function(_, fn) table.insert(AFTER, fn) end,
+    NewTicker = function(_, fn) local t = { fn = fn, Cancel = function(self) self.dead = true end } table.insert(TICKERS, t) return t end }
+function Ticking() local n = 0 for _, t in ipairs(TICKERS) do if not t.dead then n = n + 1 end end return n end
 function RunAfter() local list = AFTER AFTER = {} for _, fn in ipairs(list) do fn() end end
 COMBAT = false
 function InCombatLockdown() return COMBAT end
@@ -152,6 +155,9 @@ strtrim = function(s) return s end
         { 12345, "Somebody's Blessing", 600, NOW + 300 },
     }''')
     YR.StartCamp()
+    # the icon comes on at the login (YR.Part): nothing listens before it
+    YR.partsReady = True
+    YR.ApplyParts()
     s, stale = YR.CampState()
     check(not stale, "out of combat the reading is current")
     check(s.nearby and s.benefits and s.settled and s.carrying, "nearby, benefits, settled and carrying all read")
@@ -159,6 +165,7 @@ strtrim = function(s) return s end
     check(stats(s.buffs[1].stats) == [("Strength", "+6")], "the stat comes from the buff's tooltip")
     hud = g.HeadstartCampFrame
     check(hud is not None and hud.IsShown(hud), "the HUD is up at a camp")
+    check(g.Ticking() == 1, "a buff with a timer on show: the clock runs")
 
     lua.execute("COMBAT = true")
     g.Fire("PLAYER_REGEN_DISABLED")
@@ -182,6 +189,7 @@ strtrim = function(s) return s end
     check(not hud.IsShown(hud), "no camp, no buff, campAlways off: hidden")
     YR.SetCampAlways(True)
     check(hud.IsShown(hud), "campAlways on: the grey fire stays")
+    check(g.Ticking() == 0, "the grey resting fire: nothing moves, no clock")
 
     # The Campfire addon showing its own campfire: ours steps aside; with Campfire's off, ours is back.
     lua.execute("ADDONS = { Campfire = true } CampfireDB = { camp = true }")
@@ -205,6 +213,7 @@ strtrim = function(s) return s end
     YR.SetCampLocked(True)
     YR.SetCampIcon(False)
     check(not hud.IsShown(hud), "the campfire icon off: hidden")
+    check(g.Ticking() == 0, "the icon off: no clock")
     check(g.YippRouteDB.camp is False, "the setting is saved")
     return bad
 

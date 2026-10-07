@@ -18,6 +18,7 @@ local F = {}
 F.__index = F
 function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
 function F:SetScript(_, fn) self.fn = fn end
+function F:UnregisterAllEvents() self.ev = nil end
 function CreateFrame() local f = setmetatable({}, F) table.insert(FRAMES, f) return f end
 function Fire(e) for _, f in ipairs(FRAMES) do if f.ev and f.ev[e] and f.fn then f.fn(f, e) end end end
 C_Timer = { After = function(_, fn) fn() end }
@@ -74,7 +75,9 @@ RXP = { settings = { profile = { enableTrainerAutomation = true } } }
         { "Hammer of Justice", "Rank 2", "unavailable", 2000, 24 },
         { "Lay on Hands", "Rank 1", "used", 0, 10 },
     }''')
-    lua.execute("Fire('PLAYER_LOGIN')")
+    # the login: what is wanted comes on (Core does this at PLAYER_LOGIN)
+    YR.partsReady = True
+    YR.ApplyParts()
     # a new class table: "If I can afford it" for everything, and a 2 silver reserve
     check(g.YRT.TrainerChoice("Holy Light") == "gold" and g.YRT.TrainerData().reserve == 200,
           "new defaults: If I can afford it, keep 2 silver")

@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: Headstart: window
+## Notes: Headstart's window: its settings and the route editor. Headstart loads it the first time you open the window; nothing of it is in memory before that.
+## Author: vBaustad
+## Group: Headstart
+## X-License: CC BY-NC-SA 4.0
+## LoadOnDemand: 1
+## SavedVariables: HeadstartScanDB
+## RequiredDeps: Headstart
+
+QuestIDs.lua
+Perf.lua
+Editor.lua

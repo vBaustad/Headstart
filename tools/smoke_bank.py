@@ -50,6 +50,8 @@ function Obj.SetScript(self, what, fn) rawset(self, "_" .. what, fn) end
 function Obj.SetText(self, t) rawset(self, "_text", t) end
 function Obj.GetText(self) return rawget(self, "_text") end
 function Obj.RegisterEvent(self, e) rawset(self, "_ev", rawget(self, "_ev") or {}) self._ev[e] = true end
+function Obj.UnregisterEvent(self, e) local ev = rawget(self, "_ev") if ev then ev[e] = nil end end
+function Obj.UnregisterAllEvents(self) rawset(self, "_ev", nil) end
 function CreateFrame(_, name, parent) local f = setmetatable({}, Obj) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 UIParent = CreateFrame()
 BankFrame = CreateFrame()
@@ -150,14 +152,21 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
             print("FAIL bank:", what)
 
     # the data the rules stand on (from the game's tables via Guildhall)
-    check(C.recipeItems[2406] is not None and C.recipeItems[2406][1] == 165, "2406 is a Leatherworking recipe")
+    def recipe(item):                      # (profession line, skill to learn, spell), unpacked
+        return YR.CraftRecipe(C.recipeItems[item])
+
+    def users(item):                       # the profession lines that use a reagent
+        return [line for line in C.professions.values() if YR.CraftUsers(C.reagents[item], lua.table_from({line: 1}))]
+
+    check(isinstance(C.recipeItems[2406], int) and isinstance(C.reagents[2589], int), "a number an item, not a table an item")
+    check(C.recipeItems[2406] is not None and recipe(2406)[0] == 165, "2406 is a Leatherworking recipe")
     for item in (2598, 4292):
-        check(C.recipeItems[item] is not None and C.recipeItems[item][1] == 197, f"{item} is a Tailoring recipe")
-    check(C.recipeItems[2598][2] <= 50 < C.recipeItems[4292][2],
-          f"2598 is learnable at Tailoring 50 and 4292 not ({C.recipeItems[2598][2]}, {C.recipeItems[4292][2]})")
-    check(197 in list(C.reagents[2589].values()) and 186 in list(C.reagents[2770].values()),
+        check(C.recipeItems[item] is not None and recipe(item)[0] == 197, f"{item} is a Tailoring recipe")
+    check(recipe(2598)[1] <= 50 < recipe(4292)[1],
+          f"2598 is learnable at Tailoring 50 and 4292 not ({recipe(2598)[1]}, {recipe(4292)[1]})")
+    check(197 in users(2589) and 186 in users(2770),
           "linen is a Tailoring reagent and copper ore a Mining one")
-    check(not any(p in (197, 186) for p in C.reagents[2449].values()), "earthroot is not for Tailoring or Mining")
+    check(not any(p in (197, 186) for p in users(2449)), "earthroot is not for Tailoring or Mining")
 
     def fill():
         lua.execute("BAGS = { [0] = {}, [1] = {} } BANK = {} PRINTS = {} TICKERS = {}")
@@ -176,6 +185,12 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
         g.SHIFT = False
 
     YR.StartBank()
+    # the login: what is wanted comes on. Nobody is at the bank then (this fake's windows count as
+    # shown until hidden), so its window is out of sight for that moment
+    lua.execute("BankFrame:Hide()")
+    YR.partsReady = True
+    YR.ApplyParts()
+    lua.execute("BankFrame:Show()")
     fill()
     visit()
     check(banked() == [2406, 2449, 2672, 4292], f"a tailor-miner banks earthroot, wolf meat and the two recipes they can't learn: {banked()}")
@@ -193,7 +208,7 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     check(banked() == [], "Shift as the bank opens: nothing goes")
 
     fill()
-    lua.execute("KNOWN[%d] = true" % C.recipeItems[2406][3])
+    lua.execute("KNOWN[%d] = true" % recipe(2406)[2])
     visit()
     check(2406 not in banked(), "a recipe you already know is left alone")
     lua.execute("KNOWN = {}")
@@ -265,6 +280,9 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     g.Fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", 8)
     # ---- Mail to my alt -------------------------------------------------------------------------
     YR.StartMail()
+    lua.execute("MailFrame:Hide()")      # as above: nobody is at a mailbox as the mail part comes on
+    YR.ApplyParts()
+    lua.execute("MailFrame:Show()")
     def mailed():
         out = []
         for i in range(1, len(g.SENT) + 1):

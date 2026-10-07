@@ -22,6 +22,8 @@ FRAMES, BUILT = {}, 0
 local F = {}
 F.__index = function(t, k) return rawget(F, k) or function() end end
 function F:RegisterEvent(e) local ev = rawget(self, "ev") or {} ev[e] = true rawset(self, "ev", ev) end
+function F:UnregisterEvent(e) local ev = rawget(self, "ev") if ev then ev[e] = nil end end
+function F:UnregisterAllEvents() rawset(self, "ev", nil) end
 function F:SetScript(w, fn) rawset(self, "_" .. w, fn) end
 function F:SetShown(on) rawset(self, "shown", on and true or false) end
 function F:Show() rawset(self, "shown", true) end
@@ -112,10 +114,16 @@ end
 
     raw = lua.eval("rawget")
     YR.StartSwing()
+    # the swing timer comes on at the login, if it is on (YR.Part): nothing of it exists before
+    YR.partsReady = True
+    YR.ApplyParts()
     built = g.BUILT
     lua.execute("Fire('PLAYER_ENTERING_WORLD') Fire('PLAYER_SWING', 2.6, 0)")
     check(g.BUILT == built and g.HeadstartSwing is None and g.SwingTimerMainHandFrame.alpha == 0.8,
           "off: nothing built on a swing, Blizzard's bars left as they are")
+    check(not YR.SwingOn() and g.YippRouteDB.swing is None, "off: asking whether it's on doesn't fill its settings in")
+    check(not any(raw(f, "ev") and (raw(f, "ev")["PLAYER_SWING"] or raw(f, "ev")["PLAYER_ENTERING_WORLD"]) for f in g.FRAMES.values()) and len(list(g.CALLBACKS)) == 0,
+          "off: no swing or loading screen listened for, no Edit Mode callback")
     YR.SwingDB().on = True
     YR.SwingDB().style = "own"
     YR.SwingApply()

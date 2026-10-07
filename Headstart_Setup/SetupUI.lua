@@ -6,7 +6,9 @@
 -- it didn't take, the old way (Blizzard's Edit Mode code, which taints until a reload) runs and the
 -- reload popup asks for one. Also copied: the chat windows (tabs, channels, colours, transparency,
 -- size, position) and the camera distance.
-local _, YR = ...
+-- (part of the Headstart_Setup addon, loaded by Headstart while Character setup is on: an addon of its
+-- own has a table of its own, so Headstart's is taken from HeadstartNS)
+local YR = _G.HeadstartNS
 YR.Setup = YR.Setup or {}
 local YS = YR.Setup
 
@@ -350,14 +352,15 @@ function YS:ApplyUI(ui, o)
     local barAddon = suite or FirstLoaded(BAR_ADDONS)
     -- each game setting as it was, kept beside the bars' copy for /ysetup undo
     local char = _G.YippSetupCharDB          -- this character's saved table (Setup.lua fills it at login)
-    local backup = type(char) == "table" and char.backup or nil
+    local backup = type(char) == "table" and (char.uiBackup or char.backup) or nil
     for name, v in pairs(o.settings and ui.cvars or {}) do
         local was = C_CVar.GetCVar(name)
         if was ~= nil and was ~= v and pcall(C_CVar.SetCVar, name, v) then
             set = set + 1
             if backup then
                 backup.cvars = backup.cvars or {}
-                backup.cvars[name] = was
+                -- the first value seen is the one to go back to (a second apply mustn't overwrite it)
+                if backup.cvars[name] == nil then backup.cvars[name] = was end
             end
         end
     end

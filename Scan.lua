@@ -1,7 +1,15 @@
 -- /yroute scan: ask the server about every quest ID in Data/QuestIDs.lua and keep what it answers.
 -- RequestLoadQuestByID answers with QUEST_DATA_LOAD_RESULT; a few requests are kept in flight at a
--- time so the server isn't flooded. Results go to YippRouteDB.scan, which a /reload writes to disk.
+-- time so the server isn't flooded. Results go to HeadstartScanDB.scan, which a /reload writes to disk:
+-- the saved file of the window's addon (Headstart_Options), which is only read in when that addon is
+-- loaded - /headstart scan loads it - and not at every login.
 local _, YR = ...
+
+-- Where the results are kept (see the top of the file).
+local function Store()
+    if type(_G.HeadstartScanDB) ~= "table" then _G.HeadstartScanDB = {} end
+    return _G.HeadstartScanDB
+end
 
 local IN_FLIGHT = 10
 local TIMEOUT = 5          -- seconds before an unanswered request counts as "no answer"
@@ -28,12 +36,12 @@ local function Read(id)
     return r
 end
 
-local events = CreateFrame("Frame")          -- listens for the answers only while a scan runs
+local events            -- made by the first scan; listens for the answers only while one runs
 
 local function Finish()
     if ticker then ticker:Cancel() ticker = nil end
     events:UnregisterEvent("QUEST_DATA_LOAD_RESULT")
-    local s = YippRouteDB.scan
+    local s = Store().scan
     s.finished = time()
     local n, named = 0, 0
     for _, r in pairs(s.quests) do
@@ -48,7 +56,7 @@ local function Tick()
     for id, asked in pairs(pending) do
         if now - asked > TIMEOUT then
             pending[id] = nil
-            YippRouteDB.scan.noAnswer[id] = true
+            Store().scan.noAnswer[id] = true
         end
     end
     local inFlight = 0
@@ -66,12 +74,12 @@ local function Tick()
     if pos > #queue and inFlight == 0 then Finish() end
 end
 
-events:SetScript("OnEvent", function(_, _, id, success)
+local function Answered(_, _, id, success)
     if not (pending and pending[id]) then return end
     pending[id] = nil
-    local s = YippRouteDB.scan
+    local s = Store().scan
     if success then s.quests[id] = Read(id) else s.failed[id] = true end
-end)
+end
 
 function YR:StartScan()
     if ticker then YR.Print("already scanning.") return end
@@ -87,11 +95,16 @@ function YR:StartScan()
     pos, pending = 1, {}
     local _, class = UnitClass("player")
     local _, race = UnitRace("player")
-    YippRouteDB.scan = {
+    Store().scan = {
         started = time(), build = select(2, GetBuildInfo()), char = YR.CharKey(),
         level = UnitLevel("player"), class = class, race = race,
         quests = {}, failed = {}, noAnswer = {},
     }
+    -- nothing of the scan exists until one is asked for: no frame at a login that never scans
+    if not events then
+        events = CreateFrame("Frame")
+        events:SetScript("OnEvent", Answered)
+    end
     events:RegisterEvent("QUEST_DATA_LOAD_RESULT")
     ticker = C_Timer.NewTicker(0.1, Tick)
     YR.Print(("scanning %d quests (quest XP is as seen at level %d)."):format(#queue, UnitLevel("player")))
@@ -99,8 +112,8 @@ end
 
 --- Delete the scan's results (they stay in the saved file until then). Not while one is running.
 function YR.DeleteScan()
-    if ticker or not YippRouteDB.scan then return false end
-    YippRouteDB.scan = nil
+    if ticker or not Store().scan then return false end
+    Store().scan = nil
     return true
 end
 
@@ -109,12 +122,12 @@ function YR:StopScan()
     ticker:Cancel()
     ticker = nil
     events:UnregisterEvent("QUEST_DATA_LOAD_RESULT")
-    YippRouteDB.scan.stopped = time()
+    Store().scan.stopped = time()
     YR.Print(("scan stopped at %d of %d. /reload to write what we have."):format(pos - 1, #queue))
 end
 
 function YR:ScanStatus()
-    local s = YippRouteDB.scan
+    local s = Store().scan
     if not s then YR.Print("no scan yet.") return end
     local n = 0
     for _ in pairs(s.quests) do n = n + 1 end

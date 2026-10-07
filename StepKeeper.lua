@@ -62,7 +62,11 @@ local function Remember()
     if not key or not n then return end
     local step = YR.CharSteps(key)[n]
     if not step then return end
-    Place()[YR.CharKey()] = { key = key, n = n, text = step, quests = Quests(step) }
+    -- the same place as last time (a step set again, a route loaded again): nothing new to write down
+    local places, me = Place(), YR.CharKey()
+    local saved = places[me]
+    if saved and saved.key == key and saved.n == n and saved.text == step then return end
+    places[me] = { key = key, n = n, text = step, quests = Quests(step) }
 end
 
 -- Where the remembered step is in the route as it is now: the same text, else the same quests (a step
@@ -97,8 +101,21 @@ end
 
 -- RestedXP sets steps while it loads a route (the saved number first): nothing is remembered until it
 -- is done and the place checked, or the old number would overwrite the step we're looking for.
-local loading = false
-hooksecurefunc(RXP, "SetStep", function() if not loading and YR.RoutesOn and YR.RoutesOn() then Remember() end end)
+-- RestedXP also sets a step for every one it skips on the way to yours (a chain of finished steps is
+-- dozens of calls in one frame): the place is written down once, on the next frame, when it has settled.
+-- With the routes off the hook does nothing but ask that. (The hook and the wrap below are put on as
+-- the file loads, not at the login: RestedXP may load its route before then, and that load is the one
+-- your place is checked on.)
+local loading, soon = false, false
+local function RememberSoon()
+    soon = false
+    Remember()
+end
+hooksecurefunc(RXP, "SetStep", function()
+    if loading or soon or not (YR.RoutesOn and YR.RoutesOn()) then return end
+    soon = true
+    C_Timer.After(0, RememberSoon)
+end)
 local load = RXP.LoadGuide
 RXP.LoadGuide = function(...)
     loading = true

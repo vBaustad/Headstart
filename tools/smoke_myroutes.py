@@ -57,9 +57,11 @@ function UnitRace() return RACE, RACE end
     YR.shipped = lua.table()
     YR.CharKey = lua.eval("function() return 'Tester-Realm' end")
     YR.ShipGuide = lua.eval("function(self, key, text) table.insert(SHIPPED, key) end")
-    chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
-        open(os.path.join(ROOT, "MyRoutes.lua"), encoding="utf-8").read(), "MyRoutes.lua")
-    chunk("Headstart", YR)
+    YR.Part = lua.eval("function() end")
+    for f in ("RunStore.lua", "MyRoutes.lua"):      # (a run log is read through RunStore: it may be packed)
+        chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
+            open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
+        chunk("Headstart", YR)
     g = lua.globals()
     bad = 0
 

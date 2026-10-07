@@ -149,14 +149,16 @@ local function Train()
     end
 end
 
-local f = CreateFrame("Frame")
-f:RegisterEvent("TRAINER_SHOW")
-f:RegisterEvent("PLAYER_LOGIN")
-f:SetScript("OnEvent", function(_, event)
-    if event == "PLAYER_LOGIN" then
-        YR:SyncRxpTrainer()
-    else
-        -- the list fills a moment after the window opens
-        C_Timer.After(0.2, Train)
-    end
-end)
+-- The trainer's window is listened for only while this is on. Coming on (the login, or the setting)
+-- switches RestedXP's own off; and whenever the settings are looked at with ours off and RestedXP's
+-- still switched off by us, RestedXP gets it back.
+local function Wanted()
+    local on = YR.Option("autoTrain")
+    if not on and YippRouteDB.rxpTrainerWasOn then YR:SyncRxpTrainer() end
+    return on
+end
+
+YR.Part(Wanted, { "TRAINER_SHOW" }, function()
+    -- the list fills a moment after the window opens
+    C_Timer.After(0.2, Train)
+end, { start = function() YR:SyncRxpTrainer() end })

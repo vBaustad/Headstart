@@ -2,7 +2,8 @@
 -- RestedXP itself picks the Spirit Healer's option and confirms the resurrection on such a step, so a
 -- planned death is: die, (released), click the Spirit Healer (and Headstart accepts there too, below,
 -- when RestedXP's step has already gone). Any other death is left alone, so an
--- unplanned one can still be a corpse run. Account option deathSkipRelease (Settings, Route).
+-- unplanned one can still be a corpse run. Account option deathSkipRelease (Settings, Route): off, or
+-- with the routes off, none of this listens to anything.
 local _, YR = ...
 
 -- Is a death skip on one of the steps RestedXP shows right now?
@@ -29,42 +30,59 @@ end
 -- option and accepts, whatever step RestedXP is on by then. Any other death is left alone.
 local planned = false
 
+-- Nothing of this exists with the routes or the option off, and with them on only your death is
+-- listened for: the healer's window and coming back to life matter only while a death skip is under
+-- way, so those are listened for from such a death until it is over.
+local part
+local AFTER = { "PLAYER_UNGHOST", "PLAYER_ALIVE", "CONFIRM_XP_LOSS", "GOSSIP_SHOW" }
+if C_PlayerInteractionManager then AFTER[#AFTER + 1] = "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" end
+
+local function Plan(on)
+    on = on and true or false
+    if on == planned then return end
+    planned = on
+    local frame = part and part.frame
+    if not frame then return end
+    for _, e in ipairs(AFTER) do
+        if on then frame:RegisterEvent(e) else frame:UnregisterEvent(e) end
+    end
+end
+
+local function Confirm()
+    C_PlayerInteractionManager.ConfirmationInteraction(Enum.PlayerInteractionType.SpiritHealer)
+    C_PlayerInteractionManager.ClearInteraction(Enum.PlayerInteractionType.SpiritHealer)
+end
+
 local function AcceptAtHealer()
     if C_PlayerInteractionManager and Enum and Enum.PlayerInteractionType and Enum.PlayerInteractionType.SpiritHealer then
-        C_Timer.After(0, function()
-            C_PlayerInteractionManager.ConfirmationInteraction(Enum.PlayerInteractionType.SpiritHealer)
-            C_PlayerInteractionManager.ClearInteraction(Enum.PlayerInteractionType.SpiritHealer)
-        end)
+        C_Timer.After(0, Confirm)
     elseif AcceptXPLoss then
         AcceptXPLoss()      -- the game closes its own popup as you come alive: hiding it from here would taint it
     end
 end
 
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("PLAYER_DEAD")
-frame:RegisterEvent("PLAYER_UNGHOST")
-frame:RegisterEvent("PLAYER_ALIVE")
-frame:RegisterEvent("CONFIRM_XP_LOSS")
-frame:RegisterEvent("GOSSIP_SHOW")
-if C_PlayerInteractionManager then frame:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW") end
-frame:SetScript("OnEvent", function(_, event, arg1)
+local function Release()
+    if UnitIsDead("player") and not UnitIsGhost("player") then RepopMe() end
+end
+
+local function OnEvent(_, event, arg1)
     if event == "PLAYER_DEAD" then
-        planned = YR.RoutesOn() and YR.OnDeathSkip()
-        if not planned or not YR.Option("deathSkipRelease") then return end
+        Plan(YR.RoutesOn() and YR.Option("deathSkipRelease") and YR.OnDeathSkip())
         -- a moment for the death popup to appear first, so releasing also closes it
-        C_Timer.After(0.3, function()
-            if UnitIsDead("player") and not UnitIsGhost("player") then RepopMe() end
-        end)
+        if planned then C_Timer.After(0.3, Release) end
     elseif event == "PLAYER_UNGHOST" or (event == "PLAYER_ALIVE" and not UnitIsGhost("player")) then
-        planned = false
+        Plan(false)
     elseif planned and UnitIsGhost("player") then
         local types = Enum and Enum.PlayerInteractionType
         if event == "CONFIRM_XP_LOSS" or (event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" and types and arg1 == types.SpiritHealer) then
-            planned = false
+            Plan(false)
             AcceptAtHealer()
         elseif (event == "GOSSIP_SHOW" or (event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" and types and arg1 == types.Gossip))
                 and type(RXP) == "table" and type(RXP.SelectGossipType) == "function" then
             RXP.SelectGossipType("healer")          -- RestedXP's own pick of the healer's option
         end
     end
-end)
+end
+
+part = YR.Part(function() return YR.RoutesOn() and YR.Option("deathSkipRelease") end, { "PLAYER_DEAD" }, OnEvent,
+    { stop = function() planned = false end })      -- (its events are taken off with the part)
