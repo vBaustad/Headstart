@@ -107,10 +107,47 @@ function YR.RxpIcons()
     for _, tag in ipairs({ "goto", "groundgoto", "flygoto", "explore" }) do RXP.icons[tag] = PIN end
 end
 
+-- RestedXP's pins on the world map sit under the game's own quest markers (the user, 2026-10-07: "the
+-- points are always below the map objectives"): it adds them through HereBeDragons without saying which
+-- layer, and the library's default is the area-POI layer, below quests. HereBeDragons takes a layer as
+-- its last argument, so while the routes are on RestedXP's pins are given a higher one: the first of
+-- LAYERS this client's world map knows (none known: nothing is changed). Other addons' pins are passed
+-- on as they are.
+local LAYERS = { "PIN_FRAME_LEVEL_WAYPOINT_LOCATION", "PIN_FRAME_LEVEL_SUPER_TRACKED_CONTENT",
+    "PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST", "PIN_FRAME_LEVEL_ACTIVE_QUEST", "PIN_FRAME_LEVEL_TOPMOST" }
+local function PinLayer()
+    local map = WorldMapFrame
+    local manager = map and type(map.GetPinFrameLevelsManager) == "function" and map:GetPinFrameLevelsManager()
+    local known = type(manager) == "table" and manager.definitions
+    if type(known) ~= "table" then return nil end
+    for _, want in ipairs(LAYERS) do
+        for _, d in ipairs(known) do
+            if type(d) == "table" and d.frameLevelType == want then return want end
+        end
+    end
+end
+
+local pinsRaised = false
+function YR.RxpPinsOnTop()
+    if pinsRaised or type(RXP) ~= "table" or type(LibStub) ~= "table" then return end
+    local pins = LibStub("HereBeDragons-Pins-2.0", true)
+    if type(pins) ~= "table" or type(pins.AddWorldMapIconMap) ~= "function" then return end
+    pinsRaised = true
+    local add, layer = pins.AddWorldMapIconMap, nil
+    pins.AddWorldMapIconMap = function(self, ref, icon, uiMapID, x, y, showFlag, frameLevel, ...)
+        if ref == RXP and frameLevel == nil and YR.RoutesOn() then
+            if layer == nil then layer = PinLayer() or false end
+            frameLevel = layer or nil
+        end
+        return add(self, ref, icon, uiMapID, x, y, showFlag, frameLevel, ...)
+    end
+end
+
 function YR:RegisterGuides()
     if YR.ShipMyRoutes then YR.ShipMyRoutes() end       -- routes saved from a run (MyRoutes.lua), like ours
     if not YR.RoutesOn() then return end
     YR.RxpIcons()
+    YR.RxpPinsOnTop()
     for key, c in pairs(Custom()) do
         c.text = Renamed(c.text)
         -- edited before routes remembered their base: take today's shipped route as it

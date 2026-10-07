@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **RestedXP's pins show above the game's quest markers on the world map** (with routes on). They sat on the lowest marker layer, so a quest area or another marker over the same spot hid where the route wanted you. Other addons' pins are untouched.
+
 - **The run log no longer grows without end on an account that doesn't use routes.** With routes off, position samples (where you were every 2 seconds, nine tenths of the log) are no longer written: nothing reads them then. Events (quests, levels, deaths, purchases) are recorded as before, with where they happened. And once, at login: the old position samples of your *other* characters are dropped, with a line in chat saying how many. Nothing of the character you're on is dropped, no events are dropped, and an account that has ever had routes on keeps every sample, routes on or off: the route work is done from them.
 
 - `/headstart scan` says so when its quest list isn't in the build (Data/QuestIDs.lua is a developer's file), instead of erroring.
