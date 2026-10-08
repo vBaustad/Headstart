@@ -149,13 +149,30 @@ function ScanCompletions()
     primed = true
 end
 
+-- What was killed: your target, when it is a dead creature at the moment the XP comes. Its name, its
+-- level and "elite" / "rare" / "rareelite" (nothing for a normal one). Forever changed mob levels and
+-- no data we have says what they are now (the user, 2026-10-08: a "level 30 elite" was 35): the
+-- routes are checked against what the logs saw. Nothing when the kill wasn't your target, or where the
+-- game keeps unit values secret (dungeons and raids).
+local function Mob()
+    if not UnitExists("target") or UnitIsPlayer("target") or not UnitIsDead("target") then return end
+    local name, level, kind = UnitName("target"), UnitLevel("target"), UnitClassification("target")
+    if issecretvalue and (issecretvalue(name) or issecretvalue(level) or issecretvalue(kind)) then return end
+    if type(name) ~= "string" or type(level) ~= "number" then return end
+    return name, level, kind ~= "normal" and type(kind) == "string" and kind or nil
+end
+
 -- XP that didn't come from a quest turn-in is a kill (or exploring, rarely). A level-up in between
 -- adds what was left of the old level.
 local function XPChanged()
     local xp, level = UnitXP("player"), UnitLevel("player")
     if lastXP then
         local gained = level > lastLevel and (lastMax - lastXP + xp) or (xp - lastXP)
-        if gained > 0 and turnedInAt ~= time() then Add("kill", nil, { xp = gained }) end
+        if gained > 0 and turnedInAt ~= time() then
+            local ok, mob, mobLevel, kind = pcall(Mob)
+            if not ok then mob, mobLevel, kind = nil, nil, nil end
+            Add("kill", nil, { xp = gained, mob = mob, mlvl = mobLevel, elite = kind })
+        end
     end
     lastXP, lastMax, lastLevel = xp, UnitXPMax("player"), level
 end

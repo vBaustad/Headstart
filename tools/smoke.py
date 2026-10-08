@@ -280,6 +280,24 @@ kill = [run.ev[i] for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "kill"][
 check(kill.xp == 10, f"kill XP 10: {kill.xp}")
 steps = [run.ev[i].step for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "step"]
 check(list(steps) == [7, 8], f"steps 7 then 8: {list(steps)}")
+check(kill.mob is None and kill.mlvl is None, "a kill with no dead target: no mob written")
+# a kill of your target: its name, level and kind go with it
+lua.execute("""
+KEPT = { UnitExists, UnitLevel, UnitIsDead, UnitClassification }
+function UnitExists(u) return u == "target" end
+function UnitLevel(u) return u == "target" and 35 or 1 end
+function UnitIsDead() return true end
+function UnitClassification() return "elite" end
+""")
+g.CLOCK += 10; g.XP = 480; g.Fire("PLAYER_XP_UPDATE")
+kill = [run.ev[i] for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "kill"][-1]
+check(kill.mob == "Sten Stoutarm" and kill.mlvl == 35 and kill.elite == "elite",
+      f"a kill of your target: {kill.mob}, level {kill.mlvl}, {kill.elite}")
+lua.execute('function UnitClassification() return "normal" end')
+g.CLOCK += 10; g.XP = 490; g.Fire("PLAYER_XP_UPDATE")
+kill = [run.ev[i] for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "kill"][-1]
+check(kill.mlvl == 35 and kill.elite is None, "a normal mob: no kind written")
+lua.execute("UnitExists, UnitLevel, UnitIsDead, UnitClassification = KEPT[1], KEPT[2], KEPT[3], KEPT[4]")
 
 # Profession skill-ups are logged (name and rank); weapon skill-ups are not.
 lua.execute('''
