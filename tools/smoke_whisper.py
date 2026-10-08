@@ -75,6 +75,17 @@ function PlaySound(id, channel) PLAYED[#PLAYED + 1] = { "kit", id, channel } ret
     g.YippRouteDB.whisperChannel = "SFX"
     lua.execute("NOW = NOW + 3 Fire('CHAT_MSG_WHISPER')")
     check(last()[3] == "SFX", "another channel picked: played on it")
+    # a sound file of your own
+    lua.execute("FILES = {} function PlaySoundFile(f, ch) FILES[#FILES + 1] = f return f:find('whisper') ~= nil end")
+    g.YippRouteDB.whisperFile = "AddOns/whisper.ogg"
+    check(YR.WhisperFile() == "Interface\\AddOns\\whisper.ogg" and "file" in keys() and YR.WhisperSoundName("file") == "Your own file",
+          f"a file of your own: written from Interface, slashes either way, and in the list ({YR.WhisperFile()})")
+    check(YR.PlayWhisperSound("file") is True and g.FILES[1] == "Interface\\AddOns\\whisper.ogg", "and played")
+    g.YippRouteDB.whisperFile = "Interface\\Sounds\\gone.ogg"
+    check(YR.WhisperFile() == "Interface\\Sounds\\gone.ogg" and YR.PlayWhisperSound("file") is False, "a file the game hasn't: said so, not an error")
+    g.YippRouteDB.whisperFile = None
+    check("file" not in keys() and YR.PlayWhisperSound("file") is False, "none written: not in the list")
+    lua.execute("PlaySoundFile = nil")
     g.YippRouteDB.whisperSound = "kit:NOT_A_SOUND"
     YR.ApplyParts()            # as the settings window does after a change
     check(YR.PlayWhisperSound() is False, "a sound this client doesn't have: not played, and says so")

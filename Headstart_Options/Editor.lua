@@ -2968,6 +2968,25 @@ local BuildChat = QoLPage("chat", function(L, c, Section, Row, Opt)
         Row("Sound", sound, "The speaker on each line plays it without picking it. The game's own sounds first; with a"
             .. " sound pack or another addon that brings LibSharedMedia (Details, WeakAuras, boss mods), every sound"
             .. " of theirs is in the list too - scroll it. The game's own quiet whisper sound still plays under it")
+        local file
+        file = S.Input(c, { width = 240, placeholder = "AddOns\\whisper.ogg", onCommit = function(t)
+            t = (t or ""):gsub("^%s+", ""):gsub("%s+$", "")
+            YippRouteDB.whisperFile = t ~= "" and t or nil
+            if YR.WhisperFile() then
+                YippRouteDB.whisperSound = "file"
+                if not YR.PlayWhisperSound("file") then
+                    YR.Print("the game can't play " .. YR.WhisperFile() .. ". A file put there while the game runs is found only after the game is started again.")
+                end
+            elseif YippRouteDB.whisperSound == "file" then
+                YippRouteDB.whisperSound = nil
+            end
+            YR.SettingChanged()
+            sound:Refresh()
+        end })
+        function file:Refresh() if not self:HasFocus() then self:SetValue(YippRouteDB.whisperFile or "") end end
+        Row("A sound file of your own", file, "An .ogg or .mp3 you put under the game's Interface folder, written from there:"
+            .. " AddOns\\whisper.ogg is Interface\\AddOns\\whisper.ogg. Enter picks it and plays it. The game finds a new"
+            .. " file only after it has been started again - a reload isn't enough")
         local CHANNEL = { { "Master", "Master (heard with effects turned down)" }, { "SFX", "Sound effects" }, { "Dialog", "Dialog" } }
         local channel
         channel = S.Dropdown(c, 240, CHANNEL, function(v) YippRouteDB.whisperChannel = v channel:Refresh() end)

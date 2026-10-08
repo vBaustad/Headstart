@@ -337,7 +337,7 @@ function YR.LootLogCount() return #DB().entries end
 local function BuildWindow()
     if win then return end
     local S = YR.Style
-    win = S.Window("HeadstartLootLog", 620, 500, "Loot log")
+    win = S.Window("HeadstartLootLogWindow", 620, 500, "Loot log")
     win:SetFrameStrata("HIGH")
     win.sum = {}
     local labels = { "Money looted", "Vendor value of items", "Money and value an hour", "Experience", "Experience an hour", "Items" }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Whisper sound: a file of your own, and a shorter list** (Headstart, QoL, Chat): write where a sound file of yours is under the game's Interface folder (AddOns\whisper.ogg) and it is the whisper sound - any sound you have, from any UI you used before. The game's window clicks and rustles (backpack, menu, page turn, coins and the like) are out of the list; one you had picked still plays.
+
 - **Talent window: the see-through slider and the size buttons can be read**: with the window seen through, they stood grey on whatever was behind it. Each now has a dark plate of its own, and brighter words.
 
 - **XP bar: a new look** (Headstart, QoL, XP bar): your XP as a gradient from one colour to another (each yours to pick, or one flat colour), a clean seam where it meets the completed quests' part (the spark shows only against the empty bar; the Smooth texture is now a sheen of our own over the whole bar, where the game's bar picture faded each part at its own end), a line of words over the bar as well as under it, numbers with their thousands apart (4,585 / 6,500), and new first words: XP left to the level, your percent once the finished quests are handed in ({pctq}), time this level and this session, time to level with XP an hour, completed and rested percent. Words and colours you set yourself are kept.

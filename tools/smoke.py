@@ -1190,4 +1190,20 @@ import smoke_idle
 bad += smoke_idle.run()
 import smoke_pins
 bad += smoke_pins.run()
+# A frame's name is a global, and so is a saved variable's: one name for both and the frame replaces
+# the saved table (or the game's Esc handling finds the table where it looks for the frame).
+import glob as _glob, re as _re
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_saved, _frames = set(), set()
+for _toc in _glob.glob(os.path.join(_root, "**", "*.toc"), recursive=True):
+    for _line in open(_toc, encoding="utf-8"):
+        if _line.startswith("## SavedVariables"):
+            _saved.update(n.strip() for n in _line.split(":", 1)[1].split(","))
+for _lua in _glob.glob(os.path.join(_root, "**", "*.lua"), recursive=True):
+    _src = open(_lua, encoding="utf-8", errors="replace").read()
+    _frames.update(_re.findall(r'S\.Window\("([^"]+)"', _src))
+    _frames.update(_re.findall(r'CreateFrame\("\w+",\s*"([^"]+)"', _src))
+_clash = sorted(_saved & _frames)
+print(("ok  " if not _clash else "FAIL"), f"no frame is named as a saved variable is ({', '.join(_clash) or 'none'})")
+bad += bool(_clash)
 sys.exit(1 if bad else 0)

@@ -49,6 +49,8 @@ strtrim = function(s) return s end
 function print(...) SAID[#SAID + 1] = table.concat({ ... }, " ") end
 CLOCK = 86400 * 10 + 3600 * 12
 function time() return CLOCK end
+wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
+C_Timer = { After = function(_, fn) fn() end }
 function date(fmt, t) return os.date("!" .. fmt, t) end
 function GetChatWindowInfo(i) return ({ "General", "Combat Log", "Guild" })[i] end
 NUM_CHAT_WINDOWS = 3
@@ -108,13 +110,17 @@ def run():
     check(YR.ChatPlain(first[3]) == "[Guild] [Anna]: hi there", f"as plain text: no colour codes, a link as its words ({YR.ChatPlain(first[3])})")
     check(texts(3) == [YR.ChatLogLine(2)[3]] and len(texts(0)) == 2, "one chat window's lines, or all of them")
     check(len(texts(0, "blue sword")) == 1 and len(texts(0, "nothing like it")) == 0, "searched by the words in it, whatever their case")
+    before = YR.ChatLogCount()
+    lua.execute("""ChatFrame1:AddMessage("Zed says: twice") ChatFrame3:AddMessage("Zed says: twice") ChatFrame1:AddMessage("Zed says: twice")""")
+    check(YR.ChatLogCount() == before + 3 and len(texts(0, "twice")) == 2 and len(texts(1, "twice")) == 2 and len(texts(3, "twice")) == 1,
+          "all windows: a line two windows showed is one line there; said twice in one window it is two")
     names = [w[2] for w in YR.ChatLogWindows().values()]
     check(names == ["All windows", "General", "Guild"], f"the windows to pick from are the ones with lines ({names})")
 
     # the window: read as chat shows it, or as text to mark and copy
     check(YR.ChatLogOpen() is True and g.HeadstartChatLog is not None, "the window opens")
     lua.execute("""ChatFrame1:AddMessage("said while the window is open")""")
-    check(YR.ChatLogCount() == 3, "a line said while it is open is kept too")
+    check(YR.ChatLogCount() == 6, "a line said while it is open is kept too")
 
     # only the newest are kept
     g.YippRouteDB.chatLogMax = 200

@@ -151,10 +151,23 @@ function YR.ChatLogLines(window, search, limit)
     local found, total = {}, 0
     search = search and search ~= "" and search:lower() or nil
     limit = limit or SHOWN_MAX
+    -- all windows: a line two windows showed in the same second is one line (said twice in one
+    -- window it is two)
+    local all = window == 0 or window == nil
+    local seen, seenAt = all and {} or nil, nil
     for i = n, 1, -1 do
         local w = meta[i] % 16
         local mark = w == SESSION
-        if mark or window == 0 or window == nil or w == window then
+        local twice = false
+        if all and not mark then
+            local at = floor(meta[i] / 16)
+            if at ~= seenAt then seenAt = at wipe(seen) end
+            local first = seen[text[i]]
+            if first and first ~= w then twice = true else seen[text[i]] = w end
+        end
+        if twice then
+            -- shown already, from the other window
+        elseif mark or all or w == window then
             if mark or not search or YR.ChatPlain(text[i]):lower():find(search, 1, true) then
                 if not mark then total = total + 1 end
                 if #found < limit then found[#found + 1] = i end
@@ -197,6 +210,24 @@ local function BoxLine(l)
     return ("|cff7f8794%s|r  %s"):format(Stamp(l[1]), words)
 end
 
+-- The newest lines are at the bottom: that is where the window opens. The box of text only has its
+-- new height a frame after its text is set, so this is done when the text is set, again when the box
+-- changes size, and once more a frame on - until then the view would sit at the top.
+local toBottom = false
+local function Bottom()
+    if not win then return end
+    local h = win.box.GetHeight and win.box:GetHeight() or 0
+    win.area.content:SetHeight(math.max(10, h))
+    if win.area.UpdateBar then win.area:UpdateBar() end
+    if toBottom and win.area.SetVerticalScroll then
+        -- how far down the bottom is, worked out here: what the scroll frame says its range is is still
+        -- the range of the text before this one until it has been drawn once
+        local shown = win.area.GetHeight and win.area:GetHeight() or 0
+        win.area:SetVerticalScroll(math.max(0, h - shown))
+        if win.area.UpdateBar then win.area:UpdateBar() end
+    end
+end
+
 local function Fill()
     if not win then return end
     local list, total = YR.ChatLogLines(view.window, view.search)
@@ -215,23 +246,24 @@ local function Fill()
             out[#out + 1] = BoxLine(l)
         end
     end
+    -- (the box grows to its text; made small first, so a shorter text than the last leaves no empty
+    -- stretch under it)
+    if win.box.SetHeight then win.box:SetHeight(1) end
     win.box:SetText(table.concat(out, "\n"))
     win.box:ClearFocus()
-    local h = win.box.GetHeight and win.box:GetHeight() or 0
-    win.area.content:SetHeight(math.max(10, h))
-    -- the newest lines are at the bottom: that is where it opens
-    if win.area.UpdateBar then
-        win.area:UpdateBar()
-        local range = win.area.GetVerticalScrollRange and win.area:GetVerticalScrollRange() or 0
-        if win.area.SetVerticalScroll then win.area:SetVerticalScroll(range) end
-        win.area:UpdateBar()
-    end
+    toBottom = true
+    Bottom()
+    C_Timer.After(0, function()
+        Bottom()
+        -- and a moment later it is yours to scroll: a change of size after that leaves the view alone
+        C_Timer.After(0.3, function() Bottom() toBottom = false end)
+    end)
 end
 
 local function Build()
     if win then return end
     local S = YR.Style
-    win = S.Window("HeadstartChatLog", W, H, "Chat log")
+    win = S.Window("HeadstartChatLogWindow", W, H, "Chat log")
     win:SetFrameStrata("HIGH")
     -- which window, a search, and the two ways to look at it
     local pick
@@ -284,6 +316,7 @@ local function Build()
     box:SetPoint("TOPLEFT")
     box:SetWidth(W - 32 - 12 - 24)
     box:SetScript("OnEscapePressed", box.ClearFocus)
+    box:SetScript("OnSizeChanged", Bottom)
     win.area, win.box = area, box
 end
 
