@@ -8,7 +8,7 @@
 ## X-Curse-Project-ID: 1719292
 ## OptionalDeps: RXPGuides, AutoFeed, Headstart_Routes
 ## IconTexture: Interface\Icons\INV_Misc_Map_01
-## SavedVariables: YippRouteDB, YippSetupDB
+## SavedVariables: YippRouteDB, YippSetupDB, HeadstartAlts
 ## SavedVariablesPerCharacter: YippSetupCharDB, HeadstartChatLog, HeadstartLootLog, HeadstartRunLog, HeadstartRunLogKept
 ## AddonCompartmentFunc: Headstart_OnAddonCompartmentClick
 
@@ -47,6 +47,8 @@ TalentFade.lua
 BarHide.lua
 ChatLog.lua
 LootFeed.lua
+QuestLFG.lua
+Alts.lua
 Swing.lua
 Recap.lua
 PartyQuests.lua

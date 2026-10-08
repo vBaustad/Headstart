@@ -122,23 +122,40 @@ function YR.CraftChances()
     return best
 end
 
-local function Name(item) return C_Item.GetItemNameByID and C_Item.GetItemNameByID(item) or ("item " .. item) end
+-- An item's name, once the game has it. An item you've never held isn't known to the game until it
+-- has been asked for: asked, and nil this time ("item 3530" told nobody anything).
+local function Name(item)
+    local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(item)
+    if name and name ~= "" then return name end
+    if C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, item) end
+    return nil
+end
+
+-- One look a second after the last change, however many came.
+local pending = false
+local Later
+local waited = {}               -- [kind] = looks spent waiting for its item's name
 
 function YR.CheckCrafts()
     if InCombatLockdown() then return end
     for kind, c in pairs(YR.CraftChances()) do
         if not told[kind] then
-            told[kind] = true
-            YR.Print(("you can make %d %s from your bags, and you have %s %s - open %s."):format(c.total,
-                Name(c.item), c.have == 0 and "no" or ("only " .. c.have), LABEL[kind], c.profession or "the profession"))
+            local name = Name(c.item)
+            if not name and (waited[kind] or 0) < 5 then
+                -- its name is on its way: said a second on, with the name (after five looks, without)
+                waited[kind] = (waited[kind] or 0) + 1
+                Later()
+            else
+                told[kind], waited[kind] = true, nil
+                YR.Print(("you can make %d %s from your bags, and you have %s %s - open %s."):format(c.total,
+                    name or LABEL[kind], c.have == 0 and "no" or ("only " .. c.have), LABEL[kind], c.profession or "the profession"))
+            end
         end
     end
 end
 
--- One look a second after the last change, however many came.
-local pending = false
 local function Check() pending = false YR.CheckCrafts() end
-local function Later()
+function Later()
     if pending then return end
     pending = true
     C_Timer.After(1, Check)

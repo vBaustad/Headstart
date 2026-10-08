@@ -11,3 +11,4 @@
 QuestIDs.lua
 Perf.lua
 Editor.lua
+Welcome.lua

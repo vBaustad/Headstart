@@ -728,6 +728,8 @@ local function SetForm(bar)
     Paint()
 end
 
+local source                -- "bars" or "profile": which of the two the plan follows where they disagree
+local Start                 -- (with OpenPlanner, below)
 local function Tab(parent, label, x, y, onClick, size)
     local b = CreateFrame("Button", nil, parent)
     b.text = S.Text(b, size or 13)
@@ -779,6 +781,17 @@ local function Build()
     local y = -54
     win.modeBars = Tab(win, "On my bars", 12, y, function() SetMode("bars") end)
     win.modeGrid = Tab(win, "As a grid", 12 + win.modeBars:GetWidth() + 4, y, function() SetMode("grid") end)
+    -- which of the two the plan follows where your bars and the saved plan disagree (only then is it there)
+    win.source = Tab(win, "Saved plan", 12 + win.modeBars:GetWidth() + 4 + win.modeGrid:GetWidth() + 14, y, function()
+        Start(source == "profile" and "bars" or "profile")
+        Drop()
+        Paint()
+    end, 12)
+    win.source.text:SetTextColor(unpack(S.C.accent))
+    win.source.line:Hide()
+    win.source:SetScript("OnEnter", function(self) if self.tip then S.Tip(self, self.tip) end end)
+    win.source:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    win.source:Hide()
     y = y - 32
 
     -- Bar 1 in each form: only for a class whose forms swap the main bar
@@ -918,21 +931,34 @@ function YR.PlannerRankMenu(b)
     menu:Show()
 end
 
---- Open the planner, starting from your bars (and the saved layout where they're empty). On your bars unless you last chose the grid,
---- or no Blizzard bar is on screen at all (a bar addon draws its own).
-function YR.OpenPlanner()
-    if InCombatLockdown() then YR.Print("not in combat.") return end
-    if not win then Build() end
-    -- The plan is your bars as they are now, with the saved layout where the bars have nothing (the
-    -- spells planned for later levels; on a new character, all of it). What you see is what Apply
-    -- gives you: only the buttons you change here change on the bars.
+-- The plan is your bars and the class's saved layout laid over each other: where only one has
+-- something, that (the spells planned for later levels; on a new character, all of it). Where they
+-- disagree one of them wins - the saved layout on a character that never had it put on, your bars on
+-- one that did (YS.PlanPrefers) - and a tab at the top says which and swaps it. What you see is what
+-- Apply gives you: only the buttons that differ from your bars change on them.
+function Start(prefer)
     plan, opened = {}, {}
-    local start, now = YS.PlanStart()
+    local start, now, differ, won = YS.PlanStart(prefer)
     for slot, e in pairs(start) do
         plan[slot] = Copy(e)
         plan[slot].stale, plan[slot].rankID = nil, nil     -- planned at its highest rank unless you set one
     end
     for slot, e in pairs(now) do opened[slot] = Copy(e) end
+    source = won
+    win.source:SetShown((differ or 0) > 0)
+    win.source.text:SetText(won == "profile" and "Saved plan" or "My bars")
+    win.source:SetWidth(win.source.text:GetStringWidth() + 20)
+    win.source.tip = ("Your bars and the class's saved plan have different things in %d button%s. Showing: %s. Click for %s."):format(
+        differ or 0, differ == 1 and "" or "s", won == "profile" and "the saved plan there" or "your bars there",
+        won == "profile" and "your bars" or "the saved plan")
+end
+
+--- Open the planner. On your bars unless you last chose the grid, or no Blizzard bar is on screen
+--- at all (a bar addon draws its own).
+function YR.OpenPlanner()
+    if InCombatLockdown() then YR.Print("not in combat.") return end
+    if not win then Build() end
+    Start()
     wipe(lists)      -- spells learned or macros made since the last open
     win.subtitle:SetText("")
     formBar = 0
@@ -956,3 +982,4 @@ function YR.PlannerOverlays() return overlays end
 function YR.PlannerSetForm(bar) SetForm(bar) end
 function YR.PlannerSetList(kind) listKind = kind Paint() end
 function YR.PlannerWindow() return win end
+function YR.PlannerSource() return source end

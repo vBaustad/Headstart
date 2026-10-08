@@ -177,7 +177,7 @@ function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 -- What stays on is seen and harmless: tooltips, the flight timer, the camp icon, lines in chat.
 local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true,
     groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true,
-    deathRecap = true, chatLog = true, lootFeed = true }
+    deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true }
 YR.STARTS_OFF = STARTS_OFF
 
 --- What an option is before you've set it: on, unless it starts off or another addon does the same.
@@ -345,7 +345,34 @@ end
 function YR:ToggleWindow(page) if YR.LoadWindow() then YR:ToggleWindow(page) end end
 function YR:ToggleSettings() if YR.LoadWindow() then YR:ToggleSettings() end end
 function YR:ShowSettingsTab(key) if YR.LoadWindow() then YR:ShowSettingsTab(key) end end
-function Headstart_OnAddonCompartmentClick() YR:ToggleWindow() end
+--- A new install is asked once how much of Headstart it wants: the welcome window, a few seconds
+--- after the first login and not in a fight (the next login, then). Welcome.lua, in the window's addon.
+function YR.WelcomeFirst()
+    local db = YippRouteDB
+    if not db.welcome or db.welcomeSeen then return end
+    C_Timer.After(5, function()
+        if db.welcomeSeen or InCombatLockdown() then return end
+        if YR.LoadWindow() and YR.WelcomeShow then YR.WelcomeShow() end
+    end)
+end
+function Headstart_OnAddonCompartmentClick(_, which, from)
+    if which == "RightButton" then YR.WindowMenu(type(from) == "table" and from or nil) else YR:ToggleWindow() end
+end
+-- Keys for the windows (Bindings.xml; Key Bindings, AddOns, Headstart).
+function Headstart_Open(what)
+    if what == "alts" then YR.AltsToggle()
+    elseif what == "lfg" then YR.QuestLFGToggle()
+    elseif what == "chat" then YR.ChatLogToggle()
+    elseif what == "loot" then YR.LootLogToggle()
+    elseif what == "menu" then YR.WindowMenu()
+    else YR:ToggleWindow() end
+end
+BINDING_NAME_HEADSTART_WINDOW = "Headstart's window"
+BINDING_NAME_HEADSTART_MENU = "Menu of every window"
+BINDING_NAME_HEADSTART_ALTS = "Characters: bags, bank and gold"
+BINDING_NAME_HEADSTART_LFG = "Quest group"
+BINDING_NAME_HEADSTART_CHATLOG = "Chat log"
+BINDING_NAME_HEADSTART_LOOTLOG = "Loot log"
 
 SLASH_HEADSTART1 = "/headstart"
 SLASH_HEADSTART2 = "/yroute"   -- its name before it was Headstart
@@ -387,10 +414,21 @@ SlashCmdList.HEADSTART = function(msg)
     elseif cmd == "inv" or cmd == "invite" then
         YR.InviteTarget()
     elseif cmd == "instances" or cmd == "inst" then
-        YR:ToggleWindow("instances")
+        if arg == "id" then YR.InstanceIDDebug() else YR:ToggleWindow("instances") end
     elseif cmd == "perf" then
         -- what Headstart costs, by the game's own count (the code for it is in the window's addon)
         if YR.LoadWindow() then YR.Perf() end
+    elseif cmd == "start" or cmd == "welcome" then
+        -- the welcome window: how much of Headstart you want (the code for it is in the window's addon)
+        if YR.LoadWindow() then YR.WelcomeToggle() end
+    elseif cmd == "menu" then
+        YR.WindowMenu()
+    elseif cmd == "alts" or cmd == "chars" or cmd == "characters" then
+        YR.AltsToggle()
+    elseif cmd == "gold" then
+        YR.AltsGoldSay()
+    elseif cmd == "lfg" or cmd == "group" then
+        YR.QuestLFGToggle()
     elseif cmd == "loot" then
         YR.LootLogToggle()
     elseif cmd == "chat" then
@@ -432,7 +470,7 @@ SlashCmdList.HEADSTART = function(msg)
             .. " /headstart camp (unlock|lock|always|debug) - the campfire icon; /headstart bank - bank mats now; /headstart mail - mail them to your alt;"
             .. " /headstart routes on|off - Headstart routes in RestedXP; /headstart inv - invite your target; /headstart leave - leave the group; /headstart plan - plan your bars;"
             .. " /headstart restock - buy what you keep at this vendor; /headstart trainer - what's new at the trainer;"
-            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game")
+            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart lfg - ask chat for a group for a quest, and see who answers; /headstart start - the welcome window: pick how much of Headstart you want")
     else
         YR:ToggleWindow()
     end
@@ -442,7 +480,7 @@ end
 
 -- Defaults changed to "off until you turn it on" (see STARTS_OFF). An account that had Headstart
 -- before that keeps everything as it was: once, each of those options you never touched is written
--- down as what it was then. A new install starts quiet, and is shown the Get started page.
+-- down as what it was then. A new install starts quiet, and is asked what it wants (the welcome window).
 local WAS_ON = { "restock", "bankAuto", "levelShot", "trinketBar", "groupBar", "upgrades", "talentMove", "talentFadeSlider" }
 function YR.Latch(fresh)
     local db = YippRouteDB
@@ -479,6 +517,7 @@ f:SetScript("OnEvent", function(_, event, name)
         f:UnregisterEvent("PLAYER_LOGIN")
         YR.partsReady = true
         YR.ApplyParts()
+        YR.WelcomeFirst()
         return
     end
     -- The window's addon has just been read in, its saved file with it: what /headstart scan found
@@ -537,6 +576,8 @@ f:SetScript("OnEvent", function(_, event, name)
     YR.StartRecap()
     YR.StartChatLog()
     YR.StartLootFeed()
+    YR.StartQuestLFG()
+    YR.StartAlts()
     YR.StartCraftRemind()
     YR.StartQuickGroup()
     if YR.Style then YR.Style.Changed = YR.SettingChanged end

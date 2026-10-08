@@ -11,6 +11,10 @@ local YS = YR.Setup
 local S = YR.Style
 
 local DYNAMIC_ICON = 134400     -- the question mark; #showtooltip shows the real icon once the spell is known
+-- A spell you haven't learned yet waits in its slot as a macro. With the question mark the game shows
+-- a red "?" until the spell is known - a bar of them tells you nothing. So such a macro is given the
+-- spell's own icon (from the game's data, Data/PlannerSpells.lua): your bars look as you planned them
+-- from level 1, and the same in the planner and out of it.
 local MAX_SLOT = 180
 local SCAN_LEVEL = 60           -- Copy saves every spell
 -- How far ahead of your level a class spell gets its button now (a question-mark macro until it is
@@ -247,13 +251,36 @@ function YS.ReadBars(withOther)
     return slots, n
 end
 
---- The bar planner's start: what is on your bars now, with the saved layout where the bars have
---- nothing - the spells planned for later levels, and on a new character the whole saved layout.
---- A question-mark macro Headstart made for a saved spell counts as that spell.
---- Returns the plan's slots, and the slots as the bars alone have them (to tell what you take off).
-function YS.PlanStart()
+--- Which wins where your bars and the class's saved layout hold different things in one slot:
+---   "bars"     there is no saved layout (the plan is your bars, as they are); or this character was
+---              set up from it, or it was copied from this character - then the bars ARE that layout,
+---              lived in, and a button you moved by hand since is what you want
+---   "profile"  there is a saved layout and this character never had it put on: what is on its bars
+---              is what the game put there as you learned it, and the class's plan is the plan
+function YS.PlanPrefers()
+    local old = YS:Profile()
+    if not (old and old.slots and next(old.slots)) then return "bars" end
+    if YippSetupCharDB and YippSetupCharDB.applied then return "bars" end
+    if old.from == PlayerKey() and not old.planned then return "bars" end
+    return "profile"
+end
+
+local function SameButton(a, b)
+    if a.kind ~= b.kind then return false end
+    if a.kind == "item" then return a.id == b.id end
+    return a.name == b.name
+end
+
+--- The bar planner's start: your bars and the saved layout laid over each other. Where only one of
+--- them has something, that is it (the spells planned for later levels; a button the layout doesn't
+--- know). Where both have something different, `prefer` wins ("bars" or "profile"; left out, see
+--- YS.PlanPrefers). A question-mark macro Headstart made for a saved spell counts as that spell.
+--- Returns the plan's slots, the slots as the bars alone have them (to tell what you take off), how
+--- many slots the two disagree on, and which of them won.
+function YS.PlanStart(prefer)
+    if prefer ~= "bars" and prefer ~= "profile" then prefer = YS.PlanPrefers() end
     local now = YS.ReadBars(true)
-    local plan = {}
+    local plan, differ = {}, 0
     for slot, e in pairs(now) do plan[slot] = e end
     local old = YS:Profile()
     for slot, was in pairs(old and old.slots or {}) do
@@ -264,9 +291,12 @@ function YS.PlanStart()
             plan[slot] = was                -- the rank you set for it stays set
         elseif here.kind == "macro" and was.kind == "spell" and not was.prof and here.body == select(3, MacroFor(was)) then
             plan[slot] = was
+        elseif not SameButton(here, was) then
+            differ = differ + 1
+            if prefer == "profile" then plan[slot] = was end
         end
     end
-    return plan, now
+    return plan, now, differ, prefer
 end
 
 function YS:Scan()
@@ -341,6 +371,16 @@ local function RankNumber(e)
 end
 YS.RankNumber = RankNumber
 
+-- The icon the plan has for a spell (the game's data: the spell needn't be known), or nil.
+local function PlanIcon(spell)
+    local _, class = UnitClass("player")
+    local d = ((YR.PlannerSpells or {})[class] or {})[spell] or ((YR.PlannerGeneral or {})[class] or {})[spell]
+        or (YR.PlannerRacials or {})[spell]
+    return type(d) == "table" and d[2] or nil
+end
+YS.PlanIcon = PlanIcon
+local Unlearned         -- (set below, where a known spell is told from one that isn't)
+
 function MacroFor(e)
     if e.kind == "spell" then
         local spell = REPLACE[e.name] or e.name
@@ -348,7 +388,7 @@ function MacroFor(e)
         local rank = spell == e.name and RankNumber(e)
         local what = rank and ("%s(Rank %d)"):format(spell, rank) or spell
         local cast = MOUSEOVER_SET()[spell] and ("/cast [@mouseover,help,nodead][] " .. what) or ("/cast " .. what)
-        return ShortName(spell), DYNAMIC_ICON, "#showtooltip " .. what .. "\n" .. cast
+        return ShortName(spell), (Unlearned(spell) and PlanIcon(spell)) or DYNAMIC_ICON, "#showtooltip " .. what .. "\n" .. cast
     end
     -- your own macros: no "(Rank 3)", so a spell always casts its highest known rank
     local body = (e.body or ""):gsub("%s*%(Rank %d+%)", "")
@@ -362,6 +402,8 @@ local function KnownSpellID(name)
     local id = info and info.spellID
     if id and IsPlayerSpell(id) then return id end
 end
+
+Unlearned = function(spell) return not KnownSpellID(spell) end
 
 local function PlaceSpell(slot, id)
     local pickup = C_Spell.PickupSpell or PickupSpell
@@ -490,7 +532,8 @@ local function ClearPlaceholders()
     local removed = 0
     for i = base + numChar, base + 1, -1 do
         local name, icon, body = GetMacroInfo(i)
-        if name and icon == DYNAMIC_ICON and type(body) == "string" and body:match("^#showtooltip [^\n]+\n/cast ") then
+        local spell = type(body) == "string" and body:match("^#showtooltip ([^\n]+)\n/cast ")
+        if name and spell and (icon == DYNAMIC_ICON or icon == PlanIcon((spell:gsub("%(Rank %d+%)$", "")))) then
             DeleteMacro(i)
             removed = removed + 1
         end
@@ -1110,7 +1153,28 @@ end)
 
 --- Called by Headstart once this addon's files are in (Core.lua, YR.LoadSetup). fresh: this is the
 --- character's first login with Headstart (the saved tables themselves are made by Headstart).
+--- The macros already waiting on your bars with a question mark, for spells you haven't learned:
+--- given the spell's icon. Once a login, out of a fight. Returns how many.
+function YS.PlaceholderIcons()
+    if InCombatLockdown() or not (GetNumMacros and EditMacro) then return 0 end
+    local _, numChar = GetNumMacros()
+    local base = Constants.MacroConsts.MAX_ACCOUNT_MACROS
+    local done = 0
+    for i = base + 1, base + (numChar or 0) do
+        local name, icon, body = GetMacroInfo(i)
+        local spell = name and icon == DYNAMIC_ICON and type(body) == "string" and body:match("^#showtooltip ([^\n]+)\n/cast ")
+        spell = spell and spell:gsub("%(Rank %d+%)$", "")
+        local to = spell and Unlearned(spell) and PlanIcon(spell)
+        -- (a macro's place in the list is by its name: giving it an icon doesn't move it)
+        if to and pcall(EditMacro, i, nil, to, nil) then done = done + 1 end
+    end
+    return done
+end
+
 function YS.Start(fresh)
+    if YippSetupCharDB and YippSetupCharDB.applied then
+        C_Timer.After(4, function() YS.PlaceholderIcons() end)
+    end
     -- a new character: the main's action bars now, so Blizzard shows them while logging in
     local level = UnitLevel("player") or 0
     if fresh and level <= 1 and YS.EarlyBars then

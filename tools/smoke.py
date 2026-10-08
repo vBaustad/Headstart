@@ -1190,6 +1190,12 @@ import smoke_idle
 bad += smoke_idle.run()
 import smoke_pins
 bad += smoke_pins.run()
+import smoke_welcome
+bad += smoke_welcome.run()
+import smoke_questlfg
+bad += smoke_questlfg.run()
+import smoke_alts
+bad += smoke_alts.run()
 # A frame's name is a global, and so is a saved variable's: one name for both and the frame replaces
 # the saved table (or the game's Esc handling finds the table where it looks for the frame).
 import glob as _glob, re as _re

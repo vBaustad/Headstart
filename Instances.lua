@@ -1,11 +1,17 @@
 -- Instance tracker: how many instances you've gone into this hour and today, against the limit, so you
 -- know before the game tells you "You have entered too many instances recently". Every run is logged:
 -- where, when, how long, the XP and the money it brought.
---   What counts: going into a dungeon or raid that isn't the one you were just in. On Forever the
---   game keeps mob IDs secret inside instances, so the copy can't be read off them (Nova Instance
---   Tracker does that elsewhere): going back into the same dungeon within the minutes you set, with the
---   same group leader and no reset seen, is the same instance; anything else is a new one. A reset
---   ("Deadmines has been reset.") makes the next entry a new one at once.
+--   What counts: going into a copy of a dungeon or raid you weren't just in. Which copy you are in is
+--   in the ID of everything that lives there (a mob's, a chest's: "Creature-0-server-map-COPY-npc-spawn"),
+--   which is how Nova Instance Tracker tells too. So while you're inside, the first such ID the game
+--   lets us read - your target's, what the mouse is over, a nameplate's, what you loot - settles it:
+--   the same copy as a run in the log is that run carried on (out and in again without a reset doesn't
+--   count twice, however long you were out), another copy is a new instance (a reset nobody told us of).
+--   The game keeps those IDs secret in a fight on Forever, and perhaps always in some places, so until
+--   one is read - and where none ever is - it is told the old way: back into the same dungeon within
+--   the minutes you set, with the same group leader and no reset seen, is the same instance; anything
+--   else is a new one. A reset ("Deadmines has been reset.") makes the next entry a new one at once.
+--   /headstart instances id says what could be read where you stand.
 --   The limit: Forever's isn't known, so it's a setting (5 an hour and 30 a day, as on Classic). The
 --   game saying "too many instances" is noted with the count at that moment, so you can see where it is.
 --   Account options (YippRouteDB, Settings, QoL, Instances): instanceTrack (on unless turned off),
@@ -140,7 +146,97 @@ local function XPTick()
     xpLast, xpMaxLast, levelLast = xp, max, level
 end
 
+-- ---------------------------------------------------------------------------
+-- The copy's ID (see the top of the file)
+-- ---------------------------------------------------------------------------
+local ID_EVENTS = { "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED", "LOOT_OPENED" }
+local entry                 -- this time inside, until the copy's ID is known: { reused, at, left, again }
+
+-- Listened for only from going in until the ID is read (or you leave).
+local function WatchID(on)
+    if not frame then return end
+    for _, e in ipairs(ID_EVENTS) do
+        if on then frame:RegisterEvent(e) else frame:UnregisterEvent(e) end
+    end
+end
+
+--- The copy a GUID is of, when it is one of this map's creatures or objects and the game lets it be
+--- read: "Creature-0-4379-36-1234-639-00001A2B3C" on map 36 is copy 1234. nil otherwise.
+function YR.InstanceCopyID(guid, map)
+    if guid == nil or (issecretvalue and issecretvalue(guid)) or type(guid) ~= "string" then return nil end
+    local kind, m, copy = guid:match("^(%a+)%-%d+%-%d+%-(%d+)%-(%d+)%-")
+    if kind ~= "Creature" and kind ~= "Vehicle" and kind ~= "GameObject" then return nil end
+    if tonumber(m) ~= map then return nil end           -- a pet called out elsewhere carries that place's
+    return tonumber(copy)
+end
+
+-- The ID of the copy you're in has been read: the run you're in is settled by it.
+local function GotID(id)
+    if not (cur and entry and id) then return end
+    local e = entry
+    entry = nil
+    WatchID(false)
+    local runs = YippRouteDB.instanceRuns
+    if e.reused then
+        if cur.id == nil or cur.id == id then cur.id = id return end
+        -- told as the same instance, and it is another copy: the old run ended when you left it, and
+        -- this is a new one, counted from when you came in
+        local old, name = cur, cur.name
+        old.left, old.again, old.money0 = e.left, e.again, nil
+        cur = { char = old.char, name = name, map = old.map, difficulty = old.difficulty, entered = e.at, id = id,
+            leader = old.leader, level = UnitLevel("player"), xp = 0, money = 0, money0 = GetMoney(), counted = true }
+        runs[#runs + 1] = cur
+        Recount()
+        Announce()
+        YR.Print(("%s is another copy than the last (ID %d, that one was %d): a new instance, it counts."):format(name or "this", id, old.id))
+        return
+    end
+    -- told as a new instance: a run in the log with this very ID is the one you're back in
+    for i = #runs, 1, -1 do
+        local r = runs[i]
+        if r ~= cur and r.id == id and r.map == cur.map and r.char == cur.char then
+            for k = #runs, 1, -1 do if runs[k] == cur then table.remove(runs, k) break end end
+            r.xp, r.money = (r.xp or 0) + (cur.xp or 0), (r.money or 0) + (cur.money or 0)
+            r.left, r.again, r.money0 = nil, (r.again or 0) + 1, cur.money0
+            cur = r
+            Recount()
+            YR.Print(("back in the same copy of %s (ID %d): the same instance, it doesn't count again."):format(r.name or "the instance", id))
+            return
+        end
+    end
+    cur.id = id
+end
+
+local function SeeGUID(guid)
+    if not (cur and entry) then return end
+    GotID(YR.InstanceCopyID(guid, cur.map))
+end
+local function SeeUnit(unit)
+    if not (cur and entry) then return end
+    local ok, guid = pcall(UnitGUID, unit)
+    if ok then SeeGUID(guid) end
+end
+
+--- /headstart instances id: what the game lets be read where you stand.
+function YR.InstanceIDDebug()
+    local inside, kind = IsInInstance()
+    local map = select(8, GetInstanceInfo())
+    YR.Print(("instance ID: %s, map %s; this run's copy: %s."):format(inside and ("inside (" .. tostring(kind) .. ")") or "not in an instance",
+        tostring(map), cur and cur.id and tostring(cur.id) or "not read yet"))
+    for _, unit in ipairs({ "target", "mouseover" }) do
+        local ok, guid = pcall(UnitGUID, unit)
+        local what
+        if not ok then what = "the game refused"
+        elseif guid == nil then what = "nothing there"
+        elseif issecretvalue and issecretvalue(guid) then what = "kept secret by the game"
+        else what = guid .. " -> copy " .. tostring(YR.InstanceCopyID(guid, map)) end
+        YR.Print(("  %s: %s"):format(unit, what))
+    end
+end
+
 local function Leave()
+    entry = nil
+    WatchID(false)
     if not cur then return end
     XPTick()
     cur.left = Now()
@@ -188,10 +284,13 @@ local function Check()
         local same = last and (stillIn or (last.left and now - last.left < Limit("instanceSame", 30) * 60
             and last.leader == leader and not ((resets[map] or 0) >= last.left)))
         if same then
+            entry = { reused = true, at = now, left = last.left, again = last.again }
             cur = last
-            cur.left, cur.again = nil, (cur.again or 0) + 1
+            cur.left = nil
             cur.money0 = GetMoney()
+            -- (a reload or a login inside it is not going back in: only having left and come back is)
             if not stillIn then
+                cur.again = (cur.again or 0) + 1
                 YR.Print(("back in %s: the same instance, it doesn't count again."):format(name or "the instance"))
             end
         else
@@ -200,7 +299,11 @@ local function Check()
             runs[#runs + 1] = cur
             Prune()
             Announce()
+            entry = { reused = false, at = now }
         end
+        -- which copy this is: off the first thing whose ID can be read (a target you came in with, now)
+        WatchID(true)
+        SeeUnit("target")
         xpLast, xpMaxLast, levelLast = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
         WatchXP(true)
     else
@@ -515,6 +618,14 @@ local function OnEvent(_, event, a, b)
     if event == "UI_ERROR_MESSAGE" then
         if not (issecretvalue and issecretvalue(b)) and b == TOO_MANY then OnMessage(b, true) end
     elseif event == "PLAYER_XP_UPDATE" then XPTick()
+    elseif event == "PLAYER_TARGET_CHANGED" then SeeUnit("target")
+    elseif event == "UPDATE_MOUSEOVER_UNIT" then SeeUnit("mouseover")
+    elseif event == "NAME_PLATE_UNIT_ADDED" then SeeUnit(a)
+    elseif event == "LOOT_OPENED" then
+        if GetLootSourceInfo then
+            local ok, guid = pcall(GetLootSourceInfo, 1)
+            if ok then SeeGUID(guid) end
+        end
     elseif event == "CHAT_MSG_SYSTEM" then OnMessage(a)
     else Soon()
     end

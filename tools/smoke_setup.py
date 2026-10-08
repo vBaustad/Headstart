@@ -548,16 +548,38 @@ bad += not ok
 # Headstart made for a saved spell is that spell
 lua.execute("Fresh()")
 YS.Apply(YS, None, None, SURE)
-plan, now = YS.PlanStart()
+plan, now, differ, won = YS.PlanStart()
 saved = YS.Profile(YS).slots
 ok = all(plan[k] is not None for k in saved) and plan[4] is not None and plan[4].kind == "spell" and now[4] is not None and now[4].kind == "macro"
 print(("ok  " if ok else "FAIL"), "the planner's start: every saved button, and a question-mark macro on the bar read as its spell")
 bad += not ok
 lua.execute("BAR[60] = { kind = 'spell', id = 635 }")
-plan, now = YS.PlanStart()
+plan, now, differ, won = YS.PlanStart()
 ok = plan[60] is not None and plan[60].name == "Holy Light"
 print(("ok  " if ok else "FAIL"), "... and a button on the bars that isn't in the saved layout is in it too")
 bad += not ok
+# your bars against the saved layout, where both hold something different in a slot
+check_was = YS.Profile(YS).slots[1].name
+lua.execute("KEPT_BAR1 = BAR[1] BAR[1] = { kind = 'spell', id = 1152 }")
+plan, now, differ, won = YS.PlanStart()
+ok = won == "bars" and differ >= 1 and plan[1].name == "Purify"
+print(("ok  " if ok else "FAIL"), f"a character set up from the layout: a button moved by hand since is what the plan shows ({won}, {differ} differ)")
+bad += not ok
+plan, now, differ, won = YS.PlanStart("profile")
+ok = won == "profile" and plan[1].name == check_was and now[1].name == "Purify"
+print(("ok  " if ok else "FAIL"), "asked for the saved plan instead: that button is the plan's")
+bad += not ok
+lua.execute("YS_APPLIED = YippSetupCharDB.applied YippSetupCharDB.applied = nil YS_FROM = YippSetupDB.classes.PALADIN.profile.from YippSetupDB.classes.PALADIN.profile.from = 'Main-Realm'")
+plan, now, differ, won = YS.PlanStart()
+ok = won == "profile" and plan[1].name == check_was and plan[60] is not None
+print(("ok  " if ok else "FAIL"), "a character that never had the layout put on: the saved plan wins, and what only the bars have stays")
+bad += not ok
+lua.execute("KEPT_PROFILE = YippSetupDB.classes.PALADIN.profile YippSetupDB.classes.PALADIN.profile = nil")
+plan, now, differ, won = YS.PlanStart()
+ok = won == "bars" and differ == 0 and plan[1].name == "Purify"
+print(("ok  " if ok else "FAIL"), "no saved layout for the class: the plan is your bars as they are")
+bad += not ok
+lua.execute("YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE YippSetupDB.classes.PALADIN.profile.from = YS_FROM YippSetupCharDB.applied = YS_APPLIED BAR[1] = KEPT_BAR1")
 # an old button at a lower rank is not a choice: read as behind (stale), never as kept at that rank
 lua.execute("""Fresh(); KNOWN[639] = true; NAMEID["Holy Light"] = 639; BAR[1] = { kind = 'spell', id = 635 }""")
 now, _ = YS.ReadBars()
@@ -566,7 +588,7 @@ print(("ok  " if ok else "FAIL"), "a Rank 1 button with Rank 2 known: behind, no
 bad += not ok
 lua.execute("""KEPT_SLOT = YippSetupDB.classes.PALADIN.profile.slots[1]
     YippSetupDB.classes.PALADIN.profile.slots[1] = { kind = 'spell', name = 'Holy Light', level = 1, down = true, id = 635, rank = 1 }""")
-plan, _ = YS.PlanStart()
+plan, *_ = YS.PlanStart()
 ok = plan[1] is not None and plan[1].down is True and plan[1].id == 635
 print(("ok  " if ok else "FAIL"), "... unless you set that rank in the planner: then it stays set")
 bad += not ok
@@ -602,7 +624,7 @@ print(("ok  " if ok else "FAIL"), "a spell you took off its slot after Set up is
 bad += not ok
 # a button a layout can't hold is still a button: the planner's start has it, and never fills its slot
 lua.execute("Fresh(); BAR[1] = { kind = 'mount', id = 77 }")
-plan, now = YS.PlanStart()
+plan, now, differ, won = YS.PlanStart()
 ok = plan[1] is not None and plan[1].kind == "other" and now[1] is not None and now[1].kind == "other"
 print(("ok  " if ok else "FAIL"), "a mount on a slot the saved layout has a spell for: the planner keeps the mount there")
 bad += not ok
@@ -893,4 +915,18 @@ report(saved[21] is None, "a spell you could have and took off the bar: gone, as
 report(saved[22] is not None and saved[22].kind == "spell" and saved[22].name == "Exorcism",
        "the question-mark macro Headstart made for Exorcism is saved as the spell, not a macro of yours")
 report(saved[1] is not None and saved[1].name == "Holy Light", "what's on the bars now is saved as usual")
+# A spell not learned yet waits as a macro with the spell's own icon (the plan's data), not a question mark
+lua.execute("""HeadstartNS.PlannerSpells = { PALADIN = { ["Exorcism"] = { 879, 135903 }, ["Holy Light"] = { 635, 135920 } } }
+    EDITED = {} function EditMacro(i, name, icon, body) EDITED[i] = icon MACROS[i][2] = icon end
+    function InCombatLockdown() return false end
+    KNOWN = { [635] = true }
+    MACROS = { [121] = { "Exorcism", 134400, "#showtooltip Exorcism\\n/cast Exorcism" }, [122] = { "Mine", 134400, "/say hi" },
+        [123] = { "Light", 134400, "#showtooltip Holy Light\\n/cast Holy Light" } }""")
+icon = lua.eval('(select(2, YR_SETUP.MacroFor({ kind = "spell", name = "Exorcism", level = 20 })))')
+report(icon == 135903, f"a spell you haven't learned: its macro has the spell's own icon ({icon})")
+known = lua.eval('(function() local old = C_Spell.GetSpellInfo C_Spell.GetSpellInfo = function() return { spellID = 635 } end local was = IsPlayerSpell IsPlayerSpell = function() return true end local i = select(2, YR_SETUP.MacroFor({ kind = "spell", name = "Holy Light" })) C_Spell.GetSpellInfo, IsPlayerSpell = old, was return i end)()')
+report(known == 134400, "one you know keeps the question mark, which the game turns into the spell's icon")
+n = lua.eval("YR_SETUP.PlaceholderIcons()")
+report(n >= 1 and g.MACROS[121][2] == 135903 and g.MACROS[122][2] == 134400,
+       f"the question marks already on your bars get their icons; a macro of your own is left alone ({n})")
 sys.exit(1 if bad else 0)

@@ -69,7 +69,9 @@ local function Build()
     button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
-    button:SetScript("OnClick", function(_, which) YR:ToggleWindow(which == "RightButton" and "settings" or nil) end)
+    button:SetScript("OnClick", function(self, which)
+        if which == "RightButton" then YR.WindowMenu(self) else YR:ToggleWindow() end
+    end)
     button:SetScript("OnDragStart", function(self) self:SetScript("OnUpdate", FollowCursor) end)
     button:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
     button:SetScript("OnEnter", function(self)
@@ -84,13 +86,41 @@ local function Build()
                     wait and ("  (next in " .. YR.InstanceClock(wait) .. ")") or ""), 0.6, 0.8, 1)
             end
         end
+        -- your gold in all (Characters): here too, for where another addon draws the bag and its coins
+        if YR.AltsOn and YR.AltsOn() and YippRouteDB.altsGold ~= false then
+            local sum, list = YR.AltsGold()
+            if #list > 1 then
+                GameTooltip:AddLine(("Gold on your %d characters: %s"):format(#list, YR.AltsCoins(sum)), 1, 0.82, 0)
+            end
+        end
         GameTooltip:AddLine("Click: the Headstart window", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("Right-click: settings", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Right-click: every window of ours (characters, chat log, quest group...)", 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Drag: move round the minimap", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
     Place()
+end
+
+--- Every window of ours that can be opened now, as a menu's lines: { { function, label }, ... }. A
+--- window whose feature is off isn't in it. This is the short way to each of them: the minimap
+--- button's right-click, the addon list's, and /headstart menu.
+function YR.WindowList()
+    local out = {}
+    local function Add(on, label, open) if on then out[#out + 1] = { open, label } end end
+    Add(YR.AltsOn and YR.AltsOn(), "Characters: bags, bank and gold", function() YR.AltsToggle() end)
+    Add(YR.QuestLFGOn and YR.QuestLFGOn(), "Quest group", function() YR.QuestLFGToggle() end)
+    Add(YR.ChatLogOn and YR.ChatLogOn(), "Chat log", function() YR.ChatLogToggle() end)
+    Add(YR.LootFeedOn and YR.LootFeedOn(), "Loot log", function() YR.LootLogToggle() end)
+    Add(YR.Option("instanceTrack"), "Instances", function() YR:ShowSettingsTab("instances") end)
+    Add(YR.Option("deathRecap"), "The last time you died", function() YR.RecapShow() end)
+    Add(true, "Settings", function() YR:ToggleSettings() end)
+    Add(true, "Welcome: what do you want of Headstart", function() if YR.LoadWindow() then YR.WelcomeShow() end end)
+    return out
+end
+
+function YR.WindowMenu(anchor)
+    YR.Style.OpenMenu(anchor or UIParent, YR.WindowList(), function(open) open() end, 260)
 end
 
 --- The button, at the login: made only when it is to be shown (turned off, there is no button at all

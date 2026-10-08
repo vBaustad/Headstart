@@ -167,6 +167,8 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
     YR.ApplyParts()
     lua.execute("Fire('PLAYER_ENTERING_WORLD')")
     check(counts()[0] == 3, "a reload inside: the run carries on, not counted again")
+    runs = g.YippRouteDB.instanceRuns
+    check(runs[len(runs)].again is None, "and a reload inside isn't noted as having gone back in")
     go_out(60)
     lua.execute("NOW = NOW + 3600")           # well past the 30 minutes
     go_in()
@@ -208,6 +210,52 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
     g.YippRouteDB.instanceAccount = True
     check(counts()[0] == 5, "the account counted together: all five")
     g.YippRouteDB.instanceAccount = None
+
+    # the copy's ID, read off what lives there
+    lua.execute("""GUIDS, SECRET = {}, {}
+        function UnitGUID(u) return GUIDS[u] end
+        function issecretvalue(v) return v == SECRET end
+        function Listening(e) for _, f in ipairs(FRAMES) do if f.ev and f.ev[e] then return true end end return false end""")
+    check(YR.InstanceCopyID("Creature-0-4379-43-777-3840-00001A2B3C", 43) == 777, "a creature's ID says which copy it is in")
+    check(YR.InstanceCopyID("Creature-0-4379-36-777-3840-00001A2B3C", 43) is None and YR.InstanceCopyID("Pet-0-4379-43-777-3840-0000AA", 43) is None
+          and YR.InstanceCopyID("Player-4379-00AABBCC", 43) is None and YR.InstanceCopyID(g.SECRET, 43) is None,
+          "one of another map, a pet's, a player's or one the game keeps secret says nothing")
+    go_out(60)
+    check(not g.Listening("PLAYER_TARGET_CHANGED"), "outside: no target, mouseover or nameplate is listened for")
+    runs = g.YippRouteDB.instanceRuns
+    day0, n0 = counts()[1], len(runs)
+    go_in("Wailing Caverns", 43)
+    check(counts()[1] == day0 + 1 and g.Listening("PLAYER_TARGET_CHANGED") and g.Listening("NAME_PLATE_UNIT_ADDED"),
+          "into a dungeon: counted, and the copy's ID is looked for")
+    lua.execute("GUIDS.target = SECRET Fire('PLAYER_TARGET_CHANGED')")
+    check(runs[len(runs)].id is None and g.Listening("PLAYER_TARGET_CHANGED"), "a secret ID: nothing read, still looking")
+    lua.execute("GUIDS.mouseover = 'Creature-0-4379-43-777-3840-00001A2B3C' Fire('UPDATE_MOUSEOVER_UNIT')")
+    check(runs[len(runs)].id == 777 and not g.Listening("PLAYER_TARGET_CHANGED") and not g.Listening("UPDATE_MOUSEOVER_UNIT"),
+          "one that can be read: the run has its copy's ID, and nothing more is listened for")
+    # out for an hour and a half, and back into the very same copy: told as new, then put right
+    go_out(60)
+    lua.execute("NOW = NOW + 5400 GUIDS.target = nil")
+    go_in()
+    check(counts()[1] == day0 + 2 and len(runs) == n0 + 2, "back after ninety minutes: told as a new instance at first")
+    lua.execute("GUIDS.target = 'Creature-0-4379-43-777-9999-0000000001' Fire('PLAYER_TARGET_CHANGED')")
+    last = runs[len(runs)]
+    check(counts()[1] == day0 + 1 and len(runs) == n0 + 1 and last.id == 777 and last.again == 1 and last.left is None,
+          "the same ID: it is the same instance - the count goes back, and the run carries on")
+    # out and straight back in, but someone reset it: told as the same, then put right
+    go_out(60)
+    lua.execute("NOW = NOW + 120 GUIDS.target = nil")
+    go_in()
+    check(counts()[1] == day0 + 1 and runs[len(runs)].again == 2, "back within the half hour: told as the same instance at first")
+    lua.execute("GUIDS.target = 'Creature-0-4379-43-888-3840-0000000002' Fire('PLAYER_TARGET_CHANGED')")
+    old, new = runs[len(runs) - 1], runs[len(runs)]
+    check(counts()[1] == day0 + 2 and new.id == 888 and new.again is None and old.id == 777 and old.again == 1 and old.left is not None,
+          "another ID: a new instance after all - counted, and the old run ended where you left it")
+    # the ID read on the way in (a target you came in with)
+    go_out(60)
+    lua.execute("NOW = NOW + 120")
+    go_in()
+    check(runs[len(runs)].id == 888 and runs[len(runs)].again == 1 and not g.Listening("PLAYER_TARGET_CHANGED") and counts()[1] == day0 + 2,
+          "the same copy again, read as you come in: the same instance, nothing more to listen for")
     return bad
 
 

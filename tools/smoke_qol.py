@@ -579,6 +579,22 @@ def run():
     forget()
     YR.CheckCrafts()
     check(any("Item3239" in p for p in prints()), "and with the recipe, mats and stones on, it does tell")
+    # an item the game hasn't the name of yet: asked for, and said a second on with its name - never "item 3239"
+    forget()
+    lua.execute("""PRINTS = {} AFTER = {} ASKED = {} NAMEOF = C_Item.GetItemNameByID
+        C_Item.GetItemNameByID = function() return nil end
+        C_Item.RequestLoadItemDataByID = function(id) ASKED[#ASKED + 1] = id end""")
+    YR.CheckCrafts()
+    check(prints() == [] and len(g.ASKED) >= 1 and len(g.AFTER) == 1, "the item's name not known yet: nothing said, the name asked for, a look a second on")
+    lua.execute("C_Item.GetItemNameByID = NAMEOF local fn = AFTER[1] AFTER = {} fn()")
+    check(any("Item3239" in p for p in prints()) and not any("item 3239" in p for p in prints()), "the name there: said, with the name")
+    forget()
+    lua.execute("PRINTS = {} AFTER = {} C_Item.GetItemNameByID = function() return nil end")
+    YR.CheckCrafts()
+    for _ in range(6):
+        lua.execute("local fn = AFTER[1] AFTER = {} if fn then fn() end")
+    check(len(prints()) == 1 and "item " not in prints()[0] and "you can make" in prints()[0], f"a name that never comes: said after five looks, by its kind ({prints()})")
+    lua.execute("C_Item.GetItemNameByID = NAMEOF PRINTS = {} AFTER = {}")
     g.YippRouteDB.craftStones = None
     lua.execute("WORN = {}")
 

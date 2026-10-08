@@ -1,4 +1,22 @@
 <Bindings>
+	<Binding name="HEADSTART_WINDOW" category="ADDONS">
+		Headstart_Open("window")
+	</Binding>
+	<Binding name="HEADSTART_MENU" category="ADDONS">
+		Headstart_Open("menu")
+	</Binding>
+	<Binding name="HEADSTART_ALTS" category="ADDONS">
+		Headstart_Open("alts")
+	</Binding>
+	<Binding name="HEADSTART_LFG" category="ADDONS">
+		Headstart_Open("lfg")
+	</Binding>
+	<Binding name="HEADSTART_CHATLOG" category="ADDONS">
+		Headstart_Open("chat")
+	</Binding>
+	<Binding name="HEADSTART_LOOTLOG" category="ADDONS">
+		Headstart_Open("loot")
+	</Binding>
 	<Binding name="HEADSTART_INVITE" header="HEADSTART" category="ADDONS">
 		Headstart_InviteTarget()
 	</Binding>
