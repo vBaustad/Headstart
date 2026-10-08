@@ -48,6 +48,23 @@ function UnitFactionGroup() return "Alliance" end
     check(last() == "PIN_FRAME_LEVEL_AREA_POI", "a layer RestedXP asked for itself is kept")
     lua.execute("YippRouteDB.routes = false; LIB:AddWorldMapIconMap(RXP, {}, 1, 0.5, 0.5)")
     check(last() == "default", "routes off: RestedXP's pins as they were")
+
+    # RxpRewardGuard: RestedXP's own function errors on a hand-in with no reward choice
+    lua.execute('''
+RXP.questTurnIn = { [19] = { questId = 19 }, [20] = { questId = 20, reward = 2 } }
+function RXP.GetStepQuestReward(id)
+    local e = RXP.questTurnIn[id]
+    if not e then return 0 end
+    return (e.reward >= 0 and e.reward or 0), e
+end
+''')
+    YR.RxpRewardGuard()
+    YR.RxpRewardGuard()
+    reward, element = lua.eval("RXP.GetStepQuestReward(19)")
+    check(reward == 0 and element is not None, "a hand-in with no reward choice: 0 and its step, no error")
+    check(lua.eval("RXP.GetStepQuestReward(20)")[0] == 2, "a hand-in with a choice is RestedXP's answer")
+    check(lua.eval("RXP.GetStepQuestReward(7)") == 0 and lua.eval("RXP.GetStepQuestReward(nil)") == 0,
+          "a quest no step hands in, and no quest: RestedXP's answer")
     return bad
 
 

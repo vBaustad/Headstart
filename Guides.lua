@@ -143,11 +143,28 @@ function YR.RxpPinsOnTop()
     end
 end
 
+--- RestedXP's ".turnin -ID" (done at once when you don't have the quest) leaves the hand-in's reward
+--- choice nil, and GetStepQuestReward compares it with 0 when "quest reward automation" is on: an
+--- error at every such hand-in ("attempt to compare number with nil", the user, 2026-10-08), and the
+--- quest isn't picked at the NPC. Our routes use that mark a lot. No choice set means none: 0.
+local rewardGuarded = false
+function YR.RxpRewardGuard()
+    if rewardGuarded or type(RXP) ~= "table" or type(RXP.GetStepQuestReward) ~= "function" then return end
+    rewardGuarded = true
+    local get = RXP.GetStepQuestReward
+    RXP.GetStepQuestReward = function(titleOrId, ...)
+        local element = titleOrId and type(RXP.questTurnIn) == "table" and RXP.questTurnIn[titleOrId]
+        if type(element) == "table" and element.reward == nil then return 0, element end
+        return get(titleOrId, ...)
+    end
+end
+
 function YR:RegisterGuides()
     if YR.ShipMyRoutes then YR.ShipMyRoutes() end       -- routes saved from a run (MyRoutes.lua), like ours
     if not YR.RoutesOn() then return end
     YR.RxpIcons()
     YR.RxpPinsOnTop()
+    YR.RxpRewardGuard()
     for key, c in pairs(Custom()) do
         c.text = Renamed(c.text)
         -- edited before routes remembered their base: take today's shipped route as it
