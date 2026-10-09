@@ -159,12 +159,49 @@ function YR.RxpRewardGuard()
     end
 end
 
+--- RestedXP (4.11.20 on) draws no pins at all, on the map or the minimap, while the game says gamepad
+--- mode is on. On the beta the game said so with no controller and the gamepad option unticked (the
+--- user, 2026-10-09: no steps on the map; "/console GamePadEnable 0" brought them back). People do
+--- play with a gamepad, and RestedXP hides its pins for them on purpose, so that is left alone: its
+--- answer is only turned to "off" when the game also says no controller is there. With no way to ask
+--- about controllers, nothing is changed.
+local function NoController()
+    local pad = C_GamePad
+    if type(pad) ~= "table" then return false end
+    local seen = false
+    if type(pad.GetActiveDeviceID) == "function" then
+        if pad.GetActiveDeviceID() ~= nil then return false end
+        seen = true
+    end
+    if type(pad.GetAllDeviceIDs) == "function" then
+        local all = pad.GetAllDeviceIDs()
+        if type(all) ~= "table" or #all > 0 then return false end
+        seen = true
+    end
+    return seen
+end
+
+local padGuarded = false
+function YR.RxpGamepadGuard()
+    if padGuarded or type(RXP) ~= "table" or type(RXP.IsGamePadEnabled) ~= "function" then return end
+    padGuarded = true
+    local asked = RXP.IsGamePadEnabled
+    RXP.IsGamePadEnabled = function(...)
+        local on = asked(...)
+        if not on then return on end
+        local ok, none = pcall(NoController)
+        if ok and none then return false end
+        return on
+    end
+end
+
 function YR:RegisterGuides()
     if YR.ShipMyRoutes then YR.ShipMyRoutes() end       -- routes saved from a run (MyRoutes.lua), like ours
     if not YR.RoutesOn() then return end
     YR.RxpIcons()
     YR.RxpPinsOnTop()
     YR.RxpRewardGuard()
+    YR.RxpGamepadGuard()
     for key, c in pairs(Custom()) do
         c.text = Renamed(c.text)
         -- edited before routes remembered their base: take today's shipped route as it

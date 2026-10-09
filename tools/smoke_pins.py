@@ -65,6 +65,27 @@ end
     check(lua.eval("RXP.GetStepQuestReward(20)")[0] == 2, "a hand-in with a choice is RestedXP's answer")
     check(lua.eval("RXP.GetStepQuestReward(7)") == 0 and lua.eval("RXP.GetStepQuestReward(nil)") == 0,
           "a quest no step hands in, and no quest: RestedXP's answer")
+
+    # RxpGamepadGuard: gamepad mode "on" with no controller is off; with one, RestedXP's answer stands
+    lua.execute('''
+PAD_ON, ACTIVE, ALL = true, nil, {}
+function RXP.IsGamePadEnabled() return PAD_ON end
+C_GamePad = { GetActiveDeviceID = function() return ACTIVE end, GetAllDeviceIDs = function() return ALL end }
+''')
+    YR.RxpGamepadGuard()
+    YR.RxpGamepadGuard()
+    asks = lua.eval("function() return RXP.IsGamePadEnabled() end")
+    check(asks() is False, "gamepad mode on, no controller anywhere: off (pins drawn)")
+    lua.execute("ACTIVE = 1")
+    check(asks() is True, "an active controller: RestedXP's answer stands (no pins)")
+    lua.execute("ACTIVE, ALL = nil, { 3 }")
+    check(asks() is True, "a controller plugged in but idle: RestedXP's answer stands")
+    lua.execute("ALL, PAD_ON = {}, false")
+    check(asks() is False, "gamepad mode off: off")
+    lua.execute("PAD_ON = true; C_GamePad = {}")
+    check(asks() is True, "no way to ask about controllers: nothing changed")
+    lua.execute("C_GamePad = nil")
+    check(asks() is True, "no gamepad API at all: nothing changed")
     return bad
 
 
