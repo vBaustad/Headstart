@@ -154,12 +154,27 @@ end
 -- no data we have says what they are now (the user, 2026-10-08: a "level 30 elite" was 35): the
 -- routes are checked against what the logs saw. Nothing when the kill wasn't your target, or where the
 -- game keeps unit values secret (dungeons and raids).
-local function Mob()
-    if not UnitExists("target") or UnitIsPlayer("target") or not UnitIsDead("target") then return end
+local function Mob(alive)
+    if not UnitExists("target") or UnitIsPlayer("target") then return end
+    if alive then
+        if not UnitCanAttack("player", "target") then return end
+    elseif not UnitIsDead("target") then
+        return
+    end
     local name, level, kind = UnitName("target"), UnitLevel("target"), UnitClassification("target")
     if issecretvalue and (issecretvalue(name) or issecretvalue(level) or issecretvalue(kind)) then return end
     if type(name) ~= "string" or type(level) ~= "number" then return end
     return name, level, kind ~= "normal" and type(kind) == "string" and kind or nil
+end
+
+-- The XP usually comes a moment after the game has cleared your dead target (a logged run, 2026-10-10:
+-- 13 kills of 92 had a name). So what you were fighting is also noted when the fight starts, and the
+-- first kill of that fight takes it when there is no dead target to read. Only the first: a second
+-- mob in the same fight was never looked at.
+local opener
+local function NoteOpener()
+    local ok, name, level, kind = pcall(Mob, true)
+    opener = ok and name and { name, level, kind } or nil
 end
 
 -- XP that didn't come from a quest turn-in is a kill (or exploring, rarely). A level-up in between
@@ -171,6 +186,8 @@ local function XPChanged()
         if gained > 0 and turnedInAt ~= time() then
             local ok, mob, mobLevel, kind = pcall(Mob)
             if not ok then mob, mobLevel, kind = nil, nil, nil end
+            if not mob and opener then mob, mobLevel, kind = opener[1], opener[2], opener[3] end
+            opener = nil
             Add("kill", nil, { xp = gained, mob = mob, mlvl = mobLevel, elite = kind })
         end
     end
@@ -255,8 +272,10 @@ local function OnEvent(_, event, a, b, c)
     elseif event == "PLAYER_UNGHOST" then
         Add("alive")
     elseif event == "PLAYER_REGEN_DISABLED" then
+        NoteOpener()
         Add("fight")
     elseif event == "PLAYER_REGEN_ENABLED" then
+        opener = nil
         Add("peace")
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         if YR.Open(c) == HEARTHSTONE then Add("hearth") end

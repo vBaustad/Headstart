@@ -297,6 +297,22 @@ lua.execute('function UnitClassification() return "normal" end')
 g.CLOCK += 10; g.XP = 490; g.Fire("PLAYER_XP_UPDATE")
 kill = [run.ev[i] for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "kill"][-1]
 check(kill.mlvl == 35 and kill.elite is None, "a normal mob: no kind written")
+# the target is gone by the time the XP comes: the mob noted when the fight began is taken, once
+lua.execute("""
+function UnitIsDead() return false end
+function UnitCanAttack() return true end
+function UnitClassification() return "rare" end
+""")
+g.CLOCK += 10; g.COMBAT = True; g.Fire("PLAYER_REGEN_DISABLED")
+lua.execute("function UnitExists() return false end")
+g.XP = 500; g.Fire("PLAYER_XP_UPDATE")
+kill = [run.ev[i] for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "kill"][-1]
+check(kill.mob == "Sten Stoutarm" and kill.mlvl == 35 and kill.elite == "rare",
+      f"no dead target at the XP: the mob the fight began on ({kill.mob}, {kill.mlvl}, {kill.elite})")
+g.XP = 510; g.Fire("PLAYER_XP_UPDATE")
+kill = [run.ev[i] for i in range(1, len(run.ev) + 1) if run.ev[i][2] == "kill"][-1]
+check(kill.mob is None, "a second kill in the same fight: no name guessed")
+g.COMBAT = False; g.Fire("PLAYER_REGEN_ENABLED")
 lua.execute("UnitExists, UnitLevel, UnitIsDead, UnitClassification = KEPT[1], KEPT[2], KEPT[3], KEPT[4]")
 
 # Profession skill-ups are logged (name and rank); weapon skill-ups are not.
