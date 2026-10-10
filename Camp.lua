@@ -535,6 +535,16 @@ local function Draw()
     -- not enough to stop reading: at 0.55 over snow the whole thing disappeared.
     hud:SetAlpha((stale and not unlocked) and 0.75 or 1)
     hud.handle:SetShown(unlocked)
+    -- The frame is as wide as the text needs, and that width must not take the mouse - it reaches
+    -- well past the fire and would sit over whatever is behind it. Shrinking the HIT RECT does what
+    -- a child frame would and is not a frame: only the icon's own rectangle answers. Unlocked, the
+    -- whole thing answers again, because then you are placing it and want to grab it anywhere.
+    if unlocked then
+        hud:SetHitRectInsets(0, 0, 0, 0)
+    else
+        local side = (W - ICON_SIZE) / 2
+        hud:SetHitRectInsets(side, side, 2, math.max(0, (y + PAD) - (ICON_SIZE + 2)))
+    end
     hud:Show()
 end
 
@@ -578,11 +588,9 @@ local function OnEnter(self)
         GameTooltip:AddLine("You don't have " .. SpellName(BENEFITS, "Camp Benefits") .. ".",
             1, 0.6, 0.2, true)
     end
-    -- What the client does NOT give us, said once here rather than guessed at in the HUD. Only one
-    -- aura means "a camp is near", and it is not on you at every camp - so silence is not proof
-    -- that there is no camp, and the HUD never pretends otherwise.
-    GameTooltip:AddLine("The game doesn't tell addons where a camp is, only that one is near.",
-        0.6, 0.6, 0.6, true)
+    -- No line here about the client not telling us where a camp is. That is a fact about how this
+    -- is built, not about your character, and it was on screen every single hover. It still lives
+    -- on the settings page, where someone wondering why there is no arrow will go looking.
     if stale then
         GameTooltip:AddLine("As of the pull - buffs can't be read in combat. Updates when combat ends.",
             0.6, 0.6, 0.6, true)
@@ -657,16 +665,21 @@ local function Build()
     Edge("TOPRIGHT", "BOTTOMRIGHT", 2)
     hud.handle:Hide()
 
+    -- Draw shrinks the hit rect to the fire, so the frame's width stops catching hovers meant
+    -- for whatever is behind it.
     -- No secure children here, so unlike BuffWarden's bar this one can be dragged in combat too.
-    hud:RegisterForDrag("LeftButton")
-    hud:SetScript("OnDragStart", function(self)
+    local function StartDrag()
         if YR.Option("campLocked") then return end
-        self:StartMoving()
-    end)
-    hud:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
+        hud:StartMoving()
+    end
+    local function StopDrag()
+        hud:StopMovingOrSizing()
         SavePosition()
-    end)
+    end
+
+    hud:RegisterForDrag("LeftButton")
+    hud:SetScript("OnDragStart", StartDrag)
+    hud:SetScript("OnDragStop", StopDrag)
 
     hud:ClearAllPoints()
     local p = YippRouteDB.campPos
