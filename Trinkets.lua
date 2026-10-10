@@ -14,6 +14,17 @@
 -- the moment it ends. The swaps it makes by itself are off until you turn them on, and pause while
 -- you're flagged for PvP: on a PvP realm a swap at the wrong moment (still on the Carrot when someone
 -- jumps you) costs a fight, so by default every change is yours.
+--   How the buttons look and behave (all account options, each as it was unless set): trinketBarSize
+--   (a button's side, 38), trinketBarGap (6), trinketBarAlpha (1), trinketBarVertical, trinketBarShow
+--   ("combat" / "nocombat"; anything else: always), trinketBarNumbers (the cooldown's seconds, on unless
+--   turned off), trinketBarTips (on unless turned off), trinketBarLeft ("use": left-click uses and
+--   right-click lists; anything else the other way round), trinketFlyHover (the list opens when the
+--   mouse rests on a button), trinketFlyDir ("down" / "left" / "right"; anything else: up).
+--   Swap trinkets for me, finer: trinketAutoBuff (a used trinket stays on while its effect runs; on
+--   unless turned off), trinketAutoDelay (seconds a used trinket stays on at least, 0), trinketAutoSoon
+--   (a trinket in your bags counts as ready with this many seconds left, 30: going on costs 30 anyway).
+--   trinketNotify: said in chat, with a sound unless trinketNotifySound is false, when a trinket you
+--   used is ready again.
 --   Account options (YippRouteDB, Settings, QoL, Trinkets & sets): trinketBar, trinketBarLocked,
 --   trinketBarCount, trinketPvpPause (on unless turned off); trinketAuto, trinketMount, trinketSwim (off unless turned on),
 --   trinketMountItem / trinketSwimItem (item IDs; nil = Carrot on a Stick / none), trinketMountSlot
@@ -142,6 +153,37 @@ local function Ready(id)
 end
 YR.TrinketReady = Ready
 
+--- A trinket in your bags that the swap may put on: ready, or so nearly that the 30 seconds every
+--- trinket gets as it goes on cover what is left.
+local function Soon() return math.max(0, math.min(60, tonumber(YippRouteDB.trinketAutoSoon) or 30)) end
+local function ReadySoon(id)
+    if not OnUse(id) then return true end
+    return CooldownLeft(id) <= math.max(0.5, Soon())
+end
+
+--- The trinket you wear was used and should stay on a while yet: its effect is still on you (taking
+--- it off ends most of them), or the seconds you asked it to stay haven't passed.
+local function Holding(id, slot)
+    local start, duration = GetInventoryItemCooldown("player", slot)
+    if issecretvalue and (issecretvalue(start) or issecretvalue(duration)) then return true end
+    if not (start and duration) or start <= 0 or duration <= USED then return false end      -- not used
+    local delay = tonumber(YippRouteDB.trinketAutoDelay) or 0
+    if delay > 0 and GetTime() - start < delay then return true end
+    if YippRouteDB.trinketAutoBuff == false then return false end
+    local name, spell = nil, nil
+    if C_Item.GetItemSpell then name, spell = C_Item.GetItemSpell(id) end
+    if spell and C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID then
+        local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spell)
+        if ok and aura ~= nil then return true end
+    end
+    if name and C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName then
+        local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", name, "HELPFUL")
+        if ok and aura ~= nil then return true end
+    end
+    return false
+end
+YR.TrinketHolding = Holding
+
 --- Can't change gear right now: a fight, a cast, dead, or something on the cursor.
 local function Busy()
     return InCombatLockdown() or UnitIsDeadOrGhost("player") or (UnitCastingInfo and UnitCastingInfo("player"))
@@ -161,7 +203,7 @@ function YR.TrinketEquip(id, slot)
         if pending[slot] ~= id then
             pending[slot] = id
             local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(id) or "that trinket"
-            YR.Print(("%s goes on (%s slot) the moment the fight ends."):format(name, slot == 13 and "top" or slot == 14 and "bottom" or "its"))
+            YR.Print(("%s will be equipped (%s slot) when the fight ends."):format(name, slot == 13 and "top" or slot == 14 and "bottom" or "its"))
         end
         Wait()
         return
@@ -194,11 +236,11 @@ function YR.TrinketAuto()
         local cur = Worn(s)
         -- not a slot it looks after: turned off, held by a swap-when, or a trinket you put on yourself
         if db.auto[s] ~= false and not held[s] and not pending[s] and (not cur or rank[cur]) then
-            local curReady = cur and Ready(cur)
+            local curReady = cur and (Ready(cur) or Holding(cur, s))
             for _, id in ipairs(order) do
                 if id == cur then
-                    if curReady then break end            -- the best ready one is on already
-                elseif not WornIn(id) and InBags(id) and Ready(id) then
+                    if curReady then break end            -- the best ready one is on already (or is still at work)
+                elseif not WornIn(id) and InBags(id) and ReadySoon(id) then
                     YR.TrinketEquip(id, s)
                     return id, s
                 end
@@ -207,6 +249,31 @@ function YR.TrinketAuto()
     end
     return nil
 end
+
+-- "Ready again": a trinket you wear or have in your list was used (a cooldown longer than going on
+-- gives), and the cooldown has run out. Looked at once a second, with the swaps.
+local used = {}
+local function Notify()
+    if YippRouteDB.trinketNotify ~= true then
+        if next(used) then for k in pairs(used) do used[k] = nil end end
+        return
+    end
+    local function Look(id)
+        if not id or not OnUse(id) then return end
+        local left = CooldownLeft(id)
+        if issecretvalue and issecretvalue(left) then return end
+        if left > USED then
+            used[id] = true
+        elseif used[id] and left <= 0.5 then
+            used[id] = nil
+            YR.Print(("%s is ready."):format(C_Item.GetItemNameByID and C_Item.GetItemNameByID(id) or "your trinket"))
+            if YippRouteDB.trinketNotifySound ~= false and PlaySound then PlaySound(8959, "Master") end      -- the raid warning's sound
+        end
+    end
+    for _, s in ipairs(SLOTS) do Look(Worn(s)) end
+    for _, id in ipairs(CharDB().order) do if not WornIn(id) and InBags(id) then Look(id) end end
+end
+YR.TrinketNotify = Notify
 
 --- In the list or not: at the end when added.
 function YR.TrinketToggleList(id)
@@ -304,7 +371,7 @@ function YR.UseGearSet(which)
     end
     if InCombatLockdown() then
         wantSet = pick.name
-        YR.Print(("%s goes on as soon as this fight ends."):format(pick.name))
+        YR.Print(("%s will be equipped when the fight ends."):format(pick.name))
         Wait()
         return
     end
@@ -325,6 +392,34 @@ BINDING_NAME_HEADSTART_GEARSET5 = "Equipment set 5"
 -- ---------------------------------------------------------------------------
 local bar, flyout
 local buttons = {}
+
+--- How the buttons look and behave, as set: read by the bar here and by the preview in Settings.
+function YR.TrinketLook()
+    local db = YippRouteDB
+    local show = db.trinketBarShow
+    local dir = db.trinketFlyDir
+    return {
+        size = math.max(24, math.min(64, tonumber(db.trinketBarSize) or 38)),
+        gap = math.max(0, math.min(24, tonumber(db.trinketBarGap) or 6)),
+        alpha = math.max(0.2, math.min(1, tonumber(db.trinketBarAlpha) or 1)),
+        vertical = db.trinketBarVertical == true,
+        show = (show == "combat" or show == "nocombat") and show or "always",
+        numbers = db.trinketBarNumbers ~= false,
+        tips = db.trinketBarTips ~= false,
+        left = db.trinketBarLeft == "use" and "use" or "list",
+        hover = db.trinketFlyHover == true,
+        dir = (dir == "down" or dir == "left" or dir == "right") and dir or "up",
+    }
+end
+
+--- Where a list of `w` by `h` goes beside the button it belongs to, for the direction chosen.
+function YR.TrinketFlyPlace(list, button, dir)
+    list:ClearAllPoints()
+    if dir == "down" then list:SetPoint("TOPLEFT", button, "BOTTOMLEFT", 0, -6)
+    elseif dir == "left" then list:SetPoint("TOPRIGHT", button, "TOPLEFT", -6, 0)
+    elseif dir == "right" then list:SetPoint("TOPLEFT", button, "TOPRIGHT", 6, 0)
+    else list:SetPoint("BOTTOMLEFT", button, "TOPLEFT", 0, 6) end
+end
 
 -- The buttons' faces. Cooldown events come several to a cast: they touch only the cooldown swipe, and
 -- only when the cooldown is a different one (setting the same one again restarts the sweep). Icons
@@ -439,8 +534,17 @@ local function OpenFlyout(slot)
     flyout:SetSize(math.max(250, 16 + cols * 40), 30 + math.max(1, math.ceil(#list / 6)) * 40)
     if #list == 0 then flyout.hint:SetText("No other trinkets in your bags") else
         flyout.hint:SetText("Click: wear  ·  Right-click: in or out of your swap list") end
-    flyout:ClearAllPoints()
-    flyout:SetPoint("BOTTOMLEFT", buttons[slot], "TOPLEFT", 0, 6)
+    local look = YR.TrinketLook()
+    YR.TrinketFlyPlace(flyout, buttons[slot], look.dir)
+    -- opened by the mouse resting on a button: it goes when the mouse has left both for a moment
+    -- (looked at only while the list is up)
+    flyout.away = 0
+    flyout:SetScript("OnUpdate", look.hover and function(self, elapsed)
+        local b = buttons[self.slot]
+        if self:IsMouseOver() or (b and b:IsMouseOver()) then self.away = 0 return end
+        self.away = self.away + elapsed
+        if self.away > 0.35 then self:Hide() end
+    end or nil)
     flyout:Show()
 end
 YR.TrinketFlyout = OpenFlyout
@@ -468,7 +572,7 @@ local function Build()
     if bar or InCombatLockdown() then return end
     local S = YR.Style
     bar = CreateFrame("Frame", "HeadstartTrinketBar", UIParent)
-    bar:SetSize(84, 40)
+    bar:SetSize(86, 40)
     local p = YippRouteDB.trinketBarPos
     if p then bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT", p[1], p[2]) else bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 180) end
     bar:SetClampedToScreen(true)
@@ -482,15 +586,11 @@ local function Build()
     for i, s in ipairs(SLOTS) do
         -- secure, so right-click can use the trinket (an addon may not use items any other way)
         local b = CreateFrame("Button", "HeadstartTrinket" .. s, bar, "SecureActionButtonTemplate")
-        b:SetSize(38, 38)
-        b:SetPoint("LEFT", (i - 1) * 44 + 2, 0)
         b:RegisterForClicks("AnyUp")
         -- with the game's "cast on key down" on, a secure button only acts on the press, and this one
         -- hears the release: said here that it acts on the release, or a right-click did nothing
         b:SetAttribute("useOnKeyDown", false)
         b:RegisterForDrag("LeftButton")
-        b:SetAttribute("type2", "item")
-        b:SetAttribute("item2", tostring(s))
         S.Border(b, S.C.lineHi)
         b.icon = b:CreateTexture(nil, "ARTWORK")
         b.icon:SetPoint("TOPLEFT", 1, -1)
@@ -499,7 +599,6 @@ local function Build()
         b.cd = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
         b.cd:SetAllPoints(b.icon)
         b.queued = b:CreateTexture(nil, "OVERLAY", nil, 2)
-        b.queued:SetSize(18, 18)
         b.queued:SetPoint("BOTTOMLEFT", 2, 2)
         b.queued:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         b.queued:Hide()
@@ -509,14 +608,19 @@ local function Build()
         S.ArtTexture(b.auto, "dot")
         b.auto:SetVertexColor(unpack(S.C.green))
         b:SetScript("PostClick", function(_, which)
-            if which == "LeftButton" then OpenFlyout(s) end
+            local left = YR.TrinketLook().left == "list"
+            if which == (left and "LeftButton" or "RightButton") then OpenFlyout(s) end
         end)
         b:SetScript("OnDragStart", StartDrag)
         b:SetScript("OnDragStop", function() bar:GetScript("OnDragStop")(bar) end)
         b:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            local look = YR.TrinketLook()
+            if look.hover and not (flyout and flyout:IsShown() and flyout.slot == s) then OpenFlyout(s) end
+            if not look.tips then return end
+            GameTooltip:SetOwner(self, look.dir == "up" and "ANCHOR_BOTTOM" or "ANCHOR_TOP")
             if GetInventoryItemID("player", s) then GameTooltip:SetInventoryItem("player", s) else GameTooltip:AddLine("No trinket") end
-            GameTooltip:AddLine("Click: your other trinkets  ·  Right-click: use", 0.6, 0.6, 0.6)
+            GameTooltip:AddLine(look.left == "list" and "Click: your other trinkets  ·  Right-click: use"
+                or "Click: use  ·  Right-click: your other trinkets", 0.6, 0.6, 0.6)
             GameTooltip:Show()
         end)
         b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -545,7 +649,8 @@ function YR.TrinketSlotsShown()
 end
 
 local relayout = false       -- the count changed in a fight: the secure buttons wait for it to end
-local laid                   -- which buttons show now (one of BOTH, TOP, BOTTOM, NONE)
+local laid, laidAs           -- which buttons show now (one of BOTH, TOP, BOTTOM, NONE), and in what look
+local driven                 -- the game shows and hides the bar by itself (in a fight, or out of one)
 local function Layout()
     if not bar then return end
     if InCombatLockdown() then
@@ -555,19 +660,65 @@ local function Layout()
     end
     relayout = false
     local shown = YR.TrinketSlotsShown()
-    -- the buttons are moved only when which of them show changes (this runs on every bag change)
-    if laid ~= shown then
-        laid = shown
+    local look = YR.TrinketLook()
+    local as = ("%d %d %s %s %s"):format(look.size, look.gap, tostring(look.vertical), look.left, tostring(look.numbers))
+    -- the buttons are sized and moved only when which of them show, or their look, changes (this runs
+    -- on every bag change)
+    if laid ~= shown or laidAs ~= as then
+        laid, laidAs = shown, as
+        local pitch = look.size + look.gap
         for i, s in ipairs(shown) do
             buttons[s]:ClearAllPoints()
-            buttons[s]:SetPoint("LEFT", (i - 1) * 44 + 2, 0)
+            if look.vertical then buttons[s]:SetPoint("TOP", 0, -(i - 1) * pitch - 2)
+            else buttons[s]:SetPoint("LEFT", (i - 1) * pitch + 2, 0) end
         end
-        for _, s in ipairs(SLOTS) do buttons[s]:SetShown(s == shown[1] or s == shown[2]) end
+        local long = math.max(1, #shown) * pitch - look.gap + 4
+        if look.vertical then bar:SetSize(look.size + 2, long) else bar:SetSize(long, look.size + 2) end
+        for _, s in ipairs(SLOTS) do
+            local b = buttons[s]
+            b:SetSize(look.size, look.size)
+            b:SetShown(s == shown[1] or s == shown[2])
+            -- which click uses the trinket (the other lists your trinkets: PostClick)
+            local use, list = look.left == "use" and "1" or "2", look.left == "use" and "2" or "1"
+            b:SetAttribute("type" .. list, nil)
+            b:SetAttribute("item" .. list, nil)
+            b:SetAttribute("type" .. use, "item")
+            b:SetAttribute("item" .. use, tostring(s))
+            if b.cd and b.cd.SetHideCountdownNumbers then b.cd:SetHideCountdownNumbers(not look.numbers) end
+            b.queued:SetSize(math.floor(look.size * 0.47), math.floor(look.size * 0.47))
+        end
     end
-    bar:SetShown(YR.Option("trinketBar") and #shown > 0)
+    bar:SetAlpha(look.alpha)
+    -- Shown always, or only in a fight, or only out of one. The buttons are secure, so in a fight it
+    -- is the game that shows and hides them (a state driver), set up here out of one. Unlocked, the
+    -- bar always shows: it is unlocked to be dragged.
+    local on = YR.Option("trinketBar") and #shown > 0
+    local when = (on and look.show ~= "always" and YR.Option("trinketBarLocked")) and look.show or nil
+    if RegisterStateDriver and UnregisterStateDriver then
+        if when ~= driven then
+            if driven then UnregisterStateDriver(bar, "visibility") end
+            driven = when
+            if when then RegisterStateDriver(bar, "visibility", when == "combat" and "[combat] show; hide" or "[combat] hide; show") end
+        end
+    end
+    if not driven then bar:SetShown(on) end
     if #shown == 0 then CloseFlyout() end
 end
 YR.TrinketLayout = Layout
+--- Back where they stand on a new install. Out of a fight (the bar is protected in one).
+function YR.TrinketResetPosition()
+    if InCombatLockdown() then YR.Print("the trinket buttons can't be moved in combat.") return false end
+    YippRouteDB.trinketBarPos = nil
+    if bar then
+        bar:ClearAllPoints()
+        bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 180)
+    end
+    return true
+end
+--- After a setting of the buttons changed: as they are now (in a fight: when it ends).
+function YR.TrinketApply()
+    if bar then Layout() Paint() end
+end
 
 local showLater = false      -- the bar was to be shown or hidden in a fight: done when it ends
 function YR.ShowTrinketBar(on)
@@ -578,7 +729,11 @@ function YR.ShowTrinketBar(on)
     end
     showLater = false
     if on and not bar then Build() end
-    if bar then bar:SetShown(on and true or false) Layout() end
+    if bar then
+        if not on and driven and UnregisterStateDriver then UnregisterStateDriver(bar, "visibility") driven = nil end
+        bar:SetShown(on and true or false)
+        Layout()
+    end
     if not on then CloseFlyout() end
 end
 
@@ -600,7 +755,7 @@ end
 local function BarOn() return YR.Option("trinketBar") end
 local function SwapsOn()
     local db = YippRouteDB
-    return (db.trinketAuto == true or db.trinketMount == true or db.trinketSwim == true) and YR.QoLOn()
+    return (db.trinketAuto == true or db.trinketMount == true or db.trinketSwim == true or db.trinketNotify == true) and YR.QoLOn()
 end
 local function WatchOn() return BarOn() or SwapsOn() end
 
@@ -632,6 +787,7 @@ local function WatchStart() watching, walked = true, false end
 local function WatchStop() watching, walked = false, false end
 
 local function EverySecond()
+    Notify()
     if InCombatLockdown() then return end
     YR.TrinketWhen()
     YR.TrinketAuto()

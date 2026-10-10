@@ -237,7 +237,7 @@ function YR.MailToAlt(loud)
     if not to then
         local bare = YR.MailRecipientMissingSurname()
         if loud then
-            YR.Print(bare and ("mail needs the full name: %s's surname too. Set it in Headstart, QoL, Bank & mail (Mail to my alt)."):format(bare)
+            YR.Print(bare and ("mail needs the full name: %s's surname too. Set it in /hs, Bank & mail."):format(bare)
                 or "name the alt to mail in Headstart, QoL, Bank & mail (Mail to my alt): name and surname.")
         end
         return

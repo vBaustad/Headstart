@@ -5,7 +5,8 @@
 From the game's tables: skilllineability rows with AcquireMethod 0 on a class's own skill lines,
 their level from spelllevels and their rank from spell.NameSubtext. Talent spells (talent.SpellRank
 and traitdefinition.SpellID) are left out as first ranks: the trainer only teaches their later ranks,
-and only once you have the one before, which the addon checks with IsPlayerSpell.
+and only once you have the one before, which the addon checks with IsPlayerSpell. Every rank of a
+talent with several points (talent.SpellRank[0..8]) is left out: those are bought with talent points.
     YR.TrainerSpells[CLASS] = { { spellID, level, "name", rank or 0, raceMask or 0, talent 0/1 }, ... }  by level
 """
 import os
@@ -17,6 +18,9 @@ import duckdb
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = r"S:\forever-data\db\forever.duckdb"
 OUT = os.path.join(ROOT, "Data", "TrainerSpells.lua")
+# In the client's tables as a spell a trainer teaches, and not in the game: no trainer has it and
+# foreverchanges.pro's spellbook (built from the same table) leaves it out. Rogue: Redirect (438040).
+NOT_IN_GAME = {438040}
 CLASSES = {1: "WARRIOR", 2: "PALADIN", 3: "HUNTER", 4: "ROGUE", 5: "PRIEST", 7: "SHAMAN", 8: "MAGE", 9: "WARLOCK", 11: "DRUID"}
 
 
@@ -30,10 +34,11 @@ def main():
         for cid, token in CLASSES.items():
             if mask == 1 << (cid - 1):
                 line_class[sid] = token
-    talent = set()
+    # Every rank a talent point gives (a five-point talent has five spells): none of them is a trainer's.
+    points = set()
     for k in range(9):
-        talent |= {r[0] for r in c.sql(f'select cast("SpellRank[{k}]" as int) from {s}.talent').fetchall() if r[0]}
-    talent |= {r[0] for r in c.sql(f"select cast(SpellID as int) from {s}.traitdefinition").fetchall() if r[0]}
+        points |= {r[0] for r in c.sql(f'select cast("SpellRank[{k}]" as int) from {s}.talent').fetchall() if r[0]}
+    talent = points | {r[0] for r in c.sql(f"select cast(SpellID as int) from {s}.traitdefinition").fetchall() if r[0]}
     rows = c.sql(f"""
         select distinct a.SkillLine, cast(a.Spell as int), n.Name_lang, sp.NameSubtext_lang,
             min(cast(l.SpellLevel as int)), cast(a."RaceMasks[0]" as bigint)
@@ -42,6 +47,7 @@ def main():
         left join {s}.spell sp on sp.ID = a.Spell
         join {s}.spelllevels l on l.SpellID = a.Spell
         where a.AcquireMethod = '0' and cast(l.SpellLevel as int) > 0
+            and cast(a.Spell as int) not in ({", ".join(str(i) for i in sorted(NOT_IN_GAME))})
         group by 1, 2, 3, 4, 6""").fetchall()
     out, talent_names = {}, {}
     for line, spell, name, sub, level, race in rows:
@@ -50,7 +56,7 @@ def main():
             continue
         m = re.match(r"Rank (\d+)", sub or "")
         rank = int(m.group(1)) if m else 0
-        if spell in talent and rank <= 1:
+        if spell in points or (spell in talent and rank <= 1):
             talent_names.setdefault(token, set()).add(name)
             continue
         # One spell can have a row per race group: OR their masks, and any "every race" row wins.

@@ -323,3 +323,47 @@ function YR.StartBarHide()
         end,
     })
 end
+
+-- ---------------------------------------------------------------------------
+-- The spend flash on a resource bar. When you spend a tenth of your energy, rage or mana or more,
+-- Blizzard's bars keep the spent part up as a pale block that fades: on a bar that ticks back up at once
+-- it reads as lag. With this on that block isn't drawn, so the bar is at its new value the moment you
+-- spend and starts filling again. Only the block's own frame is made see-through (its alpha): nothing of
+-- Blizzard's is replaced or called, so the bar itself, its numbers and its timing are theirs as before.
+--   YippRouteDB.powerFlashOff == true: on. The player frame's bar, the personal resource display's and
+--   the one under your nameplate, whichever of them this client has.
+-- ---------------------------------------------------------------------------
+local function FlashFrames()
+    local out = {}
+    local function Add(bar)
+        local f = type(bar) == "table" and bar.FeedbackFrame
+        if type(f) == "table" and f.SetAlpha then out[#out + 1] = f end
+    end
+    local prd = _G.PersonalResourceDisplayFrame
+    Add(type(prd) == "table" and prd.PowerBar)
+    local player = _G.PlayerFrame
+    local get = _G.PlayerFrame_GetManaBar
+    Add(type(player) == "table" and (player.manabar or (type(get) == "function" and get())))
+    Add(_G.ClassNameplateManaBarFrame)
+    return out
+end
+function YR.PowerFlashOn() return YippRouteDB.powerFlashOff == true and YR.QoLOn() end
+function YR.PowerFlashApply()
+    local hide = YR.PowerFlashOn()
+    local n = 0
+    for _, f in ipairs(FlashFrames()) do
+        f:SetAlpha(hide and 0 or 1)
+        n = n + 1
+    end
+    return n
+end
+local flashDeclared
+function YR.StartPowerFlash()
+    if flashDeclared then return end
+    flashDeclared = true
+    -- a bar's addon can load later than we do (the personal resource display loads when it is first shown)
+    YR.Part(YR.PowerFlashOn, { "PLAYER_ENTERING_WORLD", "ADDON_LOADED" }, function() YR.PowerFlashApply() end, {
+        start = function() YR.PowerFlashApply() end,
+        stop = function() YR.PowerFlashApply() end,
+    })
+end

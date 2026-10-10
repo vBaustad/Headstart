@@ -5,12 +5,17 @@
 	<Binding name="HEADSTART_MENU" category="ADDONS">
 		Headstart_Open("menu")
 	</Binding>
+	<Binding name="HEADSTART_LAYOUT" category="ADDONS">
+		Headstart_Open("layout")
+	</Binding>
 	<Binding name="HEADSTART_ALTS" category="ADDONS">
 		Headstart_Open("alts")
 	</Binding>
+	<!-- Shelved with the quest group finder (QuestLFG.lua): put back with it.
 	<Binding name="HEADSTART_LFG" category="ADDONS">
 		Headstart_Open("lfg")
 	</Binding>
+	-->
 	<Binding name="HEADSTART_CHATLOG" category="ADDONS">
 		Headstart_Open("chat")
 	</Binding>

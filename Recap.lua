@@ -302,7 +302,7 @@ local function Build()
     panel.skull:SetTexture("Interface\\TargetingFrame\\UI-TargetingFrame-Skull")
     panel.head = S.Text(panel, 11, S.C.sub)
     panel.head:SetPoint("LEFT", panel.skull, "RIGHT", 6, 0)
-    panel.head:SetText("WHAT HAPPENED")
+    panel.head:SetText("DEATH RECAP")
     panel.close = S.IconButton(panel, "close", function() panel:Hide() end, "Close (it comes back with /headstart death)", nil, 20)
     panel.close:SetPoint("TOPRIGHT", -8, -8)
     panel.where = S.Text(panel, 11, S.C.muted)
@@ -356,7 +356,7 @@ local function Build()
         panel.rows[i] = r
     end
     panel.sourceHead = S.Text(panel, 10, S.C.muted)
-    panel.sourceHead:SetText("WHAT YOU TOOK THIS FIGHT")
+    panel.sourceHead:SetText("DAMAGE TAKEN THIS FIGHT")
     panel.sources = {}
     for i = 1, 4 do
         local r = {}

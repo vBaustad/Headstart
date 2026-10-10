@@ -223,7 +223,7 @@ end
 local function Equip(u)
     if InCombatLockdown() then
         equipAfterFight = u
-        YR.Print(u.link .. " goes on as soon as this fight ends.")
+        YR.Print(u.link .. " will be equipped when the fight ends.")
         return
     end
     local fn = (C_Item and C_Item.EquipItemByName) or EquipItemByName

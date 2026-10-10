@@ -64,6 +64,7 @@ def main():
         join {s}.spelllevels l on l.SpellID = a.Spell
         left join {s}.spellmisc m on m.SpellID = a.Spell
         where a.AcquireMethod in ('0', '2') and cast(l.SpellLevel as int) > 0
+            and cast(a.Spell as int) not in (438040)       -- Redirect: in the tables, not in the game (see gen_trainer_spells.py)
         group by 1, 2, 3, 5, 6, 7""").fetchall()
     best = {}
     # Which races get a class spell (a priest's Desperate Prayer, Starshards ...; a paladin's mount; a
@@ -81,6 +82,22 @@ def main():
         cur = best.setdefault(token, {}).get(name)
         if cur is None or level < cur[0] or (level == cur[0] and spell < cur[1]):
             best[token][name] = (level, spell, icon or 0, 1 if (attr or 0) & PASSIVE else 0)
+
+    # A talent's spell the trainer lines don't list (Riposte, Cold Blood, Inner Focus, Divine Favor), if it
+    # is something you press: the same rule, and so the same names, as gen_spell_levels.py.
+    for spell, name, mask, tier, icon, attr in c.sql(f'''
+            select cast(t."SpellRank[0]" as int), n.Name_lang, cast(tt.ClassMask as bigint), cast(t.TierID as int),
+                cast(m.SpellIconFileDataID as bigint), cast(m."Attributes[0]" as bigint)
+            from {s}.talent t
+            join {s}.talenttab tt on tt.ID = t.TabID
+            join {s}.spellname n on n.ID = t."SpellRank[0]"
+            left join {s}.spellmisc m on m.SpellID = t."SpellRank[0]"''').fetchall():
+        if (attr or 0) & PASSIVE or name == "Two-Handed Axes and Maces":       # (a weapon skill: nothing to press)
+            continue
+        for cid, token in CLASSES.items():
+            if mask == 1 << (cid - 1) and name not in best.get(token, {}):
+                best.setdefault(token, {})[name] = (10 + 5 * tier, spell, icon or 0, 0)
+                races.setdefault(token, {})[name] = 0
 
     racials = {}
     for spell, name, icon, attr, race in c.sql(f"""

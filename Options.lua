@@ -54,10 +54,9 @@ local function Build()
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
     local icon = button:CreateTexture(nil, "BACKGROUND")
-    icon:SetTexture("Interface\\Icons\\INV_Misc_Map_01")
-    icon:SetSize(20, 20)
+    icon:SetTexture("Interface\\AddOns\\Headstart\\art\\logo")       -- Headstart's own mark (tools/make_icons.py)
+    icon:SetSize(21, 21)
     icon:SetPoint("CENTER", 0, 1)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     local mask = button:CreateMaskTexture()
     mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
     mask:SetAllPoints(icon)
@@ -94,7 +93,7 @@ local function Build()
             end
         end
         GameTooltip:AddLine("Click: the Headstart window", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("Right-click: every window of ours (characters, chat log, quest group...)", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Right-click: every window of ours (characters, chat log, loot log...)", 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Drag: move round the minimap", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
@@ -112,6 +111,18 @@ function YR.WindowList()
     Add(YR.QuestLFGOn and YR.QuestLFGOn(), "Quest group", function() YR.QuestLFGToggle() end)
     Add(YR.ChatLogOn and YR.ChatLogOn(), "Chat log", function() YR.ChatLogToggle() end)
     Add(YR.LootFeedOn and YR.LootFeedOn(), "Loot log", function() YR.LootLogToggle() end)
+    -- this class's other profiles (Character setup, loaded): one click to each
+    local YS = YR.Setup
+    if YS and YS.LayoutNames and YR.SetupOn and YR.SetupOn() then
+        local on = YS.LayoutName()
+        for _, name in ipairs(YS.LayoutNames()) do
+            local to = name
+            Add(name ~= on, "Profile: " .. name, function()
+                local ok, why = YS.LayoutSwitch(to)
+                if not ok and why then YR.Print(why) end
+            end)
+        end
+    end
     Add(YR.Option("instanceTrack"), "Instances", function() YR:ShowSettingsTab("instances") end)
     Add(YR.Option("deathRecap"), "The last time you died", function() YR.RecapShow() end)
     Add(true, "Settings", function() YR:ToggleSettings() end)

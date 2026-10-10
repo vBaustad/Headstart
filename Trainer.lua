@@ -1,6 +1,7 @@
 -- Auto trainer: at your class trainer, the spells you chose are learned as the window opens.
 -- Per class (YippRouteDB.trainer[CLASS]): for each spell (all its ranks) Always, If I can afford it,
--- or Never, and a reserve: "If I can afford it" spells are only bought while you'd keep at least that
+-- First rank only (the spell itself is learned, like Always; no rank after the first is - for a spell
+-- you start with, that is nothing) or Never, and a reserve: "If I can afford it" spells are only bought while you'd keep at least that
 -- much; "Always" spells whenever the gold is there.
 -- Defaults (data version 2, 2026-10-02): "If I can afford it" and a 2 silver reserve, so a new
 -- character never trains itself down to nothing. A class's table from before keeps what it had -
@@ -10,7 +11,7 @@
 -- buys everything on its list) is switched off while ours is on, and back on when ours goes off.
 local _, YR = ...
 
-YR.TRAINER_CHOICES = { { "always", "Always" }, { "gold", "If I can afford it" }, { "never", "Never" } }
+YR.TRAINER_CHOICES = { { "always", "Always" }, { "gold", "If I can afford it" }, { "first", "First rank only" }, { "never", "Never" } }
 
 function YR.TrainerData(class)
     YippRouteDB.trainer = YippRouteDB.trainer or {}
@@ -87,6 +88,9 @@ function YR.TrainerPlan(money)
         local name, rank, category = Service(i)
         if name and category == "available" then
             local choice = YR.TrainerChoice(name)
+            -- "Rank 2" and up is not the first rank; a spell without ranks is its own first
+            local n = tonumber(tostring(rank or ""):match("%d+"))
+            if choice == "first" then choice = (n == nil or n <= 1) and "always" or "never" end
             if choice ~= "never" then
                 local cost = GetTrainerServiceCost(i) or 0
                 local level = GetTrainerServiceLevelReq and GetTrainerServiceLevelReq(i) or 0

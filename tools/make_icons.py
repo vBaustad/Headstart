@@ -88,6 +88,15 @@ d.ellipse((115, 70, 141, 96), fill=(255, 255, 255, 255))
 d.rounded_rectangle((116, 112, 140, 186), radius=12, fill=(255, 255, 255, 255))
 save(img, "info")
 
+# info, small: the same mark for the (i) after a setting's name, which is drawn 16 pixels wide. The 64
+# pixel one shrunk that far comes out jagged (the game takes every fourth pixel), so this one is saved
+# at 32 - twice its drawn size - with a ring that fills the image and heavier strokes.
+img, d = canvas()
+d.ellipse((10, 10, 246, 246), outline=(255, 255, 255, 255), width=24)
+d.ellipse((108, 58, 148, 98), fill=(255, 255, 255, 255))
+d.rounded_rectangle((110, 116, 146, 200), radius=16, fill=(255, 255, 255, 255))
+img.resize((32, 32), Image.LANCZOS).save(os.path.join(OUT, "info16.tga"), orientation=1)
+
 # rounded shapes for 9-slice buttons: 32x32, corner radius 6, drawn at 8x. The addon stretches the
 # middle and keeps the corners (Texture:SetTextureSliceMargins), so one image fits any button size.
 R = 8
@@ -178,3 +187,31 @@ d.pieslice((40, 126, 148, 234), start=180, end=360, fill=(255, 255, 255, 255))
 d.ellipse((140, 76, 188, 124), fill=(255, 255, 255, 255))
 d.pieslice((120, 136, 212, 228), start=180, end=360, fill=(255, 255, 255, 255))
 save(img, "people")
+
+
+# logo: Headstart's own mark, in colour (the minimap button, the addon list). An H leaning forward in
+# the ember accent, on a dark disc with an ember rim. Not tinted by the addon: it is drawn as it is.
+def logo():
+    n = 512
+    img = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.ellipse((6, 6, n - 6, n - 6), fill=(255, 143, 51, 255))                 # the rim
+    d.ellipse((30, 30, n - 30, n - 30), fill=(26, 22, 19, 255))               # the disc
+    # the H, as a mask, filled with the ember going lighter towards the top
+    mask = Image.new("L", (n, n), 0)
+    m = ImageDraw.Draw(mask)
+    lean, top, bottom, stem = 44, 124, 388, 74
+    for x in (150, 318):
+        m.polygon([(x + lean, top), (x + lean + stem, top), (x + stem - lean, bottom), (x - lean, bottom)], fill=255)
+    m.polygon([(170, 222), (372, 222), (352, 290), (150, 290)], fill=255)
+    fill = Image.new("RGBA", (n, n))
+    f = ImageDraw.Draw(fill)
+    for y in range(n):
+        t = min(1, max(0, (y - top) / (bottom - top)))
+        f.line([(0, y), (n, y)], fill=(255, int(204 - 82 * t), int(112 - 86 * t), 255))
+    img.paste(fill, (0, 0), mask)
+    img.resize((64, 64), Image.LANCZOS).save(os.path.join(OUT, "logo.tga"), orientation=1)
+    return img
+
+
+logo()

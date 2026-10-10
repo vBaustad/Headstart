@@ -5,7 +5,7 @@
 local ADDON, YR = ...
 
 function YR.Print(msg)
-    print("|cff66ccffHeadstart|r: " .. msg)
+    print("|cffff9a40Headstart|r: " .. msg)
 end
 
 -- Where the player is, as uiMapID and 0-100 map coordinates, or nil where the game won't say
@@ -365,10 +365,19 @@ function Headstart_Open(what)
     elseif what == "chat" then YR.ChatLogToggle()
     elseif what == "loot" then YR.LootLogToggle()
     elseif what == "menu" then YR.WindowMenu()
+    elseif what == "layout" then
+        local YS = YR.Setup
+        if YS and YS.LayoutNext then
+            local ok, why = YS.LayoutNext()
+            if not ok and why then YR.Print(why) end
+        else
+            YR.Print("profiles are part of Character setup: turn that on in /headstart, Character setup.")
+        end
     else YR:ToggleWindow() end
 end
 BINDING_NAME_HEADSTART_WINDOW = "Headstart's window"
 BINDING_NAME_HEADSTART_MENU = "Menu of every window"
+BINDING_NAME_HEADSTART_LAYOUT = "Next profile"
 BINDING_NAME_HEADSTART_ALTS = "Characters: bags, bank and gold"
 BINDING_NAME_HEADSTART_LFG = "Quest group"
 BINDING_NAME_HEADSTART_CHATLOG = "Chat log"
@@ -411,6 +420,20 @@ SlashCmdList.HEADSTART = function(msg)
     elseif cmd == "plan" then
         if YR.SetupOn() and YR.LoadSetup(true) then YR.OpenPlanner()
         elseif not YR.SetupOn() then YR.Print("Character setup is off: turn it on in /headstart, Character setup.") end
+    elseif cmd == "profile" or cmd == "profiles" or cmd == "layout" or cmd == "layouts" then
+        -- /headstart profile: the next of the class's profiles; /headstart profile Tank: that one
+        local YS = YR.SetupOn() and YR.LoadSetup(true) and YR.Setup
+        if not YS then
+            YR.Print("profiles are part of Character setup: turn that on in /headstart, Character setup.")
+        else
+            local name = strtrim((msg or ""):match("^%S+%s+(.+)$") or "")
+            local ok, why
+            if name == "" then ok, why = YS.LayoutNext() else ok, why = YS.LayoutSwitch(name) end
+            if not ok and why then YR.Print(why .. " Your profiles: " .. table.concat(YS.LayoutNames(), ", ") .. ".") end
+        end
+    elseif cmd == "macro" or cmd == "macros" then
+        if YR.SetupOn() and YR.LoadSetup(true) then YR.MacroHelperToggle()
+        elseif not YR.SetupOn() then YR.Print("the macro helper is part of Character setup: turn that on in /headstart, Character setup.") end
     elseif cmd == "inv" or cmd == "invite" then
         YR.InviteTarget()
     elseif cmd == "instances" or cmd == "inst" then
@@ -435,7 +458,7 @@ SlashCmdList.HEADSTART = function(msg)
         YR.ChatLogToggle()
     elseif cmd == "death" then
         if arg == "debug" then YR.RecapDebug()
-        elseif not YR.RecapShow() then YR.Print("no death of this character has been noted yet.") end
+        elseif not YR.RecapShow() then YR.Print("no death recorded for this character yet.") end
     elseif cmd == "gear" then
         YR.UseGearSet(arg)
     elseif cmd == "trinkets" then
@@ -470,7 +493,7 @@ SlashCmdList.HEADSTART = function(msg)
             .. " /headstart camp (unlock|lock|always|debug) - the campfire icon; /headstart bank - bank mats now; /headstart mail - mail them to your alt;"
             .. " /headstart routes on|off - Headstart routes in RestedXP; /headstart inv - invite your target; /headstart leave - leave the group; /headstart plan - plan your bars;"
             .. " /headstart restock - buy what you keep at this vendor; /headstart trainer - what's new at the trainer;"
-            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart lfg - ask chat for a group for a quest, and see who answers; /headstart start - the welcome window: pick how much of Headstart you want")
+            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart profile [name] - switch this character to another of the class's profiles; /headstart macro - the macro helper: your class's usual macros made by ticking boxes; /headstart start - the welcome window: pick how much of Headstart you want")
     else
         YR:ToggleWindow()
     end
@@ -534,6 +557,7 @@ f:SetScript("OnEvent", function(_, event, name)
     local fresh = YippRouteDB == nil
     YippRouteDB = YippRouteDB or {}
     YippRouteDB.runs = YippRouteDB.runs or {}
+    if YR.Style and YR.Style.Theme then YR.Style.Theme() end       -- the accent you chose, before any window is made
     YR.Latch(fresh)
     -- the saved tables every part keeps this character's and the classes' things in
     YR.freshChar = YippSetupCharDB == nil        -- this character's first login with Headstart
@@ -572,6 +596,7 @@ f:SetScript("OnEvent", function(_, event, name)
     YR.StartMovers()
     YR.StartTalentFade()
     YR.StartBarHide()
+    YR.StartPowerFlash()
     YR.StartSwing()
     YR.StartRecap()
     YR.StartChatLog()

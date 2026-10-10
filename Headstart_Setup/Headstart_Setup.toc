@@ -9,6 +9,8 @@
 
 SpellLevels.lua
 Setup.lua
+Layouts.lua
 SetupUI.lua
 PlannerSpells.lua
 Planner.lua
+MacroHelper.lua

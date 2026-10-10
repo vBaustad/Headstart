@@ -124,6 +124,26 @@ end
     check(not YR.SwingOn() and g.YippRouteDB.swing is None, "off: asking whether it's on doesn't fill its settings in")
     check(not any(raw(f, "ev") and (raw(f, "ev")["PLAYER_SWING"] or raw(f, "ev")["PLAYER_ENTERING_WORLD"]) for f in g.FRAMES.values()) and len(list(g.CALLBACKS)) == 0,
           "off: no swing or loading screen listened for, no Edit Mode callback")
+    # a new install's look is Slim; Classic is the look from before, and a preset changes the look only
+    d = YR.SwingDB()
+    check(d.h == 14 and d.gap == 1 and d.texture == "flat" and d.time is False and d.name is True and d.on is False,
+          "a new install: the Slim look, and still off")
+    d.pos = lua.eval("{ 100, -200 }")
+    check(YR.SwingPreset("classic") is True and d.h == 20 and d.texture == "smooth" and d.time is True and d.preset == "classic"
+          and d.on is False and d.pos[1] == 100 and YR.SwingPreset("nonsense") is False,
+          "Classic put on: sizes, texture and text - not whether it's on or where it is; an unknown look is refused")
+    check(YR.SwingPreset("slim") is True and d.h == 14 and list(d.mainColor.values())[0] == 0.72 and d.pos[1] == 100, "and Slim again")
+    # one kind of bar: Blizzard's, restyled. Settings from when Headstart drew its own are moved over, once
+    check(d.style == "blizzard" and d.look == 3 and d.spark is True and d.border is False, "a new install: Blizzard's bars, with the front edge")
+    g.YippRouteDB.swing = lua.eval("{ on = true, style = 'own', look = 2, h = 30 }")
+    moved = YR.SwingDB()
+    check(moved.style == "blizzard" and moved.look == 3 and moved.on is True and moved.h == 30,
+          "someone who had Headstart's own bars: on Blizzard's now, the rest as it was")
+    moved.style = "own"
+    check(YR.SwingDB().style == "own", "moved once only (the next look at the settings leaves them be)")
+    g.YippRouteDB.swing = d
+    YR.SwingPreset("classic")           # (the checks below were written for this look's time and length texts)
+    d.pos = None
     YR.SwingDB().on = True
     YR.SwingDB().style = "own"
     YR.SwingApply()
@@ -153,6 +173,11 @@ end
     lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, false, false)")
     check(list(raw(main, "colour").values()) == list(YR.SwingDB().mainColor.values())[:3],
           "no range check made (no target): the hand's own colour")
+    # the game's switch for reach is one switch, and Blizzard's bars may turn it off: asked again
+    lua.execute("RANGE[0] = false Fire('PLAYER_TARGET_CHANGED')")
+    check(g.RANGE[0] is True, "a new target: the game is asked about reach again")
+    lua.execute("RANGE[0] = false Fire('PLAYER_REGEN_DISABLED')")
+    check(g.RANGE[0] is True, "a fight begins: asked again")
     lua.execute("NOW = NOW + 2")
     raw(holder, "_OnUpdate")(holder, 0.016)
     check(raw(holder, "_OnUpdate") is None and raw(main, "value") == 2.6, "the swing ran out: full, and nothing drawn each frame again")

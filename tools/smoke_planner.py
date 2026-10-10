@@ -132,7 +132,33 @@ def run():
     check(all(levels[lst[i].name] is not None for i in range(1, len(lst) + 1) if not lst[i].racial and not lst[i].general),
           "every class spell is one Set up layout knows (YS.SPELL_LEVELS)")
     check("Attack" in names, "Attack is offered (a general spell, on no class skill line)")
-    check(all(lst[i].level <= lst[i + 1].level for i in range(1, len(lst))), "sorted by level")
+    cls = [lst[i] for i in range(1, len(lst) + 1) if not lst[i].racial]
+    rac = [i for i in range(1, len(lst) + 1) if lst[i].racial]
+    check(all(cls[i].level <= cls[i + 1].level for i in range(len(cls) - 1)), "the class's spells in the order you learn them")
+    check(len(rac) > 0 and min(rac) == len(cls) + 1, "your race's spells after them all")
+
+    shows = YR.PlannerMacroShows
+    check(shows("#showtooltip Stealth\n/cast !Stealth") == "Stealth", "a macro shows what #showtooltip names")
+    check(shows("#showtooltip\n/cast [@mouseover,help,nodead][] Flash Heal") == "Flash Heal",
+          "or, without a name, what its first /cast casts - conditions aside")
+    check(shows("#showtooltip\n/cast [nostance:1] Battle Stance; Charge") == "Battle Stance", "the first of several choices")
+    check(shows("/startattack\n/cast !Auto Shot") == "Auto Shot" and shows("/say hi") is None,
+          "a leading ! aside; a macro that casts nothing shows nothing")
+
+    # the stance or form you are in: read off what bar 1's first button holds
+    lua.execute("""KEPT_CLASS, KEPT_B1 = UnitClass, ActionButton1
+        UnitClass = function() return "Warrior", "WARRIOR" end
+        ActionButton1 = { action = 73 }""")
+    one = YR.PlannerFormNow()
+    lua.execute("ActionButton1 = { action = 97 }")
+    three = YR.PlannerFormNow()
+    lua.execute("ActionButton1 = { action = 1 }")
+    none = YR.PlannerFormNow()
+    lua.execute("ActionButton1 = { action = 73 } UnitClass = function() return 'Mage', 'MAGE' end")
+    mage = YR.PlannerFormNow()
+    lua.execute("UnitClass, ActionButton1 = KEPT_CLASS, KEPT_B1")
+    check(one == 1 and three == 3 and none == 1 and mage == 0,
+          f"a warrior in Battle Stance is on bonus bar 1, in Berserker on 3, and never on a bar outside a stance (its first then); a class without forms always 0 ({one}, {three}, {none}, {mage})")
 
     YR.OpenPlanner()
     def state():

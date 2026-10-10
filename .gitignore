@@ -1,2 +1,5 @@
 __pycache__/
 dist/
+
+# pictures tools/render.py draws
+tools/render/

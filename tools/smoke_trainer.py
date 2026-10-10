@@ -119,6 +119,16 @@ RXP = { settings = { profile = { enableTrainerAutomation = true } } }
     got = visit(2200)
     check(got == ["Holy Light Rank 3", "Seal of Righteousness Rank 2"], f"with 22s both: {got}")
 
+    # First rank only: the spell itself is learned (as Always), its later ranks never
+    lua.execute('YRT.SetTrainerChoices({ "Seal of the Crusader", "Seal of Righteousness", "Holy Light" }, "first")')
+    got = visit(10000)
+    check(got == ["Seal of the Crusader Rank 1"], f"First rank only: rank 1 learned, ranks 2 and 3 left: {got}")
+    lua.execute('LIST[#LIST + 1] = { "Redemption", "", "available", 300, 12 }')
+    lua.execute('YRT.SetTrainerChoice("Redemption", "first")')
+    got = visit(900)
+    check(sorted(got) == ["Redemption ", "Seal of the Crusader Rank 1"], f"a spell without ranks is its own first, and the reserve doesn't hold it back: {got}")
+    lua.execute('LIST[#LIST] = nil YRT.SetTrainerChoices({ "Seal of the Crusader", "Holy Light" }, "always") YRT.SetTrainerChoice("Seal of Righteousness", "gold")')
+
     check(visit(10000, shift=True) == [], "Shift held: nothing learned")
     check(visit(10000, tradeskill=True) == [], "a profession trainer: nothing learned")
 

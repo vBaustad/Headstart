@@ -21,7 +21,17 @@ local ADDON, YR = ...
 local GOLD = { 1, 0.82, 0 }
 local BRONZE = { 0.64, 0.52, 0.30 }
 local DEFAULT_ACCENT = { 0.40, 0.66, 1.00 }
+-- unless you chose a colour for the skin, it has the accent of Headstart's own windows (Style.lua)
+local function ThemeAccent()
+    local st = YR.Style
+    return st and st.C and st.C.accent or DEFAULT_ACCENT
+end
 local DEFAULT_FRAME = { 0.075, 0.08, 0.095, 0.92 }
+local function ThemeFrame()
+    local st = YR.Style
+    local w = st and st.C and st.C.window
+    return w and { w[1], w[2], w[3], DEFAULT_FRAME[4] } or DEFAULT_FRAME
+end
 local TITLE_SIZE, TIMER_SIZE = 11, 10       -- the title and the fight's timer, small enough to share the bar
 local BUTTON, GAP, PAD = 14, 3, 8          -- the row of buttons: one size, close together, clear of the frame
 
@@ -39,12 +49,12 @@ function YR.DamageSkinAccent()
         if c then return { c.r, c.g, c.b } end
     end
     local a = YippRouteDB.dmgSkinAccent
-    return type(a) == "table" and { a[1], a[2], a[3] } or { DEFAULT_ACCENT[1], DEFAULT_ACCENT[2], DEFAULT_ACCENT[3] }
+    return type(a) == "table" and { a[1], a[2], a[3] } or { ThemeAccent()[1], ThemeAccent()[2], ThemeAccent()[3] }
 end
 
 function YR.DamageSkinFrame()
     local f = YippRouteDB.dmgSkinFrame
-    f = type(f) == "table" and f or DEFAULT_FRAME
+    f = type(f) == "table" and f or ThemeFrame()
     return { f[1], f[2], f[3], f[4] or 1 }
 end
 

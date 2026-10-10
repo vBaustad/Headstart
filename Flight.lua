@@ -137,11 +137,17 @@ local function StopAtNext()
 end
 
 local function Build()
+    -- the bar in the accent of Headstart's windows (Style.lua), darker at its start
+    local accent = YR.Style and YR.Style.C and YR.Style.C.accent
+    if accent then
+        BLUE[1], BLUE[2], BLUE[3] = accent[1], accent[2], accent[3]
+        BLUE_DIM[1], BLUE_DIM[2], BLUE_DIM[3] = accent[1] * 0.5, accent[2] * 0.5, accent[3] * 0.5
+    end
     local S = YR.Style
     frame = CreateFrame("Frame", "HeadstartFlightFrame", UIParent)
     frame:SetSize(W, H)
     frame:SetFrameStrata("MEDIUM")
-    S.Fill(frame, { 0.055, 0.065, 0.085, 0.92 })
+    S.Fill(frame, { S.C.side[1], S.C.side[2], S.C.side[3], 0.92 })
     S.Border(frame, S.C.lineHi)
     frame.len = W - 2 * PAD
     -- top row: from > to, and the time

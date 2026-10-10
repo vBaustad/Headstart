@@ -62,25 +62,29 @@ local function Features()
         F("levelShot", "a screenshot at every ding", "acts", 2, Key("levelShot")),
         F("setupOn", "Character setup", "setup", 1, function() return YR.SetupOn() end, function(on) YR.SetSetupOn(on) end),
     }
+    -- a feature that is shelved isn't asked about (QuestLFG.lua)
+    for i = #FEATURES, 1, -1 do
+        if FEATURES[i].key == "questLFG" and not YR.QuestLFGAvailable then table.remove(FEATURES, i) end
+    end
     return FEATURES
 end
 
 -- The questions, in the order asked. An answer is a number: 0 the first choice (nothing of it), up.
 local QUESTIONS = {
-    { key = "routes", title = "Routes of your own", icon = "Interface\\Icons\\INV_Misc_Map_01", choices = {
-        { "Off", "No run log, no level splits." },
-        { "On", "Your runs recorded as you level and saved as routes of your own, played back in RestedXP. Reloads." } } },
-    { key = "screen", title = "On your screen", icon = 236562, choices = {
-        { "Nothing", "No bar, button or panel of ours." },
-        { "Essentials", "XP bar, flight timer, camp icon, loot feed, chat log, death recap, instance tracker, gear tips, your alts' bags and gold." },
-        { "Everything", "Also the swing timer, trinket buttons, Invite and Leave buttons, the quest group finder." } } },
-    { key = "acts", title = "Does things for you", icon = 133784, choices = {
-        { "Nothing", "Headstart never acts for you." },
-        { "For friends", "Accepts invites and shared quests from friends and guildies, invites them on \"inv\". No gold, no items." },
-        { "Everything", "Also restock and training (spend gold), banking (moves items), a screenshot at every ding." } } },
+    { key = "routes", title = "Your own routes", icon = "Interface\\Icons\\INV_Misc_Map_01", choices = {
+        { "Off", "No run recording and no level splits." },
+        { "On", "Records your runs and saves them as your own routes for RestedXP. Takes a reload." } } },
+    { key = "screen", title = "On screen", icon = 236562, choices = {
+        { "Nothing", "No bars, buttons or panels from Headstart." },
+        { "Essentials", "XP bar, flight timer, camp icon, loot feed, chat log, death recap, instance tracker, upgrade alerts, and your other characters' bags and gold." },
+        { "Everything", "Adds the swing timer, trinket buttons, and Invite and Leave buttons." } } },
+    { key = "acts", title = "Automation", icon = 133784, choices = {
+        { "Nothing", "Headstart never acts on your behalf." },
+        { "Friends only", "Accepts invites and shared quests from friends and guild members, and invites them when they whisper \"inv\". Never spends gold or moves items." },
+        { "Everything", "Adds restock and auto-train (spend gold), bank deposit (moves items), and a screenshot on level-up." } } },
     { key = "setup", title = "New characters", icon = 134166, choices = {
-        { "Off", "Nothing is put on your bars." },
-        { "On", "The bar planner, and a main's bars, macros and interface put on an alt." } } },
+        { "Off", "Nothing is placed on your bars." },
+        { "On", "Bar profiles and the planner, and your bars, macros and interface applied to new characters." } } },
 }
 function YR.WelcomeQuestions() return QUESTIONS end
 
@@ -234,7 +238,7 @@ local function Paint()
         for i, card in ipairs(block.cards) do
             Lit(card, answers[block.q.key] == i - 1)
             local skipped = Skipped(block.q.key, i - 1)
-            card.blurb:SetText(skipped and (block.q.choices[i][2] .. " |cff7f8794Not " .. skipped .. ".|r") or block.q.choices[i][2])
+            card.blurb:SetText(skipped and (block.q.choices[i][2] .. " |cff8a827aNot " .. skipped .. ".|r") or block.q.choices[i][2])
         end
     end
     for name, pill in pairs(win.quick) do Lit(pill, IsQuick(name)) end
@@ -254,7 +258,7 @@ local function Build()
     local S = YR.Style
     local H = 48 + 62 + #QUESTIONS * BLOCK_H + 58
     win = S.Window("HeadstartWelcomeWindow", W, H, "Welcome to Headstart")
-    win.subtitle:SetText("pick what you want of it - change it any time in /hs")
+    win.subtitle:SetText("Choose what to turn on. You can change it any time with /hs.")
 
     -- the quick picks: all four answered at once
     win.quick = {}
@@ -272,7 +276,7 @@ local function Build()
     end
     local quick = S.Text(win, 15)
     quick:SetPoint("TOPLEFT", 20, -72)
-    quick:SetText("All at once")
+    quick:SetText("Quick pick")
 
     win.blocks = {}
     for n, q in ipairs(QUESTIONS) do

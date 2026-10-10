@@ -24,12 +24,26 @@
 local ADDON, YR = ...
 
 local MAIN, OFF, RANGED = 0, 1, 2
-local DEFAULT = {
-    on = false, hideBlizz = true, w = 260, h = 20, gap = 3, lock = true, texture = "smooth", font = 12,
-    show = "combat", name = true, time = true, speed = true, icon = false, spark = true, range = true, outline = true,
-    mainColor = { 0.20, 0.45, 1.00, 1 }, offColor = { 0.15, 0.75, 0.95, 1 }, rangedColor = { 0.95, 0.65, 0.15, 1 },
-    farColor = { 0.85, 0.20, 0.20, 1 }, bgAlpha = 0.65, style = "blizzard", border = false, colors = true,
+-- The look a new install gets is Slim: low flat bars close together, a nearly black back, each hand in a
+-- quiet colour of its own with a brighter line at the front of the fill, and the hand's name in small
+-- letters. Classic is the look Headstart had before (taller, shaded, blue). YR.SwingPreset puts either on.
+local PRESETS = {
+    slim = { w = 230, h = 14, gap = 1, texture = "flat", font = 11, name = true, time = false, speed = false, icon = false,
+        spark = true, outline = true, bgAlpha = 0.85, border = false, colors = true,
+        mainColor = { 0.72, 0.24, 0.24, 1 }, offColor = { 0.80, 0.52, 0.20, 1 }, rangedColor = { 0.38, 0.66, 0.24, 1 },
+        farColor = { 0.42, 0.42, 0.42, 1 } },
+    classic = { w = 260, h = 20, gap = 3, texture = "smooth", font = 12, name = true, time = true, speed = true, icon = false,
+        spark = false, outline = true, bgAlpha = 0.65, border = false, colors = true,
+        mainColor = { 0.20, 0.45, 1.00, 1 }, offColor = { 0.15, 0.75, 0.95, 1 }, rangedColor = { 0.95, 0.65, 0.15, 1 },
+        farColor = { 0.85, 0.20, 0.20, 1 } },
 }
+YR.SWING_PRESETS = PRESETS
+-- place: where Headstart's own bars stand. "edit": exactly over Blizzard's swing bars, so Edit Mode is
+-- the one place both kinds are moved and sized, and changing between the two looks moves nothing.
+-- "own": where you drag them, at the size set here (what it was before; kept for whoever had moved them).
+local DEFAULT = { on = false, hideBlizz = true, lock = true, show = "combat", range = true, style = "blizzard",
+    border = false, colors = true, place = "edit" }
+for k, v in pairs(PRESETS.slim) do DEFAULT[k] = v end
 YR.SWING_DEFAULT = DEFAULT
 local TEXTURES = {
     flat = "Interface\\Buttons\\WHITE8X8",
@@ -48,11 +62,18 @@ function YR.SwingDB()
     local db = YippRouteDB.swing
     if db and filled == db then return db end
     if not db then db = {} YippRouteDB.swing = db end
+    -- bars you had dragged somewhere stay there: only settings from before "place" that never moved them follow Edit Mode
+    if db.place == nil and db.pos then db.place = "own" end
     for k, v in pairs(DEFAULT) do
         if db[k] == nil then db[k] = type(v) == "table" and { unpack(v) } or v end
     end
     -- the weapon icon began switched on, and wasn't liked: off, once, for settings from before
     if (db.look or 1) < 2 then db.icon, db.look = false, 2 end
+    -- One kind of bar (2026-10-09): Blizzard's own, restyled. Edit Mode already gives them a size, a
+    -- place, a title, the time and when they show, and they are timed by the game itself - bars of
+    -- ours beside them were a second set of every setting. The settings page no longer offers ours;
+    -- whoever had them is moved over once. (The code for them is still below, unused by the page.)
+    if db.look < 3 then db.style, db.look = "blizzard", 3 end
     filled = db
     return db
 end
@@ -107,9 +128,11 @@ local function Speed(kind)
 end
 
 -- Is there a bar for this hand now?
+local preview = false           -- sample swings on every bar, kept going while you change the look (YR.SwingPreview)
 local function Wanted(hand, db, now)
     local s = swings[hand.type]
     local running = s and now - s.start < s.length
+    if preview then return true end
     if not db.lock then return true end
     if db.show == "swing" then return running or false end
     if db.show == "combat" and not inCombat then return false end
@@ -118,9 +141,14 @@ local function Wanted(hand, db, now)
     return running or hunter
 end
 
+-- The fill, and the line at its front: the fill's own colour, lighter - it reads as the edge of the bar
+-- rather than as a mark laid over it.
 local function Colour(bar, db)
     local c = (db.range and far[bar.hand.type]) and db.farColor or db[bar.hand.color]
     bar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
+    if bar.spark then
+        bar.spark:SetColorTexture(c[1] + (1 - c[1]) * 0.55, c[2] + (1 - c[2]) * 0.55, c[3] + (1 - c[3]) * 0.55, 1)
+    end
 end
 
 -- One bar's fill, front line and time, for now. Returns true while its swing is still on its way.
@@ -190,8 +218,15 @@ function YR.SwingLayout()
             bar:SetShown(bar.want)
             if bar.want then
                 bar:ClearAllPoints()
-                bar:SetPoint("TOPLEFT", holder, "TOPLEFT", db.icon and db.h + 2 or 0, -n * (db.h + db.gap))
-                bar:SetPoint("RIGHT", holder, "RIGHT")
+                -- over Blizzard's bar for that hand, where it has a place; else stacked in our own holder
+                local theirs = db.place == "edit" and _G[BLIZZARD[hand.type + 1]]
+                local sb = type(theirs) == "table" and theirs.StatusBar
+                if type(sb) == "table" and sb.GetLeft and sb:GetLeft() then
+                    bar:SetAllPoints(sb)
+                else
+                    bar:SetPoint("TOPLEFT", holder, "TOPLEFT", db.icon and db.h + 2 or 0, -n * (db.h + db.gap))
+                    bar:SetPoint("RIGHT", holder, "RIGHT")
+                end
                 Colour(bar, db)
                 n = n + 1
             end
@@ -261,7 +296,8 @@ local function Build()
     holder.edge = holder:CreateTexture(nil, "BACKGROUND")
     holder.edge:SetPoint("TOPLEFT", -3, 3)
     holder.edge:SetPoint("BOTTOMRIGHT", 3, -3)
-    holder.edge:SetColorTexture(0.40, 0.66, 1.00, 0.25)
+    local accent = YR.Style and YR.Style.C and YR.Style.C.accent or { 1.00, 0.56, 0.20 }
+    holder.edge:SetColorTexture(accent[1], accent[2], accent[3], 0.25)
     for _, hand in ipairs(HANDS) do
         local bar = CreateFrame("StatusBar", nil, holder)
         bar.hand = hand
@@ -283,6 +319,18 @@ local function Build()
         bars[hand.type] = bar
     end
     Look()
+end
+
+--- Put a ready look on ("slim" or "classic"): the sizes, texture, text and colours, and nothing else -
+--- where the bars are, whether they are on and which kind they are stay as you have them.
+function YR.SwingPreset(name)
+    local p = PRESETS[name]
+    if not p then return false end
+    local db = YR.SwingDB()
+    for k, v in pairs(p) do db[k] = type(v) == "table" and { unpack(v) } or v end
+    db.preset = name
+    YR.SwingApply()
+    return true
 end
 
 -- Blizzard's own bars: see-through while ours show, as they were otherwise.
@@ -330,6 +378,10 @@ local function Tint(f, k)
     k.painting = true
     f.StatusBar:SetStatusBarColor(c[1], c[2], c[3], c[4] or 1)
     k.painting = false
+    -- the line at the front of the fill: the fill's own colour, lighter
+    if k.spark then
+        k.spark:SetColorTexture(c[1] + (1 - c[1]) * 0.55, c[2] + (1 - c[2]) * 0.55, c[3] + (1 - c[3]) * 0.55, 1)
+    end
 end
 
 function DressTint(kind)
@@ -383,6 +435,10 @@ function Dress()
                 k.icon = f:CreateTexture(nil, "ARTWORK")
                 k.icon:SetPoint("RIGHT", sb, "LEFT", -3, 0)
                 k.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                -- a bright line at the front of the fill. It hangs on the end of the fill's own texture, so
+                -- where it is never has to be worked out from the swing's value (the game may keep that secret)
+                k.spark = f:CreateTexture(nil, "OVERLAY")
+                k.spark:SetWidth(2)
                 k.length = sb:CreateFontString(nil, "OVERLAY")
                 if k.labels[1] then k.length:SetPoint("LEFT", k.labels[1], "RIGHT", 6, 0)
                 else k.length:SetPoint("CENTER") end
@@ -402,6 +458,13 @@ function Dress()
                 if k.bg then f.Background:SetAlpha(0) end
                 k.fill:SetColorTexture(0, 0, 0, db.bgAlpha)
                 k.fill:Show()
+                local front = sb:GetStatusBarTexture()
+                k.spark:ClearAllPoints()
+                if type(front) == "table" and front.GetObjectType then
+                    k.spark:SetPoint("TOP", front, "TOPRIGHT")
+                    k.spark:SetPoint("BOTTOM", front, "BOTTOMRIGHT")
+                end
+                k.spark:SetShown(db.spark and type(front) == "table" and front.GetObjectType ~= nil)
                 ShowLines(k.lines, db.outline)
                 for _, label in ipairs(k.labels) do label:SetFont(YR.Style.FONT, db.font, "OUTLINE") end
                 k.length:SetFont(YR.Style.FONT, math.max(8, db.font - 1), "OUTLINE")
@@ -422,6 +485,7 @@ function Dress()
                 end
                 k.icon:Hide()
                 k.length:Hide()
+                k.spark:Hide()
                 k.fill:Hide()
                 ShowLines(k.lines, false)
             end
@@ -429,10 +493,10 @@ function Dress()
     end
 end
 
--- The game tells us when the target goes in and out of reach, for the hands we ask about. Asked for
--- once, and never taken back: the switch is the game's one switch for that hand, and Blizzard's own
--- swing bars read the same one - turning it off for us would turn their colour off too.
-local asked = {}
+-- The game tells us when the target goes in and out of reach, for the hands we ask about. Never taken
+-- back: the switch is the game's one switch for that hand, and Blizzard's own swing bars read the
+-- same one - turning it off for us would turn their colour off too. Asked again as a fight begins and
+-- as the target changes: it is one switch, and Blizzard's bars may have turned it off since.
 local function RangeChecks()
     local on = YR.SwingOn() and YR.SwingDB().range
     if not on then
@@ -441,12 +505,7 @@ local function RangeChecks()
     end
     local swing = _G.C_SwingTimer
     if type(swing) ~= "table" or type(swing.EnableRangeCheck) ~= "function" then return end
-    for _, hand in ipairs(HANDS) do
-        if not asked[hand.type] then
-            asked[hand.type] = true
-            pcall(swing.EnableRangeCheck, hand.type, true)
-        end
-    end
+    for _, hand in ipairs(HANDS) do pcall(swing.EnableRangeCheck, hand.type, true) end
 end
 
 -- Built, sized, placed and shown as it is now - or, with the timer off, everything put back.
@@ -464,6 +523,7 @@ local part, frame
 --- After a setting changed (or the main switch). Turned on or off: every part is looked at, and
 --- coming on or going off does the rest. Still on: as it is now. Still off: nothing to do, and the
 --- settings of a timer that is off aren't read (reading fills them in).
+local PreviewShow
 function YR.SwingApply()
     local on = part and part.on or false
     if on ~= YR.SwingOn() then
@@ -471,6 +531,7 @@ function YR.SwingApply()
     elseif on then
         Apply()
     end
+    if preview then PreviewShow() end           -- the look changed under the preview: drawn again as it is now
 end
 
 function YR.SwingResetPosition()
@@ -542,10 +603,13 @@ local function DressTest()
         bar:Show()
     end
     sampler:Show()
-    local start = GetTime()
+    -- (a preview that is kept up runs on from where it was when the look is changed under it)
+    local start = (preview and sampler.start) or GetTime()
+    sampler.start = start
     sampler:SetScript("OnUpdate", function(self)
         local elapsed = GetTime() - start
-        if elapsed > 4 or InCombatLockdown() then
+        if (not preview and elapsed > 4) or InCombatLockdown() then
+            preview = false
             self:SetScript("OnUpdate", nil)
             self:Hide()                 -- our own frame: allowed at any time
             return
@@ -578,6 +642,66 @@ function YR.SwingTest()
     return true
 end
 
+-- ---------------------------------------------------------------------------
+-- Preview: sample swings on every bar, started and stopped by you, so the look can be changed while
+-- you watch it. On Headstart's own bars each sample swing is begun again as it runs out; on Blizzard's
+-- dressed bars the sample bars over them keep going. It stops when you stop it, when the settings
+-- window closes, and when a fight begins.
+-- ---------------------------------------------------------------------------
+local previewer
+local function PreviewSwings(now)
+    local began = false
+    for i, hand in ipairs(HANDS) do
+        local s = swings[hand.type]
+        if not s or now - s.start >= s.length then
+            swings[hand.type] = { start = now, length = 1.6 + i * 0.6, sample = true }
+            began = true
+        end
+    end
+    return began
+end
+function PreviewShow()
+    if Dressed() then
+        if previewer then previewer:SetScript("OnUpdate", nil) end
+        return DressTest()
+    end
+    if sampler then sampler:SetScript("OnUpdate", nil) sampler:Hide() end
+    if not Own() then return false, "turn the swing timer on first." end
+    Build()
+    previewer = previewer or CreateFrame("Frame")
+    previewer:SetScript("OnUpdate", function(self)
+        if not preview or InCombatLockdown() then
+            self:SetScript("OnUpdate", nil)
+            return
+        end
+        if PreviewSwings(GetTime()) then YR.SwingLayout() end
+    end)
+    PreviewSwings(GetTime())
+    laid = nil
+    YR.SwingLayout()
+    return true
+end
+function YR.SwingPreviewing() return preview end
+--- Start or stop the preview. Returns whether it is running, and why not when it couldn't start.
+function YR.SwingPreview(on)
+    if on then
+        if InCombatLockdown() then return false, "not in combat." end
+        if not YR.SwingOn() then return false, "turn the swing timer on first." end
+        preview = true
+        local ok, why = PreviewShow()
+        if not ok then preview = false end
+        return preview, why
+    end
+    preview = false
+    if previewer then previewer:SetScript("OnUpdate", nil) end
+    if sampler then sampler:SetScript("OnUpdate", nil) sampler:Hide() sampler.start = nil end
+    for _, hand in ipairs(HANDS) do
+        if swings[hand.type] and swings[hand.type].sample then swings[hand.type] = nil end
+    end
+    if holder then laid = nil YR.SwingLayout() end
+    return false
+end
+
 local function OnEvent(_, event, a, b, c)
     if event == "PLAYER_SWING" then
         if holder and Own() then
@@ -587,6 +711,7 @@ local function OnEvent(_, event, a, b, c)
         end
     elseif event == "PLAYER_SWING_RANGE_UPDATE" then
         if not YR.SwingOn() or type(a) ~= "number" or issecretvalue(a) or a < MAIN or a > RANGED then return end
+        if issecretvalue(b) or issecretvalue(c) then return end
         local out = c == true and b == false
         if far[a] ~= out then
             far[a] = out
@@ -598,7 +723,11 @@ local function OnEvent(_, event, a, b, c)
         end
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         inCombat = event == "PLAYER_REGEN_DISABLED"
+        if inCombat then RangeChecks() end
+        if inCombat and preview then YR.SwingPreview(false) end
         YR.SwingLayout()
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        RangeChecks()
     elseif event == "PLAYER_EQUIPMENT_CHANGED" then
         if holder then Icons() YR.SwingLayout() end
         if Dressed() then Dress() end
@@ -656,7 +785,7 @@ local function End()
 end
 
 local EVENTS = { "PLAYER_SWING", "PLAYER_SWING_RANGE_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_DISABLED",
-    "PLAYER_REGEN_ENABLED", "PLAYER_EQUIPMENT_CHANGED", "EDIT_MODE_LAYOUTS_UPDATED" }
+    "PLAYER_REGEN_ENABLED", "PLAYER_EQUIPMENT_CHANGED", "EDIT_MODE_LAYOUTS_UPDATED", "PLAYER_TARGET_CHANGED" }
 
 function YR.StartSwing()
     if part then return end

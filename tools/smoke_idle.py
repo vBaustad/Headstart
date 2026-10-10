@@ -39,6 +39,9 @@ HOT = {
 #           instance tracker, one-line reminders, tooltips) and nothing else.
 BUDGET = {
     "off": {"hot": 0, "events": 1, "tickers": 0, "onupdate": 0, "frames": 1, "hooks": 0, "kb": 0},
+    # frames stays 15. It went to 16 on 2026-10-09 for a child frame that gave the camp icon a
+    # smaller mouse area; SetHitRectInsets does the same without being a frame, so the raise was
+    # undone the same day rather than kept. Budgets only go down.
     "new": {"hot": 6, "events": 33, "tickers": 0, "onupdate": 0, "frames": 15, "hooks": 2, "kb": 2},
 }
 OFF = "{ qolOff = true, routes = false, setupOn = false, quiet = 2, minimapButton = false, logging = false, showSplits = false }"

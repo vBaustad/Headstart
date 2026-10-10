@@ -58,7 +58,7 @@ local opened = {}                  -- the bars as they were when the planner ope
 local slots, overlays, rows = {}, {}, {}
 local filter = ""
 local mode = "bars"                -- "bars" | "grid"
-local listKind = "spells"          -- "spells" | "professions" | "macros"
+local listKind = "spells"          -- "spells" | "professions" | "macros" | "items"
 local formBar = 0                  -- 0: bar 1 as normal; else the bonus bar of the form being planned
 local reopenMain = false
 
@@ -74,6 +74,29 @@ function YR.PlannerForms_()
     return (YR.PlannerForms or {})[Class()] or {}
 end
 
+--- The form (or stance) you are in now, as the bonus bar bar 1 then shows - if it is one the planner
+--- has a tab for; else 0, bar 1 as normal. A warrior is always in a stance: its bar 1 is never the
+--- "normal" one, and the planner opened on that showed buttons the warrior doesn't see.
+local function FormNow()
+    -- what the first button of bar 1 holds now is the answer itself: slots 73 and up are the bonus
+    -- bars, twelve each. (The game's own word for it is asked only where the button can't say.)
+    local now = 0
+    local first = _G.ActionButton1
+    local slot = type(first) == "table" and (tonumber(rawget(first, "action")) or (first.GetAttribute and tonumber(first:GetAttribute("action"))))
+    if slot and slot > 72 then
+        now = math.floor((slot - 73) / 12) + 1
+    elseif not slot then
+        local get = _G.GetBonusBarOffset
+        now = type(get) == "function" and get() or 0
+    end
+    for _, f in ipairs(YR.PlannerForms_()) do if f[2] == now then return now end end
+    -- a warrior has no bar outside a stance (Battle Stance from level 1, and no way to be in none):
+    -- where the stance can't be read, its first
+    if Class() == "WARRIOR" and YR.PlannerForms_()[1] then return YR.PlannerForms_()[1][2] end
+    return 0
+end
+YR.PlannerFormNow = FormNow
+
 --- The first slot of a bar, bar 1 following the form being planned.
 local function BarBase(bi)
     if bi == 1 and formBar > 0 then return 72 + (formBar - 1) * 12 + 1 end
@@ -83,7 +106,9 @@ end
 -- ---------------------------------------------------------------------------
 -- What can go on a bar
 -- ---------------------------------------------------------------------------
---- The spells to offer: { { name, level, icon, id, racial, general } } by level then name.
+--- The spells to offer: { { name, level, icon, id, racial, general } } in the order you learn them - your
+--- class's by level (a talent's spell at the level its row can be reached), then name - and your race's
+--- after them all: they aren't the class's, and few of them belong on a bar.
 function YR.PlannerList()
     local class, out = Class(), {}
     local data = (YR.PlannerSpells or {})[class] or {}
@@ -106,6 +131,7 @@ function YR.PlannerList()
         end
     end
     table.sort(out, function(a, b)
+        if (a.racial or false) ~= (b.racial or false) then return not a.racial end
         if a.level ~= b.level then return a.level < b.level end
         return a.name < b.name
     end)
@@ -128,7 +154,7 @@ function YR.PlannerMacros()
     local account, perChar = GetNumMacros()
     local ACCOUNT = MAX_ACCOUNT_MACROS or 120
     local function Add(i, isAccount)
-        local name, icon, body = GetMacroInfo(i)
+        local name, icon, body = (YS.MacroInfo or GetMacroInfo)(i)
         if name then out[#out + 1] = { name = name, icon = icon, body = body, account = isAccount, macro = true } end
     end
     for i = 1, account or 0 do Add(i, true) end
@@ -136,18 +162,79 @@ function YR.PlannerMacros()
     return out
 end
 
+--- The items in your bags that can be used (a hearthstone, a potion, a bandage, a trinket you click):
+--- { { name, id, icon, item = true } }, by name. One line for an item, however many stacks of it.
+function YR.PlannerItems()
+    local out, seen = {}, {}
+    if not (C_Container and C_Container.GetContainerNumSlots and C_Item) then return out end
+    for bag = 0, 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
+            local id = C_Container.GetContainerItemID(bag, slot)
+            if id and not seen[id] and C_Item.GetItemSpell and C_Item.GetItemSpell(id) then
+                seen[id] = true
+                local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)
+                if name then
+                    out[#out + 1] = { name = name, id = id, item = true,
+                        icon = C_Item.GetItemIconByID and C_Item.GetItemIconByID(id) or 134400 }
+                end
+            end
+        end
+    end
+    table.sort(out, function(a, b) return a.name < b.name end)
+    return out
+end
+
+--- The spell or item a macro shows, as the game picks it for a macro with the question-mark icon: what
+--- "#showtooltip" names, or without a name what its first /cast or /use line casts (conditions and a
+--- leading "!" aside, the first of several choices).
+function YR.PlannerMacroShows(body)
+    body = tostring(body or "")
+    local named = body:match("#showtooltip[ \t]+([^\r\n]+)") or body:match("#show[ \t]+([^\r\n]+)")
+    local what = named
+    if not what then
+        for line in body:gmatch("[^\r\n]+") do
+            what = line:match("^/cast%s+(.+)") or line:match("^/use%s+(.+)") or line:match("^/castsequence%s+(.+)")
+            if what then break end
+        end
+    end
+    if not what then return nil end
+    what = what:gsub("%b[]", ""):gsub("reset=%S+", ""):match("^%s*([^;,]+)")
+    what = what and strtrim(what):gsub("^!", "")
+    return what ~= "" and what or nil
+end
+
+local IconOf
+local function MacroIcon(e)
+    if e.icon and e.icon ~= 134400 then return e.icon end
+    local what = YR.PlannerMacroShows(e.body)
+    if what then
+        local icon = IconOf({ kind = "spell", name = what })
+        if icon and icon ~= 134400 then return icon end
+        icon = C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(what)
+        if icon then return icon end
+    end
+    return 134400
+end
+
 --- The icon for anything a layout can hold.
-local function IconOf(e)
+function IconOf(e)
     if not e then return nil end
     if e.kind == "spell" then
         if e.prof and e.icon then return e.icon end
         local class = Class()
         local d = ((YR.PlannerSpells or {})[class] or {})[e.name] or ((YR.PlannerGeneral or {})[class] or {})[e.name]
             or (YR.PlannerRacials or {})[e.name]
+        -- Attack and the weapon spells: the game draws them with your weapon's icon, and the data has
+        -- only a stand-in for them - asked of the game, so the button looks as it does on your bar
+        local general = ((YR.PlannerGeneral or {})[class] or {})[e.name]
+        if general and not ((YR.PlannerSpells or {})[class] or {})[e.name] then
+            local live = C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(general[1])
+            if live then return live end
+        end
         if d then return d[2] end
         return e.icon or (C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(e.id or e.name)) or 134400
     elseif e.kind == "macro" then
-        return e.icon or 134400
+        return MacroIcon(e)
     elseif e.kind == "item" then
         return (C_Item.GetItemIconByID and C_Item.GetItemIconByID(e.id)) or 134400
     elseif e.kind == "other" then
@@ -159,6 +246,7 @@ end
 --- What a list line puts on a bar: the same shape a copied main's button has. A profession spell keeps
 --- its ID and icon, which is how Set up layout finds the right one of several same-named spells.
 local function Entry(s)
+    if s.item then return { kind = "item", id = s.id, name = s.name } end
     if s.macro then return { kind = "macro", name = s.name, icon = s.icon, body = s.body } end
     if s.prof then return { kind = "spell", name = s.name, prof = true, id = s.id, icon = s.icon } end
     return { kind = "spell", name = s.name, level = s.level, racial = s.racial or nil, general = s.general or nil }
@@ -225,19 +313,46 @@ end
 -- ---------------------------------------------------------------------------
 local Paint
 
+-- While you carry something, a click anywhere that isn't a button of ours puts it down: over your own
+-- bars the planner's window isn't under the mouse, so there was nothing to click it away on. An unseen
+-- frame over the whole screen, under everything else of the interface, there only while you carry.
+local catcher
+
 local function Drop()
     carry = nil
     if cursor then cursor:Hide() end
+    if catcher then catcher:Hide() end
 end
 
 local function Carry(e)
     carry = e
+    if not catcher then
+        catcher = CreateFrame("Button", nil, UIParent)
+        catcher:SetAllPoints(UIParent)
+        catcher:SetFrameStrata("BACKGROUND")
+        catcher:SetFrameLevel(0)
+        catcher:RegisterForClicks("AnyUp")
+        catcher:SetScript("OnClick", function() Drop() end)
+    end
+    catcher:Show()
     if not cursor then
         cursor = CreateFrame("Frame", nil, UIParent)
         cursor:SetSize(SLOT, SLOT)
         cursor:SetFrameStrata("TOOLTIP")
         cursor.icon = cursor:CreateTexture(nil, "OVERLAY")
         cursor.icon:SetAllPoints()
+        -- Esc puts down what you carry (and only then, on the next press, closes the planner). Every
+        -- other key goes on to the game as if this frame weren't there.
+        if cursor.SetPropagateKeyboardInput and not InCombatLockdown() then
+            cursor:EnableKeyboard(true)
+            cursor:SetPropagateKeyboardInput(true)
+            cursor:SetScript("OnKeyDown", function(self, key)
+                if InCombatLockdown() then return end
+                local esc = key == "ESCAPE"
+                self:SetPropagateKeyboardInput(not esc)
+                if esc then Drop() end
+            end)
+        end
         cursor:SetScript("OnUpdate", function(self)
             local x, y = GetCursorPosition()
             local scale = UIParent:GetEffectiveScale()
@@ -253,6 +368,27 @@ local function SlotUnderMouse()
     for _, b in ipairs(slots) do
         if b:IsVisible() and b:IsMouseOver() then return b end
     end
+end
+
+--- What the game's own cursor holds (an item dragged from your bags, a macro from the macro window, a
+--- spell from the spellbook) as something a button can hold, taken off that cursor - or nil.
+local function FromGameCursor()
+    if not GetCursorInfo then return nil end
+    local kind, a, _, spell = GetCursorInfo()
+    local e
+    if kind == "item" and a then
+        e = { kind = "item", id = a, name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(a) or ("item " .. a) }
+    elseif kind == "macro" and a then
+        local name, icon, body = (YS.MacroInfo or GetMacroInfo)(a)
+        if name then e = { kind = "macro", name = name, icon = icon, body = body } end
+    elseif kind == "spell" and spell then
+        local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(spell)
+        for _, s in ipairs(name and YR.PlannerList() or {}) do
+            if s.name == name then e = Entry(s) break end
+        end
+    end
+    if e and ClearCursor then ClearCursor() end
+    return e
 end
 
 --- Put what you carry on this button. What was there comes along on the cursor, so two buttons swap
@@ -325,7 +461,7 @@ local function Tooltip(self)
     end
     if r then
         GameTooltip:AddLine(("Kept at rank %d (learned at level %d): newer ranks don't replace it"):format(r.rank, r.level),
-            0.4, 0.66, 1, true)
+            S.C.accent[1], S.C.accent[2], S.C.accent[3], true)
     elseif e.prof then
         GameTooltip:AddLine("Goes on the bar once you've learned it", 0.6, 0.6, 0.6)
     elseif e.kind == "spell" and e.level and not e.racial and not e.general then
@@ -360,6 +496,13 @@ local function MakeSlot(parent, bi, i)
     b.key:SetJustifyH("RIGHT")
     b.key:SetWordWrap(false)
     b.key:SetTextColor(0.9, 0.9, 0.9)
+    -- A macro's name along the bottom, as the game writes it on a real button: a macro and the spell it
+    -- casts have the same icon, and this is what tells them apart.
+    b.name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline")
+    b.name:SetPoint("BOTTOMLEFT", 1, 2)
+    b.name:SetPoint("BOTTOMRIGHT", -1, 2)
+    b.name:SetJustifyH("CENTER")
+    b.name:SetWordWrap(false)
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:RegisterForDrag("LeftButton")
     b:EnableMouseWheel(true)
@@ -372,7 +515,13 @@ local function MakeSlot(parent, bi, i)
             Tooltip(self)
         end
     end)
+    b:SetScript("OnReceiveDrag", function(self)
+        local e = FromGameCursor()
+        if e then Carry(e) PlaceIn(self) end
+    end)
     b:SetScript("OnClick", function(self, button)
+        local dragged = button == "LeftButton" and FromGameCursor()
+        if dragged then Carry(dragged) PlaceIn(self) return end
         if button == "LeftButton" and IsShiftKeyDown() and not carry and plan[self.slot] then
             YR.PlannerRankMenu(self)
             return
@@ -521,10 +670,13 @@ end
 
 
 local function Tag(s)
+    if s.item then return "in your bags" end
     if s.macro then return s.account and "account" or "character" end
     if s.prof then return s.profession end
     if s.racial then return "racial" end
     if s.general then return "general" end
+    -- a talent's spell: the earliest level its row in the tree can be reached
+    if YS.IsTalent and YS.IsTalent(s.name) then return "talent, " .. s.level .. "+" end
     return "level " .. s.level
 end
 
@@ -532,7 +684,7 @@ end
 local lists = {}
 local function ListOf(kind)
     if not lists[kind] then
-        lists[kind] = kind == "macros" and YR.PlannerMacros()
+        lists[kind] = kind == "macros" and YR.PlannerMacros() or kind == "items" and YR.PlannerItems()
             or kind == "professions" and YR.PlannerProfessionList() or YR.PlannerList()
     end
     return lists[kind]
@@ -547,7 +699,7 @@ local function PaintList()
             shown = shown + 1
             local r = ListRow(shown)
             r.spell = s
-            r.icon:SetTexture(s.icon)
+            r.icon:SetTexture(s.macro and IconOf({ kind = "macro", icon = s.icon, body = s.body }) or s.icon)
             r.name:SetText(s.name)
             r.name:SetTextColor(unpack(placed[(s.macro and "macro" or "spell") .. ":" .. s.name] and S.C.muted or S.C.text))
             r.lvl:SetText(Tag(s))
@@ -556,8 +708,19 @@ local function PaintList()
     end
     for i = shown + 1, #rows do rows[i]:Hide() end
     win.list.content:SetHeight(math.max(10, shown * LIST_ROW))
+    -- a list of another length: the scroll frame is told, and a place further down than this list
+    -- goes is brought back in (a short list after a long one showed nothing until you scrolled)
+    local list = win.list
+    if list.UpdateScrollChildRect then list:UpdateScrollChildRect() end
+    local range = list.GetVerticalScrollRange and list:GetVerticalScrollRange() or 0
+    if list.GetVerticalScroll and list.SetVerticalScroll and (list:GetVerticalScroll() or 0) > range then
+        list:SetVerticalScroll(math.max(0, range))
+    end
+    if list.UpdateBar then list:UpdateBar() end
     win.newMacro:SetShown(listKind == "macros")
-    win.empty:SetText(shown == 0 and (listKind == "macros" and "No macros yet: make one with the button below."
+    win.helpMacro:SetShown(listKind == "macros")
+    win.empty:SetText(shown == 0 and (listKind == "macros" and "No macros yet. Create one with the button below."
+        or listKind == "items" and "No usable items in your bags."
         or "Nothing matches.") or "")
 end
 
@@ -571,9 +734,11 @@ function Paint()
             b.icon:Show()
             local r = RankOf(e)
             b.rank:SetText(r and ("R" .. r.rank) or "")
+            b.name:SetText(e.kind == "macro" and e.name or "")
         else
             b.icon:Hide()
             b.rank:SetText("")
+            b.name:SetText("")
         end
     end
     PaintList()
@@ -594,7 +759,7 @@ function Paint()
     if mode == "bars" then
         local shownBars, hidden = YR.PlannerBarsShown(), {}
         for i = 1, #BARS do if not shownBars[i] then hidden[#hidden + 1] = i end end
-        win.offscreen:SetText(#hidden > 0 and ("Bars %s aren't on screen: switch them on in the game's settings or Edit Mode, or plan them in the grid.")
+        win.offscreen:SetText(#hidden > 0 and ("Bars %s are not shown. Turn them on in the game's settings or Edit Mode, or plan them in the grid.")
             :format(table.concat(hidden, ", ")) or "")
     else
         win.offscreen:SetText("")
@@ -633,9 +798,11 @@ local function Save(thenApply)
     for slot, e in pairs(plan) do
         if e.kind ~= "other" then keep[slot], n = Copy(e), n + 1 end
     end
+    local was = YS:Profile()
     YS:SetProfile({
         from = YS.PlayerKey() .. " (plan)", class = Class(), maxLevel = 60, scanned = time(),
-        slots = keep, planned = true,        -- bars only: the interface is the account's (YS:SharedUI)
+        slots = keep, planned = true,
+        ownUI = was and was.ownUI or nil, ui = was and was.ui or nil,       -- a profile's own interface stays its own
     })
     YR.Print(("saved your %s plan: %d buttons. It's the %s layout now (Headstart, Character setup)."):format(
         Class():lower(), n, Class():lower()))
@@ -649,12 +816,18 @@ local function Save(thenApply)
         for slot = 1, 180 do
             if not Same(plan[slot], opened[slot]) then only[slot], n = true, n + 1 end
         end
-        if n > 0 then YS:Apply(nil, only) else YR.Print("the bars already are as planned.") end
+        if n > 0 then YS:Apply(nil, only) else YR.Print("your bars already match the plan.") end
+        -- and the question-mark macros your choices no longer ask for (you chose "Only spells" since)
+        -- come off: a button that is the same in the plan and on the bar isn't touched above
+        local gone = YS.TidyPlaceholders and YS.TidyPlaceholders() or 0
+        if gone > 0 then
+            YR.Print(("removed %d placeholder macro%s from your bars: your settings no longer use them."):format(gone, gone == 1 and "" or "s"))
+        end
     end
 end
 
 StaticPopupDialogs["HEADSTART_PLAN_OVERWRITE"] = {
-    text = "Headstart: replace the saved layout from %s with this plan?",
+    text = "Headstart: replace the profile saved from %s with this plan?",
     button1 = "Replace",
     button2 = "Cancel",
     OnAccept = function(_, data) Save(data) end,
@@ -668,7 +841,7 @@ StaticPopupDialogs["HEADSTART_PLAN_OVERWRITE"] = {
 local MANY = 6
 local AskSave
 StaticPopupDialogs["HEADSTART_PLAN_REMOVES"] = {
-    text = "Headstart: this plan takes %d buttons off your bars. Apply it?",
+    text = "Headstart: this plan removes %d buttons from your bars. Apply it?",
     button1 = "Apply",
     button2 = "Cancel",
     OnAccept = function() AskSave(true, true) end,
@@ -769,12 +942,16 @@ local function Build()
         reopenMain = false
     end)
     win:EnableMouse(true)
-    win:SetScript("OnMouseUp", function(_, button) if button == "RightButton" then Drop() end end)
+    -- a click on the window that isn't on a button puts down what you carry
+    win:SetScript("OnMouseUp", function() Drop() end)
     -- a fight: the overlays would sit on top of the buttons you need. New macros: the Macros tab.
     win:RegisterEvent("PLAYER_REGEN_DISABLED")
     win:RegisterEvent("UPDATE_MACROS")
+    win:RegisterEvent("UPDATE_BONUS_ACTIONBAR")          -- another stance or form: bar 1 shows another page
     win:SetScript("OnEvent", function(self, event)
         if event == "PLAYER_REGEN_DISABLED" then self:Hide()
+        elseif event == "UPDATE_BONUS_ACTIONBAR" then
+            if self:IsShown() and formBar ~= FormNow() then SetForm(FormNow()) end
         else lists.macros = nil if self:IsShown() then Paint() end end
     end)
 
@@ -802,7 +979,10 @@ local function Build()
         lab:SetPoint("TOPLEFT", 16, y - 6)
         lab:SetText("Bar 1:")
         local x = 58
-        local list = { { "Normal", 0 } }
+        -- "Normal" is bar 1 out of every form: a druid's caster bar, a rogue's out of stealth. A warrior
+        -- is never out of a stance, so it has no such bar and no such tab.
+        local list = {}
+        if Class() ~= "WARRIOR" then list[1] = { "Normal", 0 } end
         for _, f in ipairs(forms) do list[#list + 1] = { ShortForm(f[1]), f[2] } end
         for _, f in ipairs(list) do
             local t = Tab(win, f[1], x, y, function() SetForm(f[2]) end, 12)
@@ -816,8 +996,12 @@ local function Build()
     -- the list: spells, professions or macros
     win.kindTabs = {}
     local x = 12
-    for _, k in ipairs({ { "spells", "Spells" }, { "professions", "Professions" }, { "macros", "Macros" } }) do
-        local t = Tab(win, k[2], x, y, function() listKind = k[1] Paint() end)
+    for _, k in ipairs({ { "spells", "Spells" }, { "professions", "Professions" }, { "macros", "Macros" }, { "items", "Items" } }) do
+        local t = Tab(win, k[2], x, y, function()
+            listKind = k[1]
+            if win.list.SetVerticalScroll then win.list:SetVerticalScroll(0) end       -- another list: from its top
+            Paint()
+        end)
         win.kindTabs[k[1]] = t
         x = x + t:GetWidth() + 4
     end
@@ -834,7 +1018,11 @@ local function Build()
     win.empty:SetPoint("TOPLEFT", 6, -8)
     win.newMacro = S.Button(win, "New macro...", OpenMacros, nil, 130)
     win.newMacro:SetPoint("TOPLEFT", win.list, "BOTTOMLEFT", 0, -6)
-    win.newMacro.tip = "Open the macro window: a stealth or shapeshift macro you make shows up in this list"
+    win.newMacro.tip = "Opens the game's macro window. Macros you create there appear in this list"
+    win.helpMacro = S.Button(win, "Macro helper...", function() YR.MacroHelperToggle() end, nil, 130)
+    win.helpMacro:SetPoint("LEFT", win.newMacro, "RIGHT", 6, 0)
+    win.helpMacro.tip = "Your class's usual macros, made by ticking what the button should do: Stealth that never un-stealths,"
+        .. " a heal for whoever the mouse is over, Charge from any stance..."
 
     win.count = S.Text(win, 13, S.C.sub)
     win.count:SetPoint("TOPLEFT", win.list, "BOTTOMLEFT", 0, -42)
@@ -849,7 +1037,9 @@ local function Build()
     help:SetJustifyH("LEFT")
     help:SetWordWrap(true)
     help:SetText("Drag onto a button, or click and then a button. Drag a button to move it; drop it off the"
-        .. " bars to take it off. Right-click empties it. Mouse wheel or Shift-click: the rank.")
+        .. " bars to take it off. Right-click empties it. Mouse wheel or Shift-click: the rank."
+        .. " Esc or a click anywhere else puts down what you carry. Items: the Items tab, or drag"
+        .. " one from your bags.")
 
     -- the grid: all eight bars as rows, beside the list
     win.grid = CreateFrame("Frame", nil, win)
@@ -960,8 +1150,9 @@ function YR.OpenPlanner()
     if not win then Build() end
     Start()
     wipe(lists)      -- spells learned or macros made since the last open
-    win.subtitle:SetText("")
-    formBar = 0
+    -- which of the class's bar layouts is being planned, when it has more than one
+    win.subtitle:SetText(YS.LayoutNames and #YS.LayoutNames() > 1 and YS.LayoutName() or "")
+    formBar = FormNow()             -- bar 1 as it is on your screen now
     Reslot()
     local want = (YippSetupDB and YippSetupDB.plannerMode) or "bars"
     if want == "bars" and not next(YR.PlannerBarsShown()) then want = "grid" end

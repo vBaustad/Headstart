@@ -229,10 +229,11 @@ local function OnTooltip(tooltip, data)
 end
 
 -- The money in your bag, hovered: every character's gold.
-local function GoldTip(owner)
-    if not YR.AltsOn() or YippRouteDB.altsGold == false then return end
+-- more: a last grey line (the bag button says what a click does)
+local function GoldTip(owner, more)
+    if not YR.AltsOn() or (YippRouteDB.altsGold == false and not more) then return end
     local sum, list = YR.AltsGold()
-    if #list == 0 then return end
+    if #list == 0 and not more then return end
     GameTooltip:SetOwner(owner, "ANCHOR_TOPRIGHT")
     GameTooltip:AddLine("Your characters' gold")
     for _, c in ipairs(list) do
@@ -245,6 +246,7 @@ local function GoldTip(owner)
     else
         GameTooltip:AddLine("Your other characters are added as each of them logs in.", 0.5, 0.53, 0.58, true)
     end
+    if more then GameTooltip:AddLine(more, 0.6, 0.6, 0.6) end
     GameTooltip:Show()
 end
 local function GoldTipHide(self) if GameTooltip:GetOwner() == self then GameTooltip:Hide() end end
@@ -252,9 +254,9 @@ local function GoldTipHide(self) if GameTooltip:GetOwner() == self then GameTool
 --- /headstart gold: the same in chat.
 function YR.AltsGoldSay()
     local sum, list = YR.AltsGold()
-    if #list == 0 then YR.Print("no character noted yet: turn Characters on in Headstart, QoL, Bank & mail.") return end
+    if #list == 0 then YR.Print("no characters recorded yet. Turn on Characters in /hs.") return end
     for _, c in ipairs(list) do YR.Print(("  %s: %s"):format(Named(c.key), YR.AltsCoins(c.money))) end
-    YR.Print(("in all: %s"):format(YR.AltsCoins(sum)))
+    YR.Print(("total: %s"):format(YR.AltsCoins(sum)))
 end
 
 -- The hooks (they can't be taken off again: each asks first whether Characters is on). Put on the
@@ -274,7 +276,7 @@ local function Hook()
             for _, part in ipairs({ "GoldButton", "SilverButton", "CopperButton" }) do
                 local b = money[part]
                 if type(b) == "table" and b.HookScript then
-                    b:HookScript("OnEnter", GoldTip)
+                    b:HookScript("OnEnter", function(self) GoldTip(self) end)
                     b:HookScript("OnLeave", GoldTipHide)
                 end
             end
@@ -289,23 +291,30 @@ local function BagButtons()
         local bag = _G[name]
         local money = type(bag) == "table" and bag.MoneyFrame
         if type(money) == "table" and not bagButtons[name] and bag.GetObjectType then
+            -- A small round mark at the left end of the money bar, quiet until the mouse is on it: it
+            -- reads as part of the bar, not as an item's icon dropped on the bag.
             local b = CreateFrame("Button", nil, bag)
-            b:SetSize(18, 18)
-            b:SetPoint("RIGHT", money, "LEFT", -6, 0)
+            b:SetSize(14, 14)
+            b:SetPoint("LEFT", money, "LEFT", 7, 0)
             b:SetFrameLevel((bag:GetFrameLevel() or 1) + 5)
             b.icon = b:CreateTexture(nil, "ARTWORK")
             b.icon:SetAllPoints()
             b.icon:SetTexture(133785)
-            b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+            b.icon:SetTexCoord(0.10, 0.90, 0.10, 0.90)
+            if b.CreateMaskTexture and b.icon.AddMaskTexture then
+                local mask = b:CreateMaskTexture()
+                mask:SetAllPoints(b.icon)
+                mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+                b.icon:AddMaskTexture(mask)
+            end
+            b:SetAlpha(0.65)
             b:SetScript("OnClick", function() YR.AltsToggle() end)
+            -- the mark is where the gold is read: every character's, the total, and what a click does
             b:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
-                GameTooltip:AddLine("Your other characters")
-                GameTooltip:AddLine("What they carry, have banked and own", 0.8, 0.8, 0.8)
-                GameTooltip:Show()
+                self:SetAlpha(1)
+                GoldTip(self, "Click: bags and bank of your other characters")
             end)
-            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            b:SetScript("OnLeave", function(self) self:SetAlpha(0.65) GameTooltip:Hide() end)
             bagButtons[name] = b
         end
     end
@@ -561,7 +570,7 @@ function Draw()
             col = col + 1
         end
         if cat then y = y + CELL + GAP end
-        note = #items == 0 and (search ~= "" and "Nothing by that name." or "Nothing noted yet. A character's bags are noted when it logs in and out, its bank when you open it.")
+        note = #items == 0 and (search ~= "" and "No item matches that name." or "Nothing recorded yet. Bags are recorded while you play a character, and its bank when you open it.")
             or #items > SHOWN and ("The first %d of %d: search for the rest."):format(SHOWN, #items)
             or ("%d different items. Soulbound and quest items aren't noted%s."):format(#items, YippRouteDB.altsAll == true and "" or "; food, drink and grey ones are hidden")
     else
@@ -611,9 +620,9 @@ local function Build()
         Draw()
     end)
     win.all:SetPoint("LEFT", win.search, "RIGHT", 10, 0)
-    win.all.tip = "Food, drink and grey items too"
+    win.all.tip = "Include food, drink and grey items"
     StaticPopupDialogs["HEADSTART_FORGET_ALT"] = {
-        text = "Headstart: forget what was noted of %s? Its bags, bank and gold are noted again the next time it plays.",
+        text = "Headstart: delete everything recorded about %s?\n\nIts bags, bank and gold are recorded again the next time you play it.",
         button1 = "Forget", button2 = "Cancel", timeout = 0, whileDead = true, hideOnEscape = true,
         OnAccept = function() YR.AltsForget(picked) end,
     }
@@ -623,7 +632,7 @@ local function Build()
     end, nil, 80)
     win.forget:SetHeight(22)
     win.forget:SetPoint("TOPRIGHT", -16, -60)
-    win.forget.tip = "Forget what was noted of this character (one you deleted, say)"
+    win.forget.tip = "Deletes what is recorded about this character, for example one you deleted"
     win.right = S.ScrollArea(win, W - LEFT - 46, H - 48 - 46 - 40)
     win.right:SetPoint("TOPLEFT", LEFT + 30, -92)
     win.note = S.Text(win, 12, S.C.muted)
@@ -637,7 +646,7 @@ end
 
 function YR.AltsToggle()
     if not YR.AltsOn() then
-        YR.Print("Characters is off: turn it on in Headstart, QoL, Bank & mail.")
+        YR.Print("Characters is off. Turn it on in /hs, Characters.")
         return false
     end
     Build()

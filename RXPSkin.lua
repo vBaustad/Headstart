@@ -27,7 +27,17 @@ local LINE = "Interface/AddOns/Headstart/art/line"
 local GOLD = { 1, 0.82, 0 }
 
 local DEFAULT_ACCENT = { 0.40, 0.66, 1.00 }
+-- unless you chose a colour for the skin, it has the accent of Headstart's own windows (Style.lua)
+local function ThemeAccent()
+    local st = YR.Style
+    return st and st.C and st.C.accent or DEFAULT_ACCENT
+end
 local DEFAULT_BACK = { 0.075, 0.08, 0.095, 0.95 }
+local function ThemeBack()
+    local st = YR.Style
+    local w = st and st.C and st.C.window
+    return w and { w[1], w[2], w[3], DEFAULT_BACK[4] } or DEFAULT_BACK
+end
 
 local function Rxp()
     local rxp = _G.RXP
@@ -42,12 +52,12 @@ function YR.RXPSkinAccent()
         if c then return { c.r, c.g, c.b } end
     end
     local a = YippRouteDB.rxpSkinAccent
-    return type(a) == "table" and { a[1], a[2], a[3] } or { DEFAULT_ACCENT[1], DEFAULT_ACCENT[2], DEFAULT_ACCENT[3] }
+    return type(a) == "table" and { a[1], a[2], a[3] } or { ThemeAccent()[1], ThemeAccent()[2], ThemeAccent()[3] }
 end
 
 function YR.RXPSkinBack()
     local b = YippRouteDB.rxpSkinBack
-    b = type(b) == "table" and b or DEFAULT_BACK
+    b = type(b) == "table" and b or ThemeBack()
     return { b[1], b[2], b[3], b[4] or 1 }
 end
 
@@ -229,8 +239,10 @@ local function Extras(frame)
         t:Hide()
         extra.lines[#extra.lines + 1] = t
     end
-    -- under the header, over the footer
-    extra.headLine = rim:CreateTexture(nil, "ARTWORK")
+    -- under the header, over the footer. The header's line is the header's own, low in it: the class
+    -- icon in the header's corner hangs down over where the line runs, and stands in front of it
+    -- (on our frame, which is above the header, the line ran across the icon).
+    extra.headLine = (head.CreateTexture and head or rim):CreateTexture(nil, "BACKGROUND", nil, 7)
     extra.headLine:SetPoint("BOTTOMLEFT", head, "BOTTOMLEFT", 2, 4)
     extra.headLine:SetPoint("BOTTOMRIGHT", head, "BOTTOMRIGHT", -2, 4)
     extra.footLine = rim:CreateTexture(nil, "ARTWORK")
@@ -253,6 +265,7 @@ local function ShowExtras(on)
     if not extra then return end
     extra.back:SetShown(on)
     extra.rim:SetShown(on)
+    extra.headLine:SetShown(on)
     if extra.track then extra.track:SetShown(on) end
 end
 
@@ -323,7 +336,14 @@ local function Layout(frame, mode)
     local icon, class, text = head.icon, head.classIcon, head.text
     -- in Blizzard's frame the header is its title strip: lower, with the guide's name on one line
     local strip = mode == "blizzard" and extra and extra.metal
-    if head.SetHeight then head:SetHeight(strip and STRIP or 35) end
+    -- a guide's name is two lines with its group under it: the header grows to hold them (upwards:
+    -- it stands on the list), where RestedXP's 35 would have the second line on the edge
+    local tall = 35
+    if on and not strip and type(text) == "table" and text.GetStringHeight then
+        local h = text:GetStringHeight()
+        if type(h) == "number" and h > 0 then tall = math.max(35, math.ceil(h) + 14) end
+    end
+    if head.SetHeight then head:SetHeight(strip and STRIP or tall) end
     if type(text) == "table" and text.SetMaxLines then text:SetMaxLines(strip and 1 or 0) end
     -- In both looks RestedXP's logo is gone and your class icon stands alone in the header's left
     -- end - and is the menu button (what RestedXP's cog in the footer is; that one is put away).
@@ -391,7 +411,9 @@ local function Layout(frame, mode)
     local scroll, list = frame.ScrollFrame, frame.BottomFrame
     if type(scroll) == "table" and scroll.ClearAllPoints and type(list) == "table" then
         scroll:ClearAllPoints()
-        scroll:SetPoint("TOPLEFT", list, 5, strip and -13 or -5)
+        -- RestedXP's header lies 9 over the top of the list, and its own fill hides the steps that scroll
+        -- up under it. Ours is see-through there, so the steps start under the header instead.
+        scroll:SetPoint("TOPLEFT", list, 5, strip and -13 or on and -12 or -5)
         scroll:SetPoint("BOTTOMRIGHT", list, -20, strip and 9 or 7)
     end
     PlaceSteps(frame, mode)

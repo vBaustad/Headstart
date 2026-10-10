@@ -19,6 +19,7 @@ local function RaceBit()
     local _, _, id = UnitRace("player")
     return id and bit.lshift(1, id - 1) or 0
 end
+YR.RaceBit = RaceBit        -- the Trainer page lists what your race is taught
 
 local function Coins(c) return (GetCoinTextureString and GetCoinTextureString(c)) or (c .. "c") end
 

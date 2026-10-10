@@ -127,6 +127,27 @@ def run():
     check(any("+920 XP" in l for l in feed()), "experience across a ding: what was left of the level, and the new level's")
     s = YR.LootSession()
     check(s.money == 574 and s.value == 750 and s["items"] == 3 and s.xp == 920, f"the session's sums ({s.money}, {s.value}, {s['items']}, {s.xp})")
+    # the other look: cards, with what the stack sells for at the right
+    def blade():
+        g.Tick()
+        return lua.eval("""(function() for _, line in ipairs(HeadstartLootFeed.lines) do
+            if rawget(line, "shown") and (rawget(line.text, "said") or ""):find("Green Blade", 1, true) then
+                return { rawget(line.value, "said") or "", rawget(line.plate, "shown") and true or false } end end end)()""")
+    b = blade()
+    check(b[1] == "" and b[2] is False, f"plain lines: no plate, and no price unless asked for ({b[1]!r})")
+    g.YippRouteDB.lootStyle = "cards"
+    YR.LootFeedApply()
+    b = blade()
+    check("7s" in b[1] and "50c" in b[1] and b[2] is True, f"cards: a plate under the line, and what the three sell for at its right ({b[1]!r})")
+    g.YippRouteDB.lootPrice = False
+    YR.LootFeedApply()
+    check(blade()[1] == "", "the price turned off: gone from the card")
+    g.YippRouteDB.lootStyle, g.YippRouteDB.lootPrice = None, True
+    YR.LootFeedApply()
+    b = blade()
+    check("7s" in b[1] and b[2] is False, "plain lines with the price asked for: shown there too")
+    g.YippRouteDB.lootPrice = None
+    YR.LootFeedApply()
     entries = g.HeadstartLootLog.entries
     check(len(entries) == 3 and entries[1][2] == "i" and entries[1][4] == 2 and entries[2][2] == "r" and entries[2][3] == "Stormwind",
           "the log has every item and reputation gain, with its time")

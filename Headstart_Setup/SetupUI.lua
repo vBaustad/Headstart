@@ -36,7 +36,21 @@ local CVARS = {
     "pvpFramesHealthText", "pvpOptionDisplayPets",
     -- Coordinates on the minimap and the world map (the same Interface settings page).
     "minimapShowPlayerCoords", "worldMapShowPlayerCoords", "worldMapShowCursorCoords", "coordsByTenths",
+    -- The game's own damage meter: on or off, and whether it resets in a new instance (Options, Advanced).
+    -- Where it sits and how large it is are Edit Mode's.
+    "damageMeterEnabled", "damageMeterResetOnNewInstance",
+    -- The other Edit Mode parts with their own on/off switch (shouldEnableCVarName in EditModeManager.xml).
+    -- The game keeps these per character, so a new character starts with them off whatever the layout
+    -- says: the swing timer, the cooldown viewer, encounter warnings, external defensives. Their size and
+    -- place are Edit Mode's. (The Personal Resource Display's switch is the class's: CLASS_CVARS.)
+    "cooldownViewerEnabled", "combatWarningsEnabled", "externalDefensivesEnabled",
 }
+-- Settings kept per class, not for the account (Setup.lua, YS.SaveClassUI): whether the Personal
+-- Resource Display is on (the user, 2026-10-10: "vi lagrer basert på class"). Per character in the game.
+local CLASS_CVARS = { "nameplateShowSelf", "showSwingTimer" }       -- and the swing timer (same day)
+YS.CLASS_CVARS = CLASS_CVARS
+local IS_CLASS_CVAR = {}
+for _, name in ipairs(CLASS_CVARS) do IS_CLASS_CVAR[name] = true end
 
 -- The RestedXP guide a new character starts on: Headstart's launch opener for its starting zone.
 local GUIDE_GROUP = "Headstart Launch (A)"
@@ -75,8 +89,98 @@ local function EditModeLayouts()
     return em and em.layoutInfo and em.layoutInfo.layouts, em
 end
 
+--------------------------------------------------------------------------------
+-- RestedXP's windows: where the guide window, the arrow, and the item and target buttons are, and
+-- how big. RestedXP keeps them in its settings profile, and a profile is a character's own - so a new
+-- character has them back in the middle of the screen. Copied from the profile of the character you
+-- copy the interface from, and written into this one's (framePositions and frameSizes: RestedXP's
+-- own tables, read back by its own LoadFramePositions). Nothing else of RestedXP's settings is touched.
+--------------------------------------------------------------------------------
+local function Deep(t)
+    if type(t) ~= "table" then return t end
+    local c = {}
+    for k, v in pairs(t) do c[k] = Deep(v) end
+    return c
+end
+
+-- RestedXP keeps its settings per character. How its windows look goes along with where they are: the
+-- theme (Headstart's RestedXP skin is one), the scales, the font size, the text colours, which way the
+-- window grows. What a character plays by (hardcore, season, professions, quest choices, automation)
+-- is that character's and is never copied.
+local RXP_LOOK = { "activeTheme", "customTheme", "windowScale", "arrowScale", "arrowText", "guideFontSize",
+    "activeItemsScale", "activeTargetScale", "anchorOrientation", "hideGuideWindow", "enableV2Interface", "enableV2MenuTheme",
+    "activePartyStepsV2WindowScale", "worldMapPinScale", "levelSplitsFontSize", "levelSplitsOpacity",
+    "textEnemyColor", "textFriendlyColor", "textLootColor", "textWarnColor", "textPickColor", "textBuyColor" }
+
+local function RXPProfile()
+    local rxp = _G.RXP
+    local settings = type(rxp) == "table" and rxp.settings
+    local profile = type(settings) == "table" and settings.profile
+    if type(profile) ~= "table" then return nil end
+    return profile, settings
+end
+
+--- RestedXP's window places and sizes as they are now, or nil (RestedXP not loaded, or nothing placed).
+-- What a saved interface holds has grown. One saved by an older Headstart lacks the newer parts, and
+-- only the character it came from can add them: YS.UIStale says so, for the window and for Apply.
+-- 2: whether the damage meter is on, and RestedXP's look.
+-- 3: the on/off switches of the swing timer, cooldown viewer, encounter warnings, external defensives.
+YS.UI_VERSION = 3
+function YS.UIStale(ui)
+    return type(ui) == "table" and (ui.v or 1) < YS.UI_VERSION
+end
+
+function YS.ScanRXP()
+    local profile, settings = RXPProfile()
+    if not profile then return nil end
+    if settings.SaveFramePositions then pcall(settings.SaveFramePositions, settings) end       -- as they are this moment
+    local look = {}
+    for _, key in ipairs(RXP_LOOK) do
+        if profile[key] ~= nil then look[key] = Deep(profile[key]) end
+    end
+    local placed = type(profile.framePositions) == "table" and next(profile.framePositions) ~= nil
+    if not placed and not next(look) then return nil end
+    return { positions = placed and Deep(profile.framePositions) or nil, sizes = placed and Deep(profile.frameSizes or {}) or nil,
+        look = look }
+end
+
+--- The saved places put on this character's RestedXP. Returns what happened, in words.
+function YS.ApplyRXP(saved)
+    if type(saved) ~= "table" or (type(saved.positions) ~= "table" and type(saved.look) ~= "table") then return "none saved" end
+    local profile, settings = RXPProfile()
+    if not profile then return "RestedXP not loaded" end
+    -- the look first: the scales are put on with the places (LoadFramePositions ends with LoadScales)
+    local theme = profile.activeTheme
+    local looks = 0
+    for _, key in ipairs(RXP_LOOK) do
+        local v = saved.look and saved.look[key]
+        if v ~= nil then profile[key] = Deep(v) looks = looks + 1 end
+    end
+    profile.framePositions = type(profile.framePositions) == "table" and profile.framePositions or {}
+    profile.frameSizes = type(profile.frameSizes) == "table" and profile.frameSizes or {}
+    local n = 0
+    for name, points in pairs(saved.positions or {}) do
+        profile.framePositions[name] = Deep(points)
+        n = n + 1
+    end
+    for name, size in pairs(saved.sizes or {}) do profile.frameSizes[name] = Deep(size) end
+    if settings.LoadFramePositions then pcall(settings.LoadFramePositions, settings) end
+    -- another theme than this character had: drawn now (one of Headstart's two goes through its skin)
+    if profile.activeTheme ~= theme then
+        local mode = YR.RXPSkinMode and YR.RXPSkinMode() or "off"
+        if mode ~= "off" and YR.SetRXPSkin then
+            pcall(YR.SetRXPSkin, mode)
+        else
+            local rxp = _G.RXP
+            if type(rxp.LoadActiveTheme) == "function" then pcall(rxp.LoadActiveTheme, rxp) end
+            if type(rxp.ReloadGuide) == "function" then pcall(rxp.ReloadGuide, rxp, true) end
+        end
+    end
+    return looks > 0 and ("%d placed, look copied"):format(n) or ("%d placed"):format(n)
+end
+
 function YS:ScanUI()
-    local ui = { cvars = {}, bars = {} }
+    local ui = { cvars = {}, bars = {}, rxp = YS.ScanRXP(), v = YS.UI_VERSION }
     local em = EditModeManagerFrame
     local active = em and em.GetActiveLayoutInfo and em:GetActiveLayoutInfo()
     if active then
@@ -331,7 +435,7 @@ end
 -- until then, hovering a button in combat trips ADDON_ACTION_BLOCKED. So Set up layout ends with a
 -- Reload button rather than a line in chat that is easy to miss.
 StaticPopupDialogs["YIPPSETUP_RELOAD"] = {
-    text = "Headstart: reload the UI to finish setting up the layout.",
+    text = "Headstart: reload the UI to finish applying the interface.",
     button1 = "Reload",
     button2 = "Later",
     OnAccept = function() ReloadUI() end,
@@ -339,6 +443,46 @@ StaticPopupDialogs["YIPPSETUP_RELOAD"] = {
     whileDead = true,
     hideOnEscape = true,
 }
+
+--------------------------------------------------------------------------------
+-- A profile's own interface (Layouts.lua): which Edit Mode layout is active, which extra bars show and
+-- where RestedXP's windows are. Not chat, game settings or the camera - those are the account's, for a
+-- new character. Put on through the game's own functions only, so switching profile needs no reload.
+--------------------------------------------------------------------------------
+function YS.ScanProfileUI()
+    local ui = { bars = {}, rxp = YS.ScanRXP() }
+    local em = EditModeManagerFrame
+    local active = em and em.GetActiveLayoutInfo and em:GetActiveLayoutInfo()
+    if active then
+        ui.layout = { name = active.layoutName, type = active.layoutType }
+        local ok, s = pcall(C_EditMode.ConvertLayoutInfoToString, active)
+        if ok then ui.layout.export = s end
+    end
+    for bar = 2, 8 do
+        local ok, v = pcall(Settings.GetValue, "PROXY_SHOW_ACTIONBAR_" .. bar)
+        if ok and v ~= nil then ui.bars[bar] = v and true or false end
+    end
+    return ui
+end
+
+--- Returns what was done, in words (nothing: an empty text).
+function YS.ApplyProfileUI(ui)
+    if type(ui) ~= "table" then return "" end
+    local suite = FirstLoaded(UI_SUITES)
+    local barAddon = suite or FirstLoaded(BAR_ADDONS)
+    local said = {}
+    if ui.layout and not suite then
+        local text, changed = ApplyLayoutClean(ui.layout)
+        if text == nil then said[#said + 1] = "Edit Mode can't be switched from an addon on this client: pick '" .. tostring(ui.layout.name) .. "' there"
+        elseif changed then said[#said + 1] = "Edit Mode " .. text end
+    end
+    if ui.bars and not barAddon then
+        local n = ApplyBarsClean(ui.bars)
+        if n and n > 0 then said[#said + 1] = ("%d bar%s shown or hidden"):format(n, n == 1 and "" or "s") end
+    end
+    if ui.rxp then YS.ApplyRXP(ui.rxp) end
+    return table.concat(said, "; ")
+end
 
 function YS:ApplyUI(ui, o)
     o = o or YS:Options()
@@ -353,7 +497,13 @@ function YS:ApplyUI(ui, o)
     -- each game setting as it was, kept beside the bars' copy for /ysetup undo
     local char = _G.YippSetupCharDB          -- this character's saved table (Setup.lua fills it at login)
     local backup = type(char) == "table" and (char.uiBackup or char.backup) or nil
-    for name, v in pairs(o.settings and ui.cvars or {}) do
+    -- the account's settings, and over them the class's own (the Personal Resource Display's switch)
+    local cvars = {}
+    if o.settings then
+        for name, v in pairs(ui.cvars or {}) do if not IS_CLASS_CVAR[name] then cvars[name] = v end end
+        for name, v in pairs(YS.ClassUI and YS.ClassUI() or {}) do cvars[name] = v end
+    end
+    for name, v in pairs(cvars) do
         local was = C_CVar.GetCVar(name)
         if was ~= nil and was ~= v and pcall(C_CVar.SetCVar, name, v) then
             set = set + 1
@@ -364,6 +514,7 @@ function YS:ApplyUI(ui, o)
             end
         end
     end
+    if YS.ClassUINoted then YS.ClassUINoted() end        -- put on, not changed by the player
     local barsDone = not barAddon and o.barVisibility
     local taint = false            -- the old way ran: only a reload clears it
     local cleanBars = barsDone and ApplyBarsClean(ui.bars or {})
@@ -389,8 +540,12 @@ function YS:ApplyUI(ui, o)
     if o.chat and type(chat) == "string" and chat:find("windows$") then taint = true end
     if o.camera then YS.ApplyCamera(ui.camera) end
     local barText = barAddon and ("left to " .. barAddon) or (o.barVisibility and (tostring(bars) .. " changed") or "off")
-    YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. RestedXP guide: %s.")
-        :format(layout, barText, chat, set, o.guide and ApplyGuide() or "off"))
+    YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. RestedXP guide: %s. RestedXP windows: %s.")
+        :format(layout, barText, chat, set, o.guide and ApplyGuide() or "off", o.rxpFrames ~= false and YS.ApplyRXP(ui.rxp) or "off"))
+    if YS.UIStale(ui) then
+        YS.Print(("this interface was saved by an older Headstart: whether the damage meter is on and RestedXP's look are not in it."
+            .. " Save it again on %s (Character setup, Save interface), then Apply interface here."):format(tostring(YS.UISource() or "the character it came from")))
+    end
     -- the old way taints until a reload; the game's own functions don't, but get checked a moment later
     if taint then
         YS.Print("reload to finish: until then the action bars can be blocked in combat.")

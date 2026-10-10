@@ -52,6 +52,8 @@ def run():
     lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
         open(os.path.join(ROOT, "QuestLFG.lua"), encoding="utf-8").read(), "QuestLFG.lua")("Headstart", YR)
     g = lua.globals()
+    shelved = YR.QuestLFGAvailable is False and YR.QuestLFGOn() is False and YR.QuestLFGToggle() is False
+    YR.QuestLFGAvailable = True          # the feature is shelved: its tests run with it brought back
     bad = 0
 
     def check(ok, what):
@@ -59,6 +61,7 @@ def run():
         print(("ok  " if ok else "FAIL"), what)
         bad += not ok
 
+    check(shelved, "shelved: not available, never on, and its window doesn't open")
     quests = list(YR.QuestLFGQuests().values())
     check([q.id for q in quests] == [11, 13, 12, 15], f"your quests: the ones meant for a group first, then by level; a finished one left out ({[q.id for q in quests]})")
     check(quests[0].group == 5 and quests[2].tracked is True and quests[2].group is None, "with how many it is meant for, and whether you track it")

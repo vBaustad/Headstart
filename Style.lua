@@ -7,23 +7,80 @@ local S = {}
 YR.Style = S
 
 S.FONT = "Fonts\\ARIALN.TTF"
+-- Warm charcoal with one ember accent: the surfaces lean a little brown rather than blue, the text is
+-- a warm white. onAccent is what is written on something filled with the accent (dark: every accent
+-- here is a light colour).
 S.C = {
-    window  = { 0.075, 0.08, 0.095, 0.98 },
-    side    = { 0.055, 0.06, 0.07, 1 },
-    card    = { 0.11, 0.12, 0.14, 1 },
-    field   = { 0.045, 0.05, 0.06, 1 },
-    line    = { 1, 1, 1, 0.07 },
-    lineHi  = { 1, 1, 1, 0.16 },
-    hover   = { 1, 1, 1, 0.045 },
-    accent  = { 0.40, 0.66, 1.00, 1 },
-    accentD = { 0.40, 0.66, 1.00, 0.16 },
-    text    = { 0.93, 0.94, 0.96, 1 },
-    sub     = { 0.70, 0.73, 0.78, 1 },
-    muted   = { 0.50, 0.53, 0.58, 1 },
-    green   = { 0.40, 0.85, 0.55, 1 },
-    danger  = { 1.00, 0.45, 0.45, 1 },
-    gold    = { 1.00, 0.80, 0.30, 1 },
+    window  = { 0.086, 0.078, 0.071, 0.98 },
+    side    = { 0.063, 0.057, 0.052, 1 },
+    card    = { 0.128, 0.117, 0.107, 1 },
+    stripe  = { 0.108, 0.098, 0.089, 1 },       -- a card's head, and every other row of a list
+    field   = { 0.050, 0.045, 0.041, 1 },
+    line    = { 1, 0.96, 0.90, 0.075 },
+    lineHi  = { 1, 0.96, 0.90, 0.17 },
+    hover   = { 1, 0.96, 0.90, 0.05 },
+    accent  = { 1.00, 0.56, 0.20, 1 },
+    accentD = { 1.00, 0.56, 0.20, 0.16 },
+    accentHi = { 1.00, 0.66, 0.34, 1 },
+    accentLo = { 0.88, 0.47, 0.14, 1 },
+    onAccent = { 0.10, 0.07, 0.04, 1 },
+    text    = { 0.95, 0.93, 0.90, 1 },
+    sub     = { 0.75, 0.72, 0.68, 1 },
+    muted   = { 0.54, 0.51, 0.48, 1 },
+    green   = { 0.45, 0.82, 0.50, 1 },
+    danger  = { 1.00, 0.45, 0.42, 1 },
+    gold    = { 1.00, 0.82, 0.36, 1 },
 }
+
+-- The accents to choose from (Headstart page, Look). "class" is your class's colour. The surfaces are
+-- the same for all but Frost, which is the cool grey and blue Headstart had before.
+S.ACCENTS = {
+    { "ember", "Ember", { 1.00, 0.56, 0.20 } },
+    { "gold", "Gold", { 0.96, 0.78, 0.30 } },
+    { "moss", "Moss", { 0.56, 0.80, 0.38 } },
+    { "jade", "Jade", { 0.28, 0.82, 0.66 } },
+    { "rose", "Rose", { 0.96, 0.48, 0.58 } },
+    { "violet", "Violet", { 0.72, 0.58, 1.00 } },
+    { "class", "My class's colour" },
+    { "frost", "Frost (the old look)", { 0.40, 0.66, 1.00 } },
+}
+local FROST = {
+    window = { 0.075, 0.08, 0.095, 0.98 }, side = { 0.055, 0.06, 0.07, 1 }, card = { 0.11, 0.12, 0.14, 1 },
+    field = { 0.045, 0.05, 0.06, 1 }, stripe = { 0.095, 0.105, 0.125, 1 }, line = { 1, 1, 1, 0.07 }, lineHi = { 1, 1, 1, 0.16 }, hover = { 1, 1, 1, 0.045 },
+    text = { 0.93, 0.94, 0.96, 1 }, sub = { 0.70, 0.73, 0.78, 1 }, muted = { 0.50, 0.53, 0.58, 1 },
+}
+
+local WARM = {}
+for name in pairs(FROST) do WARM[name] = { unpack(S.C[name]) } end
+
+local function Into(t, r, g, b, a)
+    t[1], t[2], t[3], t[4] = r, g, b, a or t[4] or 1
+end
+
+--- The look's colours set from the accent chosen (YippRouteDB.accent, "ember" unless set). The colour
+--- tables are changed in place, so everything made afterwards has them; what is already on screen keeps
+--- its colours until a reload. Called once as Headstart starts, before any window of ours is made.
+function S.Theme(key)
+    key = key or (type(YippRouteDB) == "table" and YippRouteDB.accent) or "ember"
+    local pick = S.ACCENTS[1]
+    for _, a in ipairs(S.ACCENTS) do if a[1] == key then pick = a end end
+    local c = pick[3]
+    if pick[1] == "class" then
+        local _, class = UnitClass("player")
+        local cc = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+        c = cc and { cc.r, cc.g, cc.b } or S.ACCENTS[1][3]
+    end
+    for name, v in pairs(pick[1] == "frost" and FROST or WARM) do Into(S.C[name], v[1], v[2], v[3], v[4]) end
+    local r, g, b = c[1], c[2], c[3]
+    Into(S.C.accent, r, g, b, 1)
+    Into(S.C.accentD, r, g, b, 0.16)
+    Into(S.C.accentHi, r + (1 - r) * 0.22, g + (1 - g) * 0.22, b + (1 - b) * 0.22, 1)
+    Into(S.C.accentLo, r * 0.86, g * 0.86, b * 0.86, 1)
+    -- a dark accent (a shaman's blue, a death knight's red) is written on in white
+    local light = 0.30 * r + 0.59 * g + 0.11 * b
+    if light < 0.5 then Into(S.C.onAccent, 1, 1, 1, 1) else Into(S.C.onAccent, 0.10, 0.07, 0.04, 1) end
+    return pick[1]
+end
 
 --- Called after any control of ours changed a setting (Core.lua puts YR.SettingChanged here: the parts
 --- of Headstart that listen only while they are wanted are looked at again).
@@ -93,9 +150,9 @@ S.Rounded = Rounded
 
 -- Colours per kind and state: { fill, outline or false, text }
 local LOOK = {
-    primary = { normal = { { 0.40, 0.66, 1.00, 1 }, false, { 1, 1, 1, 1 } },
-                hover  = { { 0.50, 0.73, 1.00, 1 }, false, { 1, 1, 1, 1 } },
-                down   = { { 0.33, 0.57, 0.92, 1 }, false, { 1, 1, 1, 1 } } },
+    primary = { normal = { S.C.accent, false, S.C.onAccent },
+                hover  = { S.C.accentHi, false, S.C.onAccent },
+                down   = { S.C.accentLo, false, S.C.onAccent } },
     quiet   = { normal = { { 1, 1, 1, 0.06 }, { 1, 1, 1, 0.14 }, S.C.text },
                 hover  = { { 1, 1, 1, 0.10 }, { 1, 1, 1, 0.24 }, S.C.text },
                 down   = { { 1, 1, 1, 0.04 }, { 1, 1, 1, 0.20 }, S.C.text } },
@@ -220,7 +277,7 @@ function S.ShowInfo(owner, title, text, pin)
     local isPinned = pinned and pinned.owner == owner
     f.title:SetText(title)
     f.body:SetText(text)
-    f.hint:SetText(isPinned and "Pinned: click (i) again to close" or "Click (i) to keep this open")
+    f.hint:SetText("")
     f.line:SetVertexColor(unpack(isPinned and S.C.accent or S.C.lineHi))
     f:SetHeight(10 + f.title:GetStringHeight() + 6 + f.body:GetStringHeight() + 8
         + f.hint:GetStringHeight() + 12)
@@ -266,7 +323,7 @@ function S.Toggle(parent, label, get, set, note)
     function b:Refresh()
         local on = get()
         Set(track, on and S.C.accent or { 1, 1, 1, 0.14 })
-        knob:SetColorTexture(1, 1, 1, 1)
+        if on then Set(knob, S.C.onAccent) else knob:SetColorTexture(1, 1, 1, 1) end
         knob:ClearAllPoints()
         knob:SetPoint("LEFT", track, "LEFT", on and 18 or 2, 0)
     end
@@ -321,15 +378,32 @@ local function CloseMenu() if menu then menu:Hide() end if catcher then catcher:
 S.CloseMenu = CloseMenu
 
 function S.OpenMenu(anchor, options, onPick, width, side)
+    -- the same button again closes its menu
+    if menu and menu:IsShown() and menu.anchor == anchor then CloseMenu() return end
     if not menu then
         catcher = CreateFrame("Button", nil, UIParent)
         catcher:SetAllPoints(UIParent)
-        catcher:SetFrameStrata("FULLSCREEN")
+        -- over every window of ours, the ones in the topmost layer too (the planner, the macro helper):
+        -- a menu in their own layer opened behind them
+        catcher:SetFrameStrata("FULLSCREEN_DIALOG")
+        catcher:SetFrameLevel(9000)
         catcher:SetScript("OnClick", CloseMenu)
         catcher:RegisterEvent("PLAYER_REGEN_DISABLED")
         catcher:SetScript("OnEvent", CloseMenu)
-        menu = CreateFrame("Frame", nil, UIParent)
-        menu:SetFrameStrata("FULLSCREEN_DIALOG")
+        menu = CreateFrame("Frame", "HeadstartDropMenu", UIParent)
+        menu:SetFrameStrata("TOOLTIP")
+        -- Three ways out besides picking something: the button again (above), Esc, and a click anywhere
+        -- that isn't the menu. The click is heard from the game itself, whatever frame it lands on: the
+        -- catcher alone could end up under a window and then nothing closed the menu.
+        tinsert(UISpecialFrames, "HeadstartDropMenu")
+        menu:SetScript("OnHide", function() if catcher then catcher:Hide() end end)
+        menu:SetScript("OnEvent", function(self)
+            if not self:IsShown() or self:IsMouseOver() then return end
+            if self.anchor and self.anchor.IsMouseOver and self.anchor:IsMouseOver() then return end   -- (its own click closes it)
+            CloseMenu()
+        end)
+        menu:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
+        menu:HookScript("OnHide", function(self) self:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
         S.Fill(menu, S.C.card)
         S.Border(menu, S.C.lineHi)
         menu.items = {}
@@ -369,7 +443,7 @@ function S.OpenMenu(anchor, options, onPick, width, side)
     end
     local list = type(options) == "function" and options() or options
     local shown = math.min(#list, 14)
-    menu.options, menu.offset, menu.onPick, menu.side = list, 0, onPick, side
+    menu.options, menu.offset, menu.onPick, menu.side, menu.anchor = list, 0, onPick, side, anchor
     for i = #menu.items + 1, shown do
         local item = CreateFrame("Button", nil, menu)
         item:SetHeight(22)
@@ -414,7 +488,8 @@ function S.Dropdown(parent, width, options, onPick, side)
     b:SetScript("OnClick", function(self)
         S.OpenMenu(self, options, function(v) onPick(v) end, math.max(width, 160), side)
     end)
-    function b:SetValue(label) self.label:SetText(label or "") end
+    function b:SetValue(label) self.shown = label self.label:SetText(label or "") end
+    b.options, b.onPick = options, onPick
     return b
 end
 
@@ -452,6 +527,7 @@ end
 function S.Stepper(parent, get, set, min, max, step, width)
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(width or 110, 24)
+    f.getValue, f.setValue = get, set
     local input
     local function Apply(v)
         v = tonumber(v)
@@ -621,29 +697,33 @@ function S.Switch(parent, get, set)
     function b:Refresh()
         local on = get()
         Set(track, on and S.C.accent or { 1, 1, 1, 0.14 })
-        knob:SetColorTexture(1, 1, 1, 1)
+        if on then Set(knob, S.C.onAccent) else knob:SetColorTexture(1, 1, 1, 1) end
         knob:ClearAllPoints()
         knob:SetPoint("LEFT", on and 18 or 2, 0)
     end
     b:SetScript("OnClick", function() set(not get()) b:Refresh() S.Changed() end)
     b:Refresh()
+    b.getValue, b.setValue = get, set          -- (what a settings row reads a default from, and resets with)
     return b
 end
 
 -- A slider with - and + either side of its value box: drag for big moves, - and + for exact ones
 -- (Shift-click moves ten steps), or type the number. Values are rounded to the step.
-function S.Slider(parent, min, max, step, get, set, width)
+-- compact: a track and the value's box, no - and + (the mouse wheel over it moves a step, Shift ten;
+-- or type the number) - narrow enough to share a settings row with another setting.
+function S.Slider(parent, min, max, step, get, set, width, compact)
     step = step or 1
     width = width or 220
     local f = CreateFrame("Frame", nil, parent)
     f:SetSize(width, 24)
+    f.getValue, f.setValue = get, set
     local function Round(v) return math.floor(v / step + 0.5) * step end
     local function Clamp(v) return math.max(min, math.min(max, Round(v))) end
 
     local s = CreateFrame("Slider", nil, f)
     s:SetOrientation("HORIZONTAL")
     s:SetPoint("LEFT")
-    s:SetSize(width - 104, 16)
+    s:SetSize(compact and (width - 56) or (width - 104), 16)
     s:SetMinMaxValues(min, max)
     s:SetValueStep(step)
     s:SetObeyStepOnDrag(true)
@@ -664,17 +744,23 @@ function S.Slider(parent, min, max, step, get, set, width)
         S.Changed()
         f:Refresh()
     end
-    local plus = S.IconButton(f, "plus", function() Nudge(1) end, "+" .. step .. "  (Shift: +" .. step * 10 .. ")", S.C.sub, 22)
-    plus:SetPoint("RIGHT")
-    local box = S.Input(f, { width = 52, numeric = true, onCommit = function(t)
+    local box = S.Input(f, { width = compact and 46 or 52, numeric = true, onCommit = function(t)
         local v = tonumber(t)
         if v then set(Clamp(v)) S.Changed() end
         f:Refresh()
     end })
-    box:SetPoint("RIGHT", plus, "LEFT", -2, 0)
     box:SetJustifyH("CENTER")
-    local minus = S.IconButton(f, "minus", function() Nudge(-1) end, "-" .. step .. "  (Shift: -" .. step * 10 .. ")", S.C.sub, 22)
-    minus:SetPoint("RIGHT", box, "LEFT", -2, 0)
+    if compact then
+        box:SetPoint("RIGHT")
+        s:EnableMouseWheel(true)
+        s:SetScript("OnMouseWheel", function(_, d) Nudge(d > 0 and 1 or -1) end)
+    else
+        local plus = S.IconButton(f, "plus", function() Nudge(1) end, "+" .. step .. "  (Shift: +" .. step * 10 .. ")", S.C.sub, 22)
+        plus:SetPoint("RIGHT")
+        box:SetPoint("RIGHT", plus, "LEFT", -2, 0)
+        local minus = S.IconButton(f, "minus", function() Nudge(-1) end, "-" .. step .. "  (Shift: -" .. step * 10 .. ")", S.C.sub, 22)
+        minus:SetPoint("RIGHT", box, "LEFT", -2, 0)
+    end
 
     local busy = false
     local function Show(v)

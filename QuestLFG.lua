@@ -32,7 +32,11 @@ local Draw                      -- (the window, further down)
 local function Now() return GetTime() end
 local function Secret(v) return issecretvalue and issecretvalue(v) end
 
-function YR.QuestLFGOn() return YR.Option("questLFG") end
+-- Shelved (2026-10-09): how it should work isn't decided. Everything of it is still here and tested,
+-- but with this false nothing of it is offered or runs: no settings, no card, no key, no slash command,
+-- no eye by the quest tracker, nothing listening. Set it true to bring the whole feature back.
+YR.QuestLFGAvailable = false
+function YR.QuestLFGOn() return YR.QuestLFGAvailable == true and YR.Option("questLFG") end
 local function Watching() return YippRouteDB.questLFGWatch ~= false end
 local function AnyAsking()
     local now = Now()
@@ -294,7 +298,7 @@ function Draw()
             if (r.kind == "other") == (pass == 2) then
                 if first then Line(pass == 1 and "ANSWERS" or "OTHERS LOOKING, FOR QUESTS YOU HAVE") first = false end
                 local who = r.who
-                Line(nil, Short(who) .. (r.kind == "whisper" and "  |cff7f8794whispered|r" or ""),
+                Line(nil, Short(who) .. (r.kind == "whisper" and "  |cff8a827awhispered|r" or ""),
                     ("%s: %s"):format(r.quest, (r.text:gsub("|", "||"))),
                     "Invite", function() YR.QuestLFGInvite(who) end, "Whisper", function() YR.QuestLFGWhisper(who) end)
             end
@@ -304,22 +308,22 @@ function Draw()
     local quests = YR.QuestLFGQuests()
     for _, q in ipairs(quests) do
         local quest = q
-        Line(nil, ("|cff7f8794%d|r  %s"):format(q.level, q.title),
+        Line(nil, ("|cff8a827a%d|r  %s"):format(q.level, q.title),
             (q.group and ("for %d players" .. (q.tracked and ", tracked" or "")):format(q.group)) or (q.tracked and "tracked" or nil),
             not asking[q.id] and "Ask" or nil, function() Said(YR.QuestLFGAsk(quest)) end)
     end
-    if #quests == 0 then Line(nil, "|cff7f8794No quest in your log to ask for.|r") end
+    if #quests == 0 then Line(nil, "|cff8a827aNo quest in your log to ask for.|r") end
     for i = n + 1, #rows do rows[i]:Hide() end
     win.area.content:SetHeight(math.max(10, n * ROW))
     if win.area.UpdateBar then win.area:UpdateBar() end
     local id, name = YR.QuestLFGChannel()
-    win.foot:SetText(id and ("Asks in %d. %s  (Settings, QoL, Group)"):format(id, name) or "You're in no chat channel to ask in.")
+    win.foot:SetText(id and ("Posts in %d. %s  (change in /hs, Group)"):format(id, name) or "You're in no chat channel to ask in.")
 end
 
 local function Build()
     if win then return end
     local S = YR.Style
-    win = S.Window("HeadstartQuestLFGWindow", W, H, "Quest group")
+    win = S.Window("HeadstartQuestLFGWindow", W, H, "Quest group finder")
     win:SetFrameStrata("HIGH")
     win.area = S.ScrollArea(win, W - 32, H - 48 - 16 - 40)
     win.area:SetPoint("TOPLEFT", 16, -60)
@@ -328,8 +332,9 @@ local function Build()
 end
 
 function YR.QuestLFGToggle()
+    if not YR.QuestLFGAvailable then return false end
     if not YR.QuestLFGOn() then
-        YR.Print("Quest group is off: turn it on in Headstart, QoL, Group.")
+        YR.Print("the quest group finder is off. Turn it on in /hs, Group.")
         return false
     end
     Build()
@@ -373,7 +378,7 @@ local function MakeButton()
     button.glow = button:CreateTexture(nil, "OVERLAY")
     button.glow:SetPoint("TOPLEFT", -2, 2)
     button.glow:SetPoint("BOTTOMRIGHT", 2, -2)
-    button.glow:SetColorTexture(0.40, 0.66, 1.00, 0.35)
+    button.glow:SetColorTexture(S.C.accent[1], S.C.accent[2], S.C.accent[3], 0.35)
     button.glow:Hide()
     button.count = S.Text(button, 12, S.C.gold)
     button.count:SetPoint("BOTTOMRIGHT", 2, -2)

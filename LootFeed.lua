@@ -12,7 +12,9 @@
 --   timer wakes us when the oldest line has run out.
 --   Account options (YippRouteDB; Headstart, QoL, Loot): lootFeed (off until turned on), lootItems,
 --   lootMoney, lootXP, lootRep (each on unless turned off), lootQuality (lowest item quality shown, 0),
---   lootSeconds (4), lootLock (on unless turned off), lootFeedPos. Per character: HeadstartLootLog =
+--   lootSeconds (4), lootLock (on unless turned off), lootFeedPos, lootStyle ("cards": each line a
+--   dark card with a bigger icon; anything else: plain lines), lootPrice (what an item sells for, at
+--   the right of its line: on in cards and off in lines unless set). Per character: HeadstartLootLog =
 --   { entries = { { time, "i", link, count, value } | { time, "r", faction, amount } }, session = {
 --   start, money, value, xp, items } }.
 local ADDON, YR = ...
@@ -31,6 +33,24 @@ local issecret = issecretvalue
 function YR.LootFeedOn() return YR.Option("lootFeed") end
 local function Shows(key) return YippRouteDB[key] ~= false end
 local function Seconds() return math.max(2, math.min(15, tonumber(YippRouteDB.lootSeconds) or 4)) end
+local function Cards() return YippRouteDB.lootStyle == "cards" end
+local function Prices()
+    if YippRouteDB.lootPrice == nil then return Cards() end
+    return YippRouteDB.lootPrice == true
+end
+-- A line's height and the gap under it, and the feed's width, in the look that is on.
+local CARD_H, CARD_GAP, CARD_W = 34, 3, 250
+local function Pitch() return Cards() and (CARD_H + CARD_GAP) or ROW_H end
+
+-- "4" and a copper coin, as the game writes money - or in letters where it has no such function.
+local function Price(copper)
+    local coins = (C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString) or _G.GetCoinTextureString
+    if type(coins) == "function" then
+        local ok, text = pcall(coins, copper)
+        if ok and type(text) == "string" then return text end
+    end
+    return YR.Coins(copper)
+end
 
 local function DB()
     local db = _G.HeadstartLootLog
@@ -135,9 +155,11 @@ local function Layout()
         local r, line = rows[i], holder.lines[i]
         if r then
             local words = Words(r)
-            if line.words ~= words then
-                line.words = words
+            local worth = (r.value or 0) > 0 and Prices() and r.value or false
+            if line.words ~= words or line.worth ~= worth then
+                line.words, line.worth = words, worth
                 line.text:SetText(words)
+                line.value:SetText(worth and Price(worth) or "")
                 line.icon:SetTexture(r.icon)
                 line.icon:SetShown(r.icon ~= nil)
             end
@@ -152,7 +174,7 @@ local function Layout()
                 fade:Play()
             end
         else
-            line.words = false
+            line.words, line.worth = false, false
             if line.fade then line.fade:Stop() end
             line:Hide()
         end
@@ -170,6 +192,36 @@ end
 function Wake()
     waking = false
     Layout()
+end
+
+-- The look that is on, put on the lines: plain lines, or cards (a dark plate with a thin edge, a
+-- bigger icon with its own edge, and room at the right for what the item sells for).
+local function Dress()
+    if not holder then return end
+    local cards = Cards()
+    local h, pitch = cards and CARD_H or ROW_H, Pitch()
+    local w = cards and CARD_W or W
+    holder:SetSize(w, ROWS * pitch)
+    for i = 1, ROWS do
+        local line = holder.lines[i]
+        line:SetSize(w, h)
+        line:ClearAllPoints()
+        line:SetPoint("BOTTOMLEFT", 0, (i - 1) * pitch)         -- the newest at the bottom
+        line.plate:SetShown(cards)
+        for _, t in ipairs(line.edges) do t:SetShown(cards) end
+        for _, t in ipairs(line.iconEdge) do t:SetShown(cards) end
+        local size = cards and (CARD_H - 8) or (ROW_H - 4)
+        line.icon:SetSize(size, size)
+        line.icon:ClearAllPoints()
+        line.icon:SetPoint("LEFT", cards and 4 or 2, 0)
+        line.text:SetFont(YR.Style.FONT, cards and 12 or 13, "OUTLINE")
+        line.text:ClearAllPoints()
+        line.text:SetPoint("LEFT", line.icon, "RIGHT", cards and 8 or 4, 0)
+        line.text:SetPoint("RIGHT", line.value, "LEFT", -6, 0)
+        line.value:ClearAllPoints()
+        line.value:SetPoint("RIGHT", cards and -8 or -2, 0)
+        line.value:SetFont(YR.Style.FONT, cards and 12 or 13, "OUTLINE")
+    end
 end
 
 local function Build()
@@ -194,17 +246,28 @@ local function Build()
     holder.lines = {}
     for i = 1, ROWS do
         local line = CreateFrame("Frame", nil, holder)
-        line:SetSize(W, ROW_H)
-        line:SetPoint("BOTTOMLEFT", 0, (i - 1) * ROW_H)         -- the newest at the bottom
+        line.plate = line:CreateTexture(nil, "BACKGROUND")
+        line.plate:SetAllPoints()
+        line.plate:SetColorTexture(0.05, 0.05, 0.06, 0.82)
+        line.edges = S.Border(line, { 0, 0, 0, 0.9 })
         line.icon = S.Icon(line, nil, ROW_H - 4)
-        line.icon:SetPoint("LEFT", 2, 0)
+        -- a thin dark edge round the icon (cards)
+        line.iconEdge = {}
+        for n, at in ipairs({ { "TOPLEFT", "TOPRIGHT", 0, 1 }, { "BOTTOMLEFT", "BOTTOMRIGHT", 0, -1 },
+                { "TOPLEFT", "BOTTOMLEFT", -1, 0 }, { "TOPRIGHT", "BOTTOMRIGHT", 1, 0 } }) do
+            local t = line:CreateTexture(nil, "BORDER")
+            t:SetColorTexture(0, 0, 0, 1)
+            t:SetPoint(at[1], line.icon, at[1], n > 2 and at[3] or -1, n > 2 and 1 or at[4])
+            t:SetPoint(at[2], line.icon, at[2], n > 2 and at[3] or 1, n > 2 and -1 or at[4])
+            if n > 2 then t:SetWidth(1) else t:SetHeight(1) end
+            line.iconEdge[n] = t
+        end
         line.text = line:CreateFontString(nil, "OVERLAY")
-        line.text:SetFont(S.FONT, 13, "OUTLINE")
-        line.text:SetPoint("LEFT", ROW_H + 4, 0)
-        line.text:SetPoint("RIGHT", -2, 0)
         line.text:SetJustifyH("LEFT")
         line.text:SetWordWrap(false)
-        line.fade, line.words = false, false
+        line.value = line:CreateFontString(nil, "OVERLAY")
+        line.value:SetJustifyH("RIGHT")
+        line.fade, line.words, line.worth = false, false, false
         -- its last moments it fades: the game's own animation, no code of ours a frame
         local group = line.CreateAnimationGroup and line:CreateAnimationGroup()
         local alpha = group and group.CreateAnimation and group:CreateAnimation("Alpha")
@@ -218,25 +281,26 @@ local function Build()
         line:Hide()
         holder.lines[i] = line
     end
+    Dress()
     Place()
     holder:Hide()
 end
 
 -- A line on the feed. key: what it is the same thing as (the same item again adds to its count).
-local function Feed(key, kind, what, count, icon)
+local function Feed(key, kind, what, count, icon, value)
     if not on then return end
     Build()
     local till = GetTime() + Seconds()
     for i = 1, ROWS do
         local r = rows[i]
         if r and r.key == key and kind then
-            r.count, r.till = r.count + count, till
+            r.count, r.till, r.value = r.count + count, till, (r.value or 0) + (value or 0)
             Layout()
             return
         end
     end
     for i = ROWS, 2, -1 do rows[i] = rows[i - 1] end
-    rows[1] = { key = key, kind = kind, what = what, count = count, icon = icon, till = till }
+    rows[1] = { key = key, kind = kind, what = what, count = count, icon = icon, till = till, value = value }
     for i = 1, ROWS do holder.lines[i].words = false end
     Layout()
 end
@@ -266,7 +330,7 @@ local function GotItem(link, count)
     s.items, s.value, s.last = s.items + count, s.value + value, time()
     Log({ time(), "i", link, count, value })
     if Shows("lootItems") and (tonumber(quality) or 1) >= (tonumber(YippRouteDB.lootQuality) or 0) then
-        Feed(id or link, "i", link, count, id and C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id) or nil)
+        Feed(id or link, "i", link, count, id and C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id) or nil, value)
     end
 end
 
@@ -354,7 +418,7 @@ local function BuildWindow()
     win.since:SetPoint("BOTTOMLEFT", 16, 14)
     local reset = S.Button(win, "New session", function() YR.LootSessionReset() end, nil, 110)
     reset:SetPoint("BOTTOMRIGHT", -16, 10)
-    reset.tip = "The sums start again from now. The list of items stays"
+    reset.tip = "Restarts the session totals. The item list is kept"
     local field = CreateFrame("Frame", nil, win)
     field:SetPoint("TOPLEFT", 16, -148)
     field:SetPoint("BOTTOMRIGHT", -16, 44)
@@ -386,7 +450,7 @@ local function BuildWindow()
         win.sum[4]:SetText(("%d"):format(s.xp))
         win.sum[5]:SetText(("%d"):format(s.xpHour))
         win.sum[6]:SetText(("%d"):format(s.items))
-        win.since:SetText(("This session: %s%d min. Vendor value is what a vendor pays, where the game says."):format(
+        win.since:SetText(("This session: %s%d min. Vendor value is the sell price, where the game provides it."):format(
             s.hours >= 1 and (math.floor(s.hours) .. " h ") or "", math.floor(s.hours * 60) % 60))
         list:Clear()
         local day
@@ -395,10 +459,10 @@ local function BuildWindow()
             if d ~= day then day = d list:AddMessage("---- " .. d .. " ----", 0.5, 0.53, 0.58) end
             local stamp = date and date("%H:%M", e[1]) or ""
             if e[2] == "i" then
-                list:AddMessage(("|cff7f8794%s|r  %s%s"):format(stamp, ItemText(e[3], e[4] or 1),
+                list:AddMessage(("|cff8a827a%s|r  %s%s"):format(stamp, ItemText(e[3], e[4] or 1),
                     (e[5] or 0) > 0 and ("   " .. YR.Coins(e[5])) or ""))
             else
-                list:AddMessage(("|cff7f8794%s|r  |cff66ccff+%d %s|r"):format(stamp, e[4] or 0, tostring(e[3])))
+                list:AddMessage(("|cff8a827a%s|r  |cff66ccff+%d %s|r"):format(stamp, e[4] or 0, tostring(e[3])))
             end
         end
         if list.ScrollToBottom then list:ScrollToBottom() end
@@ -421,6 +485,8 @@ function YR.LootFeedApply()
     end
     if YippRouteDB.lootLock == false then Build() end
     if holder then
+        Dress()
+        for i = 1, ROWS do holder.lines[i].words = false end
         Place()
         Layout()
     end
@@ -434,7 +500,8 @@ end
 --- A few made-up lines, to see the feed and place it (Settings).
 function YR.LootFeedSample()
     if not on then return false end
-    Feed("sample1", nil, "|cff1eff00[Sample Green Blade]|r x2", 0, "Interface\\Icons\\INV_Sword_04")
+    Feed("sample0", nil, "|cff9d9d9d[Chipped Claw]|r", 0, "Interface\\Icons\\INV_Misc_MonsterClaw_04", 4)
+    Feed("sample1", nil, "|cff1eff00[Sample Green Blade]|r x2", 0, "Interface\\Icons\\INV_Sword_04", 1240)
     Feed("sample2", nil, "+ " .. YR.Coins(1274), 0, "Interface\\Icons\\INV_Misc_Coin_01")
     Feed("sample3", nil, "|cffb48cff+320 XP|r", 0, "Interface\\Icons\\INV_Misc_Book_09")
     return true

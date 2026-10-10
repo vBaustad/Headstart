@@ -44,6 +44,7 @@ SHOTS = 0
 function Screenshot() SHOTS = SHOTS + 1 end   -- the QoL screenshot at a ding
 function GetInventoryItemDurability() return nil end
 function GetInventoryItemID() return nil end
+function GetInventoryItemTexture() return nil end
 function UnitExists() return false end   -- Quick group's bar: no target
 function UnitIsGroupLeader() return false end
 function UnitIsGroupAssistant() return false end
@@ -766,6 +767,11 @@ g.YippRouteDB.restock = None
 check(True, "settings page with reward settings opens")
 YR.ShowSettingsTab(YR, "trainer")        # the Trainer tab: the class's spells with a choice each
 check(True, "settings Trainer tab opens")
+# the Trainer page lists what a trainer teaches: Sinister Strike from its second rank (level 6), no talent's own ranks
+_ts = open(os.path.join(ROOT, "Data", "TrainerSpells.lua"), encoding="utf-8").read()
+_rogue = _ts[_ts.index("    ROGUE = {"):_ts.index("    SHAMAN = {")]
+check('{ 1757, 6, "Sinister Strike", 2,' in _rogue and "Fist Weapon Specialization" not in _rogue and '"Stealth", 1,' in _rogue,
+      "trainer data: a rogue is taught Sinister Strike 2 at level 6 and Stealth, and no rank of a talent")
 # the QoL tab: the campfire icon, the flight timer, and the reward picker with a hand-picked reward listed
 YR.RewardSettings(YR).chosen[123] = lua.eval('{ item = 1, name = "Sturdy Boots", title = "A Test Quest" }')
 YR.ShowSettingsTab(YR, "qol")
@@ -798,16 +804,102 @@ check(YR.WindowTab() == "qol", "the Trainer page is on the QoL tab")
 for key in ("start", "xpbar", "swing", "chat", "windows", "instances", "main", "rxpskin", "dmgskin", "skins", "talentwin"):
     YR.ShowSettingsTab(YR, key)
 check(True, "Chat, Bars & windows, the two skins and the pages' old names open")
-found = YR.SettingsSearch("instances an hour")
+found = YR.SettingsSearch("hourly limit")
 check(found is not None and len(found) == 1 and found[1].key == "instances",
       "the instance tracker's settings are found on the Instances page")
 YR.SettingsGo(found[1])
 check(True, "and going to one opens that page's settings")
 found = YR.SettingsSearch("micro menu")
-check(found is not None and len(found) == 1 and found[1].key == "windows", "the bag bar and micro menu are on Bars & windows")
+check(found is not None and len(found) >= 1 and all(found[i].key == "windows" for i in range(1, len(found) + 1)),
+      "the bag bar and micro menu are on Bars & windows")
+# a feature is found by the name a player would type, and by words that aren't in its name
+for words, page in (("death recap", "recap"), ("died", "recap"), ("altoholic", "alts"), ("campfire", "camps")):
+    found = YR.SettingsSearch(words)
+    check(found is not None and len(found) >= 1 and found[1].key == page, f"searching \"{words}\" finds the {page} page")
+# All features: the first page, a card for everything, each leading to a section that is there
+YR.ShowSettingsTab(YR, "home")
+YR.SettingsSearch("")
+missing = lua.eval("""(function()
+    local YR = HeadstartNS
+    local have, out = {}, {}
+    for _, e in ipairs(YR.SettingsIndex()) do if e.card then have[e.key .. "/" .. e.label] = true end end
+    for _, group in ipairs(YR.HomeFeatures()) do
+        for i = 2, #group do
+            local f = group[i]
+            if not f.go and not have[f.page .. "/" .. f.section] then out[#out + 1] = f.name end
+            if f.get then
+                local was = f.get() and true or false
+                f.set(not was)
+                if (f.get() and true or false) == was then out[#out + 1] = f.name .. " switch" end
+                f.set(was)
+            elseif type(f.state()) ~= "string" then out[#out + 1] = f.name .. " state" end
+        end
+    end
+    return table.concat(out, ", ") end)()""")
+check(missing == "", f"every card on All features opens a section that exists, and its switch works ({missing})")
+# the news on the first page names cards that exist; the XP bar's samples; the accents
+news_missing = lua.eval("""(function()
+    local YR = HeadstartNS
+    local _, news = YR.HomeNews()
+    local have, out = {}, {}
+    for _, group in ipairs(YR.HomeFeatures()) do for i = 2, #group do have[group[i].name] = true end end
+    for name in pairs(news) do if not have[name] then out[#out + 1] = name end end
+    return table.concat(out, ", ") end)()""")
+check(news_missing == "", f"every card under New in this version is a feature there is ({news_missing})")
+check(YR.XPBarSample("rested") == "rested" and YR.XPBarSampleNow() == "rested" and YR.XPBarSample(None) is None,
+      "the XP bar drawn as a sample, and as it really is again")
+accents = lua.eval("""(function()
+    local S = HeadstartNS.Style
+    local accent, out = S.C.accent, {}
+    for _, a in ipairs(S.ACCENTS) do
+        local got = S.Theme(a[1])
+        if got ~= a[1] or S.C.accent ~= accent or type(S.C.accent[1]) ~= "number" then out[#out + 1] = a[1] end
+    end
+    if S.Theme("nonsense") ~= "ember" then out[#out + 1] = "unknown name" end
+    S.Theme("ember")
+    return table.concat(out, ", ") end)()""")
+check(accents == "", f"every accent sets the look's colours in place, and an unknown one is Ember ({accents})")
+# Layout that can be worked out without the game: the menu ends inside the window, the words on a card
+# and in a card's head fit the room they have (11px narrow type is about 5.2px a letter, 13px about 6.2)
+bottom, room = YR.SettingsMenuFits()
+check(bottom is not None and bottom <= room - 4, f"the menu's last row ends inside the window ({bottom} of {room})")
+tight = lua.eval("""(function()
+    local YR, out = HeadstartNS, {}
+    local w = math.floor((1140 - 210 - 40 - 16) / 3)
+    for _, group in ipairs(YR.HomeFeatures()) do
+        for i = 2, #group do
+            local f = group[i]
+            if #f.name * 6.2 > w - 46 - 62 then out[#out + 1] = f.name end
+            if #f.desc * 5.2 > 2 * (w - 56) then out[#out + 1] = f.name .. " (line)" end
+        end
+    end
+    for _, e in ipairs(YR.SettingsIndex()) do
+        -- a card's head: icon, name, note, then "N changed - Reset" and the switch
+        if e.card and 44 + #e.label * 6.8 + 10 + #(e.tip or "") * 5.2 > 680 - 170 then out[#out + 1] = e.label .. " (note)" end
+    end
+    return table.concat(out, ", ") end)()""")
+check(tight == "", f"every card's name, line and note fits its room ({tight})")
+contrast = lua.eval("""(function()
+    local S, out = HeadstartNS.Style, {}
+    local function Lum(c)
+        local function f(v) return v <= 0.03928 and v / 12.92 or ((v + 0.055) / 1.055) ^ 2.4 end
+        return 0.2126 * f(c[1]) + 0.7152 * f(c[2]) + 0.0722 * f(c[3])
+    end
+    local function Ratio(a, b) local x, y = Lum(a), Lum(b) if x < y then x, y = y, x end return (x + 0.05) / (y + 0.05) end
+    for _, a in ipairs(S.ACCENTS) do
+        if a[3] then
+            S.Theme(a[1])
+            if Ratio(S.C.onAccent, S.C.accent) < 4.5 then out[#out + 1] = a[1] .. " button text" end
+            if Ratio(S.C.accent, S.C.card) < 3 then out[#out + 1] = a[1] .. " on a card" end
+            if Ratio(S.C.text, S.C.card) < 7 or Ratio(S.C.muted, S.C.card) < 3 then out[#out + 1] = a[1] .. " text" end
+        end
+    end
+    S.Theme("ember")
+    return table.concat(out, ", ") end)()""")
+check(contrast == "", f"text on the accent, the accent on a card and the text colours are readable in every look ({contrast})")
 found = YR.SettingsSearch("button strip")
 check(found is not None and len(found) == 1 and found[1].key == "chat", "the chat's buttons are on Chat")
-found = YR.SettingsSearch("volume follows")
+found = YR.SettingsSearch("volume channel")
 check(found is not None and len(found) == 1 and found[1].key == "chat", "and so is the whisper sound")
 YR.SettingsSearch("")
 # a menu with a button on each line (the speaker on the whisper sounds): it acts on that line's value
@@ -1230,6 +1322,8 @@ import smoke_questlfg
 bad += smoke_questlfg.run()
 import smoke_alts
 bad += smoke_alts.run()
+import smoke_macrohelper
+bad += smoke_macrohelper.run()
 # A frame's name is a global, and so is a saved variable's: one name for both and the frame replaces
 # the saved table (or the game's Esc handling finds the table where it looks for the frame).
 import glob as _glob, re as _re

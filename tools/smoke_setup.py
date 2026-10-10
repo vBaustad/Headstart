@@ -86,7 +86,8 @@ function HasAction(s) return BAR[s] ~= nil end
 function GetActionInfo(s) local b = BAR[s] return b.kind, b.id end
 function GetActionText(s) local b = BAR[s] if not b then return nil end return b.kind == "macro" and (MACROS[b.id] or {})[1] or nil end
 function GetMacroIndexByName(n) for i, m in pairs(MACROS) do if m[1] == n then return i end end return 0 end
-function GetMacroInfo(i) local m = MACROS[i] if m then return m[1], m[2], m[3] end end
+-- as the game does: a macro's text comes back with a line break at its end that was never written
+function GetMacroInfo(i) local m = MACROS[i] if m then return m[1], m[2], m[3] and (m[3] .. "\n") end end
 function GetNumMacros() local a, c = 0, 0 for i in pairs(MACROS) do if i <= 120 then a = a + 1 else c = c + 1 end end return a, c end
 function DeleteMacro(i)          -- the game shifts the later ones down
     local last = i
@@ -142,7 +143,7 @@ function RXP:LoadGuideTable(group, name) self.loaded = group .. "|" .. name end
 ''')
 YS = lua.table()
 lua.globals().HeadstartNS = YS            # the setup addon takes Headstart's table from this
-for f in ("Style.lua", "Headstart_Setup/SpellLevels.lua", "Headstart_Setup/Setup.lua", "Headstart_Setup/SetupUI.lua"):
+for f in ("Style.lua", "Headstart_Setup/SpellLevels.lua", "Headstart_Setup/Setup.lua", "Headstart_Setup/Layouts.lua", "Headstart_Setup/SetupUI.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
         open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
     chunk("Headstart", YS)
@@ -151,7 +152,7 @@ YS = YS.Setup          # the setup's own table inside Headstart
 g = lua.globals()
 SURE = lua.eval("{ sure = true }")      # Set up on a character in play asks first: the tests have answered
 lua.execute(r'''
-YippSetupDB, YippSetupCharDB = {}, {}
+YippSetupDB, YippSetupCharDB = { remember = false }, {}     -- (remembering bars as they change has its own cases, at the end)
 MACROS[121] = { "AutoFeed", 134400, "#showtooltip\n/use item:8950" }    -- the main's AutoFeed food macro
 MACROS[122] = { "Heal", 134400, "#showtooltip Holy Light(Rank 9)\n/cast [@mouseover] Holy Light(Rank 9); Holy Light (Rank 9)" }
 BAR = { [1] = {kind="spell", id=10329}, [2] = {kind="spell", id=19943}, [3] = {kind="spell", id=1311649},
@@ -229,10 +230,11 @@ bad += again != 0
 # a question-mark macro for a spell taken off the layout goes.
 lua.execute(r'''local last = 120 while MACROS[last + 1] do last = last + 1 end
     MACROS[last + 1] = { "MyOwn", 132089, "/cast [stealth] Ambush" }
-    MACROS[last + 2] = { "Gone", 134400, "#showtooltip Retired Spell\n/cast Retired Spell" }''')
+    MACROS[last + 2] = { "Gone", 134400, "#showtooltip Retired Gone\n/cast Retired Gone" }
+    MACROS[last + 3] = { "Keep", 134400, "#showtooltip Retired Gone\n/cast !Retired Gone" }''')
 YS.Apply(YS, None, None, SURE)
 left = [g.MACROS[k][1] for k in g.MACROS]
-ok = "MyOwn" in left and "Gone" not in left
+ok = "MyOwn" in left and "Gone" not in left and "Keep" in left
 print(("ok  " if ok else "FAIL"), "set up again: your own macro stays, an unused question mark goes", left)
 bad += not ok
 lua.execute("for k = 200, 121, -1 do if MACROS[k] and MACROS[k][1] == 'MyOwn' then DeleteMacro(k) end end")
@@ -268,6 +270,17 @@ w.setup._OnClick(w.setup)
 ok = ok and not w.IsShown(w)
 print(("ok  " if ok else "FAIL"), "Apply: the window stays in a fight, and goes once the layout is applied")
 bad += not ok
+# Apply interface alone doesn't mark the character done: after the reload it ends in, the window is back for the bars
+lua.execute("YippSetupCharDB.seen = nil YippSetupCharDB.uiApplied = nil")
+w.Show(w)
+YS.Refresh(YS)
+both = w.both.IsShown(w.both)
+w.applyUI._OnClick(w.applyUI)
+ok = (g.YippSetupCharDB.seen is None and g.YippSetupCharDB.uiApplied is not None and w.IsShown(w)
+      and not w.both.IsShown(w.both) and "Interface applied" in w.ui.GetText(w.ui))
+print(("ok  " if ok else "FAIL"), f"Apply interface: noted, the character not marked done, the window still there for the bars (both offered before: {both})")
+bad += not ok
+w.Hide(w)
 # A character where AutoFeed hasn't made its macro yet: AutoFeed is asked to make it (so it owns and
 # fills it), and it goes in its slot. Nothing is copied from the main.
 lua.execute(r'''MACROS = {}; AutoFeedCharDB = { owned = {} }''')
@@ -550,7 +563,7 @@ lua.execute("Fresh()")
 YS.Apply(YS, None, None, SURE)
 plan, now, differ, won = YS.PlanStart()
 saved = YS.Profile(YS).slots
-ok = all(plan[k] is not None for k in saved) and plan[4] is not None and plan[4].kind == "spell" and now[4] is not None and now[4].kind == "macro"
+ok = all(plan[k] is not None for k in saved) and plan[4] is not None and plan[4].kind == "spell" and now[4] is not None and now[4].kind == "spell"
 print(("ok  " if ok else "FAIL"), "the planner's start: every saved button, and a question-mark macro on the bar read as its spell")
 bad += not ok
 lua.execute("BAR[60] = { kind = 'spell', id = 635 }")
@@ -727,7 +740,7 @@ lua.execute("Fresh()")
 # Nothing of it is changed or lost: the layout's class gets both, other classes start from the options.
 lua.execute(r'''
 OLD_PROFILE = { from = "Friend-Realm", class = "PALADIN", scanned = 1, slots = {}, ui = { cvars = {}, bars = {} } }
-YippSetupDB = { options = { maxLevel = 14, items = true, clearBars = false }, profile = OLD_PROFILE }
+YippSetupDB = { remember = false, options = { maxLevel = 14, items = true, clearBars = false }, profile = OLD_PROFILE }
 ''')
 o = YS.Options(YS)
 p = YS.Profile(YS)
@@ -915,18 +928,379 @@ report(saved[21] is None, "a spell you could have and took off the bar: gone, as
 report(saved[22] is not None and saved[22].kind == "spell" and saved[22].name == "Exorcism",
        "the question-mark macro Headstart made for Exorcism is saved as the spell, not a macro of yours")
 report(saved[1] is not None and saved[1].name == "Holy Light", "what's on the bars now is saved as usual")
-# A spell not learned yet waits as a macro with the spell's own icon (the plan's data), not a question mark
+# A spell not learned yet waits as a question-mark macro. (For a while it had the spell's own icon: those are put back.)
 lua.execute("""HeadstartNS.PlannerSpells = { PALADIN = { ["Exorcism"] = { 879, 135903 }, ["Holy Light"] = { 635, 135920 } } }
-    EDITED = {} function EditMacro(i, name, icon, body) EDITED[i] = icon MACROS[i][2] = icon end
-    function InCombatLockdown() return false end
-    KNOWN = { [635] = true }
-    MACROS = { [121] = { "Exorcism", 134400, "#showtooltip Exorcism\\n/cast Exorcism" }, [122] = { "Mine", 134400, "/say hi" },
-        [123] = { "Light", 134400, "#showtooltip Holy Light\\n/cast Holy Light" } }""")
+    function EditMacro(i, name, icon, body) MACROS[i][2] = icon end
+    MACROS = { [121] = { "Exorcism", 135903, "#showtooltip Exorcism\\n/cast Exorcism" }, [122] = { "Mine", 135903, "/say hi" },
+        [123] = { "My own", 135903, "#showtooltip Exorcism\\n/cast Exorcism" } }""")
 icon = lua.eval('(select(2, YR_SETUP.MacroFor({ kind = "spell", name = "Exorcism", level = 20 })))')
-report(icon == 135903, f"a spell you haven't learned: its macro has the spell's own icon ({icon})")
-known = lua.eval('(function() local old = C_Spell.GetSpellInfo C_Spell.GetSpellInfo = function() return { spellID = 635 } end local was = IsPlayerSpell IsPlayerSpell = function() return true end local i = select(2, YR_SETUP.MacroFor({ kind = "spell", name = "Holy Light" })) C_Spell.GetSpellInfo, IsPlayerSpell = old, was return i end)()')
-report(known == 134400, "one you know keeps the question mark, which the game turns into the spell's icon")
+report(icon == 134400, f"a spell you haven't learned: its macro has the question mark ({icon})")
 n = lua.eval("YR_SETUP.PlaceholderIcons()")
-report(n >= 1 and g.MACROS[121][2] == 135903 and g.MACROS[122][2] == 134400,
-       f"the question marks already on your bars get their icons; a macro of your own is left alone ({n})")
+report(n == 1 and g.MACROS[121][2] == 134400 and g.MACROS[122][2] == 135903 and g.MACROS[123][2] == 135903,
+       f"a waiting macro that was given the spell's icon gets its question mark back; macros of your own are left alone ({n})")
+# A macro Headstart made for a spell is that spell wherever the bars are read - also with no saved layout to say so
+lua.execute("""Fresh()
+    KEPT_PROFILE2 = YippSetupDB.classes.PALADIN.profile
+    YippSetupDB.classes.PALADIN.profile = nil
+    MACROS = { [121] = { YR_SETUP.MacroFor({ kind = "spell", name = "Exorcism", level = 20 }) }, [122] = { "Exo", 134400, "#showtooltip Exorcism\\n/cast Exorcism" },
+        [123] = { "Mine", 134400, "/say hi" } }
+    BAR = { [5] = { kind = "macro", id = 121 }, [6] = { kind = "macro", id = 122 }, [7] = { kind = "macro", id = 123 } }""")
+now, _ = YS.ReadBars()
+report(now[5] is not None and now[5].kind == "spell" and now[5].name == "Exorcism" and now[5].level == 20,
+       "a question-mark macro Headstart made, with no saved layout: read as its spell")
+report(now[6].kind == "macro" and now[7].kind == "macro", "a macro of your own for the same spell (another name), and any other macro: macros")
+lua.execute("""YippSetupDB.classes.PALADIN.profile = { class = "PALADIN", planned = true, slots = {
+    [5] = { kind = "macro", name = MACROS[121][1], icon = 134400, body = MACROS[121][3] }, [7] = { kind = "macro", name = "Mine", icon = 134400, body = "/say hi" } } }""")
+n = YS.RepairLayouts()
+slots = YS.Profile(YS).slots
+report(n == 1 and slots[5].kind == "spell" and slots[5].name == "Exorcism" and slots[7].kind == "macro",
+       f"a plan saved with such a macro in it is put right: the spell, and your own macro left ({n})")
+lua.execute("YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE2")
+# Copy this layout over a saved one asks first - a plan, another character's, or this one's own
+lua.execute("""ASKED = nil StaticPopup_Show = function(w, text) ASKED = { which = w, text = text } end
+    SCANNED_BEFORE = YippSetupDB.classes.PALADIN.profile.scanned""")
+YS.Copy(YS)
+report(g.ASKED is not None and g.ASKED.which == "YIPPSETUP_OVERWRITE" and "buttons" in g.ASKED.text
+       and g.YippSetupDB.classes.PALADIN.profile.scanned == g.SCANNED_BEFORE,
+       f"Copy this layout with a layout saved for the class: asked first, nothing replaced yet ({g.ASKED and g.ASKED.text})")
+lua.execute("KEPT_PROFILE3 = YippSetupDB.classes.PALADIN.profile YippSetupDB.classes.PALADIN.profile = nil ASKED = nil")
+YS.Copy(YS)
+report(g.ASKED is None and g.YippSetupDB.classes.PALADIN.profile is not None, "with none saved: copied at once")
+lua.execute("YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE3")
+# A spell a talent gives never waits as a question mark; how far ahead the others do is the class's choice
+lua.execute("""KEPT_PROFILE4 = YippSetupDB.classes.PALADIN.profile
+    YippSetupDB.classes.PALADIN.profile = { class = "PALADIN", from = "Main-Realm", slots = {
+        [1] = { kind = "spell", name = "Holy Light", level = 1 }, [4] = { kind = "spell", name = "Seal of the Crusader", level = 6 } } }
+    Fresh() YippSetupCharDB.layout = nil""")
+YS.Apply(YS, None, None, SURE)
+had = g.BAR[4] is not None and g.BAR[4].kind == "macro"
+lua.execute("Fresh() YippSetupCharDB.layout = nil YippSetupCharDB.placed = nil YR_SETUP.TALENTS = { PALADIN = { ['Seal of the Crusader'] = 30 } }")
+YS.Apply(YS, None, None, SURE)
+report(had and g.BAR[4] is None and YS.IsTalent("Seal of the Crusader") and not YS.IsTalent("Holy Light"),
+       "a spell a talent gives: no question mark for it, its button empty until you learn it")
+lua.execute("KNOWN[21082] = true YippSetupCharDB.applied = YippSetupCharDB.applied or time()")
+YS.Upgrade(YS)
+report(g.BAR[4] is not None and g.BAR[4].kind == "spell", "learned: it goes into its button")
+lua.execute("YR_SETUP.TALENTS = nil Fresh() YippSetupCharDB.layout = nil YR_SETUP:Options().ahead = 0")
+YS.Apply(YS, None, None, SURE)
+report(g.BAR[4] is None and YS.Ahead(YS.Options(YS)) == 0, "levels ahead set to 0: no question mark for a spell you can't train yet")
+lua.execute("YR_SETUP:Options().ahead = nil")
+report(YS.Ahead(YS.Options(YS)) == 10, "never set: ten levels ahead")
+lua.execute("YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE4")
+# Choices changed since the layout was last put on this character: said so until it is applied again
+lua.execute("Fresh() YippSetupCharDB.choices = nil")
+YS.Apply(YS, None, None, SURE)
+lua.execute("YippSetupCharDB.applied = YippSetupCharDB.applied or time()")
+report(YS.ChoicesPending() is False, "just applied: the choices are on the bars")
+lua.execute("YR_SETUP:Options().spellButtons = 'spells'")
+report(YS.ChoicesPending() is True, "question marks changed to Only spells: not on the bars yet")
+lua.execute("YR_SETUP:Options().spellButtons = 'placeholder'")
+report(YS.ChoicesPending() is False, "changed back: nothing pending")
+lua.execute("YR_SETUP:Options().ahead = 3")
+report(YS.ChoicesPending() is True, "the levels ahead changed: pending")
+YS.Apply(YS, None, None, SURE)
+report(YS.ChoicesPending() is False, "applied again: up to date")
+lua.execute("YR_SETUP:Options().ahead = nil YippSetupCharDB.choices = nil")
+report(YS.ChoicesPending() is False and g.YippSetupCharDB.choices is not None, "a character set up before this was kept: taken as up to date, from now")
+# RestedXP's windows: their places and sizes, from its own profile into the new character's
+lua.execute("""SAVES, LOADS = 0, 0
+    RXP = RXP or {}
+    RXP.settings = { profile = { framePositions = { RXPFrame = { { "LEFT", nil, "LEFT", 40, 120 } }, arrowFrame = { { "TOP", "UIParent", "TOP", 0, -80 } },
+        activeItemFrame = { { "CENTER", "UIParent", "CENTER", 200, 0 } } }, frameSizes = { RXPFrame = { 300, 400 } } },
+        SaveFramePositions = function() SAVES = SAVES + 1 end, LoadFramePositions = function() LOADS = LOADS + 1 end }""")
+saved = YS.ScanRXP()
+report(saved is not None and saved.positions.RXPFrame[1][4] == 40 and saved.sizes.RXPFrame[1] == 300 and g.SAVES == 1,
+       "RestedXP's windows are read from its profile, as they are this moment")
+lua.execute("""RXP.settings.profile = { framePositions = { RXPFrame = { { "LEFT", nil, "LEFT", 0, 35 } }, other = { { "TOP" } } } }""")
+said = YS.ApplyRXP(saved)
+prof = lua.eval("RXP.settings.profile")
+report(said == "3 placed" and prof.framePositions.RXPFrame[1][4] == 40 and prof.framePositions.arrowFrame[1][5] == -80
+       and prof.frameSizes.RXPFrame[2] == 400 and prof.framePositions.other is not None and g.LOADS == 1,
+       f"and put into this character's: three windows placed, RestedXP told to move them, nothing else of its settings touched ({said})")
+saved.positions.RXPFrame[1][4] = 999
+report(prof.framePositions.RXPFrame[1][4] == 40, "(a copy: the saved one and RestedXP's own don't share a table)")
+report(YS.ApplyRXP(None) == "none saved", "nothing saved: said so")
+# RestedXP's look goes along (it keeps its settings per character): theme, scales, font - not how a character plays
+lua.execute("""RXP.settings.profile = { activeTheme = "Headstart", windowScale = 1.3, guideFontSize = 11, hardcore = true,
+    framePositions = { RXPFrame = { { "LEFT", nil, "LEFT", 5, 5 } } } }""")
+look = YS.ScanRXP()
+report(look.look.activeTheme == "Headstart" and look.look.windowScale == 1.3 and look.look.hardcore is None,
+       "RestedXP's look is read: its theme and scales, nothing a character plays by")
+lua.execute("""THEMED = 0
+    RXP.LoadActiveTheme = function() THEMED = THEMED + 1 end
+    RXP.settings.profile = { activeTheme = "RXP Blue", windowScale = 1, hardcore = false, framePositions = {} }""")
+said = YS.ApplyRXP(look)
+prof = lua.eval("RXP.settings.profile")
+report(said == "1 placed, look copied" and prof.activeTheme == "Headstart" and prof.windowScale == 1.3 and prof.hardcore is False
+       and g.THEMED == 1, f"and put on: the theme and scale are this character's now, drawn at once ({said}, {g.THEMED})")
+report(YS.UIStale(lua.eval("{}")) is True and YS.UIStale(lua.eval("{ v = YR_SETUP.UI_VERSION }")) is False,
+       "an interface saved by an older Headstart is known as one")
+lua.execute("KEPT_RXP = RXP.settings RXP.settings = nil")
+report(YS.ScanRXP() is None and YS.ApplyRXP(saved) == "RestedXP not loaded", "RestedXP without its settings: nothing read, and said so")
+lua.execute("RXP.settings = KEPT_RXP")
+# Setting up again takes Headstart's own waiting macros off - and no macro of yours that only looks like one
+lua.execute("""KEPT_PROFILE5 = YippSetupDB.classes.PALADIN.profile
+    YippSetupDB.classes.PALADIN.profile = { class = "PALADIN", from = "Main-Realm", slots = {
+        [1] = { kind = "spell", name = "Holy Light", level = 1 }, [4] = { kind = "spell", name = "Seal of the Crusader", level = 6 } } }
+    Fresh() YippSetupCharDB.layout = nil YippSetupCharDB.placed = nil KNOWN[21082] = nil""")
+YS.Apply(YS, None, None, SURE)
+lua.execute("""YippSetupCharDB.applied = YippSetupCharDB.applied or time()
+    CreateMacro("Crusader!", 134400, "#showtooltip Seal of the Crusader\\n/cast !Seal of the Crusader", true)
+    CreateMacro("Mine", 134400, "#showtooltip Holy Light\\n/cast [@mouseover,help][] Holy Light", true)
+    YR_SETUP:Options().spellButtons = "spells" """)
+YS.Apply(YS, None, None, lua.eval("{ sure = true, barsOnly = true }"))
+names = sorted(g.MACROS[k][1] for k in g.MACROS)
+report("Crusader" not in names and "Crusader!" in names and "Mine" in names and g.BAR[4] is None,
+       f"changed to Only spells and applied: the question mark is gone, macros of your own that begin the same way stay ({names})")
+lua.execute("YR_SETUP:Options().spellButtons = nil YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE5")
+# Question marks your choices no longer ask for come off without setting the whole character up again
+lua.execute("""KEPT_PROFILE6 = YippSetupDB.classes.PALADIN.profile
+    YippSetupDB.classes.PALADIN.profile = { class = "PALADIN", from = "Main-Realm", slots = {
+        [1] = { kind = "spell", name = "Holy Light", level = 1 }, [4] = { kind = "spell", name = "Seal of the Crusader", level = 6 } } }
+    Fresh() YippSetupCharDB.layout = nil YippSetupCharDB.placed = nil KNOWN[21082] = nil YR_SETUP:Options().spellButtons = "placeholder" """)
+YS.Apply(YS, None, None, SURE)
+lua.execute("""local last = 120 while MACROS[last + 1] do last = last + 1 end
+    MACROS[last + 1] = { "Mine", 134400, "/say hi" } BAR[9] = { kind = "macro", id = last + 1 }""")
+had = g.BAR[4] is not None and g.BAR[4].kind == "macro"
+report(had and YS.TidyPlaceholders() == 0 and g.BAR[4].kind == "macro", "question marks wanted: tidying takes nothing off")
+lua.execute("YR_SETUP:Options().spellButtons = 'spells'")
+n = YS.TidyPlaceholders()
+names = sorted(g.MACROS[k][1] for k in g.MACROS)
+report(n == 1 and g.BAR[4] is None and "Crusader" not in names and "Mine" in names and g.BAR[9] is not None and g.BAR[1] is not None,
+       f"changed to Only spells: the question mark comes off its button and is deleted, your own macro and your spells stay ({n}, {names})")
+report(YS.TidyPlaceholders() == 0, "and again: nothing more to take")
+lua.execute("COMBAT = true")
+report(YS.TidyPlaceholders() == 0, "in a fight: nothing is touched")
+lua.execute("COMBAT = false YR_SETUP:Options().spellButtons = nil YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE6")
+# Bar layouts: more than one for a class, one click between them, and your two specs
+lua.execute("""KEPT_PROFILE7 = YippSetupDB.classes.PALADIN.profile
+    YippSetupDB.classes.PALADIN.layouts = nil YippSetupDB.classes.PALADIN.profileName = nil YippSetupDB.specAsk = nil
+    YippSetupDB.classes.PALADIN.profile = { class = "PALADIN", from = "Main-Realm", slots = {
+        [1] = { kind = "spell", name = "Holy Light", level = 1 }, [2] = { kind = "spell", name = "Stoneform", level = 1, racial = true } } }
+    Fresh() YippSetupCharDB.layout = nil YippSetupCharDB.placed = nil YippSetupCharDB.layoutName = nil YippSetupCharDB.specLayouts = nil
+    MYSPEC = 1 C_SpecializationInfo = { GetActiveSpecGroup = function() return MYSPEC end }
+    YR_SETUP:Options().mouseover = "" """)
+YS.Apply(YS, None, None, SURE)
+lua.execute("YippSetupCharDB.applied = YippSetupCharDB.applied or time()")
+names = lambda: list(YS.LayoutNames().values())
+report(names() == ["Main"] and YS.LayoutName() == "Main", "a class starts with one bar layout, Main")
+New = lua.eval("function(n) local ok, why = YR_SETUP.LayoutNew(n) return { ok = ok, why = why } end")
+Switch = lua.eval("function(n) local ok, why = YR_SETUP.LayoutSwitch(n) return { ok = ok, why = why } end")
+r = New("Tank")
+report(r.ok is True and names() == ["Main", "Tank"] and YS.LayoutName() == "Tank" and g.BAR[1] is not None
+       and YS.Profile(YS).slots[1].name == "Holy Light", "a new one: your bars as they are, under a name, and you are on it")
+report(New("tank").ok is False and New("  ").ok is False, "a name taken (whatever its case) or none: not made")
+# changed by hand on Tank, then back to Main: Tank remembers, Main is put on
+lua.execute("BAR[2] = nil BAR[3] = { kind = 'spell', id = 20594 }")
+r = Switch("Main")
+report(r.ok is True and YS.LayoutName() == "Main" and g.BAR[2] is not None and g.BAR[2].id == 20594 and g.BAR[3] is None,
+       "back to Main: its buttons are on the bars again")
+tank = g.YippSetupDB.classes.PALADIN.layouts.Tank.slots
+report(tank[3] is not None and tank[3].name == "Stoneform" and tank[2] is None, "and Tank was saved as the bars were when you left it")
+lua.execute("BAR[40] = { kind = 'companion', id = 7 }")
+r = Switch("Tank")
+report(r.ok is True and g.BAR[3] is not None and g.BAR[3].id == 20594 and g.BAR[2] is None and g.BAR[40] is not None,
+       "to Tank again: its buttons, and a button no layout holds (a mount) is left where it is")
+report(Switch("Tank").ok is False and Switch("Nope").ok is False, "the one you're on, or one there isn't: nothing happens")
+lua.execute("COMBAT = true")
+report(Switch("Main").ok is False and YS.LayoutName() == "Tank", "in a fight: not switched")
+lua.execute("COMBAT = false")
+# two specs: the layout a spec was on is remembered, and asked about when you come back to it
+lua.execute("ASKED = nil StaticPopup_Show = function(w, a, b, data) ASKED = { which = w, to = a, from = b, data = data } end")
+lua.execute("MYSPEC = 2")
+YS.OnSpecChanged(2, 1)
+report(g.ASKED is None and g.YippSetupCharDB.specLayouts[1] == "Tank", "the other spec, which has had no layout yet: nothing asked; Tank is noted as the first spec's")
+Switch("Main")
+report(g.YippSetupCharDB.specLayouts[2] == "Main", "switched by hand in the second spec: Main is that spec's")
+lua.execute("MYSPEC = 1")
+YS.OnSpecChanged(1, 2)
+report(g.ASKED is not None and g.ASKED.which == "YIPPSETUP_SPEC" and g.ASKED.to == "Tank" and g.ASKED.data == "Tank" and YS.LayoutName() == "Main",
+       "back to the first spec: asked whether to switch to Tank, nothing switched yet")
+lua.execute("StaticPopupDialogs.YIPPSETUP_SPEC.OnAccept(nil, ASKED.data)")
+report(YS.LayoutName() == "Tank", "Switch: on Tank")
+lua.execute("YippSetupDB.specAsk = 'auto' ASKED = nil MYSPEC = 2")
+YS.OnSpecChanged(2, 1)
+report(g.ASKED is None and YS.LayoutName() == "Main", "set to switch by itself: switched, not asked")
+lua.execute("YippSetupDB.specAsk = 'off' MYSPEC = 1")
+YS.OnSpecChanged(1, 2)
+report(g.ASKED is None and YS.LayoutName() == "Main", "turned off: neither")
+lua.execute("YippSetupDB.specAsk = nil StaticPopupDialogs.YIPPSETUP_SPEC.OnAlt()")
+report(g.YippSetupDB.specAsk == "off", "'Don't ask again' turns it off")
+# a profile's own interface: kept as you leave it, put back when you come to it - only where turned on
+lua.execute("""YippSetupDB.specAsk = nil SCANS, PUT = 0, {}
+    REAL_SCAN, REAL_PUT = YR_SETUP.ScanProfileUI, YR_SETUP.ApplyProfileUI
+    YR_SETUP.ScanProfileUI = function() SCANS = SCANS + 1 return { layout = { name = "Screen " .. SCANS } } end
+    YR_SETUP.ApplyProfileUI = function(ui) PUT[#PUT + 1] = ui.layout.name return "Edit Mode '" .. ui.layout.name .. "'" end""")
+on_now = YS.LayoutName()
+other = "Tank" if on_now == "Main" else "Main"
+report(YS.ProfileOwnUI() is False, "a profile has no interface of its own until you say so")
+Switch(other)
+Switch(on_now)
+report(g.SCANS == 0 and len(g.PUT) == 0, "switching between profiles without one: your interface isn't read or touched")
+YS.SetProfileOwnUI(True)
+report(YS.ProfileOwnUI() is True and g.SCANS == 1 and YS.Profile(YS).ui.layout.name == "Screen 1", "turned on: the interface as it is now is this profile's")
+Switch(other)
+report(g.SCANS == 2 and len(g.PUT) == 0, "leaving it: its interface is saved as you leave it; the profile you go to has none, so nothing is put on")
+Switch(on_now)
+report(list(g.PUT.values()) == ["Screen 2"] and YS.ProfileOwnUI() is True, "coming back: its interface is put on, as you left it")
+YS.SetProfileOwnUI(False)
+report(YS.ProfileOwnUI() is False and YS.Profile(YS).ui is None, "turned off: it holds your bars only again")
+lua.execute("YR_SETUP.ScanProfileUI, YR_SETUP.ApplyProfileUI = REAL_SCAN, REAL_PUT YippSetupDB.specAsk = 'off' YippSetupCharDB.specLayouts[1] = 'Tank'")
+# rename and delete
+Rename = lua.eval("function(a, b) local ok, why = YR_SETUP.LayoutRename(a, b) return ok end")
+report(Rename("Tank", "Prot") is True and names() == ["Main", "Prot"] and g.YippSetupCharDB.specLayouts[1] == "Prot"
+       and Rename("Main", "Holy") is True and names() == ["Holy", "Prot"] and YS.LayoutName() == "Holy" and Rename("Prot", "Holy") is False,
+       "renamed: the class's first too; not to a name that is taken")
+Switch("Prot")
+Delete = lua.eval("function(n) local ok, why = YR_SETUP.LayoutDelete(n) return ok end")
+report(Delete("Holy") is False and Delete("Prot") is True and names() == ["Holy"] and YS.LayoutName() == "Holy" and g.BAR[3] is not None,
+       "deleted: never the class's first; a character on the deleted one is on the first again, its bars as they are")
+YS.OnSpecChanged(2, 1)
+report(g.ASKED is None, "one layout left: a spec change asks nothing")
+lua.execute("YR_SETUP:Options().mouseover = 'Purify'")
+lua.execute("YippSetupDB.specAsk = nil YippSetupDB.classes.PALADIN.layouts = nil YippSetupDB.classes.PALADIN.profileName = nil YippSetupCharDB.layoutName = nil YippSetupCharDB.specLayouts = nil BAR[40] = nil YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE7")
+# A profile remembers your bars as you change them
+lua.execute("""KEPT_PROFILE8 = YippSetupDB.classes.PALADIN.profile
+    YippSetupDB.classes.PALADIN.profile = { class = "PALADIN", from = "Main-Realm", planned = true, slots = {
+        [1] = { kind = "spell", name = "Holy Light", level = 1 }, [2] = { kind = "spell", name = "Stoneform", level = 1, racial = true },
+        [30] = { kind = "spell", name = "Exorcism", level = 20 } } }
+    Fresh() YippSetupCharDB.layout = nil YippSetupCharDB.placed = nil YippSetupCharDB.layoutName = nil YR_SETUP:Options().mouseover = ""
+    YippSetupDB.remember = nil""")
+YS.Apply(YS, None, None, SURE)
+lua.execute("YippSetupCharDB.applied = YippSetupCharDB.applied or time() BAR[2] = nil BAR[5] = { kind = 'spell', id = 20594 } BAR[6] = { kind = 'item', id = 6948 }")
+YS.RememberNow()
+slots = YS.Profile(YS).slots
+report(slots[5] is not None and slots[5].name == "Stoneform" and slots[2] is None and slots[6] is not None and slots[6].kind == "item",
+       "a spell dragged to another button, an item put on one: in the profile")
+report(slots[30] is not None and slots[30].name == "Exorcism" and slots[1].name == "Holy Light",
+       "a spell planned for a later level keeps its button, and what you didn't touch is as it was")
+report(g.YippSetupCharDB.layout[5] is not None, "and where spells learned later go follows it")
+lua.execute("COMBAT = true BAR[7] = { kind = 'spell', id = 635 }")
+YS.RememberNow()
+report(YS.Profile(YS).slots[7] is None, "in a fight: not read")
+lua.execute("COMBAT = false YippSetupDB.remember = false")
+YS.RememberNow()
+report(YS.Profile(YS).slots[7] is None and YS.Remembers() is False, "turned off: the profile only changes when you plan it or copy into it")
+lua.execute("YippSetupDB.remember = nil YippSetupCharDB.applied = nil")
+YS.RememberNow()
+report(YS.Profile(YS).slots[7] is None, "a character that isn't on the profile: its bars are nobody's profile, and aren't written over one")
+lua.execute("YR_SETUP:Options().mouseover = 'Purify' YippSetupDB.remember = false YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE8")
+# An item you put on a button yourself survives Apply, with "Items" off; and what you dragged a moment ago is saved first
+lua.execute("""KEPT_PROFILE9 = YippSetupDB.classes.PALADIN.profile
+    YippSetupDB.classes.PALADIN.profile = { class = "PALADIN", from = "Main-Realm", slots = {
+        [1] = { kind = "spell", name = "Holy Light", level = 1 }, [9] = { kind = "item", id = 4444, name = "A main's potion" } } }
+    Fresh() YippSetupCharDB.layout = nil YippSetupCharDB.placed = nil YR_SETUP:Options().mouseover = "" YR_SETUP:Options().items = false
+    COUNTS = { [6948] = 1 } C_Item.GetItemCount = function(id) return COUNTS[id] or 0 end
+    YippSetupDB.remember = nil""")
+YS.Apply(YS, None, None, SURE)
+report(g.BAR[9] is None and g.BAR[1] is not None, "Items off: an item this character hasn't got stays off its bars")
+lua.execute("YippSetupCharDB.applied = YippSetupCharDB.applied or time() BAR[12] = { kind = 'item', id = 6948 } ASKED = nil StaticPopup_Show = function(w) ASKED = w end")
+YS.Apply(YS)                # pressed straight after dragging the hearthstone out: asks (set up before) - and has saved it
+report(g.ASKED == "YIPPSETUP_AGAIN" and YS.Profile(YS).slots[12] is not None and YS.Profile(YS).slots[12].id == 6948,
+       "Apply pressed right after a button was dragged out: the bars are saved into the profile first")
+report(YS.Profile(YS).slots[9] is not None, "and the main's potion this character hasn't got keeps its button in the profile")
+YS.Apply(YS, None, None, lua.eval("{ sure = true, barsOnly = true }"))
+report(g.BAR[12] is not None and g.BAR[12].kind == "item" and g.BAR[12].id == 6948 and g.BAR[9] is None,
+       "applied: the hearthstone you carry is back on its button, with Items off")
+lua.execute("YR_SETUP:Options().mouseover = 'Purify' YR_SETUP:Options().items = nil YippSetupDB.remember = false YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE9")
+# Interfaces have names, and a character is on one. Saved on another character: this one doesn't save over it.
+lua.execute("""KEPT_UI = { ui = YippSetupDB.ui, from = YippSetupDB.uiFrom, at = YippSetupDB.uiScanned, prev = YippSetupDB.uiPrev,
+        iface = YippSetupCharDB.iface }
+    OTHER_UI = { cvars = {}, bars = {} }
+    YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned, YippSetupDB.uiFollow = OTHER_UI, "Healer-Realm", 1, nil
+    YippSetupCharDB.iface = nil
+    NOW_T = 1000
+    function time() NOW_T = NOW_T + 10 return NOW_T end
+    COMBAT = false""")
+me = YS.PlayerKey()
+report(YS.UISource() == "Healer-Realm" and YS.UIName() == "Main" and YS.UIOn() is False and YS.FollowUI() is False
+       and lua.eval("YippSetupDB.ui == OTHER_UI"),
+       "an interface saved on another character, never put on here: this character isn't on it and doesn't change it")
+YS.Scan(YS)
+report(lua.eval("YippSetupDB.ui == OTHER_UI") and lua.eval("YippSetupDB.uiFrom") == "Healer-Realm",
+       "saving this character's bars leaves the interface alone (it used to replace it)")
+lua.execute("ASKED = nil StaticPopup_Show = function(w, a, b) ASKED = { which = w, text = tostring(a) .. ' / ' .. tostring(b) } return ASKED end")
+YS.SaveInterface(YS)
+report(lua.eval("YippSetupDB.ui == OTHER_UI") and g.ASKED is not None and "Healer-Realm" in str(g.ASKED.text),
+       f"Save interface over one last saved elsewhere: asks first, nothing changed yet ({g.ASKED and g.ASKED.text})")
+YS.SaveInterface(YS, None, True)
+report(lua.eval("YippSetupDB.ui ~= OTHER_UI") and lua.eval("YippSetupDB.uiFrom") == me and YS.UIOn() is True
+       and lua.eval("YippSetupDB.uiPrev.ui == OTHER_UI") and YS.UIBehind() is False,
+       "answered: saved from this character, which is on it now, and the one before is kept")
+lua.execute("MARK_UI = YippSetupDB.ui")
+report(YS.FollowUI() is False and lua.eval("YippSetupDB.ui == MARK_UI"), "nothing changed on screen since: not saved again (no one is asked for nothing)")
+lua.execute("CVARS_LIVE = CVARS_LIVE or {} local get = C_CVar.GetCVar C_CVar.GetCVar = function(n) if n == 'autoLootDefault' then return 'changed' end return get(n) end")
+report(YS.FollowUI() is True and lua.eval("YippSetupDB.ui ~= MARK_UI") and lua.eval("YippSetupDB.uiFrom") == me and YS.UIBehind() is False,
+       "a setting changed on this character: saved into the interface quietly")
+lua.execute("MARK_UI = YippSetupDB.ui YippSetupDB.uiFollow = false local get = C_CVar.GetCVar C_CVar.GetCVar = function(n) if n == 'autoLootDefault' then return 'again' end return get(n) end")
+report(YS.FollowUI() is False and lua.eval("YippSetupDB.ui == MARK_UI") and YS.UIFollows() is False, "turned off: it isn't")
+lua.execute("YippSetupDB.uiFollow = nil COMBAT = true")
+report(YS.FollowUI() is False and lua.eval("YippSetupDB.ui == MARK_UI"), "nor in a fight")
+# saved on another character since: this one is behind, saves nothing over it, and the window asks
+lua.execute("""COMBAT = false
+    ELSE_UI = { cvars = { autoLootDefault = "1" }, bars = {}, v = YR_SETUP.UI_VERSION }
+    YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned = ELSE_UI, "Moray-Realm", time()""")
+behind = lua.eval("{ YR_SETUP.UIBehind() }")
+report(behind[1] is True and behind[2] == "Moray-Realm" and YS.FollowUI() is False and lua.eval("YippSetupDB.ui == ELSE_UI"),
+       "the interface saved on another character since: this one is behind, and logging out saves nothing over it")
+w = g.YippSetupFrame
+w.Hide(w)
+events = g.FRAMES[2]
+lua.execute("AFTER_KEEP = {} local after = C_Timer.After C_Timer.After = function(t, fn) AFTER_KEEP[#AFTER_KEEP + 1] = fn end")
+YS.Toggle(YS)
+report(w.IsShown(w) and w.update.IsShown(w.update) and w.keep.IsShown(w.keep) and not w.both.IsShown(w.both)
+       and not w.setup.IsShown(w.setup) and "Moray-Realm" in w.ui.GetText(w.ui) and "Main" in w.ui.GetText(w.ui),
+       f"the window asks: changed on the other character, Update or keep this one's ({w.ui.GetText(w.ui)})")
+w.update._OnClick(w.update)
+report(YS.UIBehind() is False and not w.IsShown(w) and lua.eval("YippSetupDB.ui == ELSE_UI") and lua.eval("YippSetupCharDB.iface.sig") is None,
+       "Update: the changed interface is put on, this character has that save, and the saved one is untouched")
+YS.UISettle()
+report(lua.eval("YippSetupCharDB.iface.sig") is not None and lua.eval("YippSetupDB.ui == ELSE_UI") and YS.FollowUI() is False,
+       "once it has settled, how the screen reads here is noted - and nothing is saved for that")
+lua.execute("YippSetupDB.uiFrom, YippSetupDB.uiScanned = 'Moray-Realm', time()")
+YS.Toggle(YS)
+w.keep._OnClick(w.keep)
+report(YS.UIBehind() is False and lua.eval("YippSetupDB.ui ~= ELSE_UI") and lua.eval("YippSetupDB.uiFrom") == me and not w.IsShown(w),
+       "Keep this character's: saved over the change, from here")
+# a second interface, by name
+YS.SaveInterface(YS, " Healer ")
+report(list(YS.UINames().values()) == ["Main", "Healer"] and YS.UIName() == "Healer" and lua.eval("YippSetupDB.uis.Healer.from") == me
+       and lua.eval("YippSetupDB.ui ~= YippSetupDB.uis.Healer.ui"), f"Save as Healer: a second interface, and this character is on it ({list(YS.UINames().values())})")
+report(YS.UISetDefault("Healer") is True and YS.UIDefault() == "Healer" and list(YS.UINames().values()) == ["Healer", "Main"]
+       and lua.eval("YippSetupDB.uis.Main ~= nil and YippSetupDB.uis.Healer == nil") and YS.UIName() == "Healer" and YS.UIOn() is True,
+       "new characters get Healer now: it is the one an older Headstart reads, and Main is kept beside it")
+ok, why = YS.UIRename("Healer", "Main")
+report(ok is False and "already" in why, f"a name that is taken isn't given twice ({why})")
+report(YS.UIRename("Healer", "Heals") is True and YS.UIName() == "Heals" and YS.UIDefault() == "Heals", "renamed: this character is still on it")
+lua.execute("YippSetupCharDB.iface.name = 'Healer'")
+report(YS.UIName() == "Heals", "a character that was on it under the old name finds it again")
+ok, why = YS.UIDelete("Heals")
+report(ok is False and YS.UIDelete("Main") is True and list(YS.UINames().values()) == ["Heals"],
+       f"the one new characters get can't be deleted; another can ({why})")
+report(YS.UIPick("Nope")[0] is False and YS.UIPick("Heals") is True, "only a saved interface can be picked")
+lua.execute("""C_Timer.After = function(t, fn) fn() end
+    YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned, YippSetupDB.uiPrev = KEPT_UI.ui, KEPT_UI.from, KEPT_UI.at, KEPT_UI.prev
+    YippSetupDB.uis, YippSetupDB.uiName, YippSetupDB.uiRenamed, YippSetupCharDB.iface = nil, nil, nil, KEPT_UI.iface""")
+
+# The Personal Resource Display's switch is the class's, not the account's.
+lua.execute("""KEPT_CLASSES, KEPT_CLASS = YippSetupDB.classes, ME.class
+    CVARS.nameplateShowSelf = "1"; ME.class = "ROGUE"; YippSetupDB.classes = {}""")
+ui = YS.ScanUI(YS)
+report(ui.cvars.nameplateShowSelf is None, "the Personal Resource Display's switch is not in the account's interface")
+YS.ClassUINoted()
+report(YS.FollowClassUI() is False and YS.ClassUI() is None, "a character that changed nothing saves nothing for its class")
+lua.execute('CVARS.nameplateShowSelf = "0"')
+report(YS.FollowClassUI() is True and YS.ClassUI().nameplateShowSelf == "0", "turned off on a rogue: saved for rogues")
+lua.execute('CVARS.nameplateShowSelf = "1"')
+YS.SaveClassUI()
+report(YS.ClassUI().nameplateShowSelf == "1", "Save interface saves the class's switch as this character has it")
+lua.execute('ME.class = "PALADIN"; CVARS.nameplateShowSelf = "0"')
+YS.ClassUINoted()
+YS.ApplyUI(YS, lua.eval('{ cvars = { nameplateShowSelf = "1" }, bars = {} }'), YS.Options(YS))
+report(g.CVARS.nameplateShowSelf == "0", "a paladin doesn't get the rogues' switch (nor one from an account save)")
+lua.execute('ME.class = "ROGUE"')
+YS.ApplyUI(YS, lua.eval('{ cvars = {}, bars = {} }'), YS.Options(YS))
+report(g.CVARS.nameplateShowSelf == "1", "a new rogue gets it on with Apply interface")
+report(YS.FollowClassUI() is False, "being put on is not a change by the player")
+lua.execute("YippSetupDB.classes, ME.class, CVARS.nameplateShowSelf = KEPT_CLASSES, KEPT_CLASS, nil")
 sys.exit(1 if bad else 0)

@@ -10,19 +10,47 @@ YR.Setup = YR.Setup or {}
 local YS = YR.Setup
 local S = YR.Style
 
+-- A macro's text as the game gives it has a line break at its end that wasn't written: the two lines
+-- of a Sap macro come back as three, the last one empty. Every macro Headstart made was told from one
+-- of yours by its text, so none of them was ever recognised - not swapped for its spell when you
+-- learned it, saved into a plan as a macro of yours, made a second time. Read without what trails it,
+-- everywhere.
+local function GetMacroInfo(i)
+    local name, icon, body = _G.GetMacroInfo(i)
+    if type(body) == "string" then body = body:gsub("%s+$", "") end
+    return name, icon, body
+end
+YS.MacroInfo = GetMacroInfo
+
 local DYNAMIC_ICON = 134400     -- the question mark; #showtooltip shows the real icon once the spell is known
--- A spell you haven't learned yet waits in its slot as a macro. With the question mark the game shows
--- a red "?" until the spell is known - a bar of them tells you nothing. So such a macro is given the
--- spell's own icon (from the game's data, Data/PlannerSpells.lua): your bars look as you planned them
--- from level 1, and the same in the planner and out of it.
+-- A spell you haven't learned yet waits in its slot as a macro with the question mark: a red "?" until
+-- the spell is known. (For a while such a macro was given the spell's own icon. A bar of real-looking
+-- icons that do nothing when pressed is worse than a bar of question marks: you can't tell what you
+-- have. Those are put back, YS.PlaceholderIcons. "Only spells" in the settings is the other choice:
+-- no macro at all, the slot empty until the spell is learned.)
 local MAX_SLOT = 180
 local SCAN_LEVEL = 60           -- Copy saves every spell
 -- How far ahead of your level a class spell gets its button now (a question-mark macro until it is
--- learned). There is no setting for it: every spell at or under your level is placed, the next ten
--- levels' wait as question marks, and the rest keep their slot empty and go in when you learn them.
--- (It was a setting, "Class spells up to level", 10 to begin with - and on a character past it, it
--- took every later spell off the bars.)
+-- learned). Every spell at or under your level is placed, the next levels' wait as question marks,
+-- and the rest keep their slot empty and go in when you learn them. How many levels ahead is the
+-- class's option "ahead" (10; 0: no question marks beyond what you could train now) - counted from
+-- your level, so it never takes a later spell off a character's bars (the absolute "Class spells up
+-- to level" it once was did).
+--   A spell a talent gives (YS.TALENTS, the game's data) is never a question mark: you may never
+-- take it, and a button that does nothing for thirty levels - or for ever - is a macro wasted. It
+-- keeps its slot and goes in when you learn it. Its level is where its row in the tree can be
+-- reached, not what the game's spell data says (1, for most of them).
 local AHEAD = 10
+local function Ahead(o)
+    local n = o and tonumber(o.ahead)
+    return n and math.max(0, math.min(60, n)) or AHEAD
+end
+YS.Ahead = Ahead
+local function Talent(name)
+    local _, class = UnitClass("player")
+    return ((YS.TALENTS or {})[class] or {})[name] ~= nil
+end
+YS.IsTalent = Talent
 
 -- What Set up carries over. Every part has a switch in Settings, Character tab.
 local OPTION_DEFAULTS = {
@@ -63,19 +91,49 @@ local function ClassData(class)
     return c
 end
 
--- The saved layout for a class (this character's if none is given), or nil.
+YS.ClassData = ClassData
+
+-- A class can have more bar layouts than one (Layouts.lua): a warrior's for tanking and one for damage.
+-- The class's first is where it always was, classes[CLASS].profile (named by profileName, "Main");
+-- the others are classes[CLASS].layouts[name]. Which one a character is on is the character's own
+-- (YippSetupCharDB.layoutName; none: the first), so two warriors can be on different ones.
+local function OwnLayout(class)
+    if class ~= PlayerClass() then return nil end
+    local name = YippSetupCharDB and YippSetupCharDB.layoutName
+    local c = ClassData(class)
+    if name and type(c.layouts) == "table" and c.layouts[name] then return name end
+    return nil
+end
+
+--- The saved layout for a class (this character's if none is given) - the one this character is on - or nil.
 function YS:Profile(class)
-    return YippSetupDB and ClassData(class or PlayerClass()).profile
+    if not YippSetupDB then return nil end
+    class = class or PlayerClass()
+    local c = ClassData(class)
+    local name = OwnLayout(class)
+    if name then return c.layouts[name] end
+    return c.profile
 end
 
 -- The interface - chat windows and tabs, Edit Mode, game settings, raid frames, camera, which bars show -
--- is the account's, not a class's: set it up once on any character and every class gets it. Copy this
--- layout saves it here (the newest copy wins); the bars stay per class. Kept as YippSetupDB.ui, with
--- who it came from. From before (2026-10-02) each class's layout carried its own: the newest one copied
--- from a real character (not a plan, which only ever held a level-1 character's defaults) becomes the
--- account's, once.
-function YS:SharedUI()
-    if not YippSetupDB then return nil end
+-- is the account's, not a class's: set it up once on any character and every class gets it. Save
+-- interface saves it; the bars stay per class. From before (2026-10-02) each class's layout carried
+-- its own: the newest one copied from a real character (not a plan, which only ever held a level-1
+-- character's defaults) becomes the account's, once.
+--
+-- An interface has a name ("Main", "Healer"), and a character is on one of them. Kept as:
+--   YippSetupDB.ui, .uiFrom, .uiScanned   the one new characters get, named YippSetupDB.uiName ("Main"
+--                                         unless renamed) - where an older Headstart reads it too
+--   YippSetupDB.uis[name] = { ui, from, scanned }      the others
+--   YippSetupCharDB.iface = { name, seen, sig }        the one this character is on; seen: the save of
+--       it this character has (put on, or made here); sig: how this character's own screen read then
+-- from: the character that saved it last. Every character on an interface saves into it when you
+-- change something there (leaving Edit Mode, logging out; YippSetupDB.uiFollow, on unless turned off).
+-- "Changed" is this character's screen reading differently from sig - not from the saved one, which
+-- two characters never read quite alike. A character whose interface was saved somewhere else since
+-- (seen is not the save's time) doesn't save over it: the window asks which of the two to keep.
+local MAIN = "Main"
+local function Legacy()
     if YippSetupDB.ui == nil and not YippSetupDB.uiMoved then
         YippSetupDB.uiMoved = true
         local best
@@ -85,28 +143,298 @@ function YS:SharedUI()
         end
         if best then YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned = best.ui, best.from, best.scanned end
     end
-    return YippSetupDB.ui
 end
 
-function YS:SaveSharedUI()
-    -- the one before is kept too: a copy made on the wrong character doesn't lose the good one
-    if YippSetupDB.ui then
-        YippSetupDB.uiPrev = { ui = YippSetupDB.ui, from = YippSetupDB.uiFrom, scanned = YippSetupDB.uiScanned }
+function YS.UIDefault() return YippSetupDB and YippSetupDB.uiName or MAIN end
+
+--- An interface by name (none: the one new characters get): what is saved, who saved it, when.
+function YS.UIRecord(name)
+    if not YippSetupDB then return nil end
+    Legacy()
+    if name == nil or name == YS.UIDefault() then
+        if YippSetupDB.ui == nil then return nil end
+        return YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned
     end
-    YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned = YS:ScanUI(), YS.PlayerKey(), time()
-    YippSetupDB.uiMoved = true
+    local r = YippSetupDB.uis and YippSetupDB.uis[name]
+    if r then return r.ui, r.from, r.scanned end
+    return nil
 end
 
---- The interface alone, saved from this character: chat windows, Edit Mode, game settings, which bars
---- show, the camera. No action button or macro is read, and the class's saved bars are left as they are.
-function YS:CopyInterface()
-    YS:SaveSharedUI()
-    YS.Print(("saved %s's interface (chat windows, Edit Mode, game settings, which bars show, camera). The bars"
-        .. " saved for the class are untouched."):format(YS.PlayerKey()))
+local function UIPut(name, ui, from, scanned)
+    if name == YS.UIDefault() then
+        -- the one before is kept too: a save made on the wrong character doesn't lose the good one
+        if YippSetupDB.ui then
+            YippSetupDB.uiPrev = { ui = YippSetupDB.ui, from = YippSetupDB.uiFrom, scanned = YippSetupDB.uiScanned }
+        end
+        YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned = ui, from, scanned
+        YippSetupDB.uiMoved = true
+    else
+        YippSetupDB.uis = YippSetupDB.uis or {}
+        YippSetupDB.uis[name] = { ui = ui, from = from, scanned = scanned }
+    end
+end
+
+--- Every saved interface's name: the one new characters get first, the rest by name.
+function YS.UINames()
+    local out = {}
+    if not YippSetupDB then return out end
+    for name in pairs(YippSetupDB.uis or {}) do out[#out + 1] = name end
+    table.sort(out)
+    if YS.UIRecord() then table.insert(out, 1, YS.UIDefault()) end
+    return out
+end
+
+-- This character's saved table, with the interface it is on. The character the account's one
+-- interface came from, before interfaces had names, is on that one.
+local function Char()
+    local c = _G.YippSetupCharDB
+    if type(c) ~= "table" or not YippSetupDB then return nil end
+    if c.iface == nil and YippSetupDB.ui and YippSetupDB.uiFrom == YS.PlayerKey() then
+        c.iface = { name = YS.UIDefault(), seen = YippSetupDB.uiScanned }
+    end
+    -- renamed on another character since this one was here
+    local to = c.iface and YippSetupDB.uiRenamed and YippSetupDB.uiRenamed[c.iface.name]
+    if to and not YS.UIRecord(c.iface.name) then c.iface.name = to end
+    return c
+end
+
+--- The interface this character uses: the one it is on, or the one new characters get.
+function YS.UIName()
+    local c = Char()
+    if c and c.iface and YS.UIRecord(c.iface.name) then return c.iface.name end
+    return YS.UIDefault()
+end
+--- Whether this character is on its interface: it has been put on here, or was saved here.
+function YS.UIOn()
+    local c = Char()
+    return c ~= nil and c.iface ~= nil and c.iface.seen ~= nil and YS.UIRecord(c.iface.name) ~= nil
+end
+function YS:SharedUI() return (YS.UIRecord(YS.UIName())) end
+function YS.UISource() return (select(2, YS.UIRecord(YS.UIName()))) end
+function YS.UIScanned() return (select(3, YS.UIRecord(YS.UIName()))) end
+function YS.UIFollows() return not (YippSetupDB and YippSetupDB.uiFollow == false) end
+
+-- A few game settings are the class's, not the account's (YS.CLASS_CVARS, SetupUI.lua): whether the
+-- Personal Resource Display is on - a rogue wants its energy and combo points under the character, a
+-- paladin may not. Kept as YippSetupDB.classes[CLASS].cvars[name], beside the class's bars.
+--   * Save interface writes them all, as this character has them.
+--   * One you change on a character of the class is saved when you leave Edit Mode or log out. Only
+--     what changed since login (or since they were last put on): a new character's defaults never
+--     overwrite what the class has.
+--   * Apply interface puts them on with the other game settings.
+local classAt           -- how they read on this character when last looked at
+function YS.ScanClassUI()
+    local out = {}
+    for _, name in ipairs(YS.CLASS_CVARS or {}) do
+        local v = C_CVar.GetCVar(name)
+        if v ~= nil then out[name] = v end
+    end
+    return out
+end
+--- The class's saved settings (this character's class if none is given), or nil.
+function YS.ClassUI(class)
+    if not YippSetupDB then return nil end
+    return ClassData(class or PlayerClass()).cvars
+end
+function YS.SaveClassUI()
+    if not YippSetupDB then return end
+    classAt = YS.ScanClassUI()
+    ClassData(PlayerClass()).cvars = Copy(classAt)
+end
+--- Noted as they are now (login, and after they were put on): the next change is counted from here.
+function YS.ClassUINoted() classAt = YS.ScanClassUI() end
+--- What changed on this character since they were noted, saved for the class. Returns whether any did.
+function YS.FollowClassUI()
+    if not YippSetupDB then return false end
+    local now = YS.ScanClassUI()
+    local was, changed = classAt, false
+    classAt = now
+    if not (was and YS.UIFollows()) then return false end
+    for name, v in pairs(now) do
+        if was[name] ~= nil and was[name] ~= v then
+            local c = ClassData(PlayerClass())
+            c.cvars = c.cvars or {}
+            c.cvars[name] = v
+            changed = true
+        end
+    end
+    return changed
+end
+
+-- How a screen reads, as one number: everything saved but the camera (it moves all the time).
+local function Sig(ui)
+    local parts = {}
+    local function Walk(v, depth)
+        local t = type(v)
+        if t == "table" then
+            local keys = {}
+            for k in pairs(v) do keys[#keys + 1] = k end
+            table.sort(keys, function(x, y) return tostring(x) < tostring(y) end)
+            parts[#parts + 1] = "{"
+            for _, k in ipairs(keys) do
+                if not (depth == 0 and (k == "camera" or k == "v")) then
+                    parts[#parts + 1] = tostring(k) .. "="
+                    Walk(v[k], depth + 1)
+                end
+            end
+            parts[#parts + 1] = "}"
+        elseif t == "number" then
+            parts[#parts + 1] = ("%.2f;"):format(v)
+        else
+            parts[#parts + 1] = tostring(v) .. ";"
+        end
+    end
+    Walk(ui, 0)
+    local text = table.concat(parts)
+    local h = 5381
+    for i = 1, #text do h = (h * 33 + text:byte(i)) % 4294967296 end
+    return h
+end
+YS.UISig = Sig
+
+--- Whether this character's interface was saved somewhere else since this character had it; and
+--- then who saved it, and when.
+function YS.UIBehind()
+    local c = Char()
+    if not (c and YS.UIOn()) then return false end
+    local _, from, scanned = YS.UIRecord(c.iface.name)
+    if scanned == c.iface.seen then return false end
+    return true, from, scanned
+end
+
+--- This character's screen saved into its interface, quietly, when something on it changed. Returns
+--- whether it was. The first look after an interface was put on only notes how the screen reads.
+function YS.FollowUI()
+    YS.FollowClassUI()
+    local c = Char()
+    if not (c and YS.UIOn() and YS.UIFollows()) or InCombatLockdown() then return false end
+    if YS.UIBehind() then return false end
+    local ok, ui = pcall(YS.ScanUI, YS)
+    if not ok or type(ui) ~= "table" then return false end
+    local sig = Sig(ui)
+    if c.iface.sig == nil then c.iface.sig = sig return false end
+    if sig == c.iface.sig then return false end
+    local now = time()
+    UIPut(c.iface.name, ui, YS.PlayerKey(), now)
+    c.iface.seen, c.iface.sig = now, sig
+    return true
+end
+
+-- An interface was put on this character: it is on that one now, at that save. How the screen reads
+-- is noted once it has settled (a reload usually comes first).
+local function Settle()
+    local c = Char()
+    if c and c.iface and c.iface.seen ~= nil and c.iface.sig == nil and not InCombatLockdown() then YS.FollowUI() end
+end
+YS.UISettle = Settle
+function YS.UIApplied()
+    local c = Char()
+    if not c then return end
+    local name = YS.UIName()
+    local _, _, scanned = YS.UIRecord(name)
+    if scanned == nil then return end
+    c.iface = { name = name, seen = scanned }
+    C_Timer.After(5, Settle)
+end
+
+--- This character uses that interface from now on. Nothing is put on by it: Apply interface does that.
+function YS.UIPick(name)
+    local c = Char()
+    if not (c and YS.UIRecord(name)) then return false, "no such interface." end
+    if not (c.iface and c.iface.name == name) then c.iface = { name = name } end
+    return true
+end
+
+local function CleanName(name)
+    return (strtrim(tostring(name or "")):gsub("%s+", " ")):sub(1, 24)
+end
+
+--- New characters get that one from now on.
+function YS.UISetDefault(name)
+    local old = YS.UIDefault()
+    if name == old then return true end
+    local r = YippSetupDB.uis and YippSetupDB.uis[name]
+    if not r then return false, "no such interface." end
+    YippSetupDB.uis[name] = nil
+    if YippSetupDB.ui then
+        YippSetupDB.uis[old] = { ui = YippSetupDB.ui, from = YippSetupDB.uiFrom, scanned = YippSetupDB.uiScanned }
+    end
+    YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned, YippSetupDB.uiName = r.ui, r.from, r.scanned, name
+    return true
+end
+
+function YS.UIRename(old, new)
+    new = CleanName(new)
+    if new == "" then return false, "it needs a name." end
+    if new == old then return true end
+    if YS.UIRecord(new) then return false, ("there is an interface called %s already."):format(new) end
+    if not YS.UIRecord(old) then return false, "no such interface." end
+    if old == YS.UIDefault() then
+        YippSetupDB.uiName = new
+    else
+        YippSetupDB.uis[new], YippSetupDB.uis[old] = YippSetupDB.uis[old], nil
+    end
+    -- the other characters on it find it again by this (their own tables can't be reached from here)
+    YippSetupDB.uiRenamed = YippSetupDB.uiRenamed or {}
+    for from, to in pairs(YippSetupDB.uiRenamed) do
+        if to == old then YippSetupDB.uiRenamed[from] = new end
+    end
+    YippSetupDB.uiRenamed[old], YippSetupDB.uiRenamed[new] = new, nil
+    local c = Char()
+    if c and c.iface and c.iface.name == old then c.iface.name = new end
+    return true
+end
+
+function YS.UIDelete(name)
+    if name == YS.UIDefault() then return false, "new characters get this one: pick another for them first." end
+    if not (YippSetupDB.uis and YippSetupDB.uis[name]) then return false, "no such interface." end
+    YippSetupDB.uis[name] = nil
+    local c = Char()
+    if c and c.iface and c.iface.name == name then c.iface = nil end
+    return true
+end
+
+StaticPopupDialogs["YIPPSETUP_UI_REPLACE"] = {
+    text = "Headstart: the interface %s was last saved on %s.\n\nReplace it with this character's? Every character on it is"
+        .. " asked whether to take the change. (To keep both, save this one under a new name instead.)",
+    button1 = "Replace", button2 = "Cancel", timeout = 0, whileDead = true, hideOnEscape = true,
+    OnAccept = function(_, name) YS:SaveInterface(name, true) end,
+}
+
+--- This character's interface saved under a name (none: the interface it uses): chat windows, Edit
+--- Mode, game settings, which bars show, the camera, RestedXP's look. No action button or macro is
+--- read. The character is on that interface from then on. Saving over one this character isn't on,
+--- or one saved elsewhere since, asks first (sure: asked and answered).
+function YS:SaveInterface(name, sure)
+    name = CleanName(name)
+    if name == "" then name = YS.UIName() end
+    local c = Char()
+    if not c then return end
+    local has, from = YS.UIRecord(name)
+    local mine = c.iface ~= nil and c.iface.name == name and c.iface.seen ~= nil and not YS.UIBehind()
+    if has and not mine and from ~= YS.PlayerKey() and not sure then
+        StaticPopup_Show("YIPPSETUP_UI_REPLACE", name, tostring(from or "another character"), name)
+        return
+    end
+    local ui, now = YS:ScanUI(), time()
+    UIPut(name, ui, YS.PlayerKey(), now)
+    YS.SaveClassUI()
+    c.iface = { name = name, seen = now, sig = Sig(ui) }
+    YS.Print(("saved this character's interface as |cffffffff%s|r (chat windows, Edit Mode, game settings, which bars show, camera,"
+        .. " RestedXP's look). It is kept up to date from every character that uses it."):format(name))
     if YR.RefreshWindow then YR:RefreshWindow() end
+    YS:Refresh()
+end
+function YS:CopyInterface(sure) return YS:SaveInterface(nil, sure) end
+function YS:SaveSharedUI()
+    local c = Char()
+    local ui, now = YS:ScanUI(), time()
+    UIPut(YS.UIDefault(), ui, YS.PlayerKey(), now)
+    YS.SaveClassUI()
+    if c then c.iface = { name = YS.UIDefault(), seen = now, sig = Sig(ui) } end
 end
 
---- The saved interface alone, on this character: chat windows, Edit Mode, game settings, which bars
+--- The interface this character uses, put on it: chat windows, Edit Mode, game settings, which bars
 --- show and the camera, each as its switch on Character setup says. No action button and no macro is
 --- touched. The game settings it changes are kept for /ysetup undo; chat windows and the Edit Mode
 --- layout are not something an addon can put back.
@@ -114,18 +442,22 @@ function YS:ApplyInterface()
     if InCombatLockdown() then YS.Print("not in combat.") return end
     local ui = YS:SharedUI()
     if not ui then
-        YS.Print("no interface saved yet: on the character whose interface you want, Copy interface (Headstart, Character setup).")
+        YS.Print("no interface saved yet. Use Save interface on the character whose interface you want (/hs, Character setup).")
         return
     end
     -- its own copy to undo, apart from the bars' (an older Set up's bars are not what this undoes)
     YippSetupCharDB.uiBackup = { at = time() }
+    YS.UIApplied()
     YS:ApplyUI(ui, YS:Options())
     if YR.RefreshWindow then YR:RefreshWindow() end
 end
 
 -- Set the class's saved layout (the bar planner, Planner.lua).
 function YS:SetProfile(profile, class)
-    ClassData(class or PlayerClass()).profile = profile
+    class = class or PlayerClass()
+    local c = ClassData(class)
+    local name = OwnLayout(class)
+    if name then c.layouts[name] = profile else c.profile = profile end
 end
 
 function YS:Options(class)
@@ -136,6 +468,34 @@ function YS:Options(class)
     if o.spellButtons == nil and o.placeholders == nil then o.spellButtons = "spells" end
     for k, v in pairs(OPTION_DEFAULTS) do if o[k] == nil then o[k] = v end end
     return o
+end
+
+-- The choices that decide what is on your bars. Changing one changes nothing on a character until
+-- the layout is put on it again (a question mark already on a bar stays there when you choose "Only
+-- spells"): so the choices as they were at the last Apply are kept with the character, and the page
+-- says when they have changed since.
+local BAR_CHOICES = { "classSpells", "spellButtons", "ahead", "racials", "professions", "macros", "mouseover", "autofeed", "items" }
+local function Choices(o)
+    local t = {}
+    for _, k in ipairs(BAR_CHOICES) do t[k] = o[k] end
+    t.spellButtons = YS.SpellButtons(o)
+    t.ahead = YS.Ahead(o)
+    return t
+end
+--- Note the choices as put on this character now (Apply does).
+function YS.ChoicesApplied() YippSetupCharDB.choices = Choices(YS:Options()) end
+--- Whether the choices have changed since the layout was last put on this character. (A character
+--- set up before this was kept: taken as up to date, from now.)
+function YS.ChoicesPending()
+    local c = YippSetupCharDB
+    if not (c and c.applied) then return false end
+    local now = Choices(YS:Options())
+    if type(c.choices) ~= "table" then
+        c.choices = now
+        return false
+    end
+    for _, k in ipairs(BAR_CHOICES) do if c.choices[k] ~= now[k] then return true end end
+    return false
 end
 
 -- What a class spell's button is (option spellButtons):
@@ -152,7 +512,7 @@ end
 local MACRO_NAME_MAX = 16
 
 local function Print(msg)
-    print("|cff66ccffHeadstart|r: " .. msg)
+    print("|cffff9a40Headstart|r: " .. msg)
 end
 YS.Print = Print
 
@@ -175,6 +535,14 @@ YS.PlayerKey = function() return PlayerKey() end
 
 -- Macro actions: read the macro through its name, not GetActionInfo's id, which is not always the index.
 local MacroFor       -- below, with Apply: Copy uses it to know the macros Headstart made for a spell
+
+-- A macro Headstart made for a spell - the question mark that waits for a spell you haven't learned,
+-- or the macro a mouseover spell is - IS that spell, wherever your bars are read: saved as a macro of
+-- yours it would stay a macro for ever, never swapped for the spell when you learn it, and it would be
+-- listed among your macros in the plan. (It was read as the spell only where the saved layout already
+-- had that spell in that very slot: a plan saved from bars with such macros on them kept them as
+-- macros.) Told by its shape: named and written exactly as MacroFor makes it for a spell of your class.
+local OwnSpellOf        -- (below, with MacroFor)
 
 local function ReadMacroSlot(slot, id)
     local mname = GetActionText(slot)
@@ -231,6 +599,8 @@ function YS.ReadBars(withOther)
                 end
             elseif kind == "macro" then
                 entry = ReadMacroSlot(slot, id)
+                local spell = entry and OwnSpellOf(entry)
+                if spell then entry = spell end
             elseif kind == "item" and id then
                 entry = { kind = "item", id = id, name = C_Item.GetItemNameByID(id) }
             end
@@ -299,34 +669,49 @@ function YS.PlanStart(prefer)
     return plan, now, differ, prefer
 end
 
-function YS:Scan()
+local Unavailable        -- (below, where a known spell is told from one that isn't)
+
+--- This character's bars saved as the layout it is on. (Copy this layout does it, with the interface;
+--- leaving a layout for another does it by itself, Layouts.lua.) Returns the counts and how many
+--- later spells were kept.
+function YS:ScanBars()
     local maxLevel = SCAN_LEVEL
     local _, class = UnitClass("player")
     local slots, n = YS.ReadBars()
-    -- Copied on a character still levelling, over a layout saved for more (planned to 60, or copied from
-    -- a main): what this one can't have yet stays as it was saved. A slot that's empty here keeps a class
-    -- spell above this level; a question-mark macro (or a spell macro) Headstart made for a saved spell is
-    -- that spell, not a new macro of yours. Everything else is what's on the bars now.
-    local old = ClassData(class).profile
-    local myLevel = UnitLevel("player") or 1
+    -- Saved on a character still levelling, over a layout saved for more (planned to 60, or copied from
+    -- a main): what this one can't have yet stays as it was saved. A button that is empty here keeps what
+    -- was saved for it while this character hasn't got that thing - a spell it hasn't learned (too low,
+    -- not trained yet, a talent not taken), a profession's spell, an item it isn't carrying, a macro it
+    -- hasn't made. Empty where it HAS the thing is you taking it off: that goes. A question-mark macro
+    -- (or a spell macro) Headstart made for a saved spell is that spell, not a new macro of yours.
+    -- Everything else is what's on the bars now.
+    local old = YS:Profile()
     local kept = 0
     if old and old.slots then
         for slot = 1, MAX_SLOT do
             local was, now = old.slots[slot], slots[slot]
-            if was and was.kind == "spell" and not was.prof and not was.general then
-                if now and now.kind == "spell" and now.name == was.name and was.down then
+            if was and not now then
+                if Unavailable(was) then slots[slot], kept = was, kept + 1 end
+            elseif was and was.kind == "spell" and not was.prof and not was.general then
+                if now.kind == "spell" and now.name == was.name and was.down then
                     slots[slot] = was          -- the rank you set for it in the planner stays set
-                elseif not now and (was.level or 1) > myLevel then
-                    slots[slot], kept = was, kept + 1
-                elseif now and now.kind == "macro" and now.body == select(3, MacroFor(was)) then
+                elseif now.kind == "macro" and now.body == select(3, MacroFor(was)) then
                     slots[slot] = was
                     n.macro, n.spell = n.macro - 1, n.spell + 1
                 end
             end
         end
     end
-    ClassData(class).profile = { from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots }
-    YS:SaveSharedUI()
+    YS:SetProfile({ from = PlayerKey(), class = class, maxLevel = maxLevel, scanned = time(), slots = slots,
+        ownUI = old and old.ownUI or nil, ui = old and old.ui or nil })      -- (a profile's own interface stays its own)
+    return n, kept
+end
+
+function YS:Scan()
+    local n, kept = YS:ScanBars()
+    -- the bars are this class's; the interface is the account's, and only the character it comes from
+    -- changes it (saving a healer's bars used to make every new character's screen the healer's)
+    if not YS:SharedUI() then YS:SaveSharedUI() else YS.FollowUI() end
     Print(("saved %s: %d spells, %d profession spells, %d macros and %d items%s. What goes onto a new character is"
         .. " chosen in Headstart, Character setup."):format(PlayerKey(), n.spell, n.prof, n.macro, n.item,
         kept > 0 and (", and kept %d spells from the saved layout for levels you haven't reached"):format(kept) or ""))
@@ -388,13 +773,48 @@ function MacroFor(e)
         local rank = spell == e.name and RankNumber(e)
         local what = rank and ("%s(Rank %d)"):format(spell, rank) or spell
         local cast = MOUSEOVER_SET()[spell] and ("/cast [@mouseover,help,nodead][] " .. what) or ("/cast " .. what)
-        return ShortName(spell), (Unlearned(spell) and PlanIcon(spell)) or DYNAMIC_ICON, "#showtooltip " .. what .. "\n" .. cast
+        return ShortName(spell), DYNAMIC_ICON, "#showtooltip " .. what .. "\n" .. cast
     end
     -- your own macros: no "(Rank 3)", so a spell always casts its highest known rank
-    local body = (e.body or ""):gsub("%s*%(Rank %d+%)", "")
+    local body = (e.body or ""):gsub("%s*%(Rank %d+%)", ""):gsub("%s+$", "")
     return e.name, e.icon or DYNAMIC_ICON, body
 end
 YS.MacroFor = MacroFor      -- for tests
+
+--- The spell a macro entry stands for, as a layout's entry, when the macro is one Headstart made for
+--- a spell of your class (see ReadMacroSlot); nil for a macro of your own.
+function OwnSpellOf(e)
+    if not (e and e.kind == "macro" and type(e.body) == "string" and e.name) then return nil end
+    local what = e.body:match("^#showtooltip ([^\n]+)\n/cast ")
+    if not what then return nil end
+    local spell, rank = what:match("^(.-)%(Rank (%d+)%)$")
+    spell, rank = spell or what, tonumber(rank)
+    local _, class = UnitClass("player")
+    local level = (YS.SPELL_LEVELS[class] or {})[spell] or (YS.RACIALS[spell] and 1)
+    local general = not level and ((YR.PlannerGeneral or {})[class] or {})[spell] ~= nil
+    if not (level or general) then return nil end
+    local entry = { kind = "spell", name = spell, level = level, racial = YS.RACIALS[spell] or nil, general = general or nil,
+        down = rank and true or nil, rank = rank }
+    local name, _, body = MacroFor(entry)
+    if name ~= e.name or body ~= e.body then return nil end
+    return entry
+end
+YS.OwnSpellOf = function(e) return OwnSpellOf(e) end
+
+--- A saved layout put right: every macro in it that is one of Headstart's own for a spell becomes that
+--- spell. Returns how many. (This class's layout, and the layout as it went onto this character.)
+function YS.RepairLayouts()
+    local done = 0
+    for _, slots in ipairs({ (YS:Profile() or {}).slots or false, YippSetupCharDB and YippSetupCharDB.layout or false }) do
+        if type(slots) == "table" then
+            for slot, e in pairs(slots) do
+                local spell = type(e) == "table" and OwnSpellOf(e)
+                if spell then slots[slot], done = spell, done + 1 end
+            end
+        end
+    end
+    return done
+end
 
 -- The spell's ID when this character knows it, else nil.
 local function KnownSpellID(name)
@@ -444,6 +864,21 @@ local function RealSpell(e, o)
     return KnownSpellID(spell)
 end
 
+-- Whether this character hasn't got what a saved button holds (so an empty button isn't it taken off).
+function Unavailable(e)
+    if e.kind == "spell" then
+        if e.prof then return not ProfessionSpellID(e) end
+        return not KnownSpellID(REPLACE[e.name] or e.name)
+    elseif e.kind == "item" then
+        local count = C_Item and C_Item.GetItemCount and e.id and C_Item.GetItemCount(e.id)
+        return not count or count == 0
+    elseif e.kind == "macro" then
+        local index = e.name and GetMacroIndexByName(e.name)
+        return not index or index == 0
+    end
+    return false
+end
+
 -- Whether the options carry this saved button over. levels: this class's spell levels; autofeed:
 -- AutoFeed's macro names.
 local function Wanted(e, levels, autofeed, o, myLevel)
@@ -452,13 +887,18 @@ local function Wanted(e, levels, autofeed, o, myLevel)
         if e.prof then return o.professions end
         if e.general or General(e.name) then return o.classSpells end
         if e.racial or YS.RACIALS[e.name] then return o.racials end
-        local lvl = e.level or levels[e.name]
-        return lvl ~= nil and o.classSpells and lvl <= (myLevel or UnitLevel("player") or 1) + AHEAD
+        -- (the game's data first: the level saved with a button may be from before a patch moved the spell)
+        local lvl = levels[e.name] or e.level
+        return lvl ~= nil and o.classSpells and lvl <= (myLevel or UnitLevel("player") or 1) + Ahead(o)
     elseif e.kind == "macro" then
         if autofeed[e.name] then return o.autofeed end
         return o.macros
     elseif e.kind == "item" then
-        return o.items
+        -- "Items" off keeps a main's items off a character that hasn't got them. One this character is
+        -- carrying is on its bars because you put it there (your hearthstone): that one always goes back
+        if o.items then return true end
+        local count = C_Item and C_Item.GetItemCount and e.id and C_Item.GetItemCount(e.id)
+        return (count or 0) > 0
     end
     return false
 end
@@ -526,14 +966,74 @@ end
 -- On a character that was set up before (changing the plan mid-levelling, say), only Headstart's own
 -- question-mark macros go: "#showtooltip <spell>" + "/cast", with the question-mark icon - the ones still
 -- needed are made again below. Every macro you made yourself on this character stays.
+--- The macros Headstart made for spells, brought in line with your choices as they are now - without
+--- setting the whole character up again. One your choices no longer want (you chose "Only spells"; it
+--- is a talent's spell; it is further ahead than you ask for; nothing on your bars uses it) comes off
+--- its buttons - the spell itself goes in where you know it, else the button is left empty for it -
+--- and is deleted. A macro of your own is never touched. Returns how many were deleted.
+function YS.TidyPlaceholders()
+    if InCombatLockdown() then return 0 end
+    local o = YS:Options()
+    local mode = YS.SpellButtons(o)
+    local _, class = UnitClass("player")
+    local levels = YS.SPELL_LEVELS[class] or {}
+    local myLevel = UnitLevel("player") or 1
+    -- which of our macros each button holds
+    local onBar = {}
+    for slot = 1, MAX_SLOT do
+        if HasAction(slot) then
+            local kind, id = GetActionInfo(slot)
+            local m = kind == "macro" and ReadMacroSlot(slot, id)
+            if m and OwnSpellOf(m) then
+                onBar[m.body] = onBar[m.body] or {}
+                table.insert(onBar[m.body], slot)
+            end
+        end
+    end
+    local _, numChar = GetNumMacros()
+    local base = Constants.MacroConsts.MAX_ACCOUNT_MACROS
+    local removed = 0
+    for i = base + (numChar or 0), base + 1, -1 do
+        local name, _, body = GetMacroInfo(i)
+        local e = name and OwnSpellOf({ kind = "macro", name = name, body = body })
+        if e then
+            local spell = REPLACE[e.name] or e.name
+            local known = KnownSpellID(spell)
+            local slots = onBar[body]
+            local lvl = levels[e.name]
+            local want = slots ~= nil and o.classSpells and (MOUSEOVER_SET(o)[spell] or mode == "macros"
+                or (mode == "placeholder" and not known and not Talent(e.name) and (lvl == nil or lvl <= myLevel + Ahead(o))))
+            if not want then
+                for _, slot in ipairs(slots or {}) do
+                    PickupAction(slot)
+                    ClearCursor()
+                    if known and not e.down then PlaceSpell(slot, known) ClearCursor() end
+                end
+                DeleteMacro(i)
+                removed = removed + 1
+            end
+        end
+    end
+    return removed
+end
+
 local function ClearPlaceholders()
     local _, numChar = GetNumMacros()
     local base = Constants.MacroConsts.MAX_ACCOUNT_MACROS
     local removed = 0
     for i = base + numChar, base + 1, -1 do
         local name, icon, body = GetMacroInfo(i)
-        local spell = type(body) == "string" and body:match("^#showtooltip ([^\n]+)\n/cast ")
-        if name and spell and (icon == DYNAMIC_ICON or icon == PlanIcon((spell:gsub("%(Rank %d+%)$", "")))) then
+        -- only a macro that is exactly what Headstart makes for a spell of your class, name and text: a
+        -- macro of your own that begins the same way ("#showtooltip Stealth" and "/cast !Stealth", one
+        -- from the macro helper) is yours
+        local own = name and OwnSpellOf({ kind = "macro", name = name, body = body })
+        if name and not own and icon == DYNAMIC_ICON and type(body) == "string" then
+            -- or one for a spell the class no longer has (renamed in a patch): the plain two lines for
+            -- one spell, under the name Headstart gives it
+            local a, b = body:match("^#showtooltip ([^\n]+)\n/cast ([^\n]+)$")
+            own = a and a == b and name == ShortName((a:gsub("%(Rank %d+%)$", "")))
+        end
+        if own then
             DeleteMacro(i)
             removed = removed + 1
         end
@@ -587,7 +1087,9 @@ function YS:MacrosNeeded(p, o, class)
                 body = select(3, MacroFor(e))
             elseif e.kind == "spell" and not e.prof then
                 local mouseover = MOUSEOVER_SET()[REPLACE[e.name] or e.name]
-                if mouseover or mode == "macros" or (mode == "placeholder" and not RealSpell(e)) then
+                -- (a talent's spell you haven't got waits as nothing: see the top of the file)
+                local known = RealSpell(e)
+                if (mouseover or mode == "macros" or (mode == "placeholder" and not known)) and (known or not Talent(e.name)) then
                     body = select(3, MacroFor(e))
                 end
             end
@@ -633,9 +1135,9 @@ end
 -- A character in play, not a new one: Set up asks first, and offers the bars alone.
 local NEW_LEVEL, NEW_BUTTONS = 10, 12
 StaticPopupDialogs["YIPPSETUP_CONFIRM"] = {
-    text = "Headstart: Set up layout on this character replaces what is on it now.\n\n%s\n\nA copy of your bars and"
-        .. " macros is kept: /ysetup undo puts them back.",
-    button1 = "Set up everything",
+    text = "Headstart: applying this profile replaces what is on this character now.\n\n%s\n\nYour current bars and"
+        .. " macros are backed up. /ysetup undo restores them.",
+    button1 = "Bars and interface",
     button2 = "Cancel",
     button3 = "Bars only",
     OnAccept = function(_, force) YS:Apply(force, nil, { sure = true }) end,
@@ -644,6 +1146,35 @@ StaticPopupDialogs["YIPPSETUP_CONFIRM"] = {
     whileDead = true,
     hideOnEscape = true,
 }
+
+-- A character that has been set up before: the bars are what you come back for (a changed plan, a new
+-- choice). Its interface you have made your own since - Edit Mode, another bar switched on, chat - and
+-- the saved one is older than that: putting it back takes those changes away. So it is asked every
+-- time, "Bars only" is the answer the Enter key gives, and "Everything" says how old the saved
+-- interface is.
+StaticPopupDialogs["YIPPSETUP_AGAIN"] = {
+    text = "Headstart: this character was set up before.\n\n%s\n\n|cffffffffBars only|r applies the saved bars and keeps your"
+        .. " interface as it is now.\n|cffffffffBars and interface|r also restores the saved interface (Edit Mode, visible"
+        .. " bars, chat windows, game settings) as it was %s.\n\n/ysetup undo restores your bars and macros.",
+    button1 = "Bars only",
+    button2 = "Cancel",
+    button3 = "Bars and interface",
+    OnAccept = function(_, force) YS:Apply(force, nil, { sure = true, barsOnly = true }) end,
+    OnAlt = function(_, force) YS:Apply(force, nil, { sure = true }) end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+local function Ago(t)
+    local s = time() - (tonumber(t) or 0)
+    if not t or s < 0 then return "some time ago" end
+    if s < 3600 then return "less than an hour ago" end
+    if s < 7200 then return "an hour ago" end
+    if s < 86400 then return ("%d hours ago"):format(s / 3600) end
+    if s < 172800 then return "a day ago" end
+    return ("%d days ago"):format(s / 86400)
+end
 
 --- Put the saved layout on the bars. force: another class's layout. only (the planner, on a character
 --- in play): { [slot] = true } - nothing but these slots is touched: the bars aren't cleared, no macro
@@ -656,15 +1187,24 @@ function YS:Apply(force, only, how)
         return
     end
     how = how or {}
+    -- What you changed on your bars a moment ago is the profile's before the profile is put on (a
+    -- button dragged out five seconds before you press Apply must not be what Apply takes away).
+    if not only and not how.sure and YS.RememberNow then YS.RememberNow() end
     -- A character in play has things to lose: asked first, with what goes.
     if not only and not how.sure then
         local buttons, macros = YS:ApplyCost(force)
         local level = UnitLevel("player") or 1
-        if (YS:Profile() or (force and YippSetupDB.profile)) and (level > NEW_LEVEL or macros > 0 or buttons > NEW_BUTTONS) then
+        local again = YippSetupCharDB.applied ~= nil
+        if (YS:Profile() or (force and YippSetupDB.profile)) and (again or level > NEW_LEVEL or macros > 0 or buttons > NEW_BUTTONS) then
             local o = YS:Options()
             local lines = {}
             if buttons > 0 then lines[#lines + 1] = ("%d buttons come off your bars"):format(buttons) end
             if macros > 0 then lines[#lines + 1] = ("%d of this character's macros are deleted"):format(macros) end
+            if again then
+                local from = YS.UISource() and ("on " .. tostring(YS.UISource()) .. ", " .. Ago(YS.UIScanned())) or "when it was saved"
+                StaticPopup_Show("YIPPSETUP_AGAIN", #lines > 0 and (table.concat(lines, "; ") .. ".") or "The saved bars go on.", from, force)
+                return
+            end
             if o.settings or o.editMode or o.chat or o.barVisibility then
                 lines[#lines + 1] = "game settings, Edit Mode and chat windows change (Bars only leaves them)"
             end
@@ -743,7 +1283,9 @@ function YS:Apply(force, only, how)
         -- a spell's macro: in the two macro modes, and always for a mouseover spell (that IS a macro)
         elseif e and (e.kind == "macro" or (e.kind == "spell" and not e.prof
                 and (YS.SpellButtons(o) ~= "spells" or MOUSEOVER_SET()[REPLACE[e.name] or e.name])
-                and (levels[e.name] or YS.RACIALS[e.name] or e.general))) then
+                and (levels[e.name] or YS.RACIALS[e.name] or e.general)
+                -- (a talent's spell you haven't got waits as nothing: see the top of the file)
+                and (not Talent(e.name) or KnownSpellID(REPLACE[e.name] or e.name)))) then
             local name, icon, body = MacroFor(e)
             macros = macros or MacroIndex()
             idx = macros[body]
@@ -766,6 +1308,7 @@ function YS:Apply(force, only, how)
         end
     end
     YippSetupCharDB.applied = p.scanned
+    if not only then YS.ChoicesApplied() end
     -- the layout as it went on, kept for this character: spells learned later go by it, whatever
     -- another character of the class saves afterwards
     YippSetupCharDB.layout = Copy(p.slots)
@@ -788,6 +1331,7 @@ function YS:Apply(force, only, how)
     if o.noAutoPush and not NoAutoPush() then
         Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
     end
+    YS.UIApplied()
     YS:ApplyUI(YS:SharedUI(), o)
 end
 
@@ -806,7 +1350,7 @@ function YS:Undo()
         return
     end
     local b = YippSetupCharDB.backup
-    if not b then Print("nothing to undo: no Set up has been done on this character since the copy was kept.") return end
+    if not b then Print("nothing to undo: nothing has been applied to this character since the backup.") return end
     local made = 0
     for _, m in ipairs(b.macros or {}) do
         local have
@@ -931,7 +1475,8 @@ end
 --------------------------------------------------------------------------------
 
 StaticPopupDialogs["YIPPSETUP_OVERWRITE"] = {
-    text = "Headstart: replace the saved layout from %s with this character's?",
+    text = "Headstart: this profile already has saved bars (%s).\n\nReplace them with this character's current bars?"
+        .. " Buttons planned for spells you haven't learned are kept.",
     button1 = "Replace",
     button2 = "Cancel",
     OnAccept = function() YS:Scan() YS:Refresh() YR:RefreshWindow() end,
@@ -940,10 +1485,14 @@ StaticPopupDialogs["YIPPSETUP_OVERWRITE"] = {
     hideOnEscape = true,
 }
 
+--- Copy this layout. Asked first whenever the class has a saved layout with anything in it - a plan
+--- you made, another character's bars, or this one's from before: it is replaced.
 function YS:Copy()
     local p = YS:Profile()
-    if p and p.from ~= PlayerKey() then
-        StaticPopup_Show("YIPPSETUP_OVERWRITE", p.from)
+    if p and type(p.slots) == "table" and next(p.slots) then
+        local n = 0
+        for _ in pairs(p.slots) do n = n + 1 end
+        StaticPopup_Show("YIPPSETUP_OVERWRITE", ("%s, %d buttons"):format(p.planned and "a plan you made" or ("from " .. tostring(p.from or "?")), n))
     else
         self:Scan()
         self:Refresh()
@@ -954,46 +1503,95 @@ local window
 
 -- The first-time window: two choices, in Headstart's own look.
 local function BuildWindow()
-    local w = S.Window("YippSetupFrame", 560, 146, "Set up this character")
+    local w = S.Window("YippSetupFrame", 640, 176, "Set up this character")
     w:ClearAllPoints()
     w:SetPoint("CENTER", 0, 120)
+    -- Two things, in the order you would do them: the interface (Edit Mode, chat, game settings - the
+    -- same for every class), then this class's bars. Each has its line and its button.
+    w.ui = S.Text(w, 13, S.C.sub)
+    w.ui:SetPoint("TOPLEFT", 20, -62)
+    w.ui:SetWidth(600)
+    w.ui:SetWordWrap(false)
     w.info = S.Text(w, 13, S.C.sub)
-    w.info:SetPoint("TOPLEFT", 20, -62)
-    w.info:SetWidth(520)
-    w.info:SetWordWrap(true)
-    w.info:SetSpacing(3)
+    w.info:SetPoint("TOPLEFT", 20, -84)
+    w.info:SetWidth(600)
+    w.info:SetWordWrap(false)
 
     -- Only a deliberate click marks this character as done. Escape (which also skips the intro
     -- cinematic) just hides the window, so it comes back on the next login.
     local function Done() YippSetupCharDB.seen = CharacterID() or true end
-    -- Set up is instant (a new character wants to get going); Copy first shows every choice of what
-    -- carries over (Settings, Character tab), and is done from there
-    -- applied: the window has done its job and goes. In a fight nothing can go on the bars yet, so it
-    -- stays (Apply says why) and the character isn't marked done.
-    w.setup = S.Button(w, "Apply to this character", function()
+    -- Both saved and both still to do: one click, and one reload at the end.
+    w.both = S.Button(w, "Apply both", function()
         if InCombatLockdown() then YS:Apply() return end
         Done()
+        YippSetupCharDB.uiApplied = CharacterID() or true
         YS:Apply()
         w:Hide()
-    end, "primary")
-    w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
-    w.setup.tip = "On a new character: put the saved layout on this one, now"
-    w.copy = S.Button(w, "Copy this layout...", function()
-        Done()
-        w:Hide()
-        YR:ShowSettingsTab("setup")
-    end)
-    w.copy:SetPoint("RIGHT", w.setup, "LEFT", -8, 0)
-    w.copy.tip = "On your main: see what a new character will get, then copy this one's bars, macros and settings"
+    end, "primary", 110)
+    w.both:SetPoint("BOTTOMLEFT", 16, 16)
+    w.both.tip = "Puts this class's saved bars and macros on this character, then the saved interface. One reload at the end"
+    -- The interface alone. The character isn't marked done by it: applying it often ends in a reload,
+    -- and the window is back after that with the bars still to do (YippSetupCharDB.uiApplied).
+    w.applyUI = S.Button(w, "Apply interface", function()
+        if InCombatLockdown() then YS:ApplyInterface() return end
+        YippSetupCharDB.uiApplied = CharacterID() or true
+        -- nothing left for the window to offer (the bars saved for the class are this character's own)
+        local p = YS:Profile()
+        if p and p.from == PlayerKey() and not p.planned then Done() end
+        YS:ApplyInterface()
+        YS:Refresh()
+    end, nil, 130)
+    w.applyUI.tip = "Puts your saved Edit Mode layout, chat windows and game settings on this character. Bars are not touched"
     -- No main to copy from: build the bars here, with every spell of the class at any level.
-    w.plan = S.Button(w, "Plan my bars...", function()
+    w.plan = S.Button(w, "Plan bars...", function()
         Done()
         w:Hide()
         YR.OpenPlanner()
-    end)
-    w.plan:SetPoint("BOTTOMLEFT", 16, 16)
-    w.plan.tip = "Drag every spell your class will have onto your bars now, and save it as this class's layout"
+    end, nil, 110)
+    w.plan:SetPoint("LEFT", w.applyUI, "RIGHT", 8, 0)
+    w.plan.tip = "Opens the bar planner: put any spell your class can learn on a button, and save it as this class's profile"
+    -- applied: the window has done its job and goes. In a fight nothing can go on the bars yet, so it
+    -- stays (Apply says why) and the character isn't marked done.
+    w.setup = S.Button(w, "Apply bars", function()
+        if InCombatLockdown() then YS:Apply(nil, nil, { barsOnly = true }) return end
+        Done()
+        YS:Apply(nil, nil, { barsOnly = true })
+        w:Hide()
+    end, nil, 110)
+    w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
+    w.setup.tip = "Puts this class's saved bars and macros on this character"
+    w.copy = S.Button(w, "Settings...", function()
+        Done()
+        w:Hide()
+        YR:ShowSettingsTab("setup")
+    end, nil, 100)
+    w.copy:SetPoint("RIGHT", w.setup, "LEFT", -8, 0)
+    w.copy.tip = "Character setup: profiles, what Apply brings along, and Save interface on the character you want it from"
     w.close:HookScript("OnClick", Done)
+    -- more than one interface saved: which one this character gets
+    w.pick = S.Dropdown(w, 150, function()
+        local out = {}
+        for _, name in ipairs(YS.UINames()) do out[#out + 1] = { name, name } end
+        return out
+    end, function(name)
+        YS.UIPick(name)
+        YS:Refresh()
+    end)
+    w.pick:SetPoint("TOPRIGHT", -20, -56)
+    -- The window's other job: this character's interface was changed on another character. Two answers
+    -- (the X is "not now": it asks again next login, and nothing is saved over until one is given).
+    w.update = S.Button(w, "Update", function()
+        if not InCombatLockdown() then w:Hide() end
+        YS:ApplyInterface()
+    end, "primary", 110)
+    w.update:SetPoint("BOTTOMLEFT", 16, 16)
+    w.update.tip = "Puts the changed interface on this character"
+    w.keep = S.Button(w, "Keep this character's", function()
+        w:Hide()
+        YS:SaveInterface(YS.UIName(), true)
+    end, nil, 170)
+    w.keep:SetPoint("LEFT", w.update, "RIGHT", 8, 0)
+    w.keep.tip = "Saves this character's interface over the change. The other characters on it are asked in turn"
     return w
 end
 
@@ -1001,16 +1599,48 @@ function YS:Refresh()
     if not window then return end
     local p = YS:Profile()
     local class = PlayerClass():lower()
-    if not p then
-        window.info:SetText(("No %s layout saved yet. Plan one now with every %s spell, or on your %s main"
-            .. " click Copy this layout."):format(class, class, class))
-    else
-        window.info:SetText(("Saved %s layout: |cffffffff%s|r.%s"):format(class, YS:Describe(p) or p.from,
-            YS:SharedUI() and "" or "\n|cffff8040No interface saved yet: Copy this layout on a character set up the"
-                .. " way you like it.|r"))
+    local ui = YS:SharedUI()
+    local name = YS.UIName()
+    local behind, by, at = YS.UIBehind()
+    window.behind = behind
+    for _, b in ipairs({ window.both, window.applyUI, window.plan, window.setup, window.pick }) do b:SetShown(not behind) end
+    window.update:SetShown(behind)
+    window.keep:SetShown(behind)
+    window.copy:ClearAllPoints()
+    if behind then
+        window.copy:SetPoint("BOTTOMRIGHT", -16, 16)
+        window.ui:SetWidth(600)
+        window.ui:SetText(("Interface |cffffffff%s|r was changed on |cffffffff%s|r, %s."):format(name, tostring(by or "another character"), Ago(at)))
+        window.info:SetText("Update puts it on this character. Or keep this character's, and that becomes the saved one.")
+        return
     end
-    window.setup:SetEnabled(p ~= nil and p.from ~= PlayerKey())
-    -- The planner is the way in when there's nothing saved; with a layout it's in Settings, Character.
+    window.copy:SetPoint("RIGHT", window.setup, "LEFT", -8, 0)
+    local id = CharacterID()
+    local uiDone = id ~= nil and YippSetupCharDB.uiApplied == id
+    local bars = p ~= nil and p.from ~= PlayerKey()             -- there are saved bars to put on
+    local several = #YS.UINames() > 1 and not uiDone
+    window.pick:SetShown(several)
+    window.pick:SetValue(name)
+    window.ui:SetWidth(several and 440 or 600)
+    window.ui:SetText(uiDone and ("|cff73d17fInterface applied.|r " .. (bars and "Next: your bars." or "Next: plan your bars."))
+        or ui and YS.UIStale and YS.UIStale(ui) and ("Interface: |cffffffff%s|r, saved %s. |cffffb040An older save:|r save it again once.")
+            :format(name, Ago(YS.UIScanned()))
+        or ui and ("Interface: |cffffffff%s|r, saved %s on %s."):format(name, Ago(YS.UIScanned()), tostring(YS.UISource() or "a character"))
+        or "Interface: none saved yet. Use Save interface on a character set up the way you like (Settings).")
+    if not p then
+        window.info:SetText(("Bars: no %s profile yet. Plan bars lets you build one now."):format(class))
+    else
+        window.info:SetText(("Bars: %s profile |cffffffff%s|r."):format(class, YS:Describe(p) or p.from))
+    end
+    window.applyUI:SetEnabled(ui ~= nil and not uiDone)
+    window.setup:SetEnabled(bars)
+    -- one button for both while both are still to do; otherwise the two stand alone
+    local both = ui ~= nil and not uiDone and bars
+    window.both:SetShown(both)
+    window.applyUI:ClearAllPoints()
+    if both then window.applyUI:SetPoint("LEFT", window.both, "RIGHT", 8, 0)
+    else window.applyUI:SetPoint("BOTTOMLEFT", 16, 16) end
+    -- The planner is the way in when there's nothing saved; with a profile it's in Settings, Character setup.
     window.plan:SetShown(p == nil or p.planned == true)
 end
 
@@ -1036,6 +1666,16 @@ local function FirstTimeHere()
     if (UnitLevel("player") or 1) > NEW_LEVEL then return end
     if InCinematic() or not UIParent:IsShown() then
         C_Timer.After(2, FirstTimeHere)
+        return
+    end
+    YS:Toggle()
+end
+
+-- A character on an interface that was saved on another character since: the window, asking which.
+local function ChangedElsewhere()
+    if not YS.UIFollows() or not YS.UIBehind() or (window and window:IsShown()) then return end
+    if InCombatLockdown() or InCinematic() or not UIParent:IsShown() then
+        C_Timer.After(5, ChangedElsewhere)
         return
     end
     YS:Toggle()
@@ -1088,7 +1728,7 @@ function YS:Debug()
     local p, o = YS:Profile(), YS:Options()
     local levels, autofeed = YS.SPELL_LEVELS[class] or {}, AutoFeedNames()
     Print(("debug: %s level %d. Buttons are made up to level %d. Options: buttons %s, clear bars %s, clear macros %s, class spells %s."):format(
-        tostring(class), UnitLevel("player") or 0, (UnitLevel("player") or 1) + AHEAD, YS.SpellButtons(o), tostring(o.clearBars),
+        tostring(class), UnitLevel("player") or 0, (UnitLevel("player") or 1) + Ahead(o), YS.SpellButtons(o), tostring(o.clearBars),
         tostring(o.clearMacros), tostring(o.classSpells)))
     if not p then Print("debug: no layout saved for this class.") return end
     local saved, wanted, known, tooHigh = 0, 0, 0, 0
@@ -1131,6 +1771,36 @@ local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_ENTERING_WORLD")
 f:RegisterEvent("SPELLS_CHANGED")        -- a spell learned (it also fires for much else, in bursts)
 f:RegisterEvent("PLAYER_REGEN_ENABLED")
+f:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")       -- the other of your two specs (Layouts.lua)
+f:RegisterEvent("ACTIONBAR_SLOT_CHANGED")            -- a button changed: the profile remembers (below)
+f:RegisterEvent("PLAYER_LEAVING_WORLD")              -- logging out: the account's interface follows (YS.FollowUI)
+
+-- A profile is your bars as you have them, not as they once were saved: a spell you drag somewhere
+-- else while levelling, a potion you put on a button, is in the profile a few seconds later - so it
+-- is there when you come back from another profile, and on your next character of the class. Only on
+-- a character that is on the profile (set up from it, or the one it was made on), never in a fight,
+-- and once for however many buttons changed (a login changes a hundred). The spells planned for
+-- levels you haven't reached keep their buttons (YS:ScanBars). Account option "remember" (on unless
+-- turned off).
+local rememberSoon = false
+function YS.Remembers() return not (YippSetupDB and YippSetupDB.remember == false) end
+local function Remember()
+    rememberSoon = false
+    if not (YippSetupCharDB and YippSetupCharDB.applied and YS.Remembers() and YS:Profile()) then return end
+    if InCombatLockdown() then
+        waiting = true              -- looked at again when the fight ends
+        return
+    end
+    if GetCursorInfo and GetCursorInfo() then return end        -- mid-drag: the drop changes a button again
+    YS:ScanBars()
+    YippSetupCharDB.layout = Copy(YS:Profile().slots)           -- where spells learned later go, too
+end
+YS.RememberNow = Remember
+local function RememberSoon()
+    if rememberSoon or not (YippSetupCharDB and YippSetupCharDB.applied) then return end
+    rememberSoon = true
+    C_Timer.After(4, Remember)
+end
 local upgradeSoon = false
 local function UpgradeSoon()
     -- a character never set up has nothing to keep up: nothing is set going (this is every spell change)
@@ -1142,19 +1812,30 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "PLAYER_ENTERING_WORLD" and (arg1 or arg2) then   -- login or reload only
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
         SkipIntro()
+        YS.ClassUINoted()
         C_Timer.After(0.5, FirstZoom)
         C_Timer.After(2, FirstTimeHere)
         C_Timer.After(3, FillInUI)
+        C_Timer.After(4, ChangedElsewhere)
+        C_Timer.After(6, YS.UISettle)
         if YippSetupCharDB.applied and YS:Options().noAutoPush and not InCombatLockdown() then NoAutoPush() end
+    elseif event == "ACTIVE_TALENT_GROUP_CHANGED" then
+        if YS.OnSpecChanged then YS.OnSpecChanged(arg1, arg2) end
+    elseif event == "ACTIONBAR_SLOT_CHANGED" then
+        RememberSoon()
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        YS.FollowUI()
     elseif event == "SPELLS_CHANGED" or (event == "PLAYER_REGEN_ENABLED" and waiting) then
         UpgradeSoon()
+        if event == "PLAYER_REGEN_ENABLED" then RememberSoon() end
     end
 end)
 
 --- Called by Headstart once this addon's files are in (Core.lua, YR.LoadSetup). fresh: this is the
 --- character's first login with Headstart (the saved tables themselves are made by Headstart).
---- The macros already waiting on your bars with a question mark, for spells you haven't learned:
---- given the spell's icon. Once a login, out of a fight. Returns how many.
+--- The macros waiting on your bars that were given a spell's icon (see the top of the file): back to
+--- the question mark, which the game turns into the spell's icon by itself once you know the spell.
+--- Once a login, out of a fight. Returns how many.
 function YS.PlaceholderIcons()
     if InCombatLockdown() or not (GetNumMacros and EditMacro) then return 0 end
     local _, numChar = GetNumMacros()
@@ -1162,16 +1843,23 @@ function YS.PlaceholderIcons()
     local done = 0
     for i = base + 1, base + (numChar or 0) do
         local name, icon, body = GetMacroInfo(i)
-        local spell = name and icon == DYNAMIC_ICON and type(body) == "string" and body:match("^#showtooltip ([^\n]+)\n/cast ")
+        local spell = name and icon ~= DYNAMIC_ICON and type(body) == "string" and body:match("^#showtooltip ([^\n]+)\n/cast ")
         spell = spell and spell:gsub("%(Rank %d+%)$", "")
-        local to = spell and Unlearned(spell) and PlanIcon(spell)
-        -- (a macro's place in the list is by its name: giving it an icon doesn't move it)
-        if to and pcall(EditMacro, i, nil, to, nil) then done = done + 1 end
+        -- ours: named as we name it, with the very icon the plan has for that spell
+        if spell and name == ShortName(spell) and icon == PlanIcon(spell) and pcall(EditMacro, i, nil, DYNAMIC_ICON, nil) then
+            done = done + 1
+        end
     end
     return done
 end
 
 function YS.Start(fresh)
+    YS.RepairLayouts()
+    -- leaving Edit Mode: what you changed there is the account's interface, on the character it comes from
+    local registry = _G.EventRegistry
+    if type(registry) == "table" and registry.RegisterCallback then
+        registry:RegisterCallback("EditMode.Exit", function() YS.FollowUI() end, YS)
+    end
     if YippSetupCharDB and YippSetupCharDB.applied then
         C_Timer.After(4, function() YS.PlaceholderIcons() end)
     end

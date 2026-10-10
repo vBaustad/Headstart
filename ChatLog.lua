@@ -205,9 +205,9 @@ local function BoxLine(l)
         words = words:gsub("|n", "\n")
     end
     if l[4] then
-        return ("|cff7f8794%s|r  |cff%02x%02x%02x%s|r"):format(Stamp(l[1]), l[4] * 255, l[5] * 255, l[6] * 255, words)
+        return ("|cff8a827a%s|r  |cff%02x%02x%02x%s|r"):format(Stamp(l[1]), l[4] * 255, l[5] * 255, l[6] * 255, words)
     end
-    return ("|cff7f8794%s|r  %s"):format(Stamp(l[1]), words)
+    return ("|cff8a827a%s|r  %s"):format(Stamp(l[1]), words)
 end
 
 -- The newest lines are at the bottom: that is where the window opens. The box of text only has its
@@ -231,17 +231,17 @@ end
 local function Fill()
     if not win then return end
     local list, total = YR.ChatLogLines(view.window, view.search)
-    win.count:SetText(total > SHOWN_MAX and ("the newest %d of %d lines - search to find older ones"):format(SHOWN_MAX, total)
+    win.count:SetText(total > SHOWN_MAX and ("Showing the newest %d of %d lines. Search to find older ones."):format(SHOWN_MAX, total)
         or ("%d line%s"):format(total, total == 1 and "" or "s"))
     local out, day = {}, nil
     for _, l in ipairs(list) do
         local d = Day(l[1])
         if d ~= day then
             day = d
-            out[#out + 1] = "|cff7f8794---- " .. d .. " ----|r"
+            out[#out + 1] = "|cff8a827a---- " .. d .. " ----|r"
         end
         if l[2] == SESSION then
-            out[#out + 1] = "|cff7f8794---- logged in " .. Stamp(l[1]) .. " ----|r"
+            out[#out + 1] = "|cff8a827a---- logged in " .. Stamp(l[1]) .. " ----|r"
         else
             out[#out + 1] = BoxLine(l)
         end
@@ -289,16 +289,16 @@ local function Build()
         win.box:HighlightText()
     end, nil, 100)
     win.all:SetPoint("TOPRIGHT", -16, -60)
-    win.all.tip = "Marks every line shown, ready for Ctrl+C"
+    win.all.tip = "Selects every line shown. Press Ctrl+C to copy"
     local again = S.Button(win, "Newest", function() Fill() end, nil, 90)
     again:SetPoint("RIGHT", win.all, "LEFT", -8, 0)
-    again.tip = "What chat has said since the window was opened, and down to the last line"
+    again.tip = "Loads new chat lines and jumps to the newest"
     win.count = S.Text(win, 12, S.C.muted)
     win.count:SetPoint("BOTTOMLEFT", 16, 12)
     win.hint = S.Text(win, 12, S.C.muted)
     win.hint:SetPoint("BOTTOMRIGHT", -16, 12)
     win.hint:SetJustifyH("RIGHT")
-    win.hint:SetText("Mark text with the mouse, then Ctrl+C.")
+    win.hint:SetText("Select text with the mouse, then press Ctrl+C.")
 
     -- the lines sit on a darker field, in a box of text: the one thing the game lets you mark text in
     local field = CreateFrame("Frame", nil, win)
@@ -323,7 +323,7 @@ end
 --- The log's window, on one chat window's lines (0 or nothing: all of them).
 function YR.ChatLogOpen(window)
     if not on then
-        YR.Print("the chat log is off: turn it on in Headstart, QoL, Chat.")
+        YR.Print("the chat log is off. Turn it on in /hs, Chat.")
         return false
     end
     Build()

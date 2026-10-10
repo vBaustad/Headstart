@@ -181,7 +181,7 @@ C_EquipmentSet = {
     YR.TrinketEquip(4, 14)
     YR.TrinketEquip(4, 14)
     check(g.WORN[14] == 2, "Equip from the list in a fight: not yet")
-    said = [m for m in g.SAID.values() if "the moment the fight ends" in m]
+    said = [m for m in g.SAID.values() if "when the fight ends" in m]
     check(YR.TrinketQueued(14) == 4 and len(said) == 1, f"it waits for the slot, and says so once however often you click ({len(said)})")
     ex("COMBAT = false Fire('PLAYER_REGEN_ENABLED')")
     check(g.WORN[14] == 4 and YR.TrinketQueued(14) is None, "the fight ends: on it goes at once, nothing left waiting")
@@ -250,6 +250,61 @@ C_EquipmentSet = {
         YR.TrinketAuto()
         YR.TrinketSlotsShown()
     check(0 < g.WALKS <= 5, f"three passes in one moment: the bags are walked once ({g.WALKS} bag reads for 5 bags)")
+
+    # finer swapping. A trinket in the bags with 20 s left is as good as ready: going on costs 30 anyway.
+    def fresh(extra=""):
+        g.YippRouteDB.trinketMount, g.YippRouteDB.trinketSwim = None, None
+        ex("MOUNTED, SWIMMING, COMBAT = false, false, false WORN[13] = 1 WORN[14] = 2 BAG = { 3, 4 } CD = {} " + extra)
+        o = YR.TrinketDB().order
+        for i in range(len(list(o.values())), 0, -1):
+            o[i] = None
+        for i, v in enumerate((1, 2, 4), start=1):
+            o[i] = v
+    fresh("CD[1] = { NOW, 120 } CD[4] = { NOW - 100, 120 }")
+    ex("Tick()")
+    check(worn() == (4, 2), f"1 used, 4 has 20 s left: 4 goes on (it gets 30 for going on anyway) {worn()}")
+    g.YippRouteDB.trinketAutoSoon = 0
+    fresh("CD[1] = { NOW, 120 } CD[4] = { NOW - 100, 120 }")
+    ex("Tick()")
+    check(worn() == (1, 2), f"set to wait until it is ready: 4 stays in the bag {worn()}")
+    g.YippRouteDB.trinketAutoSoon = None
+    # a used trinket stays on for the seconds you asked
+    g.YippRouteDB.trinketAutoDelay = 20
+    fresh("CD[1] = { NOW, 120 }")
+    ex("Tick()")
+    check(worn() == (1, 2), f"used a moment ago, to stay 20 s: it stays {worn()}")
+    ex("NOW = NOW + 21 Tick()")
+    check(worn() == (4, 2), f"21 s on: swapped {worn()}")
+    g.YippRouteDB.trinketAutoDelay = None
+    # ... and while its effect is on you
+    ex("BUFF = true C_UnitAuras = { GetAuraDataBySpellName = function(unit, name) return BUFF and name == 'Use' and {} or nil end }")
+    fresh("CD[1] = { NOW, 120 }")
+    ex("Tick()")
+    check(worn() == (1, 2), f"its effect still on you: it stays {worn()}")
+    g.YippRouteDB.trinketAutoBuff = False
+    ex("Tick()")
+    check(worn() == (4, 2), f"that turned off: swapped though the effect runs {worn()}")
+    g.YippRouteDB.trinketAutoBuff = None
+    ex("BUFF = false")
+    # said when a used trinket is ready again
+    g.YippRouteDB.trinketAuto, g.YippRouteDB.trinketNotify, g.YippRouteDB.trinketNotifySound = None, True, False
+    fresh("CD[1] = { NOW, 120 } PRINTS = {}")
+    ex("Tick()")
+    ex("NOW = NOW + 60 Tick()")
+    said = [str(m) for m in g.PRINTS.values() if "is ready" in str(m)]
+    check(said == [], f"used, a minute left: nothing said {said}")
+    ex("NOW = NOW + 61 Tick() Tick()")
+    said = [str(m) for m in g.PRINTS.values() if "is ready" in str(m)]
+    check(len(said) == 1 and worn() == (1, 2), f"its cooldown over: said once, and nothing swapped with the swaps off ({said})")
+    g.YippRouteDB.trinketNotify = None
+    ex("Tick()")
+    check(g.Ticking() == 0, "all of it off again: nothing ticks")
+    # the look, as set and within its limits
+    g.YippRouteDB.trinketBarSize, g.YippRouteDB.trinketFlyDir, g.YippRouteDB.trinketBarLeft = 500, "sideways", "use"
+    look = YR.TrinketLook()
+    check(look.size == 64 and look.gap == 6 and look.dir == "up" and look.left == "use" and look.show == "always" and look.numbers is True,
+          "the buttons' look: a size past the limit is the limit, an unknown direction is up, the rest as it was")
+    g.YippRouteDB.trinketBarSize, g.YippRouteDB.trinketFlyDir, g.YippRouteDB.trinketBarLeft = None, None, None
     return bad
 
 
