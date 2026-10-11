@@ -769,7 +769,7 @@ YR.ShowSettingsTab(YR, "trainer")        # the Trainer tab: the class's spells w
 check(True, "settings Trainer tab opens")
 # the Trainer page lists what a trainer teaches: Sinister Strike from its second rank (level 6), no talent's own ranks
 _ts = open(os.path.join(ROOT, "Data", "TrainerSpells.lua"), encoding="utf-8").read()
-_rogue = _ts[_ts.index("    ROGUE = {"):_ts.index("    SHAMAN = {")]
+_rogue = _ts[_ts.index("    ROGUE = function()"):_ts.index("    SHAMAN = function()")]
 check('{ 1757, 6, "Sinister Strike", 2,' in _rogue and "Fist Weapon Specialization" not in _rogue and '"Stealth", 1,' in _rogue,
       "trainer data: a rogue is taught Sinister Strike 2 at level 6 and Stealth, and no rank of a talent")
 # the QoL tab: the campfire icon, the flight timer, and the reward picker with a hand-picked reward listed

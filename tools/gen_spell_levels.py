@@ -12,9 +12,12 @@ Source: S:/forever-data/db/forever.duckdb (client DB2).
     and is listed in YS.TALENTS.
 Names are enUS, which is what the macros /cast by.
 """
+import json
 import os
 import sys
 import duckdb
+
+from spell_rules import NOT_IN_GAME, NOT_SPELLS
 
 DB = "S:/forever-data/db/forever.duckdb"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Headstart_Setup", "SpellLevels.lua")
@@ -31,7 +34,7 @@ lines = c.sql(f"""
     where sl.CategoryID = '7'""").fetchall()
 line_class = {}
 for sid, name, mask in lines:
-    if name in NOT_CLASS_SPELLS or mask is None or mask <= 0:
+    if name in NOT_CLASS_SPELLS or name.startswith("Pet - ") or mask is None or mask <= 0:
         continue
     for cid, token in CLASSES.items():
         if mask == 1 << (cid - 1):
@@ -43,43 +46,48 @@ rows = c.sql(f"""
     join {schema}.spellname n on n.ID = a.Spell
     join {schema}.spelllevels l on l.SpellID = a.Spell
     where a.AcquireMethod in ('0', '2') and cast(l.SpellLevel as int) > 0
-        and cast(a.Spell as int) not in (438040)       -- Redirect: in the tables, not in the game (see gen_trainer_spells.py)
+        and cast(a.Spell as int) not in ({", ".join(str(i) for i in sorted(NOT_IN_GAME))})
     group by 1, 2""").fetchall()
 
 levels = {}
 for sid, name, lvl in rows:
     token = line_class.get(sid)
-    if token:
+    if token and (token, name) not in NOT_SPELLS and not name.endswith(" Effect"):
         cur = levels.setdefault(token, {}).get(name)
         levels[token][name] = lvl if cur is None else min(cur, lvl)
 
-# Talents. A spell a talent gives you (Blade Flurry, Mortal Strike) has level 1 in spelllevels, or the level
-# of something else: read so, a level-1 rogue was given a button for a spell twenty talent points away. Its
-# real earliest level is where it sits in its tree: the first point comes at level 10 (numtalentsatlevel),
-# one a level, and a row needs five points for each row above it - row T (0 the top) at level 10 + 5 * T.
-# A talent's spell that the trainer lines above don't list at all (Riposte, Cold Blood, Inner Focus, Divine
-# Favor: no row in skilllineability with a level) is a class spell too, if it is something you press
-# (not passive: Attributes[0] & 0x40). Without it the planner couldn't hold it and no macro could ask for it.
+# Talents. Forever's trees are not Classic's (the client still has Classic's talent table: read from it,
+# Holy Shock was a level-40 talent and Blessing of Kings a talent at all). Which spells are talents, and
+# how many points each needs in lower tiers, is in tools/forever_talents.json (tools/fetch_talents.py,
+# from foreverchanges.pro's calculator). A talent that needs N points can first be taken at level
+# 10 + N: the first point comes at 10, one a level. (With Legacy points it can be five levels sooner.
+# Nothing here depends on that: a talent's button is never put on a bar before you have the talent.)
+# A talent the class lines don't list (Riposte, Cold Blood: only the trait has its spell) is a class
+# spell too, if it is something you press (not passive: Attributes[0] & 0x40). Without it the planner
+# couldn't hold it and no macro could ask for it.
 # (a weapon skill a talent teaches isn't marked passive in the data, and is nothing to press)
 NOT_PRESSED = {"Two-Handed Axes and Maces"}
+TREES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "forever_talents.json"), encoding="utf-8"))["classes"]
+passive_trait = {}
+for name, passive in c.sql(f"""
+        select n.Name_lang, max(cast(m."Attributes[0]" as bigint) & 64)
+        from {schema}.traitdefinition t
+        join {schema}.spellname n on n.ID = t.SpellID
+        left join {schema}.spellmisc m on m.SpellID = t.SpellID
+        group by 1""").fetchall():
+    passive_trait[name] = bool(passive)
 talents = {}
-for name, mask, tier, passive in c.sql(f'''
-        select n.Name_lang, cast(tt.ClassMask as bigint), min(cast(t.TierID as int)),
-            max(cast(m."Attributes[0]" as bigint) & 64)
-        from {schema}.talent t
-        join {schema}.talenttab tt on tt.ID = t.TabID
-        join {schema}.spellname n on n.ID = t."SpellRank[0]"
-        left join {schema}.spellmisc m on m.SpellID = t."SpellRank[0]"
-        group by 1, 2''').fetchall():
-    for cid, token in CLASSES.items():
-        if mask == 1 << (cid - 1):
-            lvl = 10 + 5 * tier
-            if name in levels.get(token, {}):
-                talents.setdefault(token, {})[name] = lvl
-                levels[token][name] = max(levels[token][name], lvl)
-            elif not passive and name not in NOT_PRESSED:
-                talents.setdefault(token, {})[name] = lvl
-                levels.setdefault(token, {})[name] = lvl
+for token, tree in TREES.items():
+    for name, t in tree.items():
+        lvl = 10 + t["needs"]
+        if (token, name) in NOT_SPELLS:
+            continue
+        if name in levels.get(token, {}):
+            talents.setdefault(token, {})[name] = lvl
+            levels[token][name] = lvl
+        elif name in passive_trait and not passive_trait[name] and name not in NOT_PRESSED:
+            talents.setdefault(token, {})[name] = lvl
+            levels.setdefault(token, {})[name] = lvl
 
 def lua_str(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
@@ -136,10 +144,32 @@ for name, sid in c.sql(f"""
 profs = sorted(prof_ids)
 out.append("-- profession spells: [name] = the spell ID with that name, or { the IDs } where there are several (a")
 out.append("-- plain number for the two thousand recipes with one: no table each); placed once the character has learned one")
-out.append("YS.PROFESSIONS = {")
-out += [f"    [{lua_str(n)}] = {prof_ids[n][0]}," if len(prof_ids[n]) == 1
-        else f"    [{lua_str(n)}] = {{ {', '.join(str(i) for i in sorted(prof_ids[n]))} }}," for n in profs]
-out.append("}")
+# Kept as one text and looked up by name when asked (a few times, when the bars are read): as a table
+# these two and a half thousand names held some 235 KB for the whole session.
+assert not any("=" in n or "\n" in n or "]==]" in n for n in profs)
+out.append("local PROFESSION_TEXT = \"\\n\" .. [==[")
+out += [f"{n}={','.join(str(i) for i in sorted(prof_ids[n]))}" for n in profs]
+out.append("]==]")
+out += ["local asked = {}",
+        "--- The spell ID a profession spell of that name has, { the IDs } where several have it, or nil.",
+        "function YS.ProfessionIDs(name)",
+        "    if type(name) ~= \"string\" then return nil end",
+        "    local known = asked[name]",
+        "    if known ~= nil then return known or nil end",
+        "    known = false",
+        "    local _, at = PROFESSION_TEXT:find(\"\\n\" .. name .. \"=\", 1, true)",
+        "    if at then",
+        "        local ids = PROFESSION_TEXT:sub(at + 1, (PROFESSION_TEXT:find(\"\\n\", at + 1, true) or 0) - 1)",
+        "        if ids:find(\",\", 1, true) then",
+        "            known = {}",
+        "            for id in ids:gmatch(\"%d+\") do known[#known + 1] = tonumber(id) end",
+        "        else",
+        "            known = tonumber(ids) or false",
+        "        end",
+        "    end",
+        "    asked[name] = known",
+        "    return known or nil",
+        "end"]
 with open(OUT, "w", encoding="utf-8", newline="\n") as f:
     f.write("\n".join(out) + "\n")
 print(f"{OUT}: {sum(len(v) for v in levels.values())} spells over {len(levels)} classes, {len(racials)} racials, {len(profs)} profession spells, from {schema}")

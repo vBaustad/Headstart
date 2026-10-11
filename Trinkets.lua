@@ -23,8 +23,6 @@
 --   Swap trinkets for me, finer: trinketAutoBuff (a used trinket stays on while its effect runs; on
 --   unless turned off), trinketAutoDelay (seconds a used trinket stays on at least, 0), trinketAutoSoon
 --   (a trinket in your bags counts as ready with this many seconds left, 30: going on costs 30 anyway).
---   trinketNotify: said in chat, with a sound unless trinketNotifySound is false, when a trinket you
---   used is ready again.
 --   Account options (YippRouteDB, Settings, QoL, Trinkets & sets): trinketBar, trinketBarLocked,
 --   trinketBarCount, trinketPvpPause (on unless turned off); trinketAuto, trinketMount, trinketSwim (off unless turned on),
 --   trinketMountItem / trinketSwimItem (item IDs; nil = Carrot on a Stick / none), trinketMountSlot
@@ -131,6 +129,7 @@ local function WornIn(id)
 end
 
 local function Left(start, duration)
+    if issecretvalue and (issecretvalue(start) or issecretvalue(duration)) then return 0 end      -- kept from us: nothing to say
     if not (start and duration) or start <= 0 or duration <= 0 then return 0 end
     return math.max(0, start + duration - GetTime())
 end
@@ -249,31 +248,6 @@ function YR.TrinketAuto()
     end
     return nil
 end
-
--- "Ready again": a trinket you wear or have in your list was used (a cooldown longer than going on
--- gives), and the cooldown has run out. Looked at once a second, with the swaps.
-local used = {}
-local function Notify()
-    if YippRouteDB.trinketNotify ~= true then
-        if next(used) then for k in pairs(used) do used[k] = nil end end
-        return
-    end
-    local function Look(id)
-        if not id or not OnUse(id) then return end
-        local left = CooldownLeft(id)
-        if issecretvalue and issecretvalue(left) then return end
-        if left > USED then
-            used[id] = true
-        elseif used[id] and left <= 0.5 then
-            used[id] = nil
-            YR.Print(("%s is ready."):format(C_Item.GetItemNameByID and C_Item.GetItemNameByID(id) or "your trinket"))
-            if YippRouteDB.trinketNotifySound ~= false and PlaySound then PlaySound(8959, "Master") end      -- the raid warning's sound
-        end
-    end
-    for _, s in ipairs(SLOTS) do Look(Worn(s)) end
-    for _, id in ipairs(CharDB().order) do if not WornIn(id) and InBags(id) then Look(id) end end
-end
-YR.TrinketNotify = Notify
 
 --- In the list or not: at the end when added.
 function YR.TrinketToggleList(id)
@@ -661,7 +635,7 @@ local function Layout()
     relayout = false
     local shown = YR.TrinketSlotsShown()
     local look = YR.TrinketLook()
-    local as = ("%d %d %s %s %s"):format(look.size, look.gap, tostring(look.vertical), look.left, tostring(look.numbers))
+    local as = look.size * 1000 + look.gap * 8 + (look.vertical and 4 or 0) + (look.left == "use" and 2 or 0) + (look.numbers and 1 or 0)
     -- the buttons are sized and moved only when which of them show, or their look, changes (this runs
     -- on every bag change)
     if laid ~= shown or laidAs ~= as then
@@ -731,7 +705,8 @@ function YR.ShowTrinketBar(on)
     if on and not bar then Build() end
     if bar then
         if not on and driven and UnregisterStateDriver then UnregisterStateDriver(bar, "visibility") driven = nil end
-        bar:SetShown(on and true or false)
+        -- (shown only in a fight, or only out of one: the game shows and hides it, and Layout leaves it be)
+        if not driven then bar:SetShown(on and true or false) end
         Layout()
     end
     if not on then CloseFlyout() end
@@ -755,7 +730,7 @@ end
 local function BarOn() return YR.Option("trinketBar") end
 local function SwapsOn()
     local db = YippRouteDB
-    return (db.trinketAuto == true or db.trinketMount == true or db.trinketSwim == true or db.trinketNotify == true) and YR.QoLOn()
+    return (db.trinketAuto == true or db.trinketMount == true or db.trinketSwim == true) and YR.QoLOn()
 end
 local function WatchOn() return BarOn() or SwapsOn() end
 
@@ -777,9 +752,12 @@ local function BarShow()
 end
 local function BarHide() YR.ShowTrinketBar(false) end
 
-local function OnChange()
+local function OnChange(_, event, slot)
     walked = false
     if not bar then return end
+    -- gear that isn't a trinket: where your trinkets are may have moved in the bags (walked again when
+    -- next asked), but no button of ours changes
+    if event == "PLAYER_EQUIPMENT_CHANGED" and type(slot) == "number" and slot ~= 13 and slot ~= 14 then return end
     Layout()
     Paint()
 end
@@ -787,7 +765,6 @@ local function WatchStart() watching, walked = true, false end
 local function WatchStop() watching, walked = false, false end
 
 local function EverySecond()
-    Notify()
     if InCombatLockdown() then return end
     YR.TrinketWhen()
     YR.TrinketAuto()

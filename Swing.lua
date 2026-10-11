@@ -446,6 +446,7 @@ function Dress()
                 -- Blizzard colours its bar as it goes: what it set is remembered, and ours goes back over it
                 hooksecurefunc(sb, "SetStatusBarColor", function(_, r, g, b, a)
                     if k.painting then return end
+                    if issecretvalue(r) or issecretvalue(g) or issecretvalue(b) then return end      -- nothing we can keep or lighten
                     k.color[1], k.color[2], k.color[3], k.color[4] = r, g, b, a      -- no new table: this can come often
                     if k.on then Tint(f, k) end
                 end)
@@ -729,6 +730,8 @@ local function OnEvent(_, event, a, b, c)
     elseif event == "PLAYER_TARGET_CHANGED" then
         RangeChecks()
     elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+        -- a weapon slot (main hand, off hand, ranged): nothing else you put on changes a swing bar
+        if type(a) == "number" and (a < 16 or a > 18) then return end
         if holder then Icons() YR.SwingLayout() end
         if Dressed() then Dress() end
     elseif event == "ADDON_LOADED" then

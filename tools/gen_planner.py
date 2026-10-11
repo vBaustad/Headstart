@@ -18,6 +18,7 @@ leaves them out.
     YR.PlannerForms[CLASS] = { { form name, bonus bar } }   forms that swap the main bar
         (spellshapeshiftform.BonusActionBar > 0): bar 1 then shows slots 72 + (bar - 1) * 12 + 1..12
 """
+import json
 import os
 import sys
 
@@ -41,6 +42,8 @@ FORM_CLASS = {"Cat Form": "DRUID", "Bear Form": "DRUID", "Dire Bear Form": "DRUI
               "Defensive Stance": "WARRIOR", "Berserker Stance": "WARRIOR", "Stealth": "ROGUE"}
 
 
+from spell_rules import NOT_IN_GAME, NOT_SPELLS, other_line
+
 def q(t):
     return '"' + t.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -50,8 +53,10 @@ def main():
     s = sys.argv[1] if len(sys.argv) > 1 else c.sql(
         "select schema_name from main.builds where schema_name like 'wow_classic_beta_%' order by schema_name desc limit 1").fetchone()[0]
     line_class = {}
-    for sid, mask in c.sql(f"""select sl.ID, cast(i.ClassMask as bigint) from {s}.skillline sl
+    for sid, line, mask in c.sql(f"""select sl.ID, sl.DisplayName_lang, cast(i.ClassMask as bigint) from {s}.skillline sl
             join {s}.skillraceclassinfo i on i.SkillID = sl.ID where sl.CategoryID = '7'""").fetchall():
+        if other_line(line):            # a hunter's pet's abilities are not buttons of the hunter's
+            continue
         for cid, token in CLASSES.items():
             if mask == 1 << (cid - 1):
                 line_class[sid] = token
@@ -64,7 +69,7 @@ def main():
         join {s}.spelllevels l on l.SpellID = a.Spell
         left join {s}.spellmisc m on m.SpellID = a.Spell
         where a.AcquireMethod in ('0', '2') and cast(l.SpellLevel as int) > 0
-            and cast(a.Spell as int) not in (438040)       -- Redirect: in the tables, not in the game (see gen_trainer_spells.py)
+            and cast(a.Spell as int) not in ({", ".join(str(i) for i in sorted(NOT_IN_GAME))})
         group by 1, 2, 3, 5, 6, 7""").fetchall()
     best = {}
     # Which races get a class spell (a priest's Desperate Prayer, Starshards ...; a paladin's mount; a
@@ -72,7 +77,7 @@ def main():
     races = {}
     for line, spell, name, level, icon, attr, race in rows:
         token = line_class.get(line)
-        if not token:
+        if not token or (token, name) in NOT_SPELLS or name.endswith(" Effect"):
             continue
         race = (race or 0) & 0xFFFFFFFF
         if race == 0xFFFFFFFF:
@@ -84,19 +89,28 @@ def main():
             best[token][name] = (level, spell, icon or 0, 1 if (attr or 0) & PASSIVE else 0)
 
     # A talent's spell the trainer lines don't list (Riposte, Cold Blood, Inner Focus, Divine Favor), if it
-    # is something you press: the same rule, and so the same names, as gen_spell_levels.py.
-    for spell, name, mask, tier, icon, attr in c.sql(f'''
-            select cast(t."SpellRank[0]" as int), n.Name_lang, cast(tt.ClassMask as bigint), cast(t.TierID as int),
-                cast(m.SpellIconFileDataID as bigint), cast(m."Attributes[0]" as bigint)
-            from {s}.talent t
-            join {s}.talenttab tt on tt.ID = t.TabID
-            join {s}.spellname n on n.ID = t."SpellRank[0]"
-            left join {s}.spellmisc m on m.SpellID = t."SpellRank[0]"''').fetchall():
-        if (attr or 0) & PASSIVE or name == "Two-Handed Axes and Maces":       # (a weapon skill: nothing to press)
-            continue
-        for cid, token in CLASSES.items():
-            if mask == 1 << (cid - 1) and name not in best.get(token, {}):
-                best.setdefault(token, {})[name] = (10 + 5 * tier, spell, icon or 0, 0)
+    # is something you press: the same rule, and so the same names, as gen_spell_levels.py - Forever's
+    # talents (tools/forever_talents.json), their spells from the traits, not Classic's talent table.
+    trees = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "forever_talents.json"), encoding="utf-8"))["classes"]
+    trait = {}
+    for name, spell, icon, attr in c.sql(f"""
+            select n.Name_lang, cast(t.SpellID as int), cast(m.SpellIconFileDataID as bigint), cast(m."Attributes[0]" as bigint)
+            from {s}.traitdefinition t
+            join {s}.spellname n on n.ID = t.SpellID
+            left join {s}.spellmisc m on m.SpellID = t.SpellID""").fetchall():
+        cur = trait.get(name)
+        if cur is None or spell < cur[0]:
+            trait[name] = (spell, icon or 0, bool((attr or 0) & PASSIVE) or (cur[2] if cur else False))
+    for token, tree in trees.items():
+        for name, t in tree.items():
+            if (token, name) in NOT_SPELLS or name == "Two-Handed Axes and Maces":       # (a weapon skill: nothing to press)
+                continue
+            level = 10 + t["needs"]
+            have = best.get(token, {}).get(name)
+            if have:
+                best[token][name] = (level,) + have[1:]
+            elif name in trait and not trait[name][2]:
+                best.setdefault(token, {})[name] = (level, trait[name][0], trait[name][1], 0)
                 races.setdefault(token, {})[name] = 0
 
     racials = {}

@@ -2917,8 +2917,6 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
         Row("Swap in when ready within", RowSlider(c, 0, 60, 5, Num("trinketAutoSoon", 30), SetNum("trinketAutoSoon")),
             "A trinket in your bags counts as ready with this many seconds left on its cooldown. Equipping a trinket"
             .. " gives it 30 seconds anyway, so 30 loses nothing. 0: only when it is fully ready.")
-        Row("Say when ready", Flag("trinketNotify", true), "A chat line when a trinket you used is ready again. Works without auto-swap.")
-        Row("Sound when ready", Flag("trinketNotifySound"), "Plays a sound with the chat line.")
         Row("Pause while PvP flagged", S.Switch(c, Opt("trinketPvpPause"), function(on) YippRouteDB.trinketPvpPause = on end),
             "Stops every automatic swap, here and under Swap rules, while you are flagged for PvP. Your own"
             .. " clicks and equipment set keys still work.")

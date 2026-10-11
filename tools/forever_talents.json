@@ -1,0 +1,1888 @@
+{
+ "build": "1.60.1.70338",
+ "classes": {
+  "DRUID": {
+   "Berserk": {
+    "needs": 30,
+    "points": 1
+   },
+   "Blood Frenzy": {
+    "needs": 15,
+    "points": 2
+   },
+   "Brutal Impact": {
+    "needs": 5,
+    "points": 2
+   },
+   "Eclipse": {
+    "needs": 20,
+    "points": 3
+   },
+   "Feral Charge": {
+    "needs": 10,
+    "points": 1
+   },
+   "Feral Instinct": {
+    "needs": 5,
+    "points": 3
+   },
+   "Feral Swiftness": {
+    "needs": 5,
+    "points": 2
+   },
+   "Ferocity": {
+    "needs": 0,
+    "points": 5
+   },
+   "Furor": {
+    "needs": 0,
+    "points": 5
+   },
+   "Genesis": {
+    "needs": 0,
+    "points": 5
+   },
+   "Gift of Nature": {
+    "needs": 10,
+    "points": 5
+   },
+   "Gift of the Earthmother": {
+    "needs": 10,
+    "points": 1
+   },
+   "Heart of the Wild": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Entangling Roots": {
+    "needs": 10,
+    "points": 3
+   },
+   "Improved Moonfire": {
+    "needs": 5,
+    "points": 2
+   },
+   "Improved Regrowth": {
+    "needs": 25,
+    "points": 5
+   },
+   "Improved Rejuvenation": {
+    "needs": 15,
+    "points": 3
+   },
+   "Improved Shifting Power": {
+    "needs": 20,
+    "points": 2
+   },
+   "Improved Starfire": {
+    "needs": 15,
+    "points": 5
+   },
+   "Improved Tranquility": {
+    "needs": 20,
+    "points": 2
+   },
+   "Improved Wrath": {
+    "needs": 0,
+    "points": 5
+   },
+   "Insect Swarm": {
+    "needs": 15,
+    "points": 1
+   },
+   "Leader of the Pack": {
+    "needs": 20,
+    "points": 1
+   },
+   "Living Spirit": {
+    "needs": 20,
+    "points": 3
+   },
+   "Moonfury": {
+    "needs": 25,
+    "points": 5
+   },
+   "Moonglow": {
+    "needs": 5,
+    "points": 3
+   },
+   "Moonkin Form": {
+    "needs": 30,
+    "points": 1
+   },
+   "Natural Instinct": {
+    "needs": 20,
+    "points": 2
+   },
+   "Natural Reaction": {
+    "needs": 25,
+    "points": 5
+   },
+   "Natural Shapeshifter": {
+    "needs": 5,
+    "points": 3
+   },
+   "Naturalist": {
+    "needs": 5,
+    "points": 5
+   },
+   "Nature's Focus": {
+    "needs": 0,
+    "points": 5
+   },
+   "Nature's Grace": {
+    "needs": 20,
+    "points": 1
+   },
+   "Nature's Majesty": {
+    "needs": 5,
+    "points": 2
+   },
+   "Nature's Reach": {
+    "needs": 5,
+    "points": 2
+   },
+   "Nature's Splendor": {
+    "needs": 10,
+    "points": 1
+   },
+   "Nature's Swiftness": {
+    "needs": 20,
+    "points": 1
+   },
+   "Overgrowth": {
+    "needs": 20,
+    "points": 2
+   },
+   "Predatory Strikes": {
+    "needs": 15,
+    "points": 3
+   },
+   "Primal Bite": {
+    "needs": 15,
+    "points": 1
+   },
+   "Reflection": {
+    "needs": 10,
+    "points": 3
+   },
+   "Rend and Tear": {
+    "needs": 25,
+    "points": 5
+   },
+   "Savage Fury": {
+    "needs": 10,
+    "points": 2
+   },
+   "Sharpened Claws": {
+    "needs": 10,
+    "points": 2
+   },
+   "Shifting Power": {
+    "needs": 15,
+    "points": 1
+   },
+   "Shredding Attacks": {
+    "needs": 10,
+    "points": 3
+   },
+   "Subtlety": {
+    "needs": 5,
+    "points": 3
+   },
+   "Swiftmend": {
+    "needs": 15,
+    "points": 1
+   },
+   "Thick Hide": {
+    "needs": 5,
+    "points": 3
+   },
+   "Tranquil Spirit": {
+    "needs": 15,
+    "points": 5
+   },
+   "Vengeance": {
+    "needs": 15,
+    "points": 5
+   },
+   "Wild Growth": {
+    "needs": 30,
+    "points": 1
+   }
+  },
+  "HUNTER": {
+   "Barrage": {
+    "needs": 20,
+    "points": 3
+   },
+   "Bestial Discipline": {
+    "needs": 20,
+    "points": 2
+   },
+   "Bestial Swiftness": {
+    "needs": 10,
+    "points": 1
+   },
+   "Bestial Wrath": {
+    "needs": 30,
+    "points": 1
+   },
+   "Careful Aim": {
+    "needs": 5,
+    "points": 5
+   },
+   "Clever Traps": {
+    "needs": 10,
+    "points": 2
+   },
+   "Counterattack": {
+    "needs": 15,
+    "points": 1
+   },
+   "Deadly Aspects": {
+    "needs": 0,
+    "points": 5
+   },
+   "Deflection": {
+    "needs": 0,
+    "points": 5
+   },
+   "Deterrence": {
+    "needs": 10,
+    "points": 1
+   },
+   "Efficiency": {
+    "needs": 5,
+    "points": 5
+   },
+   "Endurance Training": {
+    "needs": 0,
+    "points": 5
+   },
+   "Entrapment": {
+    "needs": 5,
+    "points": 5
+   },
+   "Expose Prey": {
+    "needs": 20,
+    "points": 2
+   },
+   "Ferocity": {
+    "needs": 15,
+    "points": 5
+   },
+   "Focused Fire": {
+    "needs": 5,
+    "points": 2
+   },
+   "Frenzy": {
+    "needs": 25,
+    "points": 5
+   },
+   "Hawk Eye": {
+    "needs": 0,
+    "points": 3
+   },
+   "Improved Arcane Shot": {
+    "needs": 10,
+    "points": 5
+   },
+   "Improved Aspect of the Monkey": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Concussive Shot": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Mend Pet": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Revive Pet": {
+    "needs": 5,
+    "points": 2
+   },
+   "Improved Stings": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Tracking": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Wing Clip": {
+    "needs": 5,
+    "points": 3
+   },
+   "Intimidation": {
+    "needs": 20,
+    "points": 1
+   },
+   "Lacerating Strikes": {
+    "needs": 30,
+    "points": 1
+   },
+   "Lethal Attacks": {
+    "needs": 0,
+    "points": 5
+   },
+   "Lightning Reflexes": {
+    "needs": 25,
+    "points": 5
+   },
+   "Lone Wolf": {
+    "needs": 10,
+    "points": 1
+   },
+   "Mortal Shots": {
+    "needs": 15,
+    "points": 5
+   },
+   "Pathfinding": {
+    "needs": 5,
+    "points": 2
+   },
+   "Predator's Edge": {
+    "needs": 15,
+    "points": 5
+   },
+   "Ranged Weapon Specialization": {
+    "needs": 25,
+    "points": 5
+   },
+   "Rapid Killing": {
+    "needs": 10,
+    "points": 2
+   },
+   "Rapid Recuperation": {
+    "needs": 20,
+    "points": 2
+   },
+   "Resourcefulness": {
+    "needs": 20,
+    "points": 2
+   },
+   "Savage Strikes": {
+    "needs": 5,
+    "points": 2
+   },
+   "Scatter Shot": {
+    "needs": 20,
+    "points": 1
+   },
+   "Sniper Shot": {
+    "needs": 30,
+    "points": 1
+   },
+   "Spirit Bond": {
+    "needs": 20,
+    "points": 2
+   },
+   "Strider Kick": {
+    "needs": 20,
+    "points": 1
+   },
+   "Summon Hawk": {
+    "needs": 15,
+    "points": 1
+   },
+   "Surefooted": {
+    "needs": 10,
+    "points": 3
+   },
+   "Survival Tactics": {
+    "needs": 15,
+    "points": 2
+   },
+   "Survivalist": {
+    "needs": 5,
+    "points": 5
+   },
+   "Survivalist's Discipline": {
+    "needs": 20,
+    "points": 2
+   },
+   "Trueshot Aura": {
+    "needs": 15,
+    "points": 1
+   },
+   "Unleashed Fury": {
+    "needs": 10,
+    "points": 5
+   }
+  },
+  "MAGE": {
+   "Arcane Blast": {
+    "needs": 10,
+    "points": 1
+   },
+   "Arcane Concentration": {
+    "needs": 5,
+    "points": 5
+   },
+   "Arcane Focus": {
+    "needs": 0,
+    "points": 5
+   },
+   "Arcane Geometry": {
+    "needs": 10,
+    "points": 2
+   },
+   "Arcane Impact": {
+    "needs": 10,
+    "points": 3
+   },
+   "Arcane Instability": {
+    "needs": 25,
+    "points": 3
+   },
+   "Arcane Meditation": {
+    "needs": 15,
+    "points": 3
+   },
+   "Arcane Mind": {
+    "needs": 20,
+    "points": 5
+   },
+   "Arcane Power": {
+    "needs": 30,
+    "points": 1
+   },
+   "Arcane Resilience": {
+    "needs": 5,
+    "points": 2
+   },
+   "Arcane Shielding": {
+    "needs": 15,
+    "points": 2
+   },
+   "Arcane Subtlety": {
+    "needs": 5,
+    "points": 2
+   },
+   "Arctic Reach": {
+    "needs": 15,
+    "points": 2
+   },
+   "Blast Wave": {
+    "needs": 20,
+    "points": 1
+   },
+   "Burning Soul": {
+    "needs": 10,
+    "points": 3
+   },
+   "Cold Snap": {
+    "needs": 20,
+    "points": 1
+   },
+   "Combustion": {
+    "needs": 30,
+    "points": 1
+   },
+   "Critical Mass": {
+    "needs": 20,
+    "points": 3
+   },
+   "Elemental Precision": {
+    "needs": 0,
+    "points": 5
+   },
+   "Fingers of Frost": {
+    "needs": 20,
+    "points": 2
+   },
+   "Fire Power": {
+    "needs": 25,
+    "points": 5
+   },
+   "Flame Throwing": {
+    "needs": 5,
+    "points": 2
+   },
+   "Frost Channeling": {
+    "needs": 10,
+    "points": 3
+   },
+   "Frost Warding": {
+    "needs": 0,
+    "points": 2
+   },
+   "Frostbite": {
+    "needs": 5,
+    "points": 3
+   },
+   "Heating Up": {
+    "needs": 15,
+    "points": 1
+   },
+   "Ice Barrier": {
+    "needs": 30,
+    "points": 1
+   },
+   "Ice Block": {
+    "needs": 15,
+    "points": 1
+   },
+   "Ice Lance": {
+    "needs": 10,
+    "points": 1
+   },
+   "Ice Shards": {
+    "needs": 5,
+    "points": 5
+   },
+   "Ignite": {
+    "needs": 5,
+    "points": 5
+   },
+   "Impact": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Blizzard": {
+    "needs": 10,
+    "points": 3
+   },
+   "Improved Channeling": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Cone of Cold": {
+    "needs": 20,
+    "points": 3
+   },
+   "Improved Counterspell": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Fire Ward": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Fireball": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Flamestrike": {
+    "needs": 10,
+    "points": 3
+   },
+   "Improved Frost Nova": {
+    "needs": 5,
+    "points": 2
+   },
+   "Improved Frostbolt": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Scorch": {
+    "needs": 15,
+    "points": 3
+   },
+   "Incineration": {
+    "needs": 0,
+    "points": 3
+   },
+   "Magic Absorption": {
+    "needs": 5,
+    "points": 2
+   },
+   "Master of Elements": {
+    "needs": 15,
+    "points": 3
+   },
+   "Missile Barrage": {
+    "needs": 15,
+    "points": 1
+   },
+   "Permafrost": {
+    "needs": 5,
+    "points": 3
+   },
+   "Piercing Ice": {
+    "needs": 10,
+    "points": 3
+   },
+   "Presence of Mind": {
+    "needs": 20,
+    "points": 1
+   },
+   "Pyroblast": {
+    "needs": 10,
+    "points": 1
+   },
+   "Shatter": {
+    "needs": 15,
+    "points": 3
+   },
+   "Wake of Fire": {
+    "needs": 0,
+    "points": 2
+   },
+   "Wand Specialization": {
+    "needs": 0,
+    "points": 2
+   },
+   "Winter's Chill": {
+    "needs": 25,
+    "points": 5
+   }
+  },
+  "PALADIN": {
+   "Anticipation": {
+    "needs": 5,
+    "points": 5
+   },
+   "Benediction": {
+    "needs": 0,
+    "points": 5
+   },
+   "Champion of the Light": {
+    "needs": 25,
+    "points": 3
+   },
+   "Consecrated Ground": {
+    "needs": 20,
+    "points": 2
+   },
+   "Conviction": {
+    "needs": 5,
+    "points": 5
+   },
+   "Deflection": {
+    "needs": 0,
+    "points": 5
+   },
+   "Divine Favor": {
+    "needs": 15,
+    "points": 1
+   },
+   "Divine Intellect": {
+    "needs": 0,
+    "points": 5
+   },
+   "Divine Precision": {
+    "needs": 20,
+    "points": 3
+   },
+   "Divine Strength": {
+    "needs": 0,
+    "points": 5
+   },
+   "Eye for an Eye": {
+    "needs": 15,
+    "points": 2
+   },
+   "Guardian's Favor": {
+    "needs": 5,
+    "points": 2
+   },
+   "Healing Light": {
+    "needs": 5,
+    "points": 3
+   },
+   "Holy Conduit": {
+    "needs": 5,
+    "points": 2
+   },
+   "Holy Power": {
+    "needs": 25,
+    "points": 5
+   },
+   "Holy Shield": {
+    "needs": 30,
+    "points": 1
+   },
+   "Holy Shock": {
+    "needs": 20,
+    "points": 1
+   },
+   "Illumination": {
+    "needs": 15,
+    "points": 5
+   },
+   "Improved Hammer of Justice": {
+    "needs": 15,
+    "points": 3
+   },
+   "Improved Judgement": {
+    "needs": 5,
+    "points": 2
+   },
+   "Improved Righteous Fury": {
+    "needs": 10,
+    "points": 3
+   },
+   "Improved Seal of Fury": {
+    "needs": 10,
+    "points": 1
+   },
+   "Improved Seals": {
+    "needs": 5,
+    "points": 3
+   },
+   "Infusion of Light": {
+    "needs": 15,
+    "points": 2
+   },
+   "Instrument of Law": {
+    "needs": 25,
+    "points": 2
+   },
+   "Iron Creed": {
+    "needs": 25,
+    "points": 5
+   },
+   "Light's Vigil": {
+    "needs": 30,
+    "points": 1
+   },
+   "One-Handed Weapon Specialization": {
+    "needs": 15,
+    "points": 3
+   },
+   "Precision": {
+    "needs": 5,
+    "points": 3
+   },
+   "Purifying Power": {
+    "needs": 10,
+    "points": 2
+   },
+   "Pursuit of Justice": {
+    "needs": 10,
+    "points": 2
+   },
+   "Reckoning": {
+    "needs": 20,
+    "points": 5
+   },
+   "Redoubt": {
+    "needs": 0,
+    "points": 5
+   },
+   "Repentance": {
+    "needs": 20,
+    "points": 1
+   },
+   "Reverence": {
+    "needs": 10,
+    "points": 3
+   },
+   "Sacred Arbiter": {
+    "needs": 15,
+    "points": 1
+   },
+   "Sacred Duty": {
+    "needs": 10,
+    "points": 2
+   },
+   "Sanctified Judgement": {
+    "needs": 10,
+    "points": 3
+   },
+   "Seal of Command": {
+    "needs": 10,
+    "points": 1
+   },
+   "Shield Specialization": {
+    "needs": 10,
+    "points": 3
+   },
+   "Spiritual Focus": {
+    "needs": 5,
+    "points": 2
+   },
+   "Swift Judgement": {
+    "needs": 15,
+    "points": 1
+   },
+   "Templar's Bulwark": {
+    "needs": 20,
+    "points": 1
+   },
+   "Toughness": {
+    "needs": 0,
+    "points": 5
+   },
+   "Twist of Light": {
+    "needs": 30,
+    "points": 1
+   },
+   "Two-Handed Weapon Specialization": {
+    "needs": 20,
+    "points": 3
+   },
+   "Unyielding Faith": {
+    "needs": 5,
+    "points": 2
+   },
+   "Vengeance": {
+    "needs": 20,
+    "points": 3
+   },
+   "Vindication": {
+    "needs": 10,
+    "points": 3
+   },
+   "Voice of Truth": {
+    "needs": 10,
+    "points": 1
+   }
+  },
+  "PRIEST": {
+   "Binding Heal": {
+    "needs": 15,
+    "points": 1
+   },
+   "Blackout": {
+    "needs": 0,
+    "points": 5
+   },
+   "Blessed Recovery": {
+    "needs": 10,
+    "points": 3
+   },
+   "Darkness": {
+    "needs": 25,
+    "points": 5
+   },
+   "Devouring Contagion": {
+    "needs": 20,
+    "points": 2
+   },
+   "Divine Aegis": {
+    "needs": 25,
+    "points": 3
+   },
+   "Divine Fury": {
+    "needs": 5,
+    "points": 5
+   },
+   "Early Demise": {
+    "needs": 25,
+    "points": 2
+   },
+   "Holy Nova": {
+    "needs": 10,
+    "points": 1
+   },
+   "Holy Precision": {
+    "needs": 5,
+    "points": 3
+   },
+   "Holy Reach": {
+    "needs": 15,
+    "points": 2
+   },
+   "Holy Specialization": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Fade": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Healing": {
+    "needs": 15,
+    "points": 3
+   },
+   "Improved Inner Fire": {
+    "needs": 15,
+    "points": 3
+   },
+   "Improved Mana Burn": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Mind Blast": {
+    "needs": 10,
+    "points": 5
+   },
+   "Improved Mind Flay": {
+    "needs": 10,
+    "points": 2
+   },
+   "Improved Power Word: Shield": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Psychic Scream": {
+    "needs": 10,
+    "points": 2
+   },
+   "Improved Renew": {
+    "needs": 0,
+    "points": 3
+   },
+   "Improved Shadow Word: Pain": {
+    "needs": 5,
+    "points": 2
+   },
+   "Inner Focus": {
+    "needs": 10,
+    "points": 1
+   },
+   "Inspiration": {
+    "needs": 10,
+    "points": 3
+   },
+   "Litany of Light": {
+    "needs": 20,
+    "points": 2
+   },
+   "Martyrdom": {
+    "needs": 5,
+    "points": 2
+   },
+   "Meditation": {
+    "needs": 10,
+    "points": 3
+   },
+   "Mental Agility": {
+    "needs": 10,
+    "points": 3
+   },
+   "Mental Strength": {
+    "needs": 15,
+    "points": 5
+   },
+   "Mind Flay": {
+    "needs": 10,
+    "points": 1
+   },
+   "Penance": {
+    "needs": 20,
+    "points": 1
+   },
+   "Power Infusion": {
+    "needs": 30,
+    "points": 1
+   },
+   "Power in Light": {
+    "needs": 0,
+    "points": 5
+   },
+   "Prayer of Mending": {
+    "needs": 30,
+    "points": 1
+   },
+   "Renewed Hope": {
+    "needs": 20,
+    "points": 5
+   },
+   "Searing Light": {
+    "needs": 15,
+    "points": 2
+   },
+   "Shadow Affinity": {
+    "needs": 5,
+    "points": 3
+   },
+   "Shadow Focus": {
+    "needs": 0,
+    "points": 5
+   },
+   "Shadow Reach": {
+    "needs": 5,
+    "points": 2
+   },
+   "Shadow Weaving": {
+    "needs": 15,
+    "points": 3
+   },
+   "Shadowform": {
+    "needs": 30,
+    "points": 1
+   },
+   "Silence": {
+    "needs": 20,
+    "points": 1
+   },
+   "Silent Resolve": {
+    "needs": 5,
+    "points": 3
+   },
+   "Soul Warding": {
+    "needs": 15,
+    "points": 1
+   },
+   "Spell Warding": {
+    "needs": 5,
+    "points": 5
+   },
+   "Spirit Tap": {
+    "needs": 0,
+    "points": 5
+   },
+   "Spirit of Redemption": {
+    "needs": 20,
+    "points": 1
+   },
+   "Spiritual Guidance": {
+    "needs": 20,
+    "points": 5
+   },
+   "Spiritual Healing": {
+    "needs": 25,
+    "points": 3
+   },
+   "Twilight Focus": {
+    "needs": 0,
+    "points": 3
+   },
+   "Twin Disciplines": {
+    "needs": 0,
+    "points": 5
+   },
+   "Vampiric Embrace": {
+    "needs": 15,
+    "points": 1
+   },
+   "Wand Specialization": {
+    "needs": 0,
+    "points": 2
+   }
+  },
+  "ROGUE": {
+   "Adrenaline Rush": {
+    "needs": 30,
+    "points": 1
+   },
+   "Aggression": {
+    "needs": 25,
+    "points": 3
+   },
+   "Blade Flurry": {
+    "needs": 20,
+    "points": 1
+   },
+   "Camouflage": {
+    "needs": 0,
+    "points": 5
+   },
+   "Cold Blood": {
+    "needs": 15,
+    "points": 1
+   },
+   "Cutthroat": {
+    "needs": 25,
+    "points": 5
+   },
+   "Deflection": {
+    "needs": 5,
+    "points": 3
+   },
+   "Dirty Deeds": {
+    "needs": 20,
+    "points": 2
+   },
+   "Dirty Tricks": {
+    "needs": 5,
+    "points": 2
+   },
+   "Dual Wield Specialization": {
+    "needs": 15,
+    "points": 5
+   },
+   "Elusiveness": {
+    "needs": 5,
+    "points": 2
+   },
+   "Endurance": {
+    "needs": 10,
+    "points": 2
+   },
+   "Flawless Execution": {
+    "needs": 15,
+    "points": 1
+   },
+   "Ghostly Strike": {
+    "needs": 10,
+    "points": 1
+   },
+   "Hack and Slash": {
+    "needs": 20,
+    "points": 5
+   },
+   "Heightened Senses": {
+    "needs": 15,
+    "points": 2
+   },
+   "Hemorrhage": {
+    "needs": 20,
+    "points": 1
+   },
+   "Improved Ambush": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Distract": {
+    "needs": 10,
+    "points": 2
+   },
+   "Improved Eviscerate": {
+    "needs": 0,
+    "points": 3
+   },
+   "Improved Expose Armor": {
+    "needs": 10,
+    "points": 2
+   },
+   "Improved Gouge": {
+    "needs": 0,
+    "points": 3
+   },
+   "Improved Kick": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Kidney Shot": {
+    "needs": 20,
+    "points": 2
+   },
+   "Improved Poisons": {
+    "needs": 15,
+    "points": 5
+   },
+   "Improved Sinister Strike": {
+    "needs": 0,
+    "points": 2
+   },
+   "Improved Slice and Dice": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Sprint": {
+    "needs": 10,
+    "points": 2
+   },
+   "Initiative": {
+    "needs": 10,
+    "points": 3
+   },
+   "Lethality": {
+    "needs": 10,
+    "points": 5
+   },
+   "Lightning Reflexes": {
+    "needs": 0,
+    "points": 5
+   },
+   "Malice": {
+    "needs": 0,
+    "points": 5
+   },
+   "Master of Deception": {
+    "needs": 0,
+    "points": 3
+   },
+   "Murder": {
+    "needs": 5,
+    "points": 2
+   },
+   "Mutilate": {
+    "needs": 20,
+    "points": 1
+   },
+   "Opportunity": {
+    "needs": 0,
+    "points": 2
+   },
+   "Precision": {
+    "needs": 5,
+    "points": 3
+   },
+   "Premeditation": {
+    "needs": 15,
+    "points": 1
+   },
+   "Preparation": {
+    "needs": 20,
+    "points": 1
+   },
+   "Puncturing Wounds": {
+    "needs": 5,
+    "points": 3
+   },
+   "Quietus": {
+    "needs": 25,
+    "points": 5
+   },
+   "Relentless Strikes": {
+    "needs": 10,
+    "points": 1
+   },
+   "Remorseless Attacks": {
+    "needs": 0,
+    "points": 2
+   },
+   "Riposte": {
+    "needs": 10,
+    "points": 1
+   },
+   "Ruthlessness": {
+    "needs": 5,
+    "points": 3
+   },
+   "Seal Fate": {
+    "needs": 25,
+    "points": 5
+   },
+   "Serrated Blades": {
+    "needs": 15,
+    "points": 3
+   },
+   "Setup": {
+    "needs": 5,
+    "points": 3
+   },
+   "Thousand Cuts": {
+    "needs": 30,
+    "points": 1
+   },
+   "Venom": {
+    "needs": 30,
+    "points": 1
+   },
+   "Vigor": {
+    "needs": 20,
+    "points": 2
+   },
+   "Vile Poisons": {
+    "needs": 15,
+    "points": 5
+   },
+   "Weapon Expertise": {
+    "needs": 25,
+    "points": 2
+   }
+  },
+  "SHAMAN": {
+   "Ancestral Healing": {
+    "needs": 10,
+    "points": 3
+   },
+   "Ancestral Knowledge": {
+    "needs": 0,
+    "points": 5
+   },
+   "Anticipation": {
+    "needs": 10,
+    "points": 3
+   },
+   "Call of Flame": {
+    "needs": 5,
+    "points": 3
+   },
+   "Call of Thunder": {
+    "needs": 15,
+    "points": 1
+   },
+   "Concussion": {
+    "needs": 0,
+    "points": 5
+   },
+   "Convection": {
+    "needs": 0,
+    "points": 5
+   },
+   "Earth's Grasp": {
+    "needs": 0,
+    "points": 2
+   },
+   "Earthbound": {
+    "needs": 20,
+    "points": 1
+   },
+   "Elemental Alacrity": {
+    "needs": 10,
+    "points": 3
+   },
+   "Elemental Devastation": {
+    "needs": 5,
+    "points": 3
+   },
+   "Elemental Focus": {
+    "needs": 10,
+    "points": 1
+   },
+   "Elemental Fury": {
+    "needs": 25,
+    "points": 5
+   },
+   "Elemental Reach": {
+    "needs": 20,
+    "points": 2
+   },
+   "Elemental Warding": {
+    "needs": 5,
+    "points": 3
+   },
+   "Elemental Weapons": {
+    "needs": 10,
+    "points": 3
+   },
+   "Eye of the Storm": {
+    "needs": 15,
+    "points": 3
+   },
+   "Flurry": {
+    "needs": 15,
+    "points": 5
+   },
+   "Guardian Totems": {
+    "needs": 5,
+    "points": 2
+   },
+   "Healing Focus": {
+    "needs": 10,
+    "points": 3
+   },
+   "Healing Way": {
+    "needs": 20,
+    "points": 3
+   },
+   "Improved Fire Nova": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Ghost Wolf": {
+    "needs": 5,
+    "points": 2
+   },
+   "Improved Healing Wave": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Lightning Shield": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Reincarnation": {
+    "needs": 5,
+    "points": 2
+   },
+   "Improved Stormstrike": {
+    "needs": 20,
+    "points": 2
+   },
+   "Lava Burst": {
+    "needs": 30,
+    "points": 1
+   },
+   "Lightning Overload": {
+    "needs": 20,
+    "points": 3
+   },
+   "Maelstrom Weapon": {
+    "needs": 25,
+    "points": 5
+   },
+   "Mana Tide Totem": {
+    "needs": 15,
+    "points": 1
+   },
+   "Mental Dexterity": {
+    "needs": 5,
+    "points": 3
+   },
+   "Mental Quickness": {
+    "needs": 20,
+    "points": 2
+   },
+   "Mindfulness": {
+    "needs": 5,
+    "points": 3
+   },
+   "Natural Grace": {
+    "needs": 5,
+    "points": 3
+   },
+   "Nature's Swiftness": {
+    "needs": 20,
+    "points": 1
+   },
+   "Purification": {
+    "needs": 25,
+    "points": 5
+   },
+   "Rage of the Farseer": {
+    "needs": 30,
+    "points": 1
+   },
+   "Restorative Totems": {
+    "needs": 15,
+    "points": 5
+   },
+   "Reverberation": {
+    "needs": 5,
+    "points": 5
+   },
+   "Riptide": {
+    "needs": 30,
+    "points": 1
+   },
+   "Shamanistic Focus": {
+    "needs": 10,
+    "points": 1
+   },
+   "Spirit Weapons": {
+    "needs": 20,
+    "points": 1
+   },
+   "Stormstrike": {
+    "needs": 15,
+    "points": 1
+   },
+   "Thundering Strikes": {
+    "needs": 0,
+    "points": 5
+   },
+   "Tidal Focus": {
+    "needs": 5,
+    "points": 5
+   },
+   "Tidal Mastery": {
+    "needs": 15,
+    "points": 5
+   },
+   "Totemic Focus": {
+    "needs": 0,
+    "points": 5
+   },
+   "Toughness": {
+    "needs": 15,
+    "points": 5
+   },
+   "Water Shield": {
+    "needs": 10,
+    "points": 1
+   }
+  },
+  "WARLOCK": {
+   "Aftermath": {
+    "needs": 5,
+    "points": 5
+   },
+   "Agonizing Flames": {
+    "needs": 15,
+    "points": 3
+   },
+   "Amplify Curse": {
+    "needs": 10,
+    "points": 1
+   },
+   "Bane": {
+    "needs": 0,
+    "points": 5
+   },
+   "Bane of Havoc": {
+    "needs": 20,
+    "points": 1
+   },
+   "Cataclysm": {
+    "needs": 5,
+    "points": 3
+   },
+   "Conflagrate": {
+    "needs": 15,
+    "points": 1
+   },
+   "Curse of Exhaustion": {
+    "needs": 15,
+    "points": 1
+   },
+   "Decimation": {
+    "needs": 15,
+    "points": 2
+   },
+   "Demonic Aegis": {
+    "needs": 5,
+    "points": 2
+   },
+   "Demonic Brand": {
+    "needs": 15,
+    "points": 3
+   },
+   "Demonic Embrace": {
+    "needs": 0,
+    "points": 5
+   },
+   "Demonic Energies": {
+    "needs": 5,
+    "points": 2
+   },
+   "Demonic Knowledge": {
+    "needs": 20,
+    "points": 3
+   },
+   "Demonic Pact": {
+    "needs": 30,
+    "points": 1
+   },
+   "Demonic Sacrifice": {
+    "needs": 10,
+    "points": 1
+   },
+   "Destructive Reach": {
+    "needs": 0,
+    "points": 2
+   },
+   "Fel Concentration": {
+    "needs": 10,
+    "points": 3
+   },
+   "Fel Domination": {
+    "needs": 15,
+    "points": 1
+   },
+   "Fel Vitality": {
+    "needs": 5,
+    "points": 3
+   },
+   "Fire and Brimstone": {
+    "needs": 20,
+    "points": 3
+   },
+   "Improved Bane of Agony": {
+    "needs": 10,
+    "points": 2
+   },
+   "Improved Corruption": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Drains": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Felhunter": {
+    "needs": 20,
+    "points": 3
+   },
+   "Improved Health Funnel": {
+    "needs": 0,
+    "points": 2
+   },
+   "Improved Imp": {
+    "needs": 0,
+    "points": 3
+   },
+   "Improved Life Tap": {
+    "needs": 0,
+    "points": 2
+   },
+   "Improved Sayaad": {
+    "needs": 10,
+    "points": 3
+   },
+   "Improved Shadow Bolt": {
+    "needs": 0,
+    "points": 5
+   },
+   "Improved Voidwalker": {
+    "needs": 5,
+    "points": 3
+   },
+   "Incinerate": {
+    "needs": 30,
+    "points": 1
+   },
+   "Intensity": {
+    "needs": 15,
+    "points": 3
+   },
+   "Malediction": {
+    "needs": 5,
+    "points": 5
+   },
+   "Malevolence": {
+    "needs": 15,
+    "points": 5
+   },
+   "Master Demonologist": {
+    "needs": 25,
+    "points": 5
+   },
+   "Master Summoner": {
+    "needs": 10,
+    "points": 2
+   },
+   "Molten Skin": {
+    "needs": 5,
+    "points": 5
+   },
+   "Nightfall": {
+    "needs": 15,
+    "points": 2
+   },
+   "Pandemic": {
+    "needs": 10,
+    "points": 3
+   },
+   "Pyroclasm": {
+    "needs": 20,
+    "points": 2
+   },
+   "Ruin": {
+    "needs": 10,
+    "points": 5
+   },
+   "Shadow Mastery": {
+    "needs": 25,
+    "points": 5
+   },
+   "Shadow and Flame": {
+    "needs": 25,
+    "points": 5
+   },
+   "Shadowburn": {
+    "needs": 10,
+    "points": 1
+   },
+   "Siphon Life": {
+    "needs": 20,
+    "points": 1
+   },
+   "Soul Harvest": {
+    "needs": 5,
+    "points": 2
+   },
+   "Soul Link": {
+    "needs": 20,
+    "points": 1
+   },
+   "Soul Siphon": {
+    "needs": 20,
+    "points": 3
+   },
+   "Suppression": {
+    "needs": 0,
+    "points": 5
+   },
+   "Unholy Power": {
+    "needs": 0,
+    "points": 5
+   },
+   "Wrack": {
+    "needs": 30,
+    "points": 1
+   }
+  },
+  "WARRIOR": {
+   "Anger Management": {
+    "needs": 10,
+    "points": 1
+   },
+   "Anticipation": {
+    "needs": 5,
+    "points": 5
+   },
+   "Bastion": {
+    "needs": 25,
+    "points": 5
+   },
+   "Blood Craze": {
+    "needs": 10,
+    "points": 3
+   },
+   "Bloodthirst": {
+    "needs": 30,
+    "points": 1
+   },
+   "Bloodthrill": {
+    "needs": 20,
+    "points": 5
+   },
+   "Booming Voice": {
+    "needs": 0,
+    "points": 5
+   },
+   "Concussion Blow": {
+    "needs": 20,
+    "points": 1
+   },
+   "Cruelty": {
+    "needs": 0,
+    "points": 5
+   },
+   "Death Wish": {
+    "needs": 20,
+    "points": 1
+   },
+   "Deep Wounds": {
+    "needs": 10,
+    "points": 3
+   },
+   "Defiance": {
+    "needs": 10,
+    "points": 3
+   },
+   "Deflection": {
+    "needs": 0,
+    "points": 5
+   },
+   "Dual Wield Specialization": {
+    "needs": 15,
+    "points": 5
+   },
+   "Enrage": {
+    "needs": 15,
+    "points": 5
+   },
+   "Flurry": {
+    "needs": 25,
+    "points": 5
+   },
+   "Focused Rage": {
+    "needs": 20,
+    "points": 3
+   },
+   "Furious Precision": {
+    "needs": 10,
+    "points": 3
+   },
+   "Gore Drinker": {
+    "needs": 25,
+    "points": 2
+   },
+   "Impale": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Berserker Rage": {
+    "needs": 20,
+    "points": 2
+   },
+   "Improved Bloodrage": {
+    "needs": 0,
+    "points": 2
+   },
+   "Improved Charge": {
+    "needs": 5,
+    "points": 2
+   },
+   "Improved Disarm": {
+    "needs": 10,
+    "points": 3
+   },
+   "Improved Execute": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Hamstring": {
+    "needs": 25,
+    "points": 3
+   },
+   "Improved Heroic Strike": {
+    "needs": 0,
+    "points": 3
+   },
+   "Improved Intercept": {
+    "needs": 20,
+    "points": 2
+   },
+   "Improved Overpower": {
+    "needs": 5,
+    "points": 2
+   },
+   "Improved Rend": {
+    "needs": 0,
+    "points": 3
+   },
+   "Improved Revenge": {
+    "needs": 5,
+    "points": 3
+   },
+   "Improved Shield Bash": {
+    "needs": 15,
+    "points": 2
+   },
+   "Improved Shield Wall": {
+    "needs": 20,
+    "points": 2
+   },
+   "Improved Slam": {
+    "needs": 25,
+    "points": 2
+   },
+   "Improved Sunder Armor": {
+    "needs": 15,
+    "points": 3
+   },
+   "Improved Tactical Mastery": {
+    "needs": 5,
+    "points": 5
+   },
+   "Improved Thunder Clap": {
+    "needs": 5,
+    "points": 3
+   },
+   "Iron Will": {
+    "needs": 0,
+    "points": 5
+   },
+   "Last Stand": {
+    "needs": 10,
+    "points": 1
+   },
+   "Lingering Rage": {
+    "needs": 5,
+    "points": 5
+   },
+   "Master of Defense": {
+    "needs": 10,
+    "points": 2
+   },
+   "Mortal Strike": {
+    "needs": 30,
+    "points": 1
+   },
+   "Piercing Howl": {
+    "needs": 10,
+    "points": 1
+   },
+   "Raging Blows": {
+    "needs": 15,
+    "points": 1
+   },
+   "Shield Slam": {
+    "needs": 30,
+    "points": 1
+   },
+   "Shield Specialization": {
+    "needs": 0,
+    "points": 5
+   },
+   "Spearing Strike": {
+    "needs": 15,
+    "points": 1
+   },
+   "Sweeping Strikes": {
+    "needs": 20,
+    "points": 1
+   },
+   "Two-Handed Weapon Specialization": {
+    "needs": 15,
+    "points": 3
+   },
+   "Unbridled Wrath": {
+    "needs": 5,
+    "points": 5
+   },
+   "Vanguard": {
+    "needs": 15,
+    "points": 1
+   },
+   "Weaponmaster": {
+    "needs": 20,
+    "points": 5
+   }
+  }
+ },
+ "source": "foreverchanges.pro/talents"
+}

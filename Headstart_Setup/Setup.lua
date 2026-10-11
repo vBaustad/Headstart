@@ -593,7 +593,7 @@ function YS.ReadBars(withOther)
                     n.later = n.later + 1
                 elseif General(name) then
                     entry = { kind = "spell", name = name, general = true }
-                elseif name and YS.PROFESSIONS[name] then
+                elseif name and YS.ProfessionIDs(name) then
                     -- the exact spell and its icon: one name can be several spells (see ProfessionSpellID)
                     entry = { kind = "spell", name = name, prof = true, id = id, icon = C_Spell.GetSpellTexture(id) }
                 end
@@ -837,7 +837,7 @@ end
 -- if known here, else a known one with the main's icon, else the lowest known ID (the real ranks come first).
 local function ProfessionSpellID(e)
     if e.id and IsPlayerSpell(e.id) then return e.id end
-    local ids = YS.PROFESSIONS[e.name]
+    local ids = YS.ProfessionIDs(e.name)
     if type(ids) == "number" then return IsPlayerSpell(ids) and ids or nil end       -- the one spell of that name
     if type(ids) ~= "table" then return nil end
     local first
@@ -1784,6 +1784,25 @@ f:RegisterEvent("PLAYER_LEAVING_WORLD")              -- logging out: the account
 -- turned off).
 local rememberSoon = false
 function YS.Remembers() return not (YippSetupDB and YippSetupDB.remember == false) end
+-- The game says "a button changed" for much that changes nothing we keep: a macro that shows another
+-- spell for your target, a button going grey. What each button holds (its kind and what of) is noted,
+-- and the bars are read - every button, with its spell's and its macro's details - only when that is
+-- no longer so for one of them. The first look has nothing to compare with, and reads.
+local held, heldAny = {}, false
+local function ButtonsChanged()
+    local changed = not heldAny
+    heldAny = true
+    for slot = 1, MAX_SLOT do
+        local kind, id
+        if HasAction(slot) then kind, id = GetActionInfo(slot) end
+        local now = kind and (tostring(kind) .. ":" .. tostring(id)) or false
+        if held[slot] ~= now then
+            held[slot] = now
+            changed = true
+        end
+    end
+    return changed
+end
 local function Remember()
     rememberSoon = false
     if not (YippSetupCharDB and YippSetupCharDB.applied and YS.Remembers() and YS:Profile()) then return end
@@ -1792,6 +1811,7 @@ local function Remember()
         return
     end
     if GetCursorInfo and GetCursorInfo() then return end        -- mid-drag: the drop changes a button again
+    if not ButtonsChanged() then return end
     YS:ScanBars()
     YippSetupCharDB.layout = Copy(YS:Profile().slots)           -- where spells learned later go, too
 end

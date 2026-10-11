@@ -286,17 +286,7 @@ C_EquipmentSet = {
     check(worn() == (4, 2), f"that turned off: swapped though the effect runs {worn()}")
     g.YippRouteDB.trinketAutoBuff = None
     ex("BUFF = false")
-    # said when a used trinket is ready again
-    g.YippRouteDB.trinketAuto, g.YippRouteDB.trinketNotify, g.YippRouteDB.trinketNotifySound = None, True, False
-    fresh("CD[1] = { NOW, 120 } PRINTS = {}")
-    ex("Tick()")
-    ex("NOW = NOW + 60 Tick()")
-    said = [str(m) for m in g.PRINTS.values() if "is ready" in str(m)]
-    check(said == [], f"used, a minute left: nothing said {said}")
-    ex("NOW = NOW + 61 Tick() Tick()")
-    said = [str(m) for m in g.PRINTS.values() if "is ready" in str(m)]
-    check(len(said) == 1 and worn() == (1, 2), f"its cooldown over: said once, and nothing swapped with the swaps off ({said})")
-    g.YippRouteDB.trinketNotify = None
+    g.YippRouteDB.trinketAuto = None
     ex("Tick()")
     check(g.Ticking() == 0, "all of it off again: nothing ticks")
     # the look, as set and within its limits

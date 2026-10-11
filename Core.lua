@@ -567,6 +567,7 @@ f:SetScript("OnEvent", function(_, event, name)
     -- The spell tables hold all nine classes and only yours is ever read: the other eight are let go
     -- (some three thousand small tables). The setup addon's tables are trimmed where it is loaded (YR.LoadSetup).
     local _, class = UnitClass("player")
+    if YR.TrainerSpellsOnly then YR.TrainerSpellsOnly(class) end       -- (made per class as asked for: Data/TrainerSpells.lua)
     for _, name in ipairs({ "TrainerSpells", "RestockData" }) do
         local t = YR[name]
         if class and type(t) == "table" and t[class] ~= nil then

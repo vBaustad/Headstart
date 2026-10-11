@@ -1203,6 +1203,22 @@ YS.Apply(YS, None, None, lua.eval("{ sure = true, barsOnly = true }"))
 report(g.BAR[12] is not None and g.BAR[12].kind == "item" and g.BAR[12].id == 6948 and g.BAR[9] is None,
        "applied: the hearthstone you carry is back on its button, with Items off")
 lua.execute("YR_SETUP:Options().mouseover = 'Purify' YR_SETUP:Options().items = nil YippSetupDB.remember = false YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE9")
+# "A button changed" from the game for a button that holds what it held: the bars aren't read again
+lua.execute("""YippSetupDB.remember = nil COMBAT = false
+    SCANS = 0 local scan = YR_SETUP.ScanBars YR_SETUP.ScanBars = function(...) SCANS = SCANS + 1 return scan(...) end""")
+YS.RememberNow()
+first = g.SCANS
+YS.RememberNow()
+YS.RememberNow()
+report(first <= 1 and g.SCANS == first, f"asked three times with no button changed: the bars are read once at most ({first}, {g.SCANS})")
+lua.execute("BAR[40] = { kind = 'item', id = 6948 }")
+YS.RememberNow()
+report(g.SCANS == first + 1, f"a button really changed: read again ({g.SCANS})")
+lua.execute("BAR[40] = nil YR_SETUP.RememberNow() YippSetupDB.remember = false")
+report(YS.ProfessionIDs("Accurate Scope") == 3979 and 2580 in list(YS.ProfessionIDs("Find Minerals").values())
+       and 2018 in list(YS.ProfessionIDs("Blacksmithing").values())
+       and YS.ProfessionIDs("Holy Light") is None and YS.ProfessionIDs("Find Min") is None,
+       "profession spells are found by name in the one text: one ID, several, and none for what isn't one")
 # Interfaces have names, and a character is on one. Saved on another character: this one doesn't save over it.
 lua.execute("""KEPT_UI = { ui = YippSetupDB.ui, from = YippSetupDB.uiFrom, at = YippSetupDB.uiScanned, prev = YippSetupDB.uiPrev,
         iface = YippSetupCharDB.iface }
