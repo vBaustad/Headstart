@@ -17,7 +17,7 @@ import os
 import sys
 import duckdb
 
-from spell_rules import NOT_IN_GAME, NOT_SPELLS
+from spell_rules import LINE_SPELLS, NOT_IN_GAME, NOT_SPELLS
 
 DB = "S:/forever-data/db/forever.duckdb"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Headstart_Setup", "SpellLevels.lua")
@@ -32,9 +32,13 @@ lines = c.sql(f"""
     select sl.ID, sl.DisplayName_lang, cast(i.ClassMask as bigint)
     from {schema}.skillline sl join {schema}.skillraceclassinfo i on i.SkillID = sl.ID
     where sl.CategoryID = '7'""").fetchall()
-line_class = {}
+line_class, line_only = {}, {}
 for sid, name, mask in lines:
     if name in NOT_CLASS_SPELLS or name.startswith("Pet - ") or mask is None or mask <= 0:
+        if name in LINE_SPELLS and mask:       # the line's own spell stays (Beast Training)
+            for cid, token in CLASSES.items():
+                if mask == 1 << (cid - 1):
+                    line_only[sid] = (token, name)
         continue
     for cid, token in CLASSES.items():
         if mask == 1 << (cid - 1):
@@ -52,6 +56,8 @@ rows = c.sql(f"""
 levels = {}
 for sid, name, lvl in rows:
     token = line_class.get(sid)
+    if not token and sid in line_only and line_only[sid][1] == name:
+        token = line_only[sid][0]
     if token and (token, name) not in NOT_SPELLS and not name.endswith(" Effect"):
         cur = levels.setdefault(token, {}).get(name)
         levels[token][name] = lvl if cur is None else min(cur, lvl)

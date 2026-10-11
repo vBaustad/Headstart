@@ -88,15 +88,6 @@ d.ellipse((115, 70, 141, 96), fill=(255, 255, 255, 255))
 d.rounded_rectangle((116, 112, 140, 186), radius=12, fill=(255, 255, 255, 255))
 save(img, "info")
 
-# info, small: the same mark for the (i) after a setting's name, which is drawn 16 pixels wide. The 64
-# pixel one shrunk that far comes out jagged (the game takes every fourth pixel), so this one is saved
-# at 32 - twice its drawn size - with a ring that fills the image and heavier strokes.
-img, d = canvas()
-d.ellipse((10, 10, 246, 246), outline=(255, 255, 255, 255), width=24)
-d.ellipse((108, 58, 148, 98), fill=(255, 255, 255, 255))
-d.rounded_rectangle((110, 116, 146, 200), radius=16, fill=(255, 255, 255, 255))
-img.resize((32, 32), Image.LANCZOS).save(os.path.join(OUT, "info16.tga"), orientation=1)
-
 # rounded shapes for 9-slice buttons: 32x32, corner radius 6, drawn at 8x. The addon stretches the
 # middle and keeps the corners (Texture:SetTextureSliceMargins), so one image fits any button size.
 R = 8

@@ -82,6 +82,7 @@ YS.SPELL_LEVELS = {
         ["Hunter's Mark"] = 6,
         ["Concussive Shot"] = 8,
         ["Aspect of the Hawk"] = 10,
+        ["Beast Training"] = 10,
         ["Call Pet"] = 10,
         ["Dismiss Pet"] = 10,
         ["Feed Pet"] = 10,

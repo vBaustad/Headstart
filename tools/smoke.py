@@ -772,6 +772,10 @@ _ts = open(os.path.join(ROOT, "Data", "TrainerSpells.lua"), encoding="utf-8").re
 _rogue = _ts[_ts.index("    ROGUE = function()"):_ts.index("    SHAMAN = function()")]
 check('{ 1757, 6, "Sinister Strike", 2,' in _rogue and "Fist Weapon Specialization" not in _rogue and '"Stealth", 1,' in _rogue,
       "trainer data: a rogue is taught Sinister Strike 2 at level 6 and Stealth, and no rank of a talent")
+_priest = _ts[_ts.index("    PRIEST = function()"):_ts.index("    ROGUE = function()")]
+_hunter = _ts[_ts.index("    HUNTER = function()"):_ts.index("    MAGE = function()")]
+check('"Holy Nova", 1,' not in _priest and '"Holy Nova", 2,' in _priest and _hunter.count('"Immolation Trap", 1,') == 1 and '"Bite"' not in _hunter,
+      "trainer data: no rank that comes with a talent point (Holy Nova 1), one spell a rank (Immolation Trap), no pet abilities")
 # the QoL tab: the campfire icon, the flight timer, and the reward picker with a hand-picked reward listed
 YR.RewardSettings(YR).chosen[123] = lua.eval('{ item = 1, name = "Sturdy Boots", title = "A Test Quest" }')
 YR.ShowSettingsTab(YR, "qol")

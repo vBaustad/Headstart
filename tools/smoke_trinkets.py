@@ -267,6 +267,11 @@ C_EquipmentSet = {
     fresh("CD[1] = { NOW, 120 } CD[4] = { NOW - 100, 120 }")
     ex("Tick()")
     check(worn() == (1, 2), f"set to wait until it is ready: 4 stays in the bag {worn()}")
+    # 30 is the most it can be: past that the one that went on reads as used and comes off again
+    g.YippRouteDB.trinketAutoSoon = 45
+    fresh("CD[1] = { NOW, 120 } CD[4] = { NOW - 80, 120 }")
+    ex("Tick()")
+    check(worn() == (1, 2), f"set past 30, a trinket with 40 s left: not put on (it would swap back and forth) {worn()}")
     g.YippRouteDB.trinketAutoSoon = None
     # a used trinket stays on for the seconds you asked
     g.YippRouteDB.trinketAutoDelay = 20

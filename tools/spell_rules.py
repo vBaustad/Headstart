@@ -17,6 +17,9 @@ NOT_IN_GAME = {
 # skill lines that are a class's in the tables and hold nothing a class trainer teaches or a player presses
 NOT_CLASS_LINES = {"Engraving", "Runes", "Meditation", "Explorer Imp", "Companions", "Beast Training"}
 
+# ... except the line's own spell, where it is something the player presses
+LINE_SPELLS = {"Beast Training"}
+
 HIDDEN = 0x80           # spellmisc.Attributes[0]: not shown in the spellbook
 
 
@@ -37,7 +40,6 @@ NOT_SPELLS = {
     ("PALADIN", "Sanctity Aura"),               # a Classic talent, not in Forever's trees
     ("HUNTER", "Aspect of the Viper"), ("HUNTER", "Heart of the Lion"), ("HUNTER", "Black Arrow"),
     ("HUNTER", "Enchanted Flare"), ("HUNTER", "Aspect of the Falcon"), ("HUNTER", "Improved Mend Pet"),
-    ("HUNTER", "Cobra Reflexes"),
     ("ROGUE", "Hack and Slash"),
     ("ROGUE", "Occult Poison I"), ("ROGUE", "Occult Poison II"), ("ROGUE", "Atrophic Poison"),
     ("ROGUE", "Numbing Poison"), ("ROGUE", "Sebacious Poison"),             # Season of Discovery's

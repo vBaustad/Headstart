@@ -1219,6 +1219,15 @@ report(YS.ProfessionIDs("Accurate Scope") == 3979 and 2580 in list(YS.Profession
        and 2018 in list(YS.ProfessionIDs("Blacksmithing").values())
        and YS.ProfessionIDs("Holy Light") is None and YS.ProfessionIDs("Find Min") is None,
        "profession spells are found by name in the one text: one ID, several, and none for what isn't one")
+# how a screen reads: the same whatever order a chat window lists its channels in, and whatever size
+# RestedXP has made its item and target windows at this step; not the same when a setting differs
+sig = lambda t: lua.eval("YR_SETUP.UISig(" + t + ")")
+base = '{ cvars = { a = "1" }, chat = { { id = 1, channels = { "General", "Trade" } } }, rxp = { positions = { F = { { "LEFT", 4 } } }, sizes = { F = { 200, 80 } } }, camera = 12 }'
+report(sig(base) == sig(base.replace('"General", "Trade"', '"Trade", "General"').replace("200, 80", "200, 140").replace("camera = 12", "camera = 30")),
+       "a screen reads the same with its channels in another order, RestedXP's windows another size, the camera elsewhere")
+report(sig(base) != sig(base.replace('a = "1"', 'a = "0"')) and sig(base) != sig(base.replace('"LEFT", 4', '"LEFT", 9'))
+       and sig(base) != sig(base.replace('"General", "Trade"', '"General"')),
+       "and differently with a setting changed, a RestedXP window moved, or a channel gone")
 # Interfaces have names, and a character is on one. Saved on another character: this one doesn't save over it.
 lua.execute("""KEPT_UI = { ui = YippSetupDB.ui, from = YippSetupDB.uiFrom, at = YippSetupDB.uiScanned, prev = YippSetupDB.uiPrev,
         iface = YippSetupCharDB.iface }
@@ -1268,10 +1277,12 @@ report(w.IsShown(w) and w.update.IsShown(w.update) and w.keep.IsShown(w.keep) an
        and not w.setup.IsShown(w.setup) and "Moray-Realm" in w.ui.GetText(w.ui) and "Main" in w.ui.GetText(w.ui),
        f"the window asks: changed on the other character, Update or keep this one's ({w.ui.GetText(w.ui)})")
 w.update._OnClick(w.update)
+report(lua.eval("YippSetupCharDB.iface.fresh") is True and YS.FollowUI() is False,
+       "just put on: nothing of this character's is saved until its screen has been looked at once after the reload")
 report(YS.UIBehind() is False and not w.IsShown(w) and lua.eval("YippSetupDB.ui == ELSE_UI") and lua.eval("YippSetupCharDB.iface.sig") is None,
        "Update: the changed interface is put on, this character has that save, and the saved one is untouched")
 YS.UISettle()
-report(lua.eval("YippSetupCharDB.iface.sig") is not None and lua.eval("YippSetupDB.ui == ELSE_UI") and YS.FollowUI() is False,
+report(lua.eval("YippSetupCharDB.iface.sig") is not None and lua.eval("YippSetupCharDB.iface.fresh") is None and lua.eval("YippSetupDB.ui == ELSE_UI") and YS.FollowUI() is False,
        "once it has settled, how the screen reads here is noted - and nothing is saved for that")
 lua.execute("YippSetupDB.uiFrom, YippSetupDB.uiScanned = 'Moray-Realm', time()")
 YS.Toggle(YS)

@@ -80,6 +80,7 @@ YR.PlannerSpells = {
         ["Hunter's Mark"] = { 1130, 132212, 0, 0 },
         ["Concussive Shot"] = { 5116, 135860, 0, 0 },
         ["Aspect of the Hawk"] = { 13165, 136076, 0, 0 },
+        ["Beast Training"] = { 5149, 132162, 0, 0 },
         ["Call Pet"] = { 883, 132161, 0, 0 },
         ["Dismiss Pet"] = { 2641, 136095, 0, 0 },
         ["Feed Pet"] = { 6991, 132165, 0, 0 },

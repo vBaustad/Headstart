@@ -42,7 +42,7 @@ FORM_CLASS = {"Cat Form": "DRUID", "Bear Form": "DRUID", "Dire Bear Form": "DRUI
               "Defensive Stance": "WARRIOR", "Berserker Stance": "WARRIOR", "Stealth": "ROGUE"}
 
 
-from spell_rules import NOT_IN_GAME, NOT_SPELLS, other_line
+from spell_rules import LINE_SPELLS, NOT_IN_GAME, NOT_SPELLS, other_line
 
 def q(t):
     return '"' + t.replace("\\", "\\\\").replace('"', '\\"') + '"'
@@ -52,10 +52,14 @@ def main():
     c = duckdb.connect(DB, read_only=True)
     s = sys.argv[1] if len(sys.argv) > 1 else c.sql(
         "select schema_name from main.builds where schema_name like 'wow_classic_beta_%' order by schema_name desc limit 1").fetchone()[0]
-    line_class = {}
+    line_class, line_only = {}, {}
     for sid, line, mask in c.sql(f"""select sl.ID, sl.DisplayName_lang, cast(i.ClassMask as bigint) from {s}.skillline sl
             join {s}.skillraceclassinfo i on i.SkillID = sl.ID where sl.CategoryID = '7'""").fetchall():
         if other_line(line):            # a hunter's pet's abilities are not buttons of the hunter's
+            if line in LINE_SPELLS:     # ... but the line's own spell is (Beast Training opens the window)
+                for cid, token in CLASSES.items():
+                    if mask == 1 << (cid - 1):
+                        line_only[sid] = (token, line)
             continue
         for cid, token in CLASSES.items():
             if mask == 1 << (cid - 1):
@@ -77,6 +81,8 @@ def main():
     races = {}
     for line, spell, name, level, icon, attr, race in rows:
         token = line_class.get(line)
+        if not token and line in line_only and line_only[line][1] == name:
+            token = line_only[line][0]
         if not token or (token, name) in NOT_SPELLS or name.endswith(" Effect"):
             continue
         race = (race or 0) & 0xFFFFFFFF

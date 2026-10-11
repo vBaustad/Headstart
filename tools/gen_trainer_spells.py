@@ -59,7 +59,7 @@ def main():
         where a.AcquireMethod = '0' and cast(l.SpellLevel as int) > 0
             and cast(a.Spell as int) not in ({", ".join(str(i) for i in sorted(NOT_IN_GAME))})
         group by 1, 2, 3, 4, 6""").fetchall()
-    out, talent_names = {}, {}
+    out, talent_names, trait_ranks = {}, {}, set()
     for line, spell, name, sub, level, race, attr in rows:
         token = line_class.get(line)
         if not token:
@@ -68,6 +68,7 @@ def main():
         rank = int(m.group(1)) if m else 0
         if spell in talent:
             talent_names.setdefault(token, set()).add(name)
+            trait_ranks.add((token, name, rank))
             continue
         # not shown in a spellbook (Battle Stance Passive, Bane of Doom Effect), or what a spell does
         # rather than the spell (Explosive Trap Effect)
@@ -84,6 +85,20 @@ def main():
             race = 0 if (prev[3] == 0 or race == 0) else (prev[3] | race)
             level = min(level, prev[0])
         out[token][spell] = (level, name, rank, race)
+
+    # One rank can be two spells in the tables: the spell, and what it does when it goes off (Immolation
+    # Trap 13795 / 13797, Lightning Shield 324 / 26364, Holy Nova's heal). The spell is the lower ID in
+    # every pair. A rank that is a trait's (Holy Nova rank 1 comes with the talent point) has no trained
+    # twin at all: 23455 there is the heal half, and listing it told every priest to go and train it.
+    for token, spells in out.items():
+        first = {}
+        for spell in sorted(spells):
+            level, name, rank, race = spells[spell]
+            key = (name, rank, race)
+            if (token, name, rank) in trait_ranks or key in first:
+                del spells[spell]
+            else:
+                first[key] = spell
 
     def q(t):
         return '"' + t.replace("\\", "\\\\").replace('"', '\\"') + '"'

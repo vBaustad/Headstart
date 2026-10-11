@@ -161,6 +161,10 @@ function YS.UIRecord(name)
 end
 
 local function UIPut(name, ui, from, scanned)
+    -- a name given anew is not the one that was renamed away
+    if YippSetupDB.uiRenamed then YippSetupDB.uiRenamed[name] = nil end
+    -- the first one saved is the one new characters get, whatever it is called
+    if YippSetupDB.ui == nil and not (YippSetupDB.uis and next(YippSetupDB.uis)) then YippSetupDB.uiName = name end
     if name == YS.UIDefault() then
         -- the one before is kept too: a save made on the wrong character doesn't lose the good one
         if YippSetupDB.ui then
@@ -189,8 +193,11 @@ end
 local function Char()
     local c = _G.YippSetupCharDB
     if type(c) ~= "table" or not YippSetupDB then return nil end
-    if c.iface == nil and YippSetupDB.ui and YippSetupDB.uiFrom == YS.PlayerKey() then
-        c.iface = { name = YS.UIDefault(), seen = YippSetupDB.uiScanned }
+    if c.iface == nil and not c.ifaceAsked then
+        c.ifaceAsked = true         -- once: a character that left its interface since is not put back on it
+        if YippSetupDB.ui and YippSetupDB.uiFrom == YS.PlayerKey() then
+            c.iface = { name = YS.UIDefault(), seen = YippSetupDB.uiScanned }
+        end
     end
     -- renamed on another character since this one was here
     local to = c.iface and YippSetupDB.uiRenamed and YippSetupDB.uiRenamed[c.iface.name]
@@ -264,17 +271,30 @@ end
 -- How a screen reads, as one number: everything saved but the camera (it moves all the time).
 local function Sig(ui)
     local parts = {}
-    local function Walk(v, depth)
+    local function Walk(v, depth, under)
         local t = type(v)
         if t == "table" then
-            local keys = {}
-            for k in pairs(v) do keys[#keys + 1] = k end
+            local keys, names = {}, true
+            for k, item in pairs(v) do
+                keys[#keys + 1] = k
+                if type(k) ~= "number" or type(item) ~= "string" then names = false end
+            end
+            if names and #keys > 0 then
+                -- a list of names (a chat window's groups and channels): the same whatever its order
+                local list = {}
+                for _, item in pairs(v) do list[#list + 1] = item end
+                table.sort(list)
+                parts[#parts + 1] = "[" .. table.concat(list, ",") .. "]"
+                return
+            end
             table.sort(keys, function(x, y) return tostring(x) < tostring(y) end)
             parts[#parts + 1] = "{"
             for _, k in ipairs(keys) do
-                if not (depth == 0 and (k == "camera" or k == "v")) then
+                -- not the camera or the data's version; not RestedXP's window sizes, two of which it
+                -- changes by itself at every step of a guide
+                if not (depth == 0 and (k == "camera" or k == "v")) and not (depth == 1 and under == "rxp" and k == "sizes") then
                     parts[#parts + 1] = tostring(k) .. "="
-                    Walk(v[k], depth + 1)
+                    Walk(v[k], depth + 1, k)
                 end
             end
             parts[#parts + 1] = "}"
@@ -309,8 +329,12 @@ function YS.FollowUI()
     local c = Char()
     if not (c and YS.UIOn() and YS.UIFollows()) or InCombatLockdown() then return false end
     if YS.UIBehind() then return false end
+    -- just put on, and not looked at since: a reload usually comes first, and the screen as it is in
+    -- between is not what the player made (noted at the next login, UISettle)
+    if c.iface.fresh then return false end
     local ok, ui = pcall(YS.ScanUI, YS)
     if not ok or type(ui) ~= "table" then return false end
+    if YS.KeepUnapplied then ui = YS.KeepUnapplied(ui, (YS.UIRecord(c.iface.name))) end
     local sig = Sig(ui)
     if c.iface.sig == nil then c.iface.sig = sig return false end
     if sig == c.iface.sig then return false end
@@ -324,7 +348,12 @@ end
 -- is noted once it has settled (a reload usually comes first).
 local function Settle()
     local c = Char()
-    if c and c.iface and c.iface.seen ~= nil and c.iface.sig == nil and not InCombatLockdown() then YS.FollowUI() end
+    if not (c and c.iface and c.iface.seen ~= nil and (c.iface.fresh or c.iface.sig == nil)) or InCombatLockdown() then return end
+    if not YS.UIRecord(c.iface.name) then return end
+    local ok, ui = pcall(YS.ScanUI, YS)
+    if not ok or type(ui) ~= "table" then return end
+    if YS.KeepUnapplied then ui = YS.KeepUnapplied(ui, (YS.UIRecord(c.iface.name))) end
+    c.iface.sig, c.iface.fresh = Sig(ui), nil
 end
 YS.UISettle = Settle
 function YS.UIApplied()
@@ -333,8 +362,7 @@ function YS.UIApplied()
     local name = YS.UIName()
     local _, _, scanned = YS.UIRecord(name)
     if scanned == nil then return end
-    c.iface = { name = name, seen = scanned }
-    C_Timer.After(5, Settle)
+    c.iface = { name = name, seen = scanned, fresh = true }
 end
 
 --- This character uses that interface from now on. Nothing is put on by it: Apply interface does that.
@@ -450,6 +478,7 @@ function YS:ApplyInterface()
     YS.UIApplied()
     YS:ApplyUI(ui, YS:Options())
     if YR.RefreshWindow then YR:RefreshWindow() end
+    return true
 end
 
 -- Set the class's saved layout (the bar planner, Planner.lua).
@@ -1189,7 +1218,10 @@ function YS:Apply(force, only, how)
     how = how or {}
     -- What you changed on your bars a moment ago is the profile's before the profile is put on (a
     -- button dragged out five seconds before you press Apply must not be what Apply takes away).
-    if not only and not how.sure and YS.RememberNow then YS.RememberNow() end
+    if not only and not how.sure and YS.RememberNow then
+        if YS.BarsStale then YS.BarsStale() end
+        YS.RememberNow()
+    end
     -- A character in play has things to lose: asked first, with what goes.
     if not only and not how.sure then
         local buttons, macros = YS:ApplyCost(force)
@@ -1327,12 +1359,13 @@ function YS:Apply(force, only, how)
     end
     -- The planner's apply and "Bars only" stop here: no game setting, Edit Mode, chat window, camera
     -- or RestedXP guide is touched on a character in play.
-    if only or how.barsOnly then return end
+    if only or how.barsOnly then return true end
     if o.noAutoPush and not NoAutoPush() then
         Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
     end
     YS.UIApplied()
     YS:ApplyUI(YS:SharedUI(), o)
+    return true
 end
 
 --- /ysetup undo: the bars and this character's macros as they were before the last Set up. Buttons a
@@ -1345,6 +1378,8 @@ function YS:Undo()
         local settings = 0
         for name, v in pairs(uiOnly.cvars or {}) do if pcall(C_CVar.SetCVar, name, v) then settings = settings + 1 end end
         YippSetupCharDB.uiBackup = nil
+        -- taken back: this character's screen is its own again, and is not saved into the interface
+        if YippSetupCharDB.iface then YippSetupCharDB.iface = { name = YippSetupCharDB.iface.name } end
         Print(("put back %d game settings as they were. Chat windows and the Edit Mode layout aren't something an addon can put back."):format(settings))
         if YR.RefreshWindow then YR:RefreshWindow() end
         return
@@ -1523,10 +1558,11 @@ local function BuildWindow()
     -- Both saved and both still to do: one click, and one reload at the end.
     w.both = S.Button(w, "Apply both", function()
         if InCombatLockdown() then YS:Apply() return end
-        Done()
-        YippSetupCharDB.uiApplied = CharacterID() or true
-        YS:Apply()
-        w:Hide()
+        if YS:Apply() then
+            Done()
+            YippSetupCharDB.uiApplied = CharacterID() or true
+        end
+        w:Hide()            -- (asked first, on a character with things to lose: the question has the screen)
     end, "primary", 110)
     w.both:SetPoint("BOTTOMLEFT", 16, 16)
     w.both.tip = "Puts this class's saved bars and macros on this character, then the saved interface. One reload at the end"
@@ -1534,11 +1570,12 @@ local function BuildWindow()
     -- and the window is back after that with the bars still to do (YippSetupCharDB.uiApplied).
     w.applyUI = S.Button(w, "Apply interface", function()
         if InCombatLockdown() then YS:ApplyInterface() return end
-        YippSetupCharDB.uiApplied = CharacterID() or true
-        -- nothing left for the window to offer (the bars saved for the class are this character's own)
-        local p = YS:Profile()
-        if p and p.from == PlayerKey() and not p.planned then Done() end
-        YS:ApplyInterface()
+        if YS:ApplyInterface() then
+            YippSetupCharDB.uiApplied = CharacterID() or true
+            -- nothing left for the window to offer (the bars saved for the class are this character's own)
+            local p = YS:Profile()
+            if p and p.from == PlayerKey() and not p.planned then Done() end
+        end
         YS:Refresh()
     end, nil, 130)
     w.applyUI.tip = "Puts your saved Edit Mode layout, chat windows and game settings on this character. Bars are not touched"
@@ -1554,8 +1591,7 @@ local function BuildWindow()
     -- stays (Apply says why) and the character isn't marked done.
     w.setup = S.Button(w, "Apply bars", function()
         if InCombatLockdown() then YS:Apply(nil, nil, { barsOnly = true }) return end
-        Done()
-        YS:Apply(nil, nil, { barsOnly = true })
+        if YS:Apply(nil, nil, { barsOnly = true }) then Done() end
         w:Hide()
     end, nil, 110)
     w.setup:SetPoint("BOTTOMRIGHT", -16, 16)
@@ -1774,6 +1810,7 @@ f:RegisterEvent("PLAYER_REGEN_ENABLED")
 f:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")       -- the other of your two specs (Layouts.lua)
 f:RegisterEvent("ACTIONBAR_SLOT_CHANGED")            -- a button changed: the profile remembers (below)
 f:RegisterEvent("PLAYER_LEAVING_WORLD")              -- logging out: the account's interface follows (YS.FollowUI)
+f:RegisterEvent("UPDATE_MACROS")                     -- a macro edited: what a button holds reads the same, and isn't
 
 -- A profile is your bars as you have them, not as they once were saved: a spell you drag somewhere
 -- else while levelling, a potion you put on a button, is in the profile a few seconds later - so it
@@ -1795,6 +1832,9 @@ local function ButtonsChanged()
     for slot = 1, MAX_SLOT do
         local kind, id
         if HasAction(slot) then kind, id = GetActionInfo(slot) end
+        -- a macro by its name: the number the game gives for one is on some clients the spell it shows
+        -- now, which changes with your target (a macro edited in place: UPDATE_MACROS, below)
+        if kind == "macro" then id = GetActionText(slot) end
         local now = kind and (tostring(kind) .. ":" .. tostring(id)) or false
         if held[slot] ~= now then
             held[slot] = now
@@ -1803,6 +1843,8 @@ local function ButtonsChanged()
     end
     return changed
 end
+--- What the buttons held is forgotten: the next look reads the bars whatever they read like.
+function YS.BarsStale() heldAny = false end
 local function Remember()
     rememberSoon = false
     if not (YippSetupCharDB and YippSetupCharDB.applied and YS.Remembers() and YS:Profile()) then return end
@@ -1842,6 +1884,9 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
     elseif event == "ACTIVE_TALENT_GROUP_CHANGED" then
         if YS.OnSpecChanged then YS.OnSpecChanged(arg1, arg2) end
     elseif event == "ACTIONBAR_SLOT_CHANGED" then
+        RememberSoon()
+    elseif event == "UPDATE_MACROS" then
+        YS.BarsStale()
         RememberSoon()
     elseif event == "PLAYER_LEAVING_WORLD" then
         YS.FollowUI()

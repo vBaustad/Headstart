@@ -211,9 +211,16 @@ local function ChatInfo(i)
     if f then return f(i) end
 end
 
+-- A chat window's list of groups or channels, whole. Blizzard takes a channel out by setting its
+-- entry to nil (leaving a city takes Trade out), which leaves a hole: read to the first hole, the
+-- channels after it were lost - and that was then saved, and put on every character. In order.
 local function List(t)
-    local out = {}
-    for _, v in ipairs(type(t) == "table" and t or {}) do out[#out + 1] = v end
+    local out, keys = {}, {}
+    for k, v in pairs(type(t) == "table" and t or {}) do
+        if type(k) == "number" and v ~= nil then keys[#keys + 1] = k end
+    end
+    table.sort(keys)
+    for _, k in ipairs(keys) do out[#out + 1] = t[k] end
     return out
 end
 
@@ -429,6 +436,23 @@ local function ApplyGuide()
     if not rxp.GetGuideTable(GUIDE_GROUP, name) then return "guide '" .. guide .. "' not found" end
     local ok = pcall(rxp.LoadGuideTable, rxp, GUIDE_GROUP, name)
     return ok and ("'" .. guide .. "'") or "RestedXP refused the guide"
+end
+
+--- A character's screen about to be saved into its interface: the parts Apply never put on this
+--- character (its switch is off, or a UI suite or bar addon has that part) stay as they are saved.
+--- Without this a character with Chat windows off saved its own chat as everybody's.
+function YS.KeepUnapplied(ui, saved, o)
+    if type(ui) ~= "table" or type(saved) ~= "table" then return ui end
+    o = o or YS:Options()
+    local suite = FirstLoaded(UI_SUITES)
+    local barAddon = suite or FirstLoaded(BAR_ADDONS)
+    if not o.settings then ui.cvars = saved.cvars end
+    if not o.editMode or suite then ui.layout = saved.layout end
+    if not o.barVisibility or barAddon then ui.bars = saved.bars end
+    if not o.chat then ui.chat = saved.chat end
+    if not o.camera then ui.camera = saved.camera end
+    if o.rxpFrames == false then ui.rxp = saved.rxp end
+    return ui
 end
 
 -- Changing Edit Mode and the bar settings from an addon taints the action bars until the next reload:

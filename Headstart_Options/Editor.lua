@@ -2914,7 +2914,7 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
             .. " Taking most trinkets off ends their effect.")
         Row("Keep on after use", RowSlider(c, 0, 60, 5, Num("trinketAutoDelay", 0), SetNum("trinketAutoDelay")),
             "Seconds a used trinket stays on at least, for effects the game does not show as a buff. 0: no wait.")
-        Row("Swap in when ready within", RowSlider(c, 0, 60, 5, Num("trinketAutoSoon", 30), SetNum("trinketAutoSoon")),
+        Row("Swap in when ready within", RowSlider(c, 0, 30, 5, function() return math.min(30, tonumber(YippRouteDB.trinketAutoSoon) or 30) end, SetNum("trinketAutoSoon")),
             "A trinket in your bags counts as ready with this many seconds left on its cooldown. Equipping a trinket"
             .. " gives it 30 seconds anyway, so 30 loses nothing. 0: only when it is fully ready.")
         Row("Pause while PvP flagged", S.Switch(c, Opt("trinketPvpPause"), function(on) YippRouteDB.trinketPvpPause = on end),

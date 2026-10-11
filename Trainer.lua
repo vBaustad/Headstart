@@ -90,7 +90,18 @@ function YR.TrainerPlan(money)
             local choice = YR.TrainerChoice(name)
             -- "Rank 2" and up is not the first rank; a spell without ranks is its own first
             local n = tonumber(tostring(rank or ""):match("%d+"))
-            if choice == "first" then choice = (n == nil or n <= 1) and "always" or "never" end
+            if choice == "first" then
+                -- (the rank's text can be empty a moment after the window opens: a spell you already
+                -- have any rank of is not its first rank, whatever the text says)
+                local have = false
+                if n == nil then
+                    local _, class = UnitClass("player")
+                    for _, e in ipairs((YR.TrainerSpells or {})[class] or {}) do
+                        if e[3] == name and IsPlayerSpell and IsPlayerSpell(e[1]) then have = true break end
+                    end
+                end
+                choice = (not have and (n == nil or n <= 1)) and "always" or "never"
+            end
             if choice ~= "never" then
                 local cost = GetTrainerServiceCost(i) or 0
                 local level = GetTrainerServiceLevelReq and GetTrainerServiceLevelReq(i) or 0

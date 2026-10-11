@@ -154,7 +154,9 @@ YR.TrinketReady = Ready
 
 --- A trinket in your bags that the swap may put on: ready, or so nearly that the 30 seconds every
 --- trinket gets as it goes on cover what is left.
-local function Soon() return math.max(0, math.min(60, tonumber(YippRouteDB.trinketAutoSoon) or 30)) end
+-- (30 at most: past that, the one that went on still has more left than going on gives, reads as
+-- used, and comes off again - two trinkets swapping every second)
+local function Soon() return math.max(0, math.min(30, tonumber(YippRouteDB.trinketAutoSoon) or 30)) end
 local function ReadySoon(id)
     if not OnUse(id) then return true end
     return CooldownLeft(id) <= math.max(0.5, Soon())
@@ -551,6 +553,10 @@ local function Build()
     if p then bar:SetPoint("TOPLEFT", UIParent, "TOPLEFT", p[1], p[2]) else bar:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 180) end
     bar:SetClampedToScreen(true)
     bar:SetMovable(true)
+    -- shown by the game itself (only in a fight, or only out of one): its faces as things are now - what
+    -- changed while it was out of sight wasn't drawn - and its list gone with it
+    bar:SetScript("OnShow", function() YR.TrinketPaint() end)
+    bar:SetScript("OnHide", function() if flyout then flyout:Hide() end end)
     bar:RegisterForDrag("LeftButton")
     bar:SetScript("OnDragStart", StartDrag)
     bar:SetScript("OnDragStop", function(self)
