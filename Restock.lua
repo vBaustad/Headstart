@@ -168,9 +168,7 @@ function YR.RestockPlan()
     return plan
 end
 
-local function Coins(c)
-    return (GetCoinTextureString and GetCoinTextureString(math.floor(c + 0.5))) or (math.floor(c + 0.5) .. "c")
-end
+local function Coins(c) return YR.Money(c) end
 
 local function Name(item)
     local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(item)

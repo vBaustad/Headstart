@@ -59,7 +59,7 @@ local OPTION_DEFAULTS = {
     macros = true, autofeed = true, items = false,
     clearBars = true, clearMacros = true,
     settings = true, editMode = true, barVisibility = true, guide = true, noAutoPush = true,
-    swap = true, rankUp = true, popup = true, skipIntro = true, chat = true, camera = true,
+    swap = true, rankUp = true, popup = true, skipIntro = true, chat = true, camera = true, keys = true,
 }
 
 -- Everything is kept per class: a warrior main's bars and choices don't land on a new paladin.
@@ -481,6 +481,26 @@ function YS:ApplyInterface()
     return true
 end
 
+-- Asked first, from the settings and the slash command: this is the one that can't all be put back.
+-- (The first-login window and the "changed elsewhere" window are questions already.)
+StaticPopupDialogs["YIPPSETUP_INTERFACE"] = {
+    text = "Headstart: put the saved interface on this character?\n\nIt changes your chat windows (a chat tab the saved"
+        .. " interface doesn't have is closed), the Edit Mode layout, which action bars show, your key bindings and game"
+        .. " settings, each as its switch on this page says. No action button and no macro is touched.\n\nGame settings and"
+        .. " key bindings can be put back (/ysetup undo). Chat windows and the Edit Mode layout can't be put back by an addon.",
+    button1 = "Apply interface",
+    button2 = "Cancel",
+    OnAccept = function() YS:ApplyInterface() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+function YS:AskInterface()
+    if InCombatLockdown() then YS.Print("not in combat.") return end
+    if not YS:SharedUI() then return YS:ApplyInterface() end        -- (nothing saved: it says so)
+    StaticPopup_Show("YIPPSETUP_INTERFACE")
+end
+
 -- Set the class's saved layout (the bar planner, Planner.lua).
 function YS:SetProfile(profile, class)
     class = class or PlayerClass()
@@ -804,8 +824,17 @@ function MacroFor(e)
         local cast = MOUSEOVER_SET()[spell] and ("/cast [@mouseover,help,nodead][] " .. what) or ("/cast " .. what)
         return ShortName(spell), DYNAMIC_ICON, "#showtooltip " .. what .. "\n" .. cast
     end
-    -- your own macros: no "(Rank 3)", so a spell always casts its highest known rank
-    local body = (e.body or ""):gsub("%s*%(Rank %d+%)", ""):gsub("%s+$", "")
+    -- Your own macros. A "(Rank 3)" you wrote stays where this character knows that very rank: it is
+    -- a downrank you meant (it used to be taken out of every macro, and a downrank macro on a bar was
+    -- swapped for a twin without its rank). Where the character doesn't know that rank - an alt
+    -- below it - the rank goes, so the spell casts the highest one it has.
+    local body = (e.body or ""):gsub("([^%]\n;]-)%s*%(Rank (%d+)%)", function(before, n)
+        local spell = strtrim((before:gsub("^%s*[#/]%a+%s+", "")))
+        for _, r in ipairs(YR.PlannerRanks and YR.PlannerRanks(spell) or {}) do
+            if r.rank == tonumber(n) and IsPlayerSpell(r.id) then return before .. "(Rank " .. n .. ")" end
+        end
+        return before
+    end):gsub("%s+$", "")
     return e.name, e.icon or DYNAMIC_ICON, body
 end
 YS.MacroFor = MacroFor      -- for tests
@@ -1161,11 +1190,36 @@ function YS:ApplyCost(force)
     return buttons, macros
 end
 
+-- Before anything of yours is changed - by Set up, the planner or a switch of profile - the bars and
+-- this character's macros are written down as they are (YippSetupCharDB, per character):
+--   backup   the newest: what /ysetup undo puts back
+--   older    the ones before it, newest first (four at most): undo again goes a step further back
+--   first    this character as it was before Headstart changed anything on it. Kept for good,
+--            whatever is applied after: /ysetup undo first. (One copy was all there was once, and a
+--            second Set up overwrote the only record of the bars you had built by hand.)
+-- Each also says whether the character counted as set up then (was), which undo puts back with it.
+local OLDER = 4
+local function Backup()
+    local c = YippSetupCharDB
+    local b = { at = time(), slots = (YS.ReadBars(true)), macros = CharacterMacros(),
+        was = { applied = c.applied, layout = c.layout, placed = c.placed and Copy(c.placed) or nil } }
+    if c.backup then
+        c.older = type(c.older) == "table" and c.older or {}
+        table.insert(c.older, 1, c.backup)
+        for i = #c.older, OLDER + 1, -1 do c.older[i] = nil end
+    end
+    c.backup = b
+    if not c.first then c.first = Copy(b) end
+    return b
+end
+
 -- A character in play, not a new one: Set up asks first, and offers the bars alone.
 local NEW_LEVEL, NEW_BUTTONS = 10, 12
 StaticPopupDialogs["YIPPSETUP_CONFIRM"] = {
-    text = "Headstart: applying this profile replaces what is on this character now.\n\n%s\n\nYour current bars and"
-        .. " macros are backed up. /ysetup undo restores them.",
+    text = "Headstart: applying this profile replaces what is on this character now.\n\n%s\n\nYour bars and macros"
+        .. " as they are now are kept, and /ysetup undo puts them back (not a mount, toy or pet button: an addon can't"
+        .. " place those). Chat windows and the Edit Mode layout can't be put back by an addon -"
+        .. " |cffffffffBars only|r leaves them as they are.",
     button1 = "Bars and interface",
     button2 = "Cancel",
     button3 = "Bars only",
@@ -1193,6 +1247,22 @@ StaticPopupDialogs["YIPPSETUP_AGAIN"] = {
     timeout = 0,
     whileDead = true,
     hideOnEscape = true,
+    enterClicksFirstButton = true,
+}
+
+-- "Apply bars" (the first-login window) on a character in play: asked as what was asked for - the
+-- bars alone - and not with a dialog whose first button is the interface too.
+StaticPopupDialogs["YIPPSETUP_BARS"] = {
+    text = "Headstart: put the saved bars on this character?\n\n%s\n\nYour bars and macros as they are now are kept, and"
+        .. " /ysetup undo puts them back. Your interface, chat windows and game settings are not touched, and no macro"
+        .. " of yours is deleted.",
+    button1 = "Apply bars",
+    button2 = "Cancel",
+    OnAccept = function(_, force) YS:Apply(force, nil, { sure = true, barsOnly = true }) end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    enterClicksFirstButton = true,
 }
 
 local function Ago(t)
@@ -1231,6 +1301,10 @@ function YS:Apply(force, only, how)
             local o = YS:Options()
             local lines = {}
             if buttons > 0 then lines[#lines + 1] = ("%d buttons come off your bars"):format(buttons) end
+            if how.barsOnly then
+                StaticPopup_Show("YIPPSETUP_BARS", #lines > 0 and (lines[1] .. ".") or "The saved bars go on.", nil, force)
+                return
+            end
             if macros > 0 then lines[#lines + 1] = ("%d of this character's macros are deleted"):format(macros) end
             if again then
                 local from = YS.UISource() and ("on " .. tostring(YS.UISource()) .. ", " .. Ago(YS.UIScanned())) or "when it was saved"
@@ -1238,7 +1312,7 @@ function YS:Apply(force, only, how)
                 return
             end
             if o.settings or o.editMode or o.chat or o.barVisibility then
-                lines[#lines + 1] = "game settings, Edit Mode and chat windows change (Bars only leaves them)"
+                lines[#lines + 1] = "game settings, key bindings, Edit Mode and chat windows change (Bars only leaves them)"
             end
             -- the data goes in as an argument: a field written on Blizzard's popup would be ours (tainted)
             StaticPopup_Show("YIPPSETUP_CONFIRM", table.concat(lines, "; ") .. ".", nil, force)
@@ -1254,11 +1328,10 @@ function YS:Apply(force, only, how)
         return
     end
     local o = YS:Options()
-    -- before anything goes: the bars and this character's macros as they are, for /ysetup undo
-    if not only then
-        YippSetupCharDB.backup = { at = time(), slots = (YS.ReadBars(true)), macros = CharacterMacros() }
-        YippSetupCharDB.uiBackup = nil
-    end
+    -- before anything goes: the bars and this character's macros as they are, for /ysetup undo. Also
+    -- for the planner and a switch of profile (only): those change buttons too, and had no way back.
+    Backup()
+    if not only then YippSetupCharDB.uiBackup = nil end
     if o.clearBars and not only then ClearBars() end
     -- which slots hold a spell we put there: a slot you empty yourself afterwards is left empty
     local placedSet = only and YippSetupCharDB.placed or {}
@@ -1359,39 +1432,75 @@ function YS:Apply(force, only, how)
     end
     -- The planner's apply and "Bars only" stop here: no game setting, Edit Mode, chat window, camera
     -- or RestedXP guide is touched on a character in play.
-    if only or how.barsOnly then return true end
+    if only or how.barsOnly then return true, full end
     if o.noAutoPush and not NoAutoPush() then
         Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
     end
     YS.UIApplied()
     YS:ApplyUI(YS:SharedUI(), o)
-    return true
+    return true, full
 end
 
---- /ysetup undo: the bars and this character's macros as they were before the last Set up. Buttons a
---- layout can't hold (a mount, a toy, a pet's) can't be put back by an addon: those slots are said.
-function YS:Undo()
+--- /ysetup undo: the bars and this character's macros as they were before the last change Headstart
+--- made to them; again, the change before that. first (/ysetup undo first): as they were before
+--- Headstart changed anything on this character. Buttons a layout can't hold (a mount, a toy, a
+--- pet's) can't be put back by an addon: those slots are said.
+---   Nothing is touched unless every macro it has to make again fits: the bars are cleared to put the
+---   old ones back, and with the macro list full that used to leave them empty and the copy gone.
+function YS:Undo(first, bars)
     if InCombatLockdown() then Print("can't change action bars in combat.") return end
     -- "Apply interface" was the last thing done: that alone is undone, and the bars stay as they are
-    local uiOnly = YippSetupCharDB.uiBackup
+    -- (bars: the bars are what is asked for - a switch of profile taking itself back)
+    local uiOnly = not first and not bars and YippSetupCharDB.uiBackup
     if uiOnly then
         local settings = 0
         for name, v in pairs(uiOnly.cvars or {}) do if pcall(C_CVar.SetCVar, name, v) then settings = settings + 1 end end
+        if uiOnly.keys and YS.ApplyKeys then YS.ApplyKeys(uiOnly.keys) end           -- and your keys as they were
         YippSetupCharDB.uiBackup = nil
         -- taken back: this character's screen is its own again, and is not saved into the interface
         if YippSetupCharDB.iface then YippSetupCharDB.iface = { name = YippSetupCharDB.iface.name } end
-        Print(("put back %d game settings as they were. Chat windows and the Edit Mode layout aren't something an addon can put back."):format(settings))
+        Print(("put back %d game settings%s as they were. Chat windows and the Edit Mode layout aren't something an addon can put back."):format(
+            settings, uiOnly.keys and " and your key bindings" or ""))
         if YR.RefreshWindow then YR:RefreshWindow() end
         return
     end
-    local b = YippSetupCharDB.backup
-    if not b then Print("nothing to undo: nothing has been applied to this character since the backup.") return end
-    local made = 0
-    for _, m in ipairs(b.macros or {}) do
-        local have
+    local c = YippSetupCharDB
+    local b = first and c.first or c.backup
+    if not b then
+        Print(first and "nothing to put back: Headstart has not changed this character's bars."
+            or "nothing to undo: nothing has been applied to this character since the backup.")
+        return
+    end
+    -- the macros it would have to make again, and whether they fit
+    local function Has(m)
         local idx = GetMacroIndexByName(m[1])
-        if idx and idx > 0 and select(3, GetMacroInfo(idx)) == m[3] then have = true end
-        if not have and pcall(CreateMacro, m[1], m[2], m[3], true) then made = made + 1 end
+        return idx and idx > 0 and select(3, GetMacroInfo(idx)) == m[3]
+    end
+    local need = 0
+    for _, m in ipairs(b.macros or {}) do if not Has(m) then need = need + 1 end end
+    local _, numChar = GetNumMacros()
+    local limit = Constants and Constants.MacroConsts and Constants.MacroConsts.MAX_CHARACTER_MACROS or 30
+    local room = limit - (numChar or 0)
+    if need > room then
+        Print(("can't undo yet: %d of your macros have to be made again and this character has room for %d. Delete %d of its"
+            .. " macros and undo again. Nothing was changed, and the copy is kept."):format(need, math.max(0, room), need - math.max(0, room)))
+        return
+    end
+    local made, missing = 0, 0
+    for _, m in ipairs(b.macros or {}) do
+        if not Has(m) then
+            -- (made or not is read off the count: the game hands a macro's text back with a line
+            -- break of its own at the end, so the text is not what to compare)
+            -- (and that line break is taken off again, or the macro made here would carry two)
+            local _, had = GetNumMacros()
+            pcall(CreateMacro, m[1], m[2], ((m[3] or ""):gsub("\n$", "")), true)
+            local _, have = GetNumMacros()
+            if (have or 0) > (had or 0) then made = made + 1 else missing = missing + 1 end
+        end
+    end
+    if missing > 0 then
+        Print(("can't undo: %d of your macros couldn't be made again. Your bars were not changed, and the copy is kept."):format(missing))
+        return
     end
     ClearBars()
     local index = MacroIndex()
@@ -1424,9 +1533,20 @@ function YS:Undo()
     end
     local settings = 0
     for name, v in pairs(b.cvars or {}) do if pcall(C_CVar.SetCVar, name, v) then settings = settings + 1 end end
-    YippSetupCharDB.applied, YippSetupCharDB.layout, YippSetupCharDB.placed, YippSetupCharDB.backup = nil, nil, nil, nil
-    Print(("put back %d buttons, %d macros and %d game settings as they were before the last Set up.%s"):format(back, made, settings,
-        lost > 0 and (" %d buttons couldn't be put back by an addon (mounts, toys, pet buttons and the like)."):format(lost) or ""))
+    if b.keys and YS.ApplyKeys then YS.ApplyKeys(b.keys) end                         -- and your keys as they were
+    -- the character is what it was then: set up or not, on the layout it was on
+    local was = b.was or {}
+    c.applied, c.layout, c.placed = was.applied, was.layout, was.placed and Copy(was.placed) or nil
+    if first then
+        c.backup, c.older = nil, nil            -- (the first stays: it can be put back again)
+    else
+        c.backup = type(c.older) == "table" and table.remove(c.older, 1) or nil
+    end
+    Print(("put back %d buttons, %d macros and %d game settings as they were before %s.%s%s"):format(back, made, settings,
+        first and "Headstart first changed this character" or "the last change",
+        lost > 0 and (" %d buttons couldn't be put back by an addon (mounts, toys, pet buttons and the like)."):format(lost) or "",
+        c.backup and " /ysetup undo again goes a step further back." or (not first and c.first)
+            and " /ysetup undo first puts the bars back as they were before Headstart changed anything." or ""))
     if YR.RefreshWindow then YR:RefreshWindow() end
 end
 
@@ -1463,7 +1583,7 @@ function YS:Upgrade()
             -- just learned, and nothing holds its slot (it was too far ahead when the layout went on,
             -- or question-mark buttons are off): straight in
             PlaceSpell(slot, id)
-            put[slot] = true
+            put[slot] = id
         elseif not id and not HasAction(slot) and e.kind == "spell" and not e.prof
                 and Wanted(e, levels, autofeed, o) and KnownSpellID(REPLACE[e.name] or e.name) then
             -- learned, and its button is a macro by your choices (a mouseover spell, or macros for
@@ -1485,13 +1605,17 @@ function YS:Upgrade()
             local m = kind == "macro" and ReadMacroSlot(slot, actionID)
             if m and m.body == select(3, MacroFor(e)) then
                 PlaceSpell(slot, id)
-                put[slot] = true
+                put[slot] = id
                 swapped[m.name] = m.body
             -- a new rank from the trainer: a spell on the bar is that rank only, so the slot gets the
-            -- highest one, or for a downranked slot the main's rank (RealSpell)
-            elseif kind == "spell" and actionID ~= id and not e.prof
+            -- highest one, or for a downranked slot the main's rank (RealSpell). Only where the button
+            -- is still what Headstart put there (put[slot]: the spell it placed; true from before that
+            -- was kept, its rank not known): a rank you dragged onto that slot yourself afterwards is
+            -- a rank you chose, and is left.
+            elseif kind == "spell" and actionID ~= id and not e.prof and put[slot] and (put[slot] == true or put[slot] == actionID)
                     and C_Spell.GetSpellName(actionID) == C_Spell.GetSpellName(id) then
                 PlaceSpell(slot, id)
+                put[slot] = id
             end
         end
     end
@@ -1500,8 +1624,10 @@ function YS:Upgrade()
         for slot = 1, MAX_SLOT do
             if HasAction(slot) and GetActionText(slot) == name then onBar = true break end
         end
+        -- (only one of this character's own: an account-wide macro of yours that happens to read like
+        -- a placeholder was used as one, and is yours - it stays)
         local idx = GetMacroIndexByName(name)
-        if not onBar and idx and idx > 0 and select(3, GetMacroInfo(idx)) == body then DeleteMacro(idx) end
+        if not onBar and idx and idx > Constants.MacroConsts.MAX_ACCOUNT_MACROS and select(3, GetMacroInfo(idx)) == body then DeleteMacro(idx) end
     end
 end
 
@@ -1793,9 +1919,9 @@ SlashCmdList.YIPPSETUP = function(msg)
     elseif cmd == "debug" then
         YS:Debug()
     elseif cmd == "undo" then
-        YS:Undo()
+        YS:Undo(arg == "first")
     elseif cmd == "ui" or cmd == "interface" then
-        if arg == "copy" then YS:CopyInterface() else YS:ApplyInterface() end
+        if arg == "copy" then YS:CopyInterface() else YS:AskInterface() end
     elseif cmd == "apply" then
         YS:Apply(arg == "force")
     else
@@ -1873,6 +1999,8 @@ end
 f:SetScript("OnEvent", function(self, event, arg1, arg2)
     if event == "PLAYER_ENTERING_WORLD" and (arg1 or arg2) then   -- login or reload only
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        if YS.earlyLater and UnitLevel("player") == 1 and YS.EarlyBars then YippSetupCharDB.earlyBars = YS.EarlyBars() end
+        YS.earlyLater = nil
         SkipIntro()
         YS.ClassUINoted()
         C_Timer.After(0.5, FirstZoom)
@@ -1929,9 +2057,13 @@ function YS.Start(fresh)
         C_Timer.After(4, function() YS.PlaceholderIcons() end)
     end
     -- a new character: the main's action bars now, so Blizzard shows them while logging in
+    -- (level 1 and nothing else: should the game not know the level this early and say 0, that must
+    -- not read as "new" on a character's first login with Headstart - it is looked at again at the login)
     local level = UnitLevel("player") or 0
-    if fresh and level <= 1 and YS.EarlyBars then
+    if fresh and level == 1 and YS.EarlyBars then
         YippSetupCharDB.earlyBars = YS.EarlyBars()
+    elseif fresh and level == 0 then
+        YS.earlyLater = true
     end
 end
 

@@ -432,6 +432,13 @@ events._OnEvent(events, "SPELLS_CHANGED")
 ok = ok and g.BAR[1].id == 639
 print(("ok  " if ok else "FAIL"), f"Holy Light Rank 2 trained: slot 1 now holds {g.BAR[1].id} (was Rank 1, 635)")
 bad += not ok
+# a rank you drag onto that slot yourself afterwards is a rank you chose: the next look leaves it
+lua.execute("BAR[1] = { kind = 'spell', id = 635 }")
+events._OnEvent(events, "SPELLS_CHANGED")
+ok = g.BAR[1].id == 635
+print(("ok  " if ok else "FAIL"), f"Rank 1 put back on its slot by hand: left there, not swapped for the highest again ({g.BAR[1].id})")
+bad += not ok
+lua.execute("BAR[1] = { kind = 'spell', id = 639 }")
 lua.execute("""KNOWN[639] = nil; NAMEID["Holy Light"] = 635""")   # back to Rank 1 for the tests below
 
 # Other UI addons: action slots are shared by every bar addon, so they are set as always; Edit Mode is
@@ -612,6 +619,7 @@ lua.execute("""Fresh(); OLD_LEVEL = UnitLevel UnitLevel = function() return 30 e
     for i = 20, 40 do BAR[i] = { kind = 'spell', id = 635 } end
     MACROS[121] = { 'Mine', 1, '/dance' }
     YippSetupCharDB.applied = nil          -- never set up before: its macros would go
+    YippSetupCharDB.backup, YippSetupCharDB.older, YippSetupCharDB.first = nil, nil, nil       -- and nothing of it written down yet
     ASKED = nil StaticPopup_Show = function(w, text) ASKED = { which = w, text = text } return ASKED end""")
 YS.Apply(YS)
 ok = g.ASKED is not None and g.ASKED.which == "YIPPSETUP_CONFIRM" and g.BAR[30] is not None and g.MACROS[121] is not None     and "21 buttons" in g.ASKED.text and "1 of this character's macros" in g.ASKED.text
@@ -622,9 +630,78 @@ lua.execute("StaticPopupDialogs.YIPPSETUP_CONFIRM.OnAlt(nil, nil)")
 ok = g.BAR[30] is None and g.BAR[1] is not None and g.MACROS[121] is not None and g.CVARS_SET == 0
 print(("ok  " if ok else "FAIL"), "Bars only: the saved bars go on, your macro stays, no game setting is touched")
 bad += not ok
+ok = g.YippSetupCharDB.backup is not None and g.YippSetupCharDB.first is not None and g.YippSetupCharDB.first.slots[30] is not None
+print(("ok  " if ok else "FAIL"), "before it changes anything: the bars written down, and kept apart as this character's first")
+bad += not ok
 YS.Undo(YS)
 ok = g.BAR[30] is not None and g.BAR[30].id == 635 and g.YippSetupCharDB.applied is None and g.YippSetupCharDB.backup is None
 print(("ok  " if ok else "FAIL"), "/ysetup undo: the bars as they were before, and the character no longer counts as set up")
+bad += not ok
+# A second Set up used to overwrite the only copy: the bars built by hand were gone for good. Now each
+# change has its own copy behind the last, and the first is kept whatever comes after.
+def bars():          # (a macro by its name: its place in the macro list moves as macros come and go)
+    return dict((k, (v.kind, g.MACROS[v.id][1] if v.kind == "macro" and g.MACROS[v.id] else v.id)) for k, v in g.BAR.items())
+def mine():
+    return any(m[1] == "Mine" for m in g.MACROS.values())
+hand = bars()
+YS.Apply(YS, None, None, SURE)
+once = bars()
+lua.execute("BAR[60] = { kind = 'spell', id = 635 }")       # something you put on yourself in between
+between = bars()
+YS.Apply(YS, None, None, SURE)
+ok = once != hand and g.YippSetupCharDB.backup is not None and len(list(g.YippSetupCharDB.older.values())) == 1
+print(("ok  " if ok else "FAIL"), "applied twice: the second copy does not replace the first one")
+bad += not ok
+YS.Undo(YS)
+# (Headstart's own question-mark macros are not yours to get back: a spell you know stands where its
+# question mark was, one you don't know yet leaves its slot empty)
+now = bars()
+ok = (now.get(60) == ("spell", 635) and all(now.get(k) == v for k, v in between.items() if v[0] != "macro")
+      and g.YippSetupCharDB.applied is not None and g.YippSetupCharDB.backup is not None)
+print(("ok  " if ok else "FAIL"), "undo: as it was before the second apply - the button you added in between too - and still set up (it was, then)")
+bad += not ok
+YS.Undo(YS)
+ok = bars() == hand and mine() and g.YippSetupCharDB.applied is None and g.YippSetupCharDB.backup is None
+print(("ok  " if ok else "FAIL"), f"undo again: the bars you built by hand, and your macro ({len(bars())} buttons)")
+bad += not ok
+YS.Undo(YS)
+ok = bars() == hand
+print(("ok  " if ok else "FAIL"), "and once more: nothing left to undo, nothing changed")
+bad += not ok
+# the first copy is kept for good: whatever was applied since, /ysetup undo first is the character as it was
+for _ in range(7):
+    YS.Apply(YS, None, None, SURE)
+    lua.execute("BAR[70] = { kind = 'spell', id = 635 }")
+ok = len(list(g.YippSetupCharDB.older.values())) == 4 and bars() != hand
+print(("ok  " if ok else "FAIL"), "seven applies: five copies kept in all, the oldest of them dropped")
+bad += not ok
+YS.Undo(YS, True)
+ok = bars() == hand and mine() and g.YippSetupCharDB.first is not None and g.YippSetupCharDB.backup is None and g.YippSetupCharDB.applied is None
+print(("ok  " if ok else "FAIL"), "/ysetup undo first: the bars and the macro as they were before Headstart changed anything, and that copy stays")
+bad += not ok
+# the planner and a switch of profile change buttons too (only): they write a copy down as well
+lua.execute("YippSetupCharDB.backup, YippSetupCharDB.older = nil, nil")
+YS.Apply(YS, None, lua.eval("{ [1] = true }"), SURE)
+ok = g.YippSetupCharDB.backup is not None and g.YippSetupCharDB.backup.slots[30] is not None
+print(("ok  " if ok else "FAIL"), "the planner's Save and apply, and a switch of profile: a copy first, so they can be undone")
+bad += not ok
+YS.Undo(YS)
+ok = bars() == hand
+print(("ok  " if ok else "FAIL"), "and undone: the bars as they were")
+bad += not ok
+# Undo with no room for the macros it must make again: nothing is touched, and the copy is kept
+YS.Apply(YS, None, None, SURE)
+applied = bars()
+# (the character's macro list filled since: every free place taken)
+lua.execute("KEPT_M = {} for i = 121, 150 do KEPT_M[i] = MACROS[i] MACROS[i] = MACROS[i] or { 'Full' .. i, 1, '/sit' } end")
+YS.Undo(YS)
+ok = bars() == applied and g.YippSetupCharDB.backup is not None and g.MACROS[150] is not None
+print(("ok  " if ok else "FAIL"), "undo with the macro list full: the bars are not cleared, nothing is deleted, the copy is kept")
+bad += not ok
+lua.execute("for i = 121, 150 do MACROS[i] = KEPT_M[i] end")
+YS.Undo(YS)
+ok = bars() == hand and mine()
+print(("ok  " if ok else "FAIL"), "room made: the same undo now puts everything back")
 bad += not ok
 lua.execute("UnitLevel = OLD_LEVEL")
 # a spell you took off a slot it was put on stays off
@@ -645,7 +722,12 @@ bad += not ok
 lua.execute("""Fresh(); BAR[50] = { kind = 'spell', id = 635 } MACROS[121] = { 'Mine', 1, '/dance' }
     YippSetupCharDB.backup, YippSetupCharDB.uiBackup = nil, nil""")
 bars_before = dict((k, v.id) for k, v in g.BAR.items())
-YS.ApplyInterface(YS)
+lua.execute("ASKED = nil StaticPopup_Show = function(w, text) ASKED = { which = w, text = text } return ASKED end")
+YS.AskInterface(YS)
+ok = g.ASKED is not None and g.ASKED.which == "YIPPSETUP_INTERFACE" and g.YippSetupCharDB.uiBackup is None
+print(("ok  " if ok else "FAIL"), "Apply interface from the settings or /ysetup ui: asked first, nothing changed until answered")
+bad += not ok
+lua.execute("StaticPopupDialogs.YIPPSETUP_INTERFACE.OnAccept()")
 ok = dict((k, v.id) for k, v in g.BAR.items()) == bars_before and g.MACROS[121] is not None and g.YippSetupCharDB.uiBackup is not None
 print(("ok  " if ok else "FAIL"), "Apply interface: every button and macro is as it was, and a copy to undo is kept")
 bad += not ok
@@ -1330,4 +1412,149 @@ YS.ApplyUI(YS, lua.eval('{ cvars = {}, bars = {} }'), YS.Options(YS))
 report(g.CVARS.nameplateShowSelf == "1", "a new rogue gets it on with Apply interface")
 report(YS.FollowClassUI() is False, "being put on is not a change by the player")
 lua.execute("YippSetupDB.classes, ME.class, CVARS.nameplateShowSelf = KEPT_CLASSES, KEPT_CLASS, nil")
+
+# ---------------------------------------------------------------------------
+# What a character with a setup of its own could lose (the sweep of 2026-10-13)
+# ---------------------------------------------------------------------------
+# a rank written into a macro of your own stays where this character knows that very rank
+lua.execute("""KEPT_RANKS = HeadstartNS.PlannerRanks
+    HeadstartNS.PlannerRanks = function(name)
+        if name == "Holy Light" then return { { id = 635, rank = 1 }, { id = 639, rank = 2 } } end
+        return {}
+    end
+    KNOWN[635] = true KNOWN[639] = nil""")
+same, body = lua.eval("""(function()
+    local nl = string.char(10)
+    local _, _, body = YR_SETUP.MacroFor({ kind = "macro", name = "Heal",
+        body = "#showtooltip Holy Light(Rank 1)" .. nl .. "/cast [@mouseover,help][] Holy Light(Rank 1); Holy Light(Rank 2)" })
+    return body == "#showtooltip Holy Light(Rank 1)" .. nl .. "/cast [@mouseover,help][] Holy Light(Rank 1); Holy Light", body
+end)()""")
+report(same is True, f"a macro of your own: the rank you know stays as you wrote it, one this character hasn't got is taken out ({body!r})")
+lua.execute("HeadstartNS.PlannerRanks = KEPT_RANKS")
+
+# "Apply bars" on a character in play is asked as the bars alone
+lua.execute("""Fresh(); OLD_LEVEL = UnitLevel UnitLevel = function() return 30 end
+    for i = 20, 40 do BAR[i] = { kind = 'spell', id = 635 } end
+    YippSetupCharDB.applied = nil
+    ASKED = nil StaticPopup_Show = function(w, a, b, data) ASKED = { which = w, to = a, what = b, data = data } end""")
+YS.Apply(YS, None, None, lua.eval("{ barsOnly = true }"))
+report(g.ASKED is not None and g.ASKED.which == "YIPPSETUP_BARS" and g.BAR[30] is not None,
+       "Apply bars on a character in play: asked as the bars alone, nothing changed until answered")
+report(lua.eval("StaticPopupDialogs.YIPPSETUP_BARS.enterClicksFirstButton == true and StaticPopupDialogs.YIPPSETUP_AGAIN.enterClicksFirstButton == true"
+                " and StaticPopupDialogs.YIPPSETUP_AGAIN.button1 == 'Bars only'"),
+       "and Enter is the answer that changes least: the bars alone")
+lua.execute("UnitLevel = OLD_LEVEL")
+
+# a switch of profile on a character whose bars were never set up with Headstart: asked first, and a copy kept
+lua.execute("Fresh()")
+YS.Apply(YS, None, None, SURE)
+r = New("Solo")
+lua.execute("BAR[2] = nil BAR[3] = { kind = 'spell', id = 20594 }")       # Solo differs from Main
+Switch("Main")
+Switch("Solo")
+Switch("Main")
+lua.execute("""YippSetupCharDB.applied, YippSetupCharDB.backup, YippSetupCharDB.older = nil, nil, nil
+    BAR[77] = { kind = 'spell', id = 20594 } ASKED = nil""")                # bars built by hand, never set up
+before = dict((k, v.id) for k, v in g.BAR.items())
+r = Switch("Solo")
+report(r.ok is False and r.why is None and g.ASKED is not None and g.ASKED.which == "YIPPSETUP_SWITCH" and g.ASKED.data == "Solo"
+       and YS.LayoutName() == "Main" and dict((k, v.id) for k, v in g.BAR.items()) == before and g.YippSetupCharDB.backup is None,
+       f"a switch of profile on a character never set up: asked first, nothing changed ({g.ASKED and g.ASKED.what})")
+lua.execute("StaticPopupDialogs.YIPPSETUP_SWITCH.OnAccept(nil, ASKED.data)")
+report(YS.LayoutName() == "Solo" and g.YippSetupCharDB.backup is not None and g.YippSetupCharDB.backup.slots[77] is not None,
+       "Switch: on the profile, with the bars as they were written down first")
+YS.Undo(YS)
+report(g.BAR[77] is not None and g.BAR[77].id == 20594, "and /ysetup undo puts the bars built by hand back")
+
+# a class with nothing saved: bars arranged on Main are saved into it when you switch to it, not lost
+lua.execute("""Fresh()""")
+YS.Apply(YS, None, None, SURE)
+lua.execute("YippSetupCharDB.applied = YippSetupCharDB.applied or time() YippSetupCharDB.layoutName = 'Solo'")
+lua.execute("KEPT_PROFILE = YippSetupDB.classes.PALADIN.profile YippSetupDB.classes.PALADIN.profile = nil BAR[88] = { kind = 'spell', id = 20594 }")
+r = Switch("Main")
+main = g.YippSetupDB.classes.PALADIN.profile
+report(r.ok is True and main is not None and main.slots is not None and main.slots[88] is not None and main.slots[88].name == "Stoneform",
+       "switched to an empty Main: the bars you are on are saved into it then, as it says")
+lua.execute("YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE")
+
+# a switch that can't make a macro the profile needs takes itself back, rather than leaving half of each
+lua.execute("Fresh()")
+YS.Apply(YS, None, None, SURE)
+lua.execute("YippSetupCharDB.applied = YippSetupCharDB.applied or time() YippSetupCharDB.layoutName = nil")
+Switch("Solo")
+lua.execute("""local at = 121 while MACROS[at] do at = at + 1 end
+    MACROS[at] = { 'Zed', 1, '/zed' } BAR[100] = { kind = 'macro', id = at } ZED = at""")
+Switch("Main")                                                              # Solo saved with the macro Zed on a button
+# (Zed gone, and no room to make it again: the game refuses a 31st macro, which this fake did not)
+lua.execute("""BAR[100] = nil MACROS[ZED] = nil
+    for i = 121, 150 do MACROS[i] = MACROS[i] or { 'Full' .. i, 1, '/sit' } end
+    OLD_CREATE = CreateMacro
+    CreateMacro = function(n, icon, body, perChar)
+        local _, mine = GetNumMacros()
+        if perChar and mine >= 30 then error("macro list full") end
+        return OLD_CREATE(n, icon, body, perChar)
+    end""")
+before = dict((k, (v.kind, v.id)) for k, v in g.BAR.items())
+r = Switch("Solo")
+report(r.ok is False and r.why is not None and "macro list is full" in r.why and "Zed" in r.why and YS.LayoutName() == "Main"
+       and dict((k, (v.kind, v.id)) for k, v in g.BAR.items()) == before,
+       f"a switch with the macro list full: not switched, and the bars are as they were ({r.why and r.why[:50]})")
+lua.execute("CreateMacro = OLD_CREATE for i = 121, 150 do if MACROS[i] and MACROS[i][1]:find('^Full') then MACROS[i] = nil end end")
+
+
+# Key bindings are part of the saved interface: read action by action, put on, kept for undo
+lua.execute("""
+    BINDS = { { "MOVEFORWARD", "W", "UP" }, { "HEADER_MOVEMENT" }, { "JUMP", "SPACE" }, { "ACTIONBUTTON1", "1" }, { "ACTIONBUTTON2", "2" },
+        { "TOGGLEBAG", "B" }, { "ONLYHERE", "F9" } }
+    SAVED_SETS = 0
+    function GetNumBindings() return #BINDS end
+    function GetBinding(i) local b = BINDS[i] if b then return b[1], "cat", b[2], b[3] end end
+    function GetBindingKey(action) for _, b in ipairs(BINDS) do if b[1] == action then return b[2], b[3] end end end
+    function SetBinding(key, action)
+        for _, b in ipairs(BINDS) do
+            if b[2] == key then b[2], b[3] = b[3], nil elseif b[3] == key then b[3] = nil end
+        end
+        if action then
+            for _, b in ipairs(BINDS) do
+                if b[1] == action then if not b[2] then b[2] = key else b[3] = key end end
+            end
+        end
+        return true
+    end
+    function SaveBindings() SAVED_SETS = SAVED_SETS + 1 end
+    function GetCurrentBindingSet() return 1 end
+    function KEYS() local t = {} for _, b in ipairs(BINDS) do t[b[1]] = (b[2] or "-") .. "," .. (b[3] or "-") end return t end
+""")
+mine = YS.ScanKeys()
+report(mine is not None and mine.MOVEFORWARD[1] == "W" and mine.MOVEFORWARD[2] == "UP" and mine.JUMP[2] is False and mine.HEADER_MOVEMENT is None,
+       "the keys are read action by action, both keys of each, a heading left out")
+scanned = YS.ScanUI(YS)["keys"]            # (["keys"]: .keys on a Lua table is Python's own method here)
+report(scanned is not None and scanned.ACTIONBUTTON1[1] == "1", "and are part of the interface that Save interface saves")
+# the main's keys: E moves forward (W is strafe on the main, here nothing), 1 and 2 swapped, the bag key taken off
+main = lua.eval('{ MOVEFORWARD = { "E", false }, JUMP = { "SPACE", false }, ACTIONBUTTON1 = { "2", false }, ACTIONBUTTON2 = { "1", "Q" }, TOGGLEBAG = { false, false } }')
+lua.execute("YippSetupCharDB.uiBackup = { at = 1 } SAVED_SETS = 0")
+n = YS.ApplyKeys(main, g.YippSetupCharDB.uiBackup)
+now = g.KEYS()
+report(n == 4 and now.MOVEFORWARD == "E,-" and now.ACTIONBUTTON1 == "2,-" and now.ACTIONBUTTON2 == "1,Q" and now.TOGGLEBAG == "-,-"
+       and now.JUMP == "SPACE,-" and now.ONLYHERE == "F9,-" and g.SAVED_SETS == 1,
+       f"put on: each action its saved keys (two keys swapped between two actions too), a key taken off stays off, an action the saved set doesn't name keeps its key ({n}: {dict(now.items())})")
+report(YS.ApplyKeys(main) == 0 and g.SAVED_SETS == 1, "applied again: nothing to change, nothing saved")
+was = g.YippSetupCharDB.uiBackup["keys"]
+report(was is not None and was.MOVEFORWARD[1] == "W" and was.TOGGLEBAG[1] == "B", "the keys as they were are kept for undo")
+YS.Undo(YS)
+now = g.KEYS()
+report(now.MOVEFORWARD == "W,UP" and now.ACTIONBUTTON1 == "1,-" and now.ACTIONBUTTON2 == "2,-" and now.TOGGLEBAG == "B,-",
+       f"/ysetup undo after Apply interface: your own keys back ({dict(now.items())})")
+lua.execute("COMBAT = true")
+report(YS.ApplyKeys(main) is None and g.KEYS().MOVEFORWARD == "W,UP", "in a fight: no key is touched")
+lua.execute("COMBAT = false")
+# through Apply interface, by its switch
+lua.execute("YippSetupCharDB.uiBackup = nil")
+YS.ApplyUI(YS, lua.eval('{ cvars = {}, bars = {}, keys = { MOVEFORWARD = { "E", false } } }'), YS.Options(YS))
+report(g.KEYS().MOVEFORWARD == "E,-", "Apply interface puts the saved keys on")
+lua.execute('SetBinding("E") SetBinding("W", "MOVEFORWARD") SetBinding("UP", "MOVEFORWARD")')
+YS.Options(YS).keys = False
+YS.ApplyUI(YS, lua.eval('{ cvars = {}, bars = {}, keys = { MOVEFORWARD = { "E", false } } }'), YS.Options(YS))
+report(g.KEYS().MOVEFORWARD == "W,UP", "with Key bindings switched off: yours are left alone")
+YS.Options(YS).keys = True
 sys.exit(1 if bad else 0)

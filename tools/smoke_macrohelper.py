@@ -131,6 +131,9 @@ def run():
           "your macros: this character's, with where each is")
     check(YS.MacroSave(121, "Mine2", "/cast [stealth] Sap") == 121 and lua.eval("MACROS[1][1] .. '|' .. MACROS[1][3]") == "Mine2|/cast [stealth] Sap",
           "saved over: the new name and text")
+    check(YS.MacroSave(121, "Mine3", "/x", "Other")[0] is None and lua.eval("MACROS[1][1] .. '|' .. MACROS[1][3]") == "Mine2|/cast [stealth] Sap"
+          and YS.MacroSave(121, "Mine2", "/cast [stealth] Sap", "Mine2") == 121,
+          "and only over the macro you opened: with another one at that place now, nothing is written")
     check(YS.MacroSave(121, "", "/cast Sap")[0] is None and YS.MacroSave(121, "X", "y" * 256)[0] is None and YS.MacroSave(140, "X", "/cast Sap")[0] is None,
           "not without a name, not longer than a macro holds, not one that isn't there")
     check(YS.MacroDelete(121, "Mine")[0] is None and len(list(YS.MacroOwn().values())) == 2,

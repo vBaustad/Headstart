@@ -30,8 +30,69 @@ end
 
 -- ---------------------------------------------------------------------------
 -- Minimap button: drag it round the minimap; left click opens the window, right click the settings.
+--   Made by LibDBIcon (Libs/, with LibDataBroker): the button every other addon's is, so it sits
+--   right in the ring, and the addons that gather minimap buttons into one place take it too. Where
+--   it stands and whether it shows is kept as LibDBIcon keeps it, in YippRouteDB.minimap
+--   ({ hide, minimapPos }); the angle from before (YippRouteDB.minimapAngle) is carried over once.
+--   Without the library (its folder gone) a button of our own is made instead, as it was.
 -- ---------------------------------------------------------------------------
 local button
+local LOGO = "Interface\\AddOns\\Headstart\\art\\logo"       -- Headstart's own mark (tools/make_icons.py)
+-- on the library's button: the H alone. That button brings its own dark disc and ring, and a rim of
+-- ours inside that ring showed every pixel the two were apart.
+local MARK = "Interface\\AddOns\\Headstart\\art\\logomark"
+local icons            -- LibDBIcon, once our button is its
+
+-- What the button says under the mouse: the same lines on LibDBIcon's tooltip and on our own button's.
+local function Tip(tip)
+    tip:AddLine("Headstart")
+    if YR.InstanceCounts and YR.Option("instanceTrack") then
+        local hour, day, wait = YR.InstanceCounts()
+        local perHour, perDay = YR.InstanceLimits()
+        -- nothing about instances for someone who hasn't been in one today
+        if day > 0 then
+            tip:AddLine(("Instances: %d/%d this hour, %d/%d today%s"):format(hour, perHour, day, perDay,
+                wait and ("  (next in " .. YR.InstanceClock(wait) .. ")") or ""), 0.6, 0.8, 1)
+        end
+    end
+    -- your gold in all (Characters): here too, for where another addon draws the bag and its coins
+    if YR.AltsOn and YR.AltsOn() and YippRouteDB.altsGold ~= false then
+        local sum, list = YR.AltsGold()
+        if #list > 1 then
+            tip:AddLine(("Gold on your %d characters: %s"):format(#list, YR.AltsCoins(sum)), 1, 0.82, 0)
+        end
+    end
+    tip:AddLine("Click: the Headstart window", 0.8, 0.8, 0.8)
+    tip:AddLine("Right-click: every window of ours (characters, chat log, loot log...)", 0.8, 0.8, 0.8)
+    tip:AddLine("Drag: move round the minimap", 0.8, 0.8, 0.8)
+end
+
+local function Clicked(self, which)
+    if which == "RightButton" then YR.WindowMenu(self) else YR:ToggleWindow() end
+end
+
+-- The library's button. Returns whether it was made.
+local function BuildWithLibrary()
+    local stub = _G.LibStub
+    if type(stub) ~= "table" or type(stub.GetLibrary) ~= "function" then return false end
+    local broker, lib = stub:GetLibrary("LibDataBroker-1.1", true), stub:GetLibrary("LibDBIcon-1.0", true)
+    if not (broker and lib) then return false end
+    local db = YippRouteDB.minimap
+    if type(db) ~= "table" then
+        db = { minimapPos = (tonumber(YippRouteDB.minimapAngle) or 225) % 360 }
+        YippRouteDB.minimap = db
+    end
+    db.hide = not YR.Option("minimapButton")
+    local ok, object = pcall(broker.NewDataObject, broker, "Headstart", {
+        type = "launcher", text = "Headstart", icon = MARK, iconCoords = { 0, 1, 0, 1 },      -- (drawn to fit: not cropped)
+        OnClick = Clicked, OnTooltipShow = Tip,
+    })
+    if not (ok and object) then return false end
+    if not pcall(lib.Register, lib, "Headstart", object, db) then return false end
+    icons = lib
+    button = lib.GetMinimapButton and lib:GetMinimapButton("Headstart") or true
+    return true
+end
 
 local function Place()
     local angle = math.rad(YippRouteDB.minimapAngle or 225)
@@ -49,14 +110,17 @@ local function FollowCursor()
 end
 
 local function Build()
+    if BuildWithLibrary() then return end
     button = CreateFrame("Button", "HeadstartMinimapButton", Minimap)
     button:SetSize(31, 31)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)
     local icon = button:CreateTexture(nil, "BACKGROUND")
-    icon:SetTexture("Interface\\AddOns\\Headstart\\art\\logo")       -- Headstart's own mark (tools/make_icons.py)
-    icon:SetSize(21, 21)
-    icon:SetPoint("CENTER", 0, 1)
+    icon:SetTexture(LOGO)
+    -- The ring's hole is not in the middle of the button: the ring is a 53-pixel texture hung from the
+    -- button's top left corner, and its hole is centred 17 across and 16 down from there (by eye, in game).
+    icon:SetSize(20, 20)
+    icon:SetPoint("CENTER", button, "TOPLEFT", 17, -16)
     local mask = button:CreateMaskTexture()
     mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
     mask:SetAllPoints(icon)
@@ -68,33 +132,12 @@ local function Build()
     button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button:RegisterForDrag("LeftButton")
-    button:SetScript("OnClick", function(self, which)
-        if which == "RightButton" then YR.WindowMenu(self) else YR:ToggleWindow() end
-    end)
+    button:SetScript("OnClick", Clicked)
     button:SetScript("OnDragStart", function(self) self:SetScript("OnUpdate", FollowCursor) end)
     button:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine("Headstart")
-        if YR.InstanceCounts and YR.Option("instanceTrack") then
-            local hour, day, wait = YR.InstanceCounts()
-            local perHour, perDay = YR.InstanceLimits()
-            -- nothing about instances for someone who hasn't been in one today
-            if day > 0 then
-                GameTooltip:AddLine(("Instances: %d/%d this hour, %d/%d today%s"):format(hour, perHour, day, perDay,
-                    wait and ("  (next in " .. YR.InstanceClock(wait) .. ")") or ""), 0.6, 0.8, 1)
-            end
-        end
-        -- your gold in all (Characters): here too, for where another addon draws the bag and its coins
-        if YR.AltsOn and YR.AltsOn() and YippRouteDB.altsGold ~= false then
-            local sum, list = YR.AltsGold()
-            if #list > 1 then
-                GameTooltip:AddLine(("Gold on your %d characters: %s"):format(#list, YR.AltsCoins(sum)), 1, 0.82, 0)
-            end
-        end
-        GameTooltip:AddLine("Click: the Headstart window", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("Right-click: every window of ours (characters, chat log, loot log...)", 0.8, 0.8, 0.8)
-        GameTooltip:AddLine("Drag: move round the minimap", 0.8, 0.8, 0.8)
+        Tip(GameTooltip)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -144,5 +187,11 @@ end
 function YR:ShowMinimapButton(on)
     YippRouteDB.minimapButton = on
     if on and not button and Minimap then Build() end
-    if button then button:SetShown(on) end
+    if icons then
+        -- the library's: it shows and hides its button, and keeps which in the table it was given
+        YippRouteDB.minimap.hide = not on
+        if on then icons:Show("Headstart") else icons:Hide("Headstart") end
+    elseif button then
+        button:SetShown(on)
+    end
 end

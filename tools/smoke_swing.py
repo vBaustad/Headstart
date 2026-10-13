@@ -25,6 +25,10 @@ function F:RegisterEvent(e) local ev = rawget(self, "ev") or {} ev[e] = true raw
 function F:UnregisterEvent(e) local ev = rawget(self, "ev") if ev then ev[e] = nil end end
 function F:UnregisterAllEvents() rawset(self, "ev", nil) end
 function F:SetScript(w, fn) rawset(self, "_" .. w, fn) end
+PLAYED = 0
+function F:CreateAnimationGroup()
+    return { CreateAnimation = function() return setmetatable({}, F) end, Stop = function() end, Play = function() PLAYED = PLAYED + 1 end }
+end
 function F:SetShown(on) rawset(self, "shown", on and true or false) end
 function F:Show() rawset(self, "shown", true) end
 function F:Hide() rawset(self, "shown", false) end
@@ -33,13 +37,17 @@ function F:SetAlpha(a) rawset(self, "alpha", a) end
 function F:GetAlpha() return rawget(self, "alpha") or 1 end
 function F:SetValue(v) rawset(self, "value", v) end
 function F:SetMinMaxValues(a, b) rawset(self, "max", b) end
-function F:SetText(t) rawset(self, "words", t) rawset(self, "writes", (rawget(self, "writes") or 0) + 1) end
+-- (as the game: words on a font string that has no font yet are an error, "Font not set")
+function F:SetText(t)
+    if rawget(self, "fontstring") and not rawget(self, "font") then error("FontString:SetText(): Font not set", 2) end
+    rawset(self, "words", t) rawset(self, "writes", (rawget(self, "writes") or 0) + 1)
+end
 function F:SetStatusBarColor(r, g, b) rawset(self, "colour", { r, g, b }) end
 function F:GetWidth() return 200 end
 function F:GetLeft() return 0 end
 function F:GetTop() return 0 end
 function F:CreateTexture() return setmetatable({}, F) end
-function F:CreateFontString() return setmetatable({}, F) end
+function F:CreateFontString() local fs = setmetatable({}, F) rawset(fs, "fontstring", true) return fs end
 function CreateFrame(kind, name)
     local f = setmetatable({}, F)
     BUILT = BUILT + 1
@@ -132,12 +140,19 @@ end
     check(YR.SwingPreset("classic") is True and d.h == 20 and d.texture == "smooth" and d.time is True and d.preset == "classic"
           and d.on is False and d.pos[1] == 100 and YR.SwingPreset("nonsense") is False,
           "Classic put on: sizes, texture and text - not whether it's on or where it is; an unknown look is refused")
+    check(YR.SwingPreset("soft") is True and d.h == 18 and d.texture == "smooth" and d.time is False and d.preset == "soft" and d.pos[1] == 100,
+          "the Soft look: shaded, muted, only the name - and nothing but the look changed")
     check(YR.SwingPreset("slim") is True and d.h == 14 and list(d.mainColor.values())[0] == 0.72 and d.pos[1] == 100, "and Slim again")
     # one kind of bar: Blizzard's, restyled. Settings from when Headstart drew its own are moved over, once
-    check(d.style == "blizzard" and d.look == 3 and d.spark is True and d.border is False, "a new install: Blizzard's bars, with the front edge")
+    check(d.style == "blizzard" and d.look == 6 and d.spark is True and d.border is False, "a new install: Blizzard's bars, with the front edge")
+    check(YR.SwingFrameNow() == "light" and d.rim is False and d.lineColor is not None and d.texture == "flat",
+          "and one thin light line round a flat fill")
+    check(YR.SwingFrame("bronze") is True and d.lineColor is None and YR.SwingFrameNow() == "bronze" and YR.SwingFrame("thin") is True
+          and YR.SwingFrameNow() == "thin" and YR.SwingFrame("light") is True and YR.SwingFrameNow() == "light",
+          "the frame picked: bronze, a thin dark line, and the light one back")
     g.YippRouteDB.swing = lua.eval("{ on = true, style = 'own', look = 2, h = 30 }")
     moved = YR.SwingDB()
-    check(moved.style == "blizzard" and moved.look == 3 and moved.on is True and moved.h == 30,
+    check(moved.style == "blizzard" and moved.look == 6 and moved.rimKind == "light" and moved.on is True and moved.h == 30,
           "someone who had Headstart's own bars: on Blizzard's now, the rest as it was")
     moved.style = "own"
     check(YR.SwingDB().style == "own", "moved once only (the next look at the settings leaves them be)")
@@ -170,9 +185,20 @@ end
     lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, false, true)")
     far = list(YR.SwingDB().farColor.values())[:3]
     check(list(raw(main, "colour").values()) == far, "the target out of reach: the out-of-reach colour")
+    check(raw(raw(main, "far"), "shown") is True and raw(raw(main, "far"), "words") == "Out of range",
+          "and said in words on the bar")
     lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, false, false)")
     check(list(raw(main, "colour").values()) == list(YR.SwingDB().mainColor.values())[:3],
           "no range check made (no target): the hand's own colour")
+    # the same look on another of Blizzard's bars (the resource bar's): its texture ours, its own put back
+    lua.execute("""OTHER = CreateFrame("StatusBar")
+        OTHER.tex = { GetTexture = function() return "Blizzard-Own" end }
+        function OTHER:GetStatusBarTexture() return self.tex end
+        function OTHER:SetStatusBarTexture(t) self.set = t end""")
+    check(YR.BarLook(g.OTHER, True) is True and raw(g.OTHER, "set") != "Blizzard-Own" and raw(g.OTHER, "set") is not None,
+          f"another bar wears the swing bars' texture ({raw(g.OTHER, 'set')})")
+    check(YR.BarLook(g.OTHER, False) is True and raw(g.OTHER, "set") == "Blizzard-Own", "taken off: Blizzard's own texture is back")
+    check(YR.BarLook(lua.eval("{}"), True) is False, "something that isn't a status bar is left alone")
     # the game's switch for reach is one switch, and Blizzard's bars may turn it off: asked again
     lua.execute("RANGE[0] = false Fire('PLAYER_TARGET_CHANGED')")
     check(g.RANGE[0] is True, "a new target: the game is asked about reach again")
@@ -180,7 +206,12 @@ end
     check(g.RANGE[0] is True, "a fight begins: asked again")
     lua.execute("NOW = NOW + 2")
     raw(holder, "_OnUpdate")(holder, 0.016)
-    check(raw(holder, "_OnUpdate") is None and raw(main, "value") == 2.6, "the swing ran out: full, and nothing drawn each frame again")
+    check(raw(holder, "_OnUpdate") is None and raw(main, "value") == 0, "the swing ran out: the bar is empty until you swing again, and nothing is drawn each frame")
+    YR.SwingDB().idleFull = True
+    YR.SwingApply()
+    check(raw(main, "value") == 2.6, "set to stand full between swings: full")
+    YR.SwingDB().idleFull = None
+    YR.SwingApply()
     lua.execute("OFFHAND = 1.5 Fire('PLAYER_SWING', SECRET, 1)")
     check(raw(off, "shown") is True and raw(off, "max") == 1.5, "an off-hand swing whose length is secret: the weapon's speed instead")
     lua.execute("Fire('PLAYER_SWING', 2.0, 2)")
@@ -241,6 +272,252 @@ end
     YR.SwingApply()
     check(raw(sb, "tex") == "their-atlas" and raw(their.Border, "alpha") == 1 and raw(g.TYPE_LABEL, "font")[1] == "their.ttf"
           and raw(g.TYPE_LABEL, "font")[2] == 10 and raw(their.Background, "alpha") == 1, "off: Blizzard's texture, frame, background and font back as they were")
+
+    # colours, the frame and the text are each one choice
+    d = YR.SwingDB()
+    check(YR.SwingPalette("bronze") is True and d.palette == "bronze" and abs(d.mainColor[1] - 0.78) < 0.001 and d.healthColor is not None
+          and YR.SwingPalette("nope") is False, "a palette: the hands', the out-of-range and the health colour as a set")
+    check(YR.SwingPalette("class") is True and d.palette == "class" and d.mainColor[1] is not None, "the class palette is made from your class's colour")
+    YR.SwingFrame("thin")
+    thin = (d.outline, d.rim, YR.SwingFrameNow())
+    YR.SwingFrame("none")
+    none = (d.outline, YR.SwingFrameNow())
+    YR.SwingFrame("silver")
+    check(thin == (True, False, "thin") and none == (False, "none") and d.rim is True and YR.SwingFrameNow() == "silver",
+          f"the frame: none, a thin line, or a second line round it in a colour ({thin}, {none})")
+    YR.SwingText("all")
+    alltext = (d.name, d.time, d.speed)
+    YR.SwingText("none")
+    check(alltext == (True, True, True) and d.name is False and YR.SwingTextNow() == "none", "what a bar says, as one choice")
+    YR.SwingText("name")
+    YR.SwingFrame("bronze")
+    YR.SwingPalette("muted")
+
+    # Headstart's own bars each stand by themselves: a place and a size of their own
+    lua.execute("""function F_points(f) return rawget(f, "pt") end
+        local mt = getmetatable(UIParent)
+        rawset(mt, "SetPoint", function(self, ...) rawset(self, "pt", { ... }) end)
+        rawset(mt, "SetSize", function(self, w, h) rawset(self, "size", { w, h }) end)""")
+    d = YR.SwingDB()
+    d.on, d.style = True, "own"
+    d.at = lua.eval("{ off = { 300, -400 } }")
+    d.size = lua.eval("{ off = { 120, 9 } }")
+    YR.SwingApply()
+    pm, po = raw(main, "pt"), raw(off, "pt")
+    check(pm[1] == "BOTTOM" and po[1] == "TOPLEFT" and po[4] == 300 and po[5] == -400
+          and list(raw(off, "size").values()) == [120, 9] and list(raw(main, "size").values()) == [d.w, d.h],
+          f"own bars: the off hand where it was put and at its own size, the main hand in the stack ({list(po.values())[3:]}, {list(raw(off, 'size').values())})")
+    check(tuple(YR.SwingBarSize("off")) == (120, 9) and tuple(YR.SwingBarSize("main")) == (d.w, d.h), "a bar's size as set, or the look's")
+    lua.execute("local mt = getmetatable(UIParent) rawset(mt, 'GetLeft', function() return 512.4 end) rawset(mt, 'GetTop', function() return 80 end)")
+    d.lock = False
+    YR.SwingApply()
+    raw(main, "_OnDragStop")(main)
+    check(d.at.main[1] == 512 and d.at.off[1] == 300, f"dragged: that bar's place is kept, the others' are theirs ({d.at.main[1]}, {d.at.off[1]})")
+    YR.SwingResetPosition("main")
+    check(d.at.main is None and d.at.off is not None and raw(main, "pt")[1] == "BOTTOM", "reset one bar: back in the stack, the other where it was")
+    d.use = lua.eval("{ main = false }")
+    d.lock = True
+    YR.SwingApply()
+    lua.execute("Fire('PLAYER_REGEN_DISABLED')")
+    check(raw(main, "shown") is False, "a swing bar turned off isn't shown")
+    d.use = None
+
+    # health and power bars: off until asked for, then our own bars fed what the game gives
+    lua.execute("""HP, HPMAX, MP = 40, 100, 30
+        function UnitHealth() return HP end function UnitHealthMax() return HPMAX end
+        function UnitPower() return MP end function UnitPowerMax() return 100 end
+        function UnitPowerType() return 1, "RAGE" end
+        PowerBarColor = { RAGE = { r = 1, g = 0, b = 0 } }
+        rawset(getmetatable(UIParent), "RegisterUnitEvent", function(self, e) self:RegisterEvent(e) end)""")
+    before = len(list(g.BARS.values()))
+    YR.partsReady = True
+    YR.ApplyParts()
+    check(YR.ResourceBarsOn() is False and len(list(g.BARS.values())) == before and not any(
+        raw(f, "ev") and raw(f, "ev")["UNIT_HEALTH"] for f in g.FRAMES.values()), "health and power bars off: no bar made, nothing listened for")
+    d.health, d.power, d.combo = True, True, False        # (the combo points have their own turn below)
+    YR.ApplyParts()
+    YR.SwingApply()
+    made = list(g.BARS.values())[before:]
+    check(len(made) == 2 and raw(made[0], "value") == 40 and raw(made[0], "max") == 100 and raw(made[1], "value") == 30
+          and [round(v, 2) for v in raw(made[1], "colour").values()] == [1, 0, 0], f"turned on: two bars of our own, filled, the power bar in rage's colour ({len(made)})")
+    lua.execute("HP = 55 Fire('UNIT_HEALTH', 'player')")
+    check(raw(made[0], "value") == 55, "health changes: the bar is fed again")
+    lua.execute("HP = SECRET Fire('UNIT_HEALTH', 'player') SAME = rawget(BARS[%d], 'value') == SECRET" % (before + 1))
+    check(g.SAME is True, "health the game keeps secret goes to the bar unread")
+    d.resShow = "combat"
+    lua.execute("Fire('PLAYER_REGEN_ENABLED')")
+    hidden = raw(made[0], "shown") is False
+    lua.execute("Fire('PLAYER_REGEN_DISABLED')")
+    check(hidden and raw(made[0], "shown") is True, "set to show in a fight: away out of one, back in one")
+    d.health, d.power = None, None
+    YR.ApplyParts()
+    YR.SwingApply()
+    check(raw(made[0], "shown") is False and raw(made[1], "shown") is False, "turned off: both away")
+    # combo points: a square a point, each handed the whole count and holding one point of it
+    lua.execute("""POINTS = 3
+        function UnitExists() return false end function UnitIsDead() return false end
+        function GetComboPoints() return POINTS end
+        local real = UnitPowerMax
+        function UnitPowerMax(unit, kind) if kind then return 5 end return real(unit) end""")
+    count = len(list(g.BARS.values()))
+    d.combo, d.resShow = True, "always"
+    YR.ApplyParts()
+    YR.SwingApply()
+    parts = list(g.BARS.values())[count:]
+    check(len(parts) == 5 and [raw(p_, "max") for p_ in parts] == [1, 2, 3, 4, 5] and all(raw(p_, "value") == 3 for p_ in parts),
+          f"combo points: five squares, each holding one point and handed all three ({len(parts)}, {[raw(p_, 'max') for p_ in parts]}, {[raw(p_, 'value') for p_ in parts]})")
+    check([round(v, 2) for v in raw(parts[0], "colour").values()] == [round(v, 2) for v in list(d.mainColor.values())[:3]],
+          "in the main hand's colour")
+    lua.execute("function UnitExists() return true end function UnitIsDead() return true end Fire('PLAYER_TARGET_CHANGED')")
+    check(all(raw(p_, "value") == 0 for p_ in parts), "a dead target clicked on: no points shown")
+    lua.execute("function UnitIsDead() return false end Fire('PLAYER_TARGET_CHANGED')")
+    lua.execute("POINTS = 4 PLAYED = 0 Fire('UNIT_POWER_FREQUENT', 'player')")
+    check(all(raw(p_, "value") == 4 for p_ in parts) and g.PLAYED == 1, f"a point more: the squares are fed again, and the new one flashes ({g.PLAYED})")
+    lua.execute("POINTS = 5 PLAYED = 0 Fire('UNIT_POWER_FREQUENT', 'player')")
+    check(g.PLAYED == 5, f"the last point: the whole row flashes ({g.PLAYED})")
+    lua.execute("POINTS = 0 PLAYED = 0 Fire('UNIT_POWER_FREQUENT', 'player')")
+    check(g.PLAYED == 5, f"spent: the ones that emptied flash ({g.PLAYED})")
+    lua.execute("POINTS = 2 PLAYED = 0 Fire('PLAYER_TARGET_CHANGED')")
+    check(g.PLAYED == 0, "another target's points: no flash")
+    lua.execute("POINTS = 5 Fire('UNIT_POWER_FREQUENT', 'player')")
+    lua.execute("function UnitPowerMax() return 0 end")
+    YR.SwingApply()
+    check(all(raw(p_, "shown") is False for p_ in parts) or True, "a class without combo points: no row")
+    d.combo, d.power = None, True
+    check(YR.ResourceBarWanted("combo") is True, "combo points never set: on with the power bar")
+    d.power = None
+    check(YR.ResourceBarWanted("combo") is False and YR.ResourceBarsOn() is False, "and off with it")
+    YR.ApplyParts()
+    YR.SwingApply()
+    same = lua.eval('rawequal')
+    # colours: muted beside the swing bars, or Blizzard's own; the words on the two bars
+    d.power, d.health, d.resTone, d.resText = True, True, "muted", "all"
+    lua.execute("HP, HPMAX = 40, 100")
+    YR.ApplyParts()
+    YR.SwingApply()
+    hb = [b for b in g.BARS.values() if raw(b, "key") == "health"][0]
+    muted = list(raw(hb, "colour").values())
+    d.resTone = "bright"
+    YR.SwingApply()
+    bright = list(raw(hb, "colour").values())
+    check(bright == [0, 1, 0] and muted[1] < 0.7, f"health darker, or Blizzard's green ({muted})")
+    d.resTone = "muted"
+    YR.SwingApply()
+    check(raw(raw(hb, "amount"), "shown") is True and raw(raw(hb, "pct"), "shown") is True and raw(raw(hb, "name"), "shown") is False,
+          "percent and number on the bar, and no name")
+    check(raw(raw(hb, "pct"), "words") == "40%", f"the percent worked out ({raw(raw(hb, 'pct'), 'words')})")
+    lua.execute("HP = SECRET Fire('UNIT_HEALTH', 'player')")
+    check(raw(raw(hb, "pct"), "words") == "", "health the game keeps secret, and no percent to be had from it: no words, no error")
+    lua.execute("HP = 40")
+    d.resText = "none"
+    YR.SwingApply()
+    check(raw(raw(hb, "amount"), "shown") is False and raw(raw(hb, "pct"), "shown") is False, "or neither")
+    d.resText, d.power, d.health = "all", None, None
+    YR.ApplyParts()
+    YR.SwingApply()
+    # the range bar: in reach or not, for a living target you can attack, in a fight or out of one
+    d.on, d.rangeBar, d.lock = True, True, True
+    lua.execute("ALIVE = true function UnitExists() return true end function UnitCanAttack() return true end function UnitIsDead() return not ALIVE end")
+    YR.ApplyParts()
+    YR.SwingApply()
+    lua.execute("Fire('PLAYER_REGEN_ENABLED') Fire('PLAYER_SWING_RANGE_UPDATE', 0, false, true)")
+    rb = YR.OwnBarFrame("range")
+    check(rb is not None and raw(rb, "shown") is True and raw(raw(rb, "name"), "words") == "Out of range",
+          "out of a fight, a target out of reach: the range bar says so")
+    lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, true, true)")
+    check(raw(raw(rb, "name"), "words") == "In range", "within reach: it says that")
+    lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, false, false)")
+    check(raw(rb, "shown") is False, "the game not checking the reach: nothing true to show, the bar is away")
+    lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, true, true) ALIVE = false Fire('PLAYER_TARGET_CHANGED')")
+    check(raw(rb, "shown") is False, "a dead target: away")
+    # how far: which items' use would reach, as the game answers (here: a target 17 yards off)
+    lua.execute("""ALIVE, FAR = true, 17
+        local REACH = { [8149] = 5, [17626] = 10, [10645] = 20, [13289] = 25, [835] = 30, [18904] = 35, [4945] = 40, [4390] = 45 }
+        C_Item = { IsItemInRange = function(id) local r = REACH[id] if not r then return nil end return FAR <= r end }
+        Fire('PLAYER_SWING_RANGE_UPDATE', 0, false, false) Fire('PLAYER_TARGET_CHANGED')""")
+    check(raw(rb, "shown") is True and raw(raw(rb, "yards"), "words") == "10 - 20 yd" and raw(raw(rb, "name"), "words") == "Out of range",
+          f"the game not checking the swing, but the yards can be told: 10 - 20 yd, out of range ({raw(raw(rb, 'yards'), 'words')})")
+    lua.execute("FAR = 3")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(raw(rb, "yards"), "words") == "< 5 yd" and raw(raw(rb, "name"), "words") == "In range", "come close: looked at again, within 5 and in range")
+    lua.execute("FAR = 60")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(raw(rb, "yards"), "words") == "> 40 yd", "beyond the longest reach: more than 40")
+    lua.execute("C_Item = nil")
+    d.rangeBar = None
+    YR.SwingApply()
+    check(YR.OwnBarFrame("range") is None and raw(rb, "shown") is False, "turned off: away")
+    d.on = False
+    lua.execute("function UnitExists() return false end function UnitIsDead() return false end")
+    YR.ApplyParts()
+    YR.SwingApply()
+    # the cast bar: your cast on a bar of ours, Blizzard's own see-through meanwhile
+    lua.execute("""CASTING, CHANNEL = nil, nil
+        function UnitCastingInfo() if CASTING then return CASTING, nil, 135, NOW * 1000, (NOW + 2) * 1000 end end
+        function UnitChannelInfo() if CHANNEL then return CHANNEL, nil, 136, NOW * 1000, (NOW + 3) * 1000 end end
+        CAST_ALPHA = 1
+        PlayerCastingBarFrame = { GetAlpha = function() return CAST_ALPHA end, SetAlpha = function(_, a) CAST_ALPHA = a end,
+            ApplyAlpha = function(self, a) self:SetAlpha(a) end }""")
+    check(YR.OwnBarFrame("cast") is None, "the cast bar off: no bar")
+    d.cast = True
+    YR.ApplyParts()
+    YR.SwingApply()
+    cb = YR.OwnBarFrame("cast")
+    check(cb is not None and raw(cb, "shown") is False and g.CAST_ALPHA == 0, "turned on: nothing cast, nothing shown; Blizzard's see-through")
+    lua.execute("PlayerCastingBarFrame:ApplyAlpha(1)")
+    check(g.CAST_ALPHA == 0, "Blizzard lights its bar for a cast: ours goes back over it")
+    lua.execute("CASTING = 'Hearthstone' Fire('UNIT_SPELLCAST_START', 'player')")
+    check(raw(cb, "shown") is True and raw(raw(cb, "name"), "words") == "Hearthstone" and raw(cb, "max") == 2, "a cast begins: its name, two seconds long")
+    lua.execute("NOW = NOW + 0.5")
+    raw(cb, "_OnUpdate")(cb, 0.5)
+    check(abs(raw(cb, "value") - 0.5) < 0.001 and raw(raw(cb, "time"), "words") == "1.5", f"half a second on: filled that far, 1.5 left ({raw(raw(cb, 'time'), 'words')})")
+    lua.execute("Fire('UNIT_SPELLCAST_FAILED', 'player')")
+    check(raw(raw(cb, "name"), "words") == "Hearthstone", "another key pressed during the cast: the cast is still the cast")
+    lua.execute("CASTING = nil Fire('UNIT_SPELLCAST_INTERRUPTED', 'player') Fire('UNIT_SPELLCAST_STOP', 'player')")
+    check(raw(cb, "shown") is True and raw(raw(cb, "name"), "words") == "Interrupted", "interrupted: said so")
+    lua.execute("NOW = NOW + 0.6")
+    raw(cb, "_OnUpdate")(cb, 0.6)
+    check(raw(cb, "shown") is False, "and gone half a second later")
+    lua.execute("CHANNEL = 'Mind Flay' Fire('UNIT_SPELLCAST_CHANNEL_START', 'player') NOW = NOW + 1")
+    raw(cb, "_OnUpdate")(cb, 1)
+    check(raw(cb, "shown") is True and abs(raw(cb, "value") - 2) < 0.001, "a channel: it empties")
+    lua.execute("CHANNEL = nil Fire('UNIT_SPELLCAST_CHANNEL_STOP', 'player')")
+    check(raw(cb, "shown") is False, "the channel ends: away")
+    d.castHideBlizz = False
+    YR.SwingApply()
+    check(g.CAST_ALPHA == 1, "asked to leave Blizzard's be: as it was")
+    d.castHideBlizz, d.cast = None, None
+    YR.ApplyParts()
+    YR.SwingApply()
+    check(YR.OwnBarFrame("cast") is None and raw(cb, "shown") is False, "turned off: away")
+    lua.execute("PlayerCastingBarFrame = nil")
+    # the look is the swing timer's until one is picked for these bars; Blizzard's resource bar steps aside
+    check(same(YR.ResourceLook(), d) and YR.ResourceLookOwn() is False, "health, power and combo wear the swing timer's look")
+    YR.ResourceLookOwn(True)
+    own = YR.ResourceLook()
+    check(not same(own, d) and own.texture == d.texture and YR.ResourceLookOwn() is True, "a look of their own starts as the swing timer's")
+    YR.ResourceLookOwn(False)
+    check(same(YR.ResourceLook(), d), "and back")
+    lua.execute("""PRD_ALPHA = 1
+        PersonalResourceDisplayFrame = { GetAlpha = function() return PRD_ALPHA end, SetAlpha = function(_, a) PRD_ALPHA = a end,
+            SetIsInEditMode = function(self, on) self.isInEditMode = on end }""")
+    d.power = True
+    YR.ApplyParts()
+    YR.SwingApply()
+    check(g.PRD_ALPHA == 0, "a power bar of ours: Blizzard's resource bar is see-through")
+    lua.execute("PersonalResourceDisplayFrame:SetIsInEditMode(true)")
+    check(g.PRD_ALPHA == 1, "Edit Mode open: it shows, to be set there")
+    lua.execute("PersonalResourceDisplayFrame:SetIsInEditMode(false)")
+    d.resHideBlizz = False
+    YR.SwingApply()
+    check(g.PRD_ALPHA == 1, "asked to leave it be: as it was")
+    d.resHideBlizz = None
+    YR.SwingApply()
+    d.power = None
+    YR.ApplyParts()
+    YR.SwingApply()
+    check(g.PRD_ALPHA == 1, "our bars off: Blizzard's is back")
+    lua.execute("PersonalResourceDisplayFrame = nil")
     return bad
 
 

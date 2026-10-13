@@ -247,16 +247,46 @@ function print() end
     check(db.welcome is True and db.restock is None and not YR.Option("restock") and not YR.Option("bankAuto")
           and not YR.XPBarOn() and not YR.Option("logging"),
           "a new install: quiet (no restock, no banking, no XP bar, no run log), and Get started is shown")
+    # nothing that acts for you or stands on one of Blizzard's windows, also once the routes are turned on
+    db.routes = True
+    acting = [k for k in ("bankButton", "mailButton", "deathSkipRelease", "skipQuests", "groupShare", "groupAccept", "autoTrain", "restock",
+                          "bankAuto", "levelShot") if YR.Option(k)]
+    check(acting == [] and db.pickRewards is None and db.quiet == 3,
+          f"a new install with the routes turned on: still nothing that acts for you, and no button of ours on the bank or the mailbox ({acting})")
+    db.routes = None
     lua.execute("YippRouteDB = { runs = {} }")
     YR.Latch(False)
     db = g.YippRouteDB
     check(db.welcome is None and db.restock is True and db.bankAuto is True and db.trinketBar is True
           and db.acceptInvites == "friends" and db.acceptFrom == "friends" and db.xpbar.on is True and db.showSplits is True,
           "an account that had Headstart: each option never touched is written down as it was (on)")
+    check(db.bankButton is True and db.mailButton is True and db.deathSkipRelease is True and db.skipQuests is True and db.groupShare is True
+          and db.groupAccept is True and db.pickRewards is True,
+          "and so are the ones that came to start off later: the bank and mail buttons, the routes' automation, reward picking")
+    # an account already latched once (quiet 2) gets only the newer ones written down, and what it turned off stays off
+    lua.execute("YippRouteDB = { runs = {}, quiet = 2, mailButton = false }")
+    YR.Latch(False)
+    db = g.YippRouteDB
+    check(db.quiet == 3 and db.bankButton is True and db.mailButton is False and db.pickRewards is True and db.restock is None,
+          "an account from the version before: the newer ones kept on, a choice of its own left alone, nothing older written again")
+    lua.execute("YippRouteDB = { runs = {} } ")
+    YR.Latch(False)
+    db = g.YippRouteDB
     lua.execute("YippRouteDB.restock = nil")
     YR.Latch(False)
     check(g.YippRouteDB.restock is None, "once only: it isn't written again on a later login")
     lua.execute("YippRouteDB = KEPT_DB")
+    # colours and text come as sets
+    d = YR.XPBarDB()
+    check(YR.XPBarPalette("blizzard") is True and d.palette == "blizzard" and d.gradient is False and abs(d.xpColor[1] - 0.58) < 0.001
+          and YR.XPBarPalette("nope") is False, "a palette: every colour of the bar as a set")
+    check(YR.XPBarLayout("simple") is True and d.center == "" and d.over is False and d.right == "{pct}%" and YR.XPBarLayoutNow() == "simple",
+          "a text layout: the nine places for words filled in one go")
+    d.left = "Mine: {level}"
+    check(YR.XPBarLayoutNow() == "own", "a word changed by hand: the layout is your own")
+    check(YR.XPBarLayout("detailed") is True and YR.XPBarLayoutNow() == "detailed" and d.over is True and d.left == "Level {level}",
+          "Detailed is the layout a new install has")
+    YR.XPBarPalette("violet")
     return bad
 
 

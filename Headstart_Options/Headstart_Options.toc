@@ -12,3 +12,5 @@ QuestIDs.lua
 Perf.lua
 Editor.lua
 Welcome.lua
+Journey.lua
+Transfer.lua

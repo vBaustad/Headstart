@@ -74,6 +74,11 @@ function print(m) table.insert(PRINTS, m) end
 function UnitFullName() return "Tester", "Realm" end
 function GetRealmName() return "Realm" end
 function UnitClass() return "Paladin", "PALADIN" end
+function UnitHealth() return 80 end
+function UnitHealthMax() return 100 end
+function UnitPower() return 40 end
+function UnitPowerMax() return 100 end
+function UnitPowerType() return 0, "MANA" end
 function UnitRace() return "Dwarf", "Dwarf" end
 function UnitLevel() return 1 end
 GUID = "Player-A"
@@ -98,17 +103,17 @@ DONE = {}
 SENT = {}
 IN_GROUP = false
 PARTY_NAMES = {}
-C_ChatInfo = { RegisterAddonMessagePrefix = function() return true end,
+C_ChatInfo = { SendChatMessage = function() end, RegisterAddonMessagePrefix = function() return true end,
                SendAddonMessage = function(prefix, msg, channel) table.insert(SENT, { prefix, msg, channel }) end }
 function IsInGroup() return IN_GROUP end
 function UnitInParty(n) return PARTY_NAMES[n] or false end
 function UnitInRaid() return false end
 function Ambiguate(n) return n end
-function strsplit(sep, s)
+function strsplit(sep, s, pieces)        -- pieces: at most that many, the last one the rest (as the game's does)
     local out, i = {}, 1
     while true do
         local j = s:find(sep, i, true)
-        if not j then out[#out + 1] = s:sub(i) break end
+        if not j or (pieces and #out + 1 >= pieces) then out[#out + 1] = s:sub(i) break end
         out[#out + 1] = s:sub(i, j - 1)
         i = j + 1
     end
@@ -135,6 +140,16 @@ function UnitXP() return XP end
 function UnitXPMax() return 400 end
 COMBAT = false
 function UnitAffectingCombat() return COMBAT end
+UnitOnTaxi = UnitOnTaxi or function() return false end
+UnitIsAFK = UnitIsAFK or function() return false end
+IsSwimming = IsSwimming or function() return false end
+IsResting = IsResting or function() return false end
+IsMounted = IsMounted or function() return false end
+IsInInstance = IsInInstance or function() return false end
+UnitPosition = UnitPosition or function() return nil end
+GetRealZoneText = GetRealZoneText or function() return "Teldrassil" end
+IsInRaid = IsInRaid or function() return false end
+GetNumGroupMembers = GetNumGroupMembers or function() return 0 end
 function UnitIsDeadOrGhost() return false end
 function UnitIsGhost() return false end
 function UnitCastingInfo() return nil end
@@ -180,8 +195,9 @@ for l in open(os.path.join(ROUTES, "Headstart_Routes.toc"), encoding="utf-8"):
     if f.endswith(".lua") and not f.startswith("#"):
         lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROUTES, f), encoding="utf-8").read(), f)("Headstart_Routes", RNS)
 # every file the .toc loads, in its order
+# (not the libraries in Libs/: LibStub, LibDataBroker and LibDBIcon are other people's, and need the game)
 TOC = [l.strip().replace(chr(92), "/") for l in open(os.path.join(ROOT, "Headstart.toc"), encoding="utf-8")
-       if l.strip().endswith(".lua") and not l.startswith("#")]
+       if l.strip().endswith(".lua") and not l.startswith("#") and not l.startswith("Libs")]
 # and the window's addon (Headstart_Options, load on demand in the game), loaded after it
 for sub in ("Headstart_Setup", "Headstart_Options"):
     TOC += [sub + "/" + l.strip().replace(chr(92), "/")
@@ -347,7 +363,7 @@ check(g.REPOPS == 1, "... not once that step is done, nor with the option off")
 # ... and at the Spirit Healer, Headstart accepts the resurrection of a death skip even when RestedXP's
 # step has already gone (it ends itself on entering Kharanos, where the healer is); never another death's
 lua.execute('''
-YippRouteDB.deathSkipRelease = nil
+YippRouteDB.deathSkipRelease = true
 GHOST, ACCEPTS = false, 0
 function UnitIsGhost() return GHOST end
 function AcceptXPLoss() ACCEPTS = ACCEPTS + 1 end
@@ -760,9 +776,137 @@ g.YippRouteDB.restock = False
 YR.ShowSettingsTab(YR, "vendors")
 dimmed = lua.eval("""(function()
     local n = 0
-    for _, f in ipairs(FRAMES) do if f.alpha == 0.45 then n = n + 1 end end
+    for _, f in ipairs(FRAMES) do if f.alpha == 0.40 then n = n + 1 end end
     return n end)()""")
 check(dimmed > 0, f"Vendor restock off: its rows are dimmed ({dimmed})")
+# the features stand on All features in the order of their cards on the page
+_order = {}
+for e in YR.SettingsIndex().values():
+    _order.setdefault(e.key, {"top": [], "cards": []})["cards" if e.card else "top"].append(e.label)
+_feats = {}
+for group in YR.HomeFeatures().values():
+    for i in range(2, len(list(group.values())) + 1):
+        f = group[i]
+        if f.get and f.set and not f.plain and f.section != "On this page":
+            _feats.setdefault(f.page, []).append(f.section)
+_wrong = []
+for page, sections in _feats.items():
+    cards = [c for c in _order.get(page, {}).get("cards", []) if c in sections]
+    seen = []
+    for sec in sections:
+        if sec not in seen:
+            seen.append(sec)
+    if cards and seen != cards:
+        _wrong.append((page, seen, cards))
+check(not _wrong, f"on every page the top switches are in the order of their cards: {_wrong}")
+# the card of a feature that is off stands under the cards of the ones that are on
+def _card_y(page, label):
+    return [e.y for e in YR.SettingsIndex().values() if e.key == page and e.card and e.label == label][0]
+_sw = YR.SwingDB()
+_was = (_sw.on, _sw.health, _sw.power)
+_sw.on, _sw.health, _sw.power = True, None, None
+YR.ShowSettingsTab(YR, "swing")
+YR.RefreshWindow(YR)
+_first = _card_y("swing", "Swing timer") > _card_y("swing", "Health and power bars")
+_sw.on, _sw.health = False, True
+YR.RefreshWindow(YR)
+check(_first and _card_y("swing", "Health and power bars") > _card_y("swing", "Swing timer")
+,
+      "Combat bars: the swing timer's card first while it is on; turned off with the health bar on, the health and power card goes above it")
+# off is off: a frame over the card's rows takes the mouse, so nothing in it can be changed
+def _blocked(label):
+    row = [e.row for e in YR.SettingsIndex().values() if e.key == "swing" and e.card and e.label == label][0]
+    return row.block is not None and row.block.hidden is not True
+check(_blocked("Swing timer") and not _blocked("Health and power bars"),
+      "a card whose feature is off answers no click (the swing timer's, off here); one that is on does")
+_sw.on, _sw.health, _sw.power = _was
+YR.RefreshWindow(YR)
+# a feature's switch is in the head of its own card (a block of switches at the top of the page sent you looking)
+_idx = [e for e in YR.SettingsIndex().values() if e.key == "trinkets"]
+check(not any(e.label == "On this page" for e in _idx) and any(e.card and e.label == "Trinket auto-swap" for e in _idx),
+      "no block of switches at the top of a page: each card has its own")
+# Cards fold. A page of several cards opens as a list of their heads; a click on a head opens that
+# card and it is remembered; the cards under it move, and so does what a page keeps under its cards.
+g.YippRouteDB.cardsOpen = None
+YR.ShowSettingsTab(YR, "swing")
+YR.RefreshWindow(YR)
+_L = YR.SettingsLayout("swing")
+def _hidden(page, card):
+    return [e.row.hidden is True for e in YR.SettingsIndex().values() if e.key == page and not e.card and e.of and e.of.title == card]
+def _heads(page):
+    return sorted([e.y for e in YR.SettingsIndex().values() if e.key == page and e.card and e.of and e.label == e.of.title], reverse=True)
+_ys = _heads("swing")
+check(_L.AnyShut() is True and len(_hidden("swing", "Cast bar")) > 3 and all(_hidden("swing", "Cast bar")),
+      f"a page of several cards starts folded: the Cast bar's rows are away ({len(_hidden('swing', 'Cast bar'))})")
+check(len(_ys) == 3 and all(a - b == 54 for a, b in zip(_ys, _ys[1:])), f"folded, each head stands right under the one before ({_ys})")
+_cast = [cd for cd in _L.cards.values() if cd.title == "Cast bar"][0]
+_cast.head.fn()                     # a click on the card's head
+check(g.YippRouteDB.cardsOpen["swing:Cast bar"] is True and not any(_hidden("swing", "Cast bar")) and _cast.shut is False,
+      "a click on its head opens the card: its rows are back, and it is remembered")
+_cast.head.fn()
+_first = max(_L.cards.values(), key=lambda cd: cd.top + (cd.shift or 0))       # the card at the top of the page
+_first.head.fn()
+_ys2 = _heads("swing")
+check(_first.span > 54 and _ys2[0] == _ys[0] and _ys[1] - _ys2[1] == _first.span - 54 and _ys[2] - _ys2[2] == _first.span - 54,
+      f"an open card takes its room: the heads under it move down by what it grew ({_ys} to {_ys2}, {_first.span})")
+_first.head.fn()
+check(_heads("swing") == _ys, "and back up when it is folded again")
+check(g.YippRouteDB.cardsOpen["swing:Cast bar"] is None and all(_hidden("swing", "Cast bar")), "clicked again: folded, and that is remembered too")
+found = YR.SettingsSearch("show out of range")
+YR.SettingsGo(found[1])
+check(g.YippRouteDB.cardsOpen["swing:Swing timer"] is True and found[1].row.hidden is not True,
+      "the search opens the card of the setting it leads to")
+_L.FoldAll(True)
+check(_L.AnyShut() is False and not any(_hidden("swing", "Health and power bars")), "Open all: every card of the page open")
+_L.FoldAll(False)
+check(_L.AnyShut() is True and all(_hidden("swing", "Health and power bars")) and g.YippRouteDB.cardsOpen["swing:Swing timer"] is None,
+      "Fold all: every one folded again")
+YR.SettingsSearch("")
+YR.ShowSettingsTab(YR, "journey")
+_J = YR.SettingsLayout("journey")
+check(_J.AnyShut() is None and not any(_hidden("journey", "Journey")) and len(_hidden("journey", "Journey")) > 2,
+      "a page with one card: it is all there is on it, and it does not fold")
+# /hs journey: with nothing after it (the window), and a made-up journey at a level
+UnitRace = g.UnitRace
+if UnitRace is None:
+    lua.execute('function UnitRace() return "Dwarf", "Dwarf" end')
+for _words, _want in (("journey", None), ("journey test", "Level 50"), ("journey test 60", "Level 60"), ("journey test 999", "Level 60")):
+    g.SlashCmdList.HEADSTART(_words)
+    _unit = g.HeadstartJourneyWindow.unit.text
+    check(g.HeadstartJourneyWindow.hidden is False and (_want is None or _want in _unit), f"/hs {_words}: the window, {_want or 'your own journey'} ({_unit})")
+g.HeadstartJourneyWindow.Hide(g.HeadstartJourneyWindow)
+# The beta's banner at the top of All features: there in a test client, hidden for a week when asked,
+# never on the live game
+YR.ShowSettingsTab(YR, "home")
+check(YR.BetaClient() is False and g.HeadstartBetaBanner is not None and g.HeadstartBetaBanner.hidden is True,
+      "the live game: no banner about the beta's settings")
+lua.execute("function IsBetaBuild() return true end")
+YR.RefreshWindow(YR)
+check(YR.BetaClient() is True and g.HeadstartBetaBanner.hidden is False, "a beta client: the banner says its settings stay in the beta")
+lua.execute("IsBetaBuild = nil KEPT_REALM = GetRealmName GetRealmName = function() return 'Classic Beta PvP 2' end")
+check(YR.BetaClient() is True, "and a realm with Beta in its name says the same where the game doesn't")
+lua.execute("GetRealmName = KEPT_REALM function IsBetaBuild() return true end YippRouteDB.betaNoteUntil = time() + 7 * 86400")
+YR.RefreshWindow(YR)
+check(g.HeadstartBetaBanner.hidden is True, "Hide for a week: gone for now")
+lua.execute("YippRouteDB.betaNoteUntil = time() - 1")
+YR.RefreshWindow(YR)
+check(g.HeadstartBetaBanner.hidden is False, "and back when the week is over: it is about something still to do")
+lua.execute("IsBetaBuild = nil YippRouteDB.betaNoteUntil = nil")
+YR.RefreshWindow(YR)
+# /headstart transfer: the window to move your settings with, and what this account's settings are as a text
+g.SlashCmdList.HEADSTART("transfer")
+_text = YR.TransferExport()
+_back = lua.eval("function(t) local d, why = HeadstartNS.TransferRead(t) return { d = d, why = why } end")(_text)
+check(g.HeadstartTransferWindow is not None and g.HeadstartTransferWindow.hidden is False and _text.startswith("HEADSTART-SETTINGS 1")
+      and _back.d is not None and _back.d.settings > 3 and _back.d.db.runs is None and g.YippRouteDB.runs is not None,
+      f"/headstart transfer: the window, and this account's settings written and read back ({len(_text)} letters, {_back.why})")
+g.HeadstartTransferWindow.Hide(g.HeadstartTransferWindow)
+YR.ShowSettingsTab(YR, "gear")
+_G = YR.SettingsLayout("gear")
+_lift = _G.lift
+_G.FoldAll(True)
+check(_lift > 0 and _G.tail is not None and _G.lift == 0, f"what a page keeps under its cards comes up with them as they fold ({_lift}), and goes back down")
+_G.FoldAll(False)
 g.YippRouteDB.restock = None
 check(True, "settings page with reward settings opens")
 YR.ShowSettingsTab(YR, "trainer")        # the Trainer tab: the class's spells with a choice each
@@ -929,6 +1073,28 @@ YR.ShowSettingsTab(YR, "route")
 check(g.HeadstartMinimapButton is not None and g.HeadstartMinimapButton.hidden is not True, "minimap button shown")
 YR.ShowMinimapButton(YR, False)
 check(g.HeadstartMinimapButton.hidden is True and g.YippRouteDB.minimapButton is False, "minimap button can be hidden")
+# with LibDBIcon there (it is, in the game: Libs/), the button is the library's - registered with
+# where it stood before, and shown and hidden through the library
+_opt = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, "Options.lua"), encoding="utf-8").read(), "Options.lua")
+lua.execute("""DBI = { calls = {} }
+    local broker = { NewDataObject = function(self, name, o) DBI.object = o return o end }
+    local icon = { Register = function(self, name, o, db) DBI.db = db DBI.calls[#DBI.calls + 1] = "register" end,
+        Show = function(self, name) DBI.calls[#DBI.calls + 1] = "show" end, Hide = function(self, name) DBI.calls[#DBI.calls + 1] = "hide" end,
+        GetMinimapButton = function() return { lib = true } end }
+    KEPT_STUB = LibStub
+    LibStub = { GetLibrary = function(self, name) return name == "LibDataBroker-1.1" and broker or name == "LibDBIcon-1.0" and icon or nil end }
+    YippRouteDB.minimapAngle, YippRouteDB.minimap = 480, nil""")
+_show, _build = YR.ShowMinimapButton, YR.BuildMinimapButton
+_opt("Headstart", YR)             # the file read again: its button isn't made yet
+YR.ShowMinimapButton(YR, True)
+check(list(g.DBI.calls.values()) == ["register", "show"] and g.DBI.db.minimapPos == 120 and g.DBI.db.hide is False
+      and g.DBI.object.icon.endswith("logomark") and g.DBI.object.OnClick is not None and g.DBI.object.OnTooltipShow is not None,
+      f"with LibDBIcon: the button is registered with it, where ours stood (480 degrees is 120), and shown ({list(g.DBI.calls.values())}, {g.DBI.db.minimapPos})")
+YR.ShowMinimapButton(YR, False)
+check(list(g.DBI.calls.values())[-1] == "hide" and g.DBI.db.hide is True and g.YippRouteDB.minimapButton is False,
+      "turned off: hidden through the library, and kept so")
+lua.execute("LibStub = KEPT_STUB YippRouteDB.minimap, YippRouteDB.minimapAngle = nil, nil")
+YR.ShowMinimapButton, YR.BuildMinimapButton = _show, _build
 
 # The step model: every step of both shipped routes reads into lines and writes back to the same text
 # (spacing aside); the templates make steps; editing a line's argument changes only that argument.
@@ -1204,6 +1370,12 @@ check(not reds, "no red mobs to kill outside dungeons" + "".join(
 # The flight timer (its own fake API)
 import smoke_flight
 bad += smoke_flight.run()
+import smoke_arrange
+bad += smoke_arrange.run()
+import smoke_journey
+bad += smoke_journey.run()
+import smoke_transfer
+bad += smoke_transfer.run()
 
 # The camp HUD (its own fake API)
 import smoke_camp

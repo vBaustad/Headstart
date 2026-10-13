@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def files(folder, toc):
     return [os.path.join(folder, l.strip().replace(chr(92), "/"))
             for l in open(os.path.join(folder, toc), encoding="utf-8")
-            if l.strip().endswith(".lua") and not l.startswith("#")]
+            if l.strip().endswith(".lua") and not l.startswith("#") and not l.startswith("Libs")]
 
 
 def run():
@@ -61,14 +61,22 @@ def run():
     check([q.key for q in YR.WelcomeQuestions().values()] == ["routes", "screen", "acts", "setup"], "four questions")
     check(on(T(0, 0, 0, 0)) == [], "nothing to every question: nothing of ours on your screen, nothing done for you")
     ess = on(T(None, 1, None, None), "screen")
-    check("xpbar" in ess and "lootFeed" in ess and "chatLog" in ess and "deathRecap" in ess and "flightTimer" in ess and "swing" not in ess,
-          f"on your screen, Essentials: what's good to see ({len(ess)})")
+    check("xpbar" not in ess and "lootFeed" in ess and "chatLog" in ess and "deathRecap" in ess and "flightTimer" in ess and "swing" not in ess,
+          f"on your screen, Essentials: what's good to see - not the XP bar, which many have another addon draw ({len(ess)})")
     every = on(T(None, 2, None, None), "screen")
-    check(set(ess) < set(every) and "swing" in every and "trinketBar" in every and "talentMove" in every, f"Everything: the swing timer and the buttons too ({len(every)})")
+    check(set(ess) < set(every) and "xpbar" in every and "swing" in every and "trinketBar" in every and "talentMove" in every,
+          f"Everything: the XP bar, the swing timer and the buttons too ({len(every)})")
     check(on(T(None, None, 1, None), "acts") == ["acceptFrom", "acceptInvites", "whisperInvite"],
           "does things for you, For friends: invites and shared quests - nothing that spends gold or moves items")
-    check(set(on(T(None, None, 2, None), "acts")) == {"acceptFrom", "acceptInvites", "whisperInvite", "restock", "autoTrain", "bankAuto", "levelShot"},
-          "Everything: restock, training, banking and screenshots too")
+    check(set(on(T(None, None, 2, None), "acts")) == {"acceptFrom", "acceptInvites", "whisperInvite", "restock", "autoTrain", "bankAuto", "levelShot",
+                                                     "pickRewards"},
+          "Everything: restock, training, banking, picked quest rewards and screenshots too")
+    # a new install acts for you in nothing: "Nothing" is what it has, quest rewards included
+    check(YR.WelcomeNow().acts == 0 and not YR.RewardSettings(YR).on,
+          "a new install: Automation is at Nothing as it comes - no reward is picked for you either")
+    names = [c.name for c in YR.WelcomeChecks().values()]
+    check(names == ["Nothing here needs setting", "Installing changed nothing of yours", "New on your screen"],
+          f"Before you play on a new install: nothing to set, and what installing did not touch ({names})")
     # the questions are answered each by itself: every bar and nothing automated, or the other way round
     mixed = plan(T(None, 2, 0, None))
     check(mixed["swing"].on and not mixed["restock"].on and not mixed["acceptInvites"].on, "every bar and nothing automated is an answer")
@@ -91,13 +99,28 @@ def run():
     # applied: exactly the plan, and counted
     db = g.YippRouteDB
     turned = YR.WelcomeApply(rec)
-    check(turned[0] > 0 and turned[2] is False and YR.XPBarOn() and YR.Option("lootFeed") and YR.Option("chatLog") and YR.Option("deathRecap")
+    check(turned[0] > 0 and turned[2] is False and not YR.XPBarOn() and YR.Option("lootFeed") and YR.Option("chatLog") and YR.Option("deathRecap")
           and YR.AcceptInvitesSet() == "friends" and not YR.Option("restock") and not YR.Option("autoTrain") and not YR.SetupOn(),
           f"Recommended applied: its things on, nothing that spends ({turned[0]} on, {turned[1]} off), no reload")
     check(db.welcome is None, "answered: it isn't asked again")
+    checks = {c.name: c for c in YR.WelcomeChecks().values()}
+    check("Invites are answered for you" in checks and "The XP bar stands in for Blizzard's" not in checks
+          and "Class trainer spends gold" not in checks and "Restock spends gold" not in checks and "Nothing here needs setting" not in checks
+          and checks["Invites are answered for you"].page == "group",
+          f"Before you play after Recommended: the invites, nothing about gold - and Blizzard's XP bar is still yours ({sorted(checks)})")
     check(YR.WelcomeApply(rec)[0:2] == (0, 0), "applied again: nothing left to change")
     now = YR.WelcomeNow()
     check(now.screen == 1 and now.acts == 1 and now.setup == 0, "what you have now is read back as those answers")
+    kept = {k: db[k] for k in ("autoTrain", "restock", "bankAuto", "pickRewards", "levelShot")}
+    YR.WelcomeApply(lua.eval("{ acts = 2 }"))
+    names = [c.name for c in YR.WelcomeChecks().values()]
+    check(names[:3] == ["Class trainer spends gold", "Restock spends gold", "Bank deposit moves your items"]
+          and "Quest rewards are picked for you" in names and names[-2:] == ["Installing changed nothing of yours", "New on your screen"]
+          and len(names) <= 8 and all(len(c.note) <= 235 for c in YR.WelcomeChecks().values()),
+          f"Before you play with all the automation on: what spends gold first, then what moves items ({names})")
+    check(YR.RewardSettings(YR).on is True and db.pickRewards is True, "quest reward picking turned on by its answer, for this class and the ones to come")
+    YR.WelcomeApply(lua.eval("{ acts = 1 }"))
+    check(not YR.RewardSettings(YR).on and not YR.Option("autoTrain"), "and off again with it")
     db.restock = True
     check(YR.WelcomeNow().acts is None, "one thing set by hand: that question matches no answer, and is left as it is unless you answer it")
     turned = YR.WelcomeApply(full)
@@ -129,6 +152,15 @@ def run():
     check(YR.WelcomeToggle() is False and YR.WelcomeToggle() is True, "/headstart start: closed when open, open when closed")
     check(all(len(q.choices) in (2, 3) and all(c[2] for c in q.choices.values()) for q in YR.WelcomeQuestions().values()),
           "every answer says on its card what it does")
+    # everything on at once: the list still fits the window's eight lines, the two standing ones last
+    YR.WelcomeApply(lua.eval("{ routes = 1, screen = 2, acts = 2, setup = 1 }"))
+    db.mailAuto = True
+    names = [c.name for c in YR.WelcomeChecks().values()]
+    check(len(names) == 8 and names[0] == "Class trainer spends gold" and "Mail to alt sends without asking" in names
+          and names[-2:] == ["Installing changed nothing of yours", "New on your screen"],
+          f"everything on: eight lines, what can cost you first ({names})")
+    YR.WelcomeShowChecks()
+    check(True, "and the list is put up in the window without an error")
     return bad
 
 

@@ -9,6 +9,16 @@
 -- player may have relied on it; the Trainer page has buttons to switch a whole class at once. Always first, then the rest, each lowest level first. Hold Shift as you open the trainer to do
 -- it yourself. Account option autoTrain (Settings, Trainer). RestedXP's own trainer automation (it
 -- buys everything on its list) is switched off while ours is on, and back on when ours goes off.
+--   Two things keep it from spending what you didn't mean to spend:
+--   Only your class's spells are bought - the names in the client's list of what your class learns
+--   from a trainer (Data/TrainerSpells.lua). A weapon master, a riding trainer and anything else
+--   that opens this same window is not a profession trainer either, and "every spell you can afford"
+--   there would be every weapon skill, or riding the moment the window opened. What isn't a class
+--   spell is left to you, and named. With no list for your class, nothing is bought at all.
+--   And the switch is the whole account's while the choices and the reserve are each class's: so the
+--   first time it would buy on a character, it asks - how many spells, for how much, and what it
+--   keeps (YippSetupCharDB.trainOK, per character). Not now: nothing is bought, and it asks again at
+--   the next visit. After a yes it never asks on that character again.
 local _, YR = ...
 
 YR.TRAINER_CHOICES = { { "always", "Always" }, { "gold", "If I can afford it" }, { "first", "First rank only" }, { "never", "Never" } }
@@ -80,13 +90,27 @@ local function Service(i)
 end
 YR.TrainerService = Service   -- the trainer reminder (Reminders.lua) reads the costs with it
 
--- What to buy now, in order: [{ index, name, rank, cost }], and what was left for want of gold.
+-- Your class's spells by name (asked at every trainer visit: made once per class).
+local mine, mineOf
+local function ClassSpells()
+    local _, class = UnitClass("player")
+    if mineOf ~= class then
+        mine, mineOf = {}, class
+        for _, e in ipairs((YR.TrainerSpells or {})[class or ""] or {}) do mine[e[3]] = true end
+    end
+    return mine
+end
+
+-- What to buy now, in order: [{ index, name, rank, cost }], what was left for want of gold, and the
+-- names of what the trainer offers that is not one of your class's spells (never bought).
 function YR.TrainerPlan(money)
     local data = YR.TrainerData()
-    local wants = {}
+    local wants, other, class = {}, {}, ClassSpells()
     for i = 1, GetNumTrainerServices() or 0 do
         local name, rank, category = Service(i)
-        if name and category == "available" then
+        if name and category == "available" and not class[name] then
+            other[#other + 1] = name
+        elseif name and category == "available" then
             local choice = YR.TrainerChoice(name)
             -- "Rank 2" and up is not the first rank; a spell without ranks is its own first
             local n = tonumber(tostring(rank or ""):match("%d+"))
@@ -102,8 +126,10 @@ function YR.TrainerPlan(money)
                 end
                 choice = (not have and (n == nil or n <= 1)) and "always" or "never"
             end
-            if choice ~= "never" then
-                local cost = GetTrainerServiceCost(i) or 0
+            -- (a price the game hasn't given yet is not a price of nothing: that line waits for the
+            -- next visit, or it would be bought past the reserve)
+            local cost = GetTrainerServiceCost(i)
+            if choice ~= "never" and type(cost) == "number" then
                 local level = GetTrainerServiceLevelReq and GetTrainerServiceLevelReq(i) or 0
                 wants[#wants + 1] = { index = i, name = name, rank = rank, cost = cost, level = level,
                     always = choice == "always" }
@@ -125,15 +151,27 @@ function YR.TrainerPlan(money)
             short[#short + 1] = w
         end
     end
-    return buy, short
+    return buy, short, other
 end
 
-local function Gold(c)
-    return GetCoinTextureString and GetCoinTextureString(c) or (floor(c / 100) / 100 .. "g")
-end
+local function Gold(c) return YR.Money(c) end
 
-local function Train()
-    if not YR.Option("autoTrain") or IsShiftKeyDown() or not GetNumTrainerServices then return end
+-- this character's own saved table (the one thing kept there: that it said yes)
+local function Char() return type(YippSetupCharDB) == "table" and YippSetupCharDB or {} end
+
+local Train
+StaticPopupDialogs["HEADSTART_TRAIN_FIRST"] = {
+    text = "%s", button1 = "Learn them", button2 = "Not now",
+    OnAccept = function()
+        Char().trainOK = true
+        -- (planned again from what the trainer offers now: the window may have been shut meanwhile)
+        C_Timer.After(0, function() Train(true) end)
+    end,
+    timeout = 0, whileDead = false, hideOnEscape = true, preferredIndex = 3,
+}
+
+function Train(agreed)
+    if not YR.Option("autoTrain") or (IsShiftKeyDown() and not agreed) or not GetNumTrainerServices then return end
     if IsTradeskillTrainer and IsTradeskillTrainer() then return end
     -- a Hunter's pet trainer is a trainer too, with the pet's name on it
     local title = ClassTrainerFrame and ClassTrainerFrame.TitleContainer and ClassTrainerFrame.TitleContainer.TitleText
@@ -141,7 +179,15 @@ local function Train()
     if SetTrainerServiceTypeFilter and GetTrainerServiceTypeFilter and not GetTrainerServiceTypeFilter("available") then
         SetTrainerServiceTypeFilter("available", 1)
     end
-    local buy, short = YR.TrainerPlan(GetMoney())
+    local buy, short, other = YR.TrainerPlan(GetMoney())
+    -- the first time on this character: asked, with what it would cost and what is kept
+    if #buy > 0 and not agreed and not Char().trainOK then
+        local cost = 0
+        for _, w in ipairs(buy) do cost = cost + w.cost end
+        StaticPopup_Show("HEADSTART_TRAIN_FIRST", ("Headstart: learn %d %s here for %s?\n\nThe class trainer is switched on for every character of this account. It learns your class's spells as the trainer opens and keeps %s; what to learn and how much to keep are set per class in Headstart's settings (Trainer). It asks only this once on this character."):format(
+            #buy, #buy == 1 and "spell" or "spells", Gold(cost), Gold(YR.TrainerData().reserve or 0)))
+        return
+    end
     -- bought from the bottom of the list up: a line learned leaves the list and moves the ones below it
     local order = {}
     for _, w in ipairs(buy) do order[#order + 1] = w end
@@ -161,6 +207,9 @@ local function Train()
             msg = msg .. (" Left for now (your reserve): %s."):format(table.concat(left, ", "))
         end
         YR.Print(msg)
+    elseif #other > 0 then
+        -- a weapon master, a riding trainer: nothing here is bought by itself, and it is said why
+        YR.Print("nothing here is one of your class's spells, so nothing is learned by itself: that is yours to buy.")
     end
 end
 

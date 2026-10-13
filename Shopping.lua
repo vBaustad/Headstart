@@ -67,9 +67,7 @@ function YR.ShoppingWanted(e)
     return true
 end
 
-local function Coins(c)
-    return GetCoinTextureString and GetCoinTextureString(c) or (("%dg %ds %dc"):format(c / 10000, (c / 100) % 100, c % 100))
-end
+local function Coins(c) return YR.Money(c) end
 
 local function Place(e)
     if not e.where then return "" end

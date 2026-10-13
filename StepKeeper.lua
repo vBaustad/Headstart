@@ -103,32 +103,33 @@ end
 -- is done and the place checked, or the old number would overwrite the step we're looking for.
 -- RestedXP also sets a step for every one it skips on the way to yours (a chain of finished steps is
 -- dozens of calls in one frame): the place is written down once, on the next frame, when it has settled.
--- With the routes off the hook does nothing but ask that. (The hook and the wrap below are put on as
--- the file loads, not at the login: RestedXP may load its route before then, and that load is the one
--- your place is checked on.)
+-- With the routes off the hook does nothing but ask that, and the wrap is RestedXP's own function
+-- called straight through: the same arguments, the same returns, its own errors with its own
+-- traceback. (The hook and the wrap below are put on as the file loads, not at the login: RestedXP
+-- may load its route before then, and that load is the one your place is checked on.)
+local function Routes() return type(YippRouteDB) == "table" and YR.RoutesOn ~= nil and YR.RoutesOn() end
 local loading, soon = false, false
 local function RememberSoon()
     soon = false
     Remember()
 end
 hooksecurefunc(RXP, "SetStep", function()
-    if loading or soon or not (YR.RoutesOn and YR.RoutesOn()) then return end
+    if loading or soon or not Routes() then return end
     soon = true
     C_Timer.After(0, RememberSoon)
 end)
 local load = RXP.LoadGuide
 RXP.LoadGuide = function(...)
+    if not Routes() then return load(...) end
     loading = true
     local results = { pcall(load, ...) }
     loading = false
     if not results[1] then error(results[2], 0) end
-    if YR.RoutesOn and YR.RoutesOn() then
-        cache, keyOf = {}, {}             -- the route may have been edited or updated since
-        loading = true
-        local ok, err = pcall(Restore)
-        loading = false
-        if not ok then YR.Print("couldn't check your place in the route: " .. tostring(err)) end
-        Remember()
-    end
+    cache, keyOf = {}, {}             -- the route may have been edited or updated since
+    loading = true
+    local ok, err = pcall(Restore)
+    loading = false
+    if not ok then YR.Print("couldn't check your place in the route: " .. tostring(err)) end
+    Remember()
     return unpack(results, 2)
 end

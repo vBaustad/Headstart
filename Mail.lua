@@ -154,7 +154,7 @@ end
 -- ---------------------------------------------------------------------------
 -- Sending
 -- ---------------------------------------------------------------------------
-local function Coins(c) return (GetCoinTextureString and GetCoinTextureString(c)) or (c .. "c") end
+local function Coins(c) return YR.Money(c) end
 
 local function Finish(note)
     local r = run

@@ -79,10 +79,12 @@ function YR:RewardSettings(class)
                 if pick.item and YR.RewardKind(pick.item) == nil then db.chosen[quest] = Copy(pick) end
             end
         end
-        db.on = YippRouteDB.pickRewards ~= false
+        db.on = YippRouteDB.pickRewards == true
         YippRouteDB.rewardClasses[class] = db
     end
-    if db.on == nil then db.on = true end
+    -- (picking is something you turn on: pickRewards is true on an account that had Headstart while
+    -- it was on from the start - Core's Latch - and after you turn it on in the welcome window)
+    if db.on == nil then db.on = YippRouteDB.pickRewards == true end
     if db.greenStop == nil then db.greenStop = true end
     -- every kind is in the list once, so the settings can switch any of them on
     local seen = {}
@@ -200,9 +202,9 @@ local function Set()
     local _, class = UnitClass("player")
     local all = YippRouteDB.rewardClasses
     local db = all and all[class or "WARRIOR"]
-    if db then return db.on ~= false, db.maxLevel end
+    if db then return db.on == true, db.maxLevel end
     local old = YippRouteDB.rewards
-    return YippRouteDB.pickRewards ~= false, old and old.maxLevel or 10
+    return YippRouteDB.pickRewards == true, old and old.maxLevel or 10
 end
 local function Picking() return (Set()) end
 -- (a character past the level limit has nothing picked for it: it doesn't listen for quests either)
@@ -247,12 +249,15 @@ end })
 
 -- RestedXP acts on the same events as these windows, after them (Blizzard's frames were there first):
 -- switching one of its settings off when a window opens, back on the next frame, keeps it out of that
--- one window. Only a setting that was on, and only for that moment.
+-- one window. Only for that moment, and RestedXP's setting is put back exactly as it was: a setting
+-- nobody ever chose (not in its saved table at all) is taken out again, not written down as "on" -
+-- that turned RestedXP's own reward picking on for good for anyone who had never set it.
 local function Pause(key)
     local p = type(RXP) == "table" and type(RXP.settings) == "table" and RXP.settings.profile
     if type(p) ~= "table" or p[key] == false then return end
+    local was = p[key]
     p[key] = false
-    C_Timer.After(0, function() p[key] = true end)
+    C_Timer.After(0, function() if p[key] == false then p[key] = was end end)
 end
 
 function YR:HookQuestWindows()

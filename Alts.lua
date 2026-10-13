@@ -185,13 +185,7 @@ function YR.AltsHave(item)
     return index[item]
 end
 
-function YR.AltsCoins(c)
-    c = math.floor(c or 0)
-    if GetCoinTextureString then return GetCoinTextureString(c) end
-    if c >= 10000 then return ("%dg %ds %dc"):format(c / 10000, c % 10000 / 100, c % 100) end
-    if c >= 100 then return ("%ds %dc"):format(c / 100, c % 100) end
-    return c .. "c"
-end
+function YR.AltsCoins(c) return YR.Money(math.floor(c or 0)) end
 
 local function Colour(class)
     local col = class and _G.RAID_CLASS_COLORS and _G.RAID_CLASS_COLORS[class]

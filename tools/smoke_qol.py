@@ -27,6 +27,7 @@ function Obj.RegisterEvent(self, e) rawset(self, "_ev", rawget(self, "_ev") or {
 function Obj.UnregisterEvent(self, e) local ev = rawget(self, "_ev") if ev then ev[e] = nil end end
 function Obj.UnregisterAllEvents(self) rawset(self, "_ev", nil) end
 function Obj.SetText(self, t) rawset(self, "_text", t) end
+function Obj.SetShown(self, on) if on then self:Show() else self:Hide() end end
 function CreateFrame(_, name) local f = setmetatable({}, Obj) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 UIParent = CreateFrame()
 GameTooltip = CreateFrame()
@@ -353,7 +354,47 @@ def run():
     g.Fire("PLAYER_LEVEL_UP", 12)
     lua.execute("RunAfter()")
     check(g.SHOTS == 1, "a screenshot at the ding")
-    check(any("2 talent points to spend" in p for p in prints()), f"unspent talents are mentioned: {prints()}")
+    said = lambda: lua.eval("rawget(HeadstartTalentNotice.text, '_text')")
+    up = lambda: lua.eval("rawget(HeadstartTalentNotice, '_shown') == true")
+    hears = lambda: lua.eval("rawget(HeadstartTalentNotice, '_ev') ~= nil and next(rawget(HeadstartTalentNotice, '_ev')) ~= nil")
+    check(g.HeadstartTalentNotice is not None and up() and said() == "2 talent points to spend"
+          and not any("talent point" in p for p in prints()),
+          f"unspent talent points are said on the screen - an icon and a line of words - not in chat ({said()})")
+    lua.execute("UNSPENT = 1")
+    g.Fire("TRAIT_CONFIG_UPDATED")
+    check(up() and said() == "1 talent point to spend", "one spent: it says one")
+    lua.execute("COMBAT = true")
+    g.Fire("PLAYER_REGEN_DISABLED")
+    check(not up(), "a fight: nothing of it on the screen")
+    lua.execute("COMBAT = false")
+    g.Fire("PLAYER_REGEN_ENABLED")
+    check(up(), "and back when the fight is over")
+    lua.execute("rawget(HeadstartTalentNotice, '_OnClick')(HeadstartTalentNotice)")
+    g.Fire("PLAYER_TALENT_UPDATE")
+    check(not up(), "a click puts it away, and it stays away while the number is the same")
+    lua.execute("UNSPENT = 2")
+    g.Fire("TRAIT_CONFIG_UPDATED")
+    check(up() and said() == "2 talent points to spend", "another point (a new level): it is back")
+    lua.execute("UNSPENT = 0")
+    g.Fire("TRAIT_CONFIG_UPDATED")
+    check(not up() and not hears(), "the last point spent: gone, and it listens for nothing any more")
+    lua.execute("UNSPENT = 2 YippRouteDB.talentNotice = 'icon'")
+    YR.TalentNotice()
+    check(up() and lua.eval("rawget(HeadstartTalentNotice.count, '_text')") == 2 and lua.eval("rawget(HeadstartTalentNotice.text, '_shown') == false"),
+          "as an icon alone: the number on the icon, no words")
+    frame = YR.TalentNoticeFrame(True)
+    check(frame is not None and up(), "Arrange has it to place, with sample points on it")
+    YR.TalentNoticeFrame(False)
+    lua.execute("UNSPENT = 0")
+    YR.TalentNotice()
+    check(not up(), "and the sample goes with the grid")
+    # the line in chat it used to be, for those who want that
+    lua.execute("PRINTS = {} UNSPENT = 2 YippRouteDB.talentNotice = 'chat' YippRouteDB.levelShot = false")      # (no second screenshot)
+    g.Fire("PLAYER_LEVEL_UP", 12)
+    lua.execute("RunAfter()")
+    check(any("2 talent points to spend" in p for p in prints()) and not up() and YR.TalentNoticeFrame(True) is None,
+          f"set to a line in chat: said there, nothing on the screen: {prints()}")
+    lua.execute("YippRouteDB.talentNotice = nil YippRouteDB.levelShot = nil UNSPENT = 2")
     check(any("new at your class trainer" in p for p in prints()), "and the trainer")
     g.YippRouteDB.levelShot = False
     g.YippRouteDB.remindTalents = False

@@ -1,6 +1,7 @@
 """Draw Headstart's settings window without the game, to look at its layout.
 
     python tools/render.py [page ...]      writes tools/render/<page>.html  (default: a handful of pages)
+    python tools/render.py transfer transfer:export transfer:import      the Move settings window, shut and open
 
 The smoke test's fake game is used as far as the point where it opens the window; from there every frame,
 texture and text the addon makes is recorded (parent, size, anchors, colour, words) instead of thrown away.
@@ -346,13 +347,17 @@ def main(pages):
     os.makedirs(out_dir, exist_ok=True)
     YR.ToggleWindow(YR, "settings")
     for page in pages:
+        root = "HeadstartWindow"
         if page.startswith("find:"):
             YR.ShowSettingsTab(YR, "home")
             YR.SettingsSearch(page[5:])
+        elif page.startswith("transfer"):
+            YR.TransferShow(page[9:] or None)       # a window of its own: drawn by itself
+            root = "HeadstartTransferWindow"
         else:
             YR.ShowSettingsTab(YR, page)
         objs = load(lua)
-        draw.window = lua.eval('HeadstartWindow and rawget(HeadstartWindow, "rid")')
+        draw.window = lua.eval('%s and rawget(%s, "rid")' % (root, root))
         path = os.path.join(out_dir, page.replace(":", "_").replace(" ", "_") + ".html")
         open(path, "w", encoding="utf-8").write(draw(objs, "Headstart: " + page))
         print(path, len(objs), "window %dx%d" % draw.size)

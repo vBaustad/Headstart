@@ -686,7 +686,16 @@ local function Build()
     if p and p[1] and p[2] then
         hud:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p[1], p[2])
     else
-        hud:SetPoint("CENTER", UIParent, "CENTER", 240, 40)
+        -- Nowhere chosen yet: at the left of the quest list, by its top - out of the way on any
+        -- screen, and where the eye goes anyway. (It was right of the middle of the screen, in the
+        -- way of the fight.) Hung on the list, so it keeps its place beside it when that is moved in
+        -- Edit Mode; with no such list, the same corner of the screen. Dragged, it is where you left it.
+        local list = _G.ObjectiveTrackerFrame
+        if type(list) == "table" and list.GetObjectType then
+            hud:SetPoint("TOPRIGHT", list, "TOPLEFT", -6, 0)
+        else
+            hud:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -330, -170)
+        end
     end
 
     statRows, buffRows = {}, {}

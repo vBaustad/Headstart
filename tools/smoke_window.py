@@ -15,7 +15,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def files(folder, toc):
     return [os.path.join(folder, l.strip().replace(chr(92), "/"))
             for l in open(os.path.join(folder, toc), encoding="utf-8")
-            if l.strip().endswith(".lua") and not l.startswith("#")]
+            if l.strip().endswith(".lua") and not l.startswith("#") and not l.startswith("Libs")]
 
 
 def run():
@@ -52,7 +52,7 @@ def run():
     # an account that had Headstart before keeps it on (latched once)
     g.YippRouteDB = lua.table(quiet=1)
     YR.Latch(False)
-    check(YR.SetupOn() and g.YippRouteDB.quiet == 2, "an account that had Headstart: Character setup stays on")
+    check(YR.SetupOn() and g.YippRouteDB.quiet == 3, "an account that had Headstart: Character setup stays on")
     g.YippRouteDB.setupOn = False
     YR.Latch(False)
     check(not YR.SetupOn(), "turned off after that: it stays off")

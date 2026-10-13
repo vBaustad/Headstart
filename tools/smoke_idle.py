@@ -42,7 +42,18 @@ BUDGET = {
     # frames stays 15. It went to 16 on 2026-10-09 for a child frame that gave the camp icon a
     # smaller mouse area; SetHitRectInsets does the same without being a frame, so the raise was
     # undone the same day rather than kept. Budgets only go down.
-    "new": {"hot": 6, "events": 33, "tickers": 0, "onupdate": 0, "frames": 15, "hooks": 2, "kb": 2},
+    # Raised on 2026-10-13 for Journey, which the owner asked to have on for a new install: a journey can
+    # only be told if it was counted from the start, and it shows nothing while it counts. What it costs
+    # is what the raise is: one ticker (a look a second), one frame, 17 events of which three are hot
+    # (CHAT_MSG_LOOT, CHAT_MSG_COMBAT_XP_GAIN and the player's own UNIT_SPELLCAST_SUCCEEDED, each a short
+    # handler), and two hooks (the jump, Repair all). Money is read at the look, not listened for, to
+    # keep PLAYER_MONEY out of it. Before: hot 6, events 33, tickers 0, frames 15, hooks 2.
+    # hooks 4 -> 5 the same day: the messages you send are counted by one hook on the game's send
+    # function (the kind of chat only), which costs less than listening to every chat event would.
+    # Down the same day: reward picking, the bank and mail buttons and the routes' automation start off
+    # (a new install acts for you in nothing), so their events, frames and the reward hook are not there.
+    # Was: events 50, frames 16, hooks 5, kb 2.
+    "new": {"hot": 9, "events": 41, "tickers": 1, "onupdate": 0, "frames": 13, "hooks": 4, "kb": 1},
 }
 OFF = "{ qolOff = true, routes = false, setupOn = false, quiet = 2, minimapButton = false, logging = false, showSplits = false }"
 
@@ -83,7 +94,7 @@ def measure(saved="nil"):
     """.replace("SAVED", saved))
     YR = lua.table()
     toc = [l.strip().replace(chr(92), "/") for l in open(os.path.join(ROOT, "Headstart.toc"), encoding="utf-8")
-           if l.strip().endswith(".lua") and not l.startswith("#")]
+           if l.strip().endswith(".lua") and not l.startswith("#") and not l.startswith("Libs")]
     load = lua.eval("function(c, n) return assert(loadstring(c, n)) end")
     for f in toc:
         load(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)("Headstart", YR)

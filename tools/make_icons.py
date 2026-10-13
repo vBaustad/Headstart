@@ -202,7 +202,19 @@ def logo():
         f.line([(0, y), (n, y)], fill=(255, int(204 - 82 * t), int(112 - 86 * t), 255))
     img.paste(fill, (0, 0), mask)
     img.resize((64, 64), Image.LANCZOS).save(os.path.join(OUT, "logo.tga"), orientation=1)
+    # The mark alone, for the minimap button: the H with nothing round it. The button has its own dark
+    # disc and gold ring; a second rim inside that one showed every pixel the two were apart.
+    mark = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    mark.paste(fill, (0, 0), mask)
+    box = mask.getbbox()
+    side = max(box[2] - box[0], box[3] - box[1])
+    pad = int(side * 0.12)
+    square = Image.new("RGBA", (side + 2 * pad, side + 2 * pad), (0, 0, 0, 0))
+    cut = mark.crop(box)
+    square.paste(cut, (pad + (side - cut.width) // 2, pad + (side - cut.height) // 2), cut)
+    square.resize((64, 64), Image.LANCZOS).save(os.path.join(OUT, "logomark.tga"), orientation=1)
     return img
 
 
 logo()
+

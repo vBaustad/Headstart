@@ -685,6 +685,14 @@ local function Layout()
     if #shown == 0 then CloseFlyout() end
 end
 YR.TrinketLayout = Layout
+--- Where the buttons stand now, kept (Arrange.lua moved them: a drag of their own keeps it itself).
+function YR.TrinketSavePosition()
+    if not bar or InCombatLockdown() then return false end
+    local left, top = bar:GetLeft(), bar:GetTop()
+    if not (left and top) then return false end
+    YippRouteDB.trinketBarPos = { math.floor(left + 0.5), math.floor(top - UIParent:GetTop() + 0.5) }
+    return true
+end
 --- Back where they stand on a new install. Out of a fight (the bar is protected in one).
 function YR.TrinketResetPosition()
     if InCombatLockdown() then YR.Print("the trinket buttons can't be moved in combat.") return false end

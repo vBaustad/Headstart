@@ -357,10 +357,48 @@ function YR.PowerFlashApply()
     end
     return n
 end
+-- The swing bars' look on the resource bar. The personal resource display's health and power bars (and
+-- the extra one some classes have) wear the texture, dark back, outline and light edge set for the swing
+-- timer (Combat bars, Look; YR.BarLook, Swing.lua), so the bars in the middle of your screen read as one
+-- set. Their colours stay Blizzard's: those bars are painted in a plain colour, so only what the colour
+-- is painted on changes. Not the player frame's bars, and not the cast bar: Blizzard paints those with
+-- pictures that carry their own colour and swaps them as it goes, and a plain texture would lose both.
+--   YippRouteDB.resourceLook == true: on.
+local function LookBars()
+    local out = {}
+    local prd = _G.PersonalResourceDisplayFrame
+    if type(prd) ~= "table" then return out end
+    local health = type(prd.HealthBarsContainer) == "table" and prd.HealthBarsContainer.healthBar or prd.healthbar
+    for _, bar in ipairs({ health or false, prd.PowerBar or false, prd.AlternatePowerBar or false }) do
+        if type(bar) == "table" and type(bar.SetStatusBarTexture) == "function" then out[#out + 1] = bar end
+    end
+    return out
+end
+function YR.ResourceLookOn() return YippRouteDB.resourceLook == true and YR.QoLOn() end
+--- As it is set now, on every bar of the display that is there. Returns how many it found.
+function YR.ResourceLookApply()
+    if not YR.BarLook then return 0 end
+    local on = YR.ResourceLookOn()
+    local n = 0
+    for _, bar in ipairs(LookBars()) do
+        if YR.BarLook(bar, on) then n = n + 1 end
+    end
+    return n
+end
+
 local flashDeclared
 function YR.StartPowerFlash()
     if flashDeclared then return end
     flashDeclared = true
+    -- The look on Blizzard's resource bar is no longer offered (2026-10-12): Headstart's own health,
+    -- power and combo bars are the ones dressed, and Blizzard's is hidden while they show. Whoever had
+    -- it on has it taken off, as there is no switch left to do that with.
+    YippRouteDB.resourceLook = nil
+    -- (the same two moments serve the look: the display's addon loads when it is first shown)
+    YR.Part(YR.ResourceLookOn, { "PLAYER_ENTERING_WORLD", "ADDON_LOADED" }, function() YR.ResourceLookApply() end, {
+        start = function() YR.ResourceLookApply() end,
+        stop = function() YR.ResourceLookApply() end,
+    })
     -- a bar's addon can load later than we do (the personal resource display loads when it is first shown)
     YR.Part(YR.PowerFlashOn, { "PLAYER_ENTERING_WORLD", "ADDON_LOADED" }, function() YR.PowerFlashApply() end, {
         start = function() YR.PowerFlashApply() end,

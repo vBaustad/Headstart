@@ -18,12 +18,12 @@ def run():
     lua = env["lua"]
     YR = lua.table()
     toc = [l.strip().replace(chr(92), "/") for l in open(os.path.join(ROOT, "Headstart.toc"), encoding="utf-8")
-           if l.strip().endswith(".lua") and not l.startswith("#")]
+           if l.strip().endswith(".lua") and not l.startswith("#") and not l.startswith("Libs")]
     # and the window's addon (Headstart_Options, load on demand in the game), loaded after it
     for sub in ("Headstart_Setup", "Headstart_Options"):
         toc += [sub + "/" + l.strip().replace(chr(92), "/")
                 for l in open(os.path.join(ROOT, sub, sub + ".toc"), encoding="utf-8")
-                if l.strip().endswith(".lua") and not l.startswith("#")]
+                if l.strip().endswith(".lua") and not l.startswith("#") and not l.startswith("Libs")]
     for f in toc:
         lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)("Headstart", YR)

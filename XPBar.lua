@@ -36,6 +36,93 @@ local DEFAULT = {
 }
 YR.XPBAR_DEFAULT = DEFAULT
 
+-- Colours are picked as a set: your XP (and where it ends, with a gradient), the same while rested, the
+-- completed-quests part, and how far your rested XP reaches. "class" is made from your class's colour.
+local PALETTES = {
+    violet = { gradient = true, xpColor = { 0.47, 0.42, 1.0, 1 }, xpColor2 = { 0.82, 0.38, 0.95, 1 },
+        xpRestedColor = { 0.09, 0.47, 0.85, 1 }, xpRestedColor2 = { 0.25, 0.85, 1.0, 1 },
+        questColor = { 1.0, 0.69, 0.0, 0.9 }, restColor = { 0.3, 0.6, 1.0, 0.4 } },
+    blizzard = { gradient = false, xpColor = { 0.58, 0.0, 0.55, 1 }, xpColor2 = { 0.58, 0.0, 0.55, 1 },
+        xpRestedColor = { 0.0, 0.39, 0.88, 1 }, xpRestedColor2 = { 0.0, 0.39, 0.88, 1 },
+        questColor = { 1.0, 0.69, 0.0, 0.9 }, restColor = { 0.0, 0.39, 0.88, 0.45 } },
+    ember = { gradient = true, xpColor = { 1.0, 0.52, 0.18, 1 }, xpColor2 = { 1.0, 0.78, 0.36, 1 },
+        xpRestedColor = { 0.25, 0.60, 0.95, 1 }, xpRestedColor2 = { 0.45, 0.85, 1.0, 1 },
+        questColor = { 0.96, 0.90, 0.55, 0.9 }, restColor = { 0.3, 0.6, 1.0, 0.4 } },
+    muted = { gradient = false, xpColor = { 0.55, 0.50, 0.80, 1 }, xpColor2 = { 0.55, 0.50, 0.80, 1 },
+        xpRestedColor = { 0.36, 0.58, 0.80, 1 }, xpRestedColor2 = { 0.36, 0.58, 0.80, 1 },
+        questColor = { 0.85, 0.68, 0.30, 0.9 }, restColor = { 0.36, 0.58, 0.80, 0.35 } },
+}
+YR.XPBAR_PALETTES = { { "violet", "Violet" }, { "blizzard", "Blizzard's" }, { "ember", "Ember" }, { "muted", "Muted" },
+    { "class", "Class colour" } }
+-- What the bar says is picked as a layout: the nine places for words (left, middle and right, on the
+-- bar, over it and under it) filled in one go. "own" is whatever you wrote yourself.
+local TEXT_KEYS = { "left", "center", "right", "over", "left0", "center0", "right0", "under", "left2", "center2", "right2" }
+local LAYOUTS = {
+    detailed = { left = DEFAULT.left, center = DEFAULT.center, right = DEFAULT.right, over = true, left0 = DEFAULT.left0,
+        center0 = DEFAULT.center0, right0 = DEFAULT.right0, under = true, left2 = DEFAULT.left2, center2 = DEFAULT.center2,
+        right2 = DEFAULT.right2 },
+    levelling = { left = "Level {level}", center = "{xp} / {max} ({left})", right = "{pct}%", over = false, left0 = "", center0 = "",
+        right0 = "", under = true, left2 = "Leveling in: {ding} ({rate} XP/Hour)", center2 = "",
+        right2 = "Completed: |cffffb000{questpct}%|r - Rested: |cff5ab4ff{restedpct}|r" },
+    xp = { left = "Level {level}", center = "{xp} / {max}", right = "{pct}%", over = false, left0 = "", center0 = "", right0 = "",
+        under = false, left2 = "", center2 = "", right2 = "" },
+    simple = { left = "Level {level}", center = "", right = "{pct}%", over = false, left0 = "", center0 = "", right0 = "",
+        under = false, left2 = "", center2 = "", right2 = "" },
+    none = { left = "", center = "", right = "", over = false, left0 = "", center0 = "", right0 = "", under = false, left2 = "",
+        center2 = "", right2 = "" },
+}
+YR.XPBAR_LAYOUTS = { { "detailed", "Detailed" }, { "levelling", "XP and time to level" }, { "xp", "Level, XP and percent" },
+    { "simple", "Level and percent" }, { "none", "Nothing" }, { "own", "Your own" } }
+--- A layout put on (one of YR.XPBAR_LAYOUTS). "own": what is written stays, and is yours to change.
+function YR.XPBarLayout(key)
+    local db = YR.XPBarDB()
+    if key == "own" then db.textLayout = "own" YR.XPBarApply() return true end
+    local set = LAYOUTS[key]
+    if not set then return false end
+    for _, k in ipairs(TEXT_KEYS) do db[k] = set[k] end
+    db.textLayout = key
+    YR.XPBarApply()
+    return true
+end
+--- Which layout the words are now: the one picked, as long as the words still are that one's.
+function YR.XPBarLayoutNow()
+    local db = YR.XPBarDB()
+    local function Is(set)
+        for _, k in ipairs(TEXT_KEYS) do
+            local a, b = db[k], set[k]
+            if type(b) == "boolean" then a = a and true or false end
+            if (a or "") ~= (b or "") and not (a == b) then return false end
+        end
+        return true
+    end
+    if db.textLayout and LAYOUTS[db.textLayout] and Is(LAYOUTS[db.textLayout]) then return db.textLayout end
+    for _, o in ipairs(YR.XPBAR_LAYOUTS) do
+        if LAYOUTS[o[1]] and Is(LAYOUTS[o[1]]) then return o[1] end
+    end
+    return "own"
+end
+
+--- A set of colours put on the bar (one of YR.XPBAR_PALETTES). Nothing else changes.
+function YR.XPBarPalette(key)
+    local db = YR.XPBarDB()
+    local set = PALETTES[key]
+    if key == "class" then
+        local _, class = UnitClass("player")
+        local c = RAID_CLASS_COLORS and class and RAID_CLASS_COLORS[class]
+        local r, g, b = 0.47, 0.42, 1.0
+        if type(c) == "table" and c.r then r, g, b = c.r, c.g, c.b end
+        local function Light(v) return v + (1 - v) * 0.4 end
+        set = { gradient = true, xpColor = { r, g, b, 1 }, xpColor2 = { Light(r), Light(g), Light(b), 1 },
+            xpRestedColor = { 0.09, 0.47, 0.85, 1 }, xpRestedColor2 = { 0.25, 0.85, 1.0, 1 },
+            questColor = { 1.0, 0.69, 0.0, 0.9 }, restColor = { 0.3, 0.6, 1.0, 0.4 } }
+    end
+    if not set then return false end
+    for k, v in pairs(set) do db[k] = type(v) == "table" and { unpack(v) } or v end
+    db.palette = key
+    YR.XPBarApply()
+    return true
+end
+
 -- The first look (before the line under the bar): a value still as it was then takes the new one.
 local FIRST = {
     h = 14, ticks = 10, texture = "flat", font = 11, bgAlpha = 0.65,
@@ -352,7 +439,7 @@ local function Paint()
     if not bar then return end
     local db = YR.XPBarDB()
     local level, maxLevel = UnitLevel("player"), GetMaxPlayerLevel and GetMaxPlayerLevel() or 60
-    local show = YR.XPBarOn() and YR.QoLOn() and not (db.maxHide and level >= maxLevel)
+    local show = YR.XPBarOn() and YR.QoLOn() and not (db.maxHide ~= false and level >= maxLevel)
     bar:SetShown(show)
     HideBlizz(show and db.hideBlizz)
     if not show then return end

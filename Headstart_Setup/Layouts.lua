@@ -136,13 +136,31 @@ local function Same(a, b)
     return a.name == b.name and (a.down and a.id or 0) == (b.down and b.id or 0)
 end
 
---- Switch this character to another of its class's layouts. Returns true, or false and why not.
-function YS.LayoutSwitch(name)
+-- A character whose bars were never set up with Headstart: its bars are nobody's layout, so a switch
+-- can't save them into the one it leaves. Asked first, with how much changes.
+StaticPopupDialogs["YIPPSETUP_SWITCH"] = {
+    text = "Headstart: put the profile %s on this character?\n\nIts bars were not set up with Headstart, so they are not saved"
+        .. " in any profile: %s. Your bars and macros as they are now are kept first, and /ysetup undo puts them back.",
+    button1 = "Switch",
+    button2 = "Cancel",
+    OnAccept = function(_, name)
+        local ok, why = YS.LayoutSwitch(name, true)
+        if not ok and why then YS.Print(why) end
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+
+--- Switch this character to another of its class's layouts. Returns true, or false and why not
+--- (false and nothing: asked first, see above). sure: asked and answered.
+function YS.LayoutSwitch(name, sure)
     if InCombatLockdown() then return false, "not in a fight: bars can't be changed there." end
     local to = Exists(tostring(name or ""))
     if not to then return false, "no such profile." end
     if to == YS.LayoutName() then return false, ("you are on %s already."):format(to) end
     local c = Data()
+    local was = YippSetupCharDB.layoutName
     -- the one you leave, as your bars are this moment (a character never set up has bars that are
     -- nobody's layout: those aren't written over a saved one)
     if YS:Profile() and YippSetupCharDB.applied then
@@ -154,8 +172,10 @@ function YS.LayoutSwitch(name)
     local target = YS:Profile()
     local slots = target and target.slots or {}
     if not next(slots) then
-        -- nothing in it yet: your bars stay, and are what it holds when you next leave it
+        -- nothing in it yet: your bars stay, and are saved into it now (a class with nothing saved has
+        -- no "Main" to save into on the way out, so "when you next leave it" was never for that one)
         YippSetupCharDB.applied = YippSetupCharDB.applied or time()
+        YS:ScanBars()
         NoteSpec()
         YS.Print(("switched to profile %s. It is empty, so your current bars are kept and saved to it."):format(to))
         return true
@@ -172,7 +192,23 @@ function YS.LayoutSwitch(name)
             only[slot], n = true, n + 1
         end
     end
-    if n > 0 then YS:Apply(nil, only) end
+    if n > 0 and not sure and not YippSetupCharDB.applied then
+        YippSetupCharDB.layoutName = was
+        StaticPopup_Show("YIPPSETUP_SWITCH", to, ("%d button%s change to what the profile has"):format(n, n == 1 and "" or "s"), to)
+        return false
+    end
+    if n > 0 then
+        local _, full = YS:Apply(nil, only)
+        if full then
+            -- no room for a macro the profile needs: back as it was, rather than half of each on the
+            -- bars (and that half then saved over the profile)
+            YS:Undo(nil, true)
+            YippSetupCharDB.layoutName = was
+            if YR.RefreshWindow then YR:RefreshWindow() end
+            return false, ("not switched to %s: this character's macro list is full, and the profile needs to make '%s'. Delete a"
+                .. " macro and switch again; your bars are back as they were."):format(to, tostring(full))
+        end
+    end
     YippSetupCharDB.applied = YippSetupCharDB.applied or time()
     NoteSpec()
     local ui = target.ownUI and target.ui and YS.ApplyProfileUI and YS.ApplyProfileUI(target.ui) or ""

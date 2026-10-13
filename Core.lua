@@ -39,6 +39,36 @@ function YR.QoLOn()
     return YippRouteDB.qolOff ~= true
 end
 
+--- Whether this is a test client - the beta. What is set up here is kept in that client's own
+--- folder, which the live game never reads: the window says so while it is one (Editor.lua, the
+--- banner on All features). The game says it is a beta build; a realm with "beta" in its name
+--- says the same where it doesn't.
+function YR.BetaClient()
+    if type(IsBetaBuild) == "function" then
+        local ok, yes = pcall(IsBetaBuild)
+        if ok and yes then return true end
+    end
+    local realm = GetRealmName and GetRealmName()
+    return type(realm) == "string" and realm:lower():find("beta", 1, true) ~= nil
+end
+
+--- Money as the game writes it (a number and a coin for gold, silver and copper), or in letters
+--- ("1g 20s 40c") where it can't. The game's function is C_CurrencyInfo.GetCoinTextureString on this
+--- client: the old global of that name is not there, and what asked for it by that name printed
+--- "2134c" or "0.21g" instead.
+function YR.Money(copper)
+    copper = math.floor((tonumber(copper) or 0) + 0.5)
+    local coins = (type(C_CurrencyInfo) == "table" and C_CurrencyInfo.GetCoinTextureString) or _G.GetCoinTextureString
+    if type(coins) == "function" then
+        local ok, text = pcall(coins, copper)
+        if ok and type(text) == "string" then return text end
+    end
+    local g, s, c = math.floor(copper / 10000), math.floor(copper % 10000 / 100), copper % 100
+    if g > 0 then return ("%dg %ds %dc"):format(g, s, c) end
+    if s > 0 then return ("%ds %dc"):format(s, c) end
+    return c .. "c"
+end
+
 --- Quality of life on or off, for the whole account. What's on screen follows at once where it can;
 --- the rest (hooks already made, bars already built) follows a /reload.
 function YR.SetQoLOn(on)
@@ -147,6 +177,7 @@ local OTHERS = {
     swing = {
         { "EllesmereUI", function() return Loaded("EllesmereUIResourceBars") and InProfiles("EllesmereUIResourceBarsDB", "swingTimer", "enabled") == true end },
         { "Naowh Forever", function() return Loaded("NaowhForever") end },
+        { "AppelSwingsForever", function() return Loaded("AppelSwingsForever") end },
     },
     whisperSound = { { "EllesmereUI", function() return Loaded("EllesmereUIChat") end } },
     lootFeed = { { "Naowh Forever", function() return Loaded("NaowhForever") end } },
@@ -175,9 +206,14 @@ function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 -- items, joins or forms a group for you, takes screenshots, puts a bar or buttons of ours on your
 -- screen or changes one of Blizzard's windows. Nobody should find those out by installing Headstart.
 -- What stays on is seen and harmless: tooltips, the flight timer, the camp icon, lines in chat.
+--   The buttons under the bank and mail windows are ours on Blizzard's windows (and float on their own
+--   where a bag addon hides the bank's). The routes' own automation - release at a death skip, abandon
+--   a skipped quest, share and accept route quests - acts for you, so turning the routes on is not
+--   enough to turn those on. (Quest rewards are picked per class, off the same way: Rewards.lua.)
 local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true,
     groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true,
-    deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true }
+    deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true,
+    bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
 YR.STARTS_OFF = STARTS_OFF
 
 --- What an option is before you've set it: on, unless it starts off or another addon does the same.
@@ -441,6 +477,9 @@ SlashCmdList.HEADSTART = function(msg)
     elseif cmd == "perf" then
         -- what Headstart costs, by the game's own count (the code for it is in the window's addon)
         if YR.LoadWindow() then YR.Perf() end
+    elseif cmd == "transfer" or cmd == "export" or cmd == "import" then
+        -- your settings as a text, to take to another install (the live game, another computer)
+        if YR.LoadWindow() and YR.TransferShow then YR.TransferShow(cmd ~= "transfer" and cmd or nil) end
     elseif cmd == "start" or cmd == "welcome" then
         -- the welcome window: how much of Headstart you want (the code for it is in the window's addon)
         if YR.LoadWindow() then YR.WelcomeToggle() end
@@ -461,6 +500,27 @@ SlashCmdList.HEADSTART = function(msg)
         elseif not YR.RecapShow() then YR.Print("no death recorded for this character yet.") end
     elseif cmd == "gear" then
         YR.UseGearSet(arg)
+    elseif cmd == "move" or cmd == "arrange" then
+        YR.ArrangeToggle()
+    elseif cmd == "journey" then
+        if arg == "toast" then
+            YR.JourneyToast(UnitLevel("player") or 20)
+        elseif arg and arg:find("^test") then
+            -- a made-up journey, told at one of the levels a chapter is written at (50 unless one is
+            -- given: /hs journey test 60)
+            local level = math.max(20, math.min(60, math.floor((tonumber(arg:match("(%d+)")) or 50) / 10) * 10))
+            YR.JourneyToast(level)
+            if YR.LoadWindow() and YR.JourneyShow then YR.JourneyShow(level) end
+        elseif arg == "live" then
+            -- the running totals as they stand now, told as if a chapter were written this minute
+            if YR.LoadWindow() and YR.JourneyShow then YR.JourneyShow(nil, "live") end
+        elseif arg == "on" or arg == "off" then
+            if arg == "on" then YippRouteDB.journey = nil else YippRouteDB.journey = false end
+            YR.ApplyParts()
+            YR.Print("Journey is " .. arg .. ".")
+        else
+            YR.JourneyOpen()
+        end
     elseif cmd == "trinkets" then
         YippRouteDB.trinketBar = not YR.Option("trinketBar")
         YR.ShowTrinketBar(YR.Option("trinketBar"))
@@ -493,7 +553,7 @@ SlashCmdList.HEADSTART = function(msg)
             .. " /headstart camp (unlock|lock|always|debug) - the campfire icon; /headstart bank - bank mats now; /headstart mail - mail them to your alt;"
             .. " /headstart routes on|off - Headstart routes in RestedXP; /headstart inv - invite your target; /headstart leave - leave the group; /headstart plan - plan your bars;"
             .. " /headstart restock - buy what you keep at this vendor; /headstart trainer - what's new at the trainer;"
-            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart profile [name] - switch this character to another of the class's profiles; /headstart macro - the macro helper: your class's usual macros made by ticking boxes; /headstart start - the welcome window: pick how much of Headstart you want")
+            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart profile [name] - switch this character to another of the class's profiles; /headstart macro - the macro helper: your class's usual macros made by ticking boxes; /headstart start - the welcome window: pick how much of Headstart you want; /headstart transfer - your settings as a text, to move them to another install")
     else
         YR:ToggleWindow()
     end
@@ -505,11 +565,21 @@ end
 -- before that keeps everything as it was: once, each of those options you never touched is written
 -- down as what it was then. A new install starts quiet, and is asked what it wants (the welcome window).
 local WAS_ON = { "restock", "bankAuto", "levelShot", "trinketBar", "groupBar", "upgrades", "talentMove", "talentFadeSlider" }
+local WAS_ON_3 = { "bankButton", "mailButton", "deathSkipRelease", "skipQuests", "groupShare", "groupAccept" }
 function YR.Latch(fresh)
     local db = YippRouteDB
     local was = tonumber(db.quiet) or 0
+    if was >= 3 then return end
+    db.quiet = 3
+    -- 3: the bank and mail buttons, the routes' own automation and quest reward picking became things
+    -- you turn on. An account that had Headstart keeps each as it was (on, unless another addon did it).
+    if not fresh then
+        for _, key in ipairs(WAS_ON_3) do
+            if db[key] == nil then db[key] = YR.OtherHas(key) == nil end
+        end
+        if db.pickRewards == nil then db.pickRewards = true end
+    end
     if was >= 2 then return end
-    db.quiet = 2
     -- 2: Character setup became something you turn on. An account that had Headstart keeps it on.
     if not fresh and db.setupOn == nil then db.setupOn = true end
     if was >= 1 then return end
@@ -530,7 +600,12 @@ function YR.Latch(fresh)
 end
 
 SLASH_HEADSTARTSETTINGS1 = "/hs"
-SlashCmdList.HEADSTARTSETTINGS = function() YR:ToggleSettings() end
+SlashCmdList.HEADSTARTSETTINGS = function(msg)
+    local cmd = strtrim(msg or ""):lower()
+    if cmd == "move" or cmd == "arrange" then YR.ArrangeToggle() return end
+    if cmd:find("^journey") then SlashCmdList.HEADSTART(cmd) return end
+    YR:ToggleSettings()
+end
 
 local f = CreateFrame("Frame")
 f:RegisterEvent("ADDON_LOADED")
@@ -599,6 +674,7 @@ f:SetScript("OnEvent", function(_, event, name)
     YR.StartBarHide()
     YR.StartPowerFlash()
     YR.StartSwing()
+    YR.StartJourney()
     YR.StartRecap()
     YR.StartChatLog()
     YR.StartLootFeed()

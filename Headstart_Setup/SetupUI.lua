@@ -125,7 +125,7 @@ end
 -- only the character it came from can add them: YS.UIStale says so, for the window and for Apply.
 -- 2: whether the damage meter is on, and RestedXP's look.
 -- 3: the on/off switches of the swing timer, cooldown viewer, encounter warnings, external defensives.
-YS.UI_VERSION = 3
+YS.UI_VERSION = 4          -- 4: the key bindings are in it
 function YS.UIStale(ui)
     return type(ui) == "table" and (ui.v or 1) < YS.UI_VERSION
 end
@@ -179,8 +179,62 @@ function YS.ApplyRXP(saved)
     return looks > 0 and ("%d placed, look copied"):format(n) or ("%d placed"):format(n)
 end
 
+-- Key bindings: your keys as they are, action by action - keys[action] = { key1, key2 }, false where
+-- it has none (a default you took off is part of how you play). Read with the game's own list of
+-- actions, put on with its own SetBinding and saved as the game saves them (the set you are on: the
+-- account's, unless you ticked character-specific bindings).
+--   Put on in two passes: first every action that differs lets go of the keys it has, then each gets
+--   the keys it should have - so a key moving from one action to another is free when it is asked for.
+--   An action the saved set doesn't name (one this install has and the other hadn't) keeps its keys,
+--   unless one of them is a key the saved set gives to something else.
+function YS.ScanKeys()
+    if not GetBinding then return nil end
+    local keys, n = {}, 0
+    -- (walked until the game has no more: how many there are is not asked for by a name of its own -
+    -- GetBinding(index) is what this client's own settings page uses, and nothing else is leaned on)
+    for i = 1, 3000 do
+        local ok, action, _, k1, k2 = pcall(GetBinding, i)
+        if not ok or action == nil then break end
+        if type(action) == "string" and not action:find("^HEADER_") then
+            keys[action] = { k1 or false, k2 or false }
+            n = n + 1
+        end
+    end
+    return n > 0 and keys or nil
+end
+
+--- The saved keys put on. backup: where the keys as they were are kept for /ysetup undo (the first
+--- time only). Returns how many actions changed, or nil where it can't be done (a fight, no keys saved).
+function YS.ApplyKeys(keys, backup)
+    if type(keys) ~= "table" or not (SetBinding and GetBindingKey and SaveBindings) then return nil end
+    if InCombatLockdown() then return nil end
+    local was = backup and backup.keys == nil and YS.ScanKeys() or nil
+    local differs = {}
+    for action, want in pairs(keys) do
+        if type(action) == "string" and type(want) == "table" then
+            local k1, k2 = GetBindingKey(action)
+            if (k1 or false) ~= (want[1] or false) or (k2 or false) ~= (want[2] or false) then
+                differs[action] = want
+                if k1 then SetBinding(k1) end
+                if k2 then SetBinding(k2) end
+            end
+        end
+    end
+    local changed = 0
+    for action, want in pairs(differs) do
+        if type(want[1]) == "string" then SetBinding(want[1], action) end
+        if type(want[2]) == "string" then SetBinding(want[2], action) end
+        changed = changed + 1
+    end
+    if changed > 0 then
+        pcall(SaveBindings, GetCurrentBindingSet and GetCurrentBindingSet() or 1)
+        if backup and was then backup.keys = was end
+    end
+    return changed
+end
+
 function YS:ScanUI()
-    local ui = { cvars = {}, bars = {}, rxp = YS.ScanRXP(), v = YS.UI_VERSION }
+    local ui = { cvars = {}, bars = {}, rxp = YS.ScanRXP(), v = YS.UI_VERSION, keys = YS.ScanKeys() }
     local em = EditModeManagerFrame
     local active = em and em.GetActiveLayoutInfo and em:GetActiveLayoutInfo()
     if active then
@@ -563,11 +617,17 @@ function YS:ApplyUI(ui, o)
     -- chat frames is ours until a reload, so it ends with the same Reload question
     if o.chat and type(chat) == "string" and chat:find("windows$") then taint = true end
     if o.camera then YS.ApplyCamera(ui.camera) end
+    -- your keys, as they were where the interface was saved (kept for /ysetup undo like the game settings)
+    local keys = "off"
+    if o.keys ~= false then
+        local n = YS.ApplyKeys(ui.keys, backup)
+        keys = n and (n .. " changed") or (ui.keys and "not now" or "none saved")
+    end
     local barText = barAddon and ("left to " .. barAddon) or (o.barVisibility and (tostring(bars) .. " changed") or "off")
-    YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. RestedXP guide: %s. RestedXP windows: %s.")
-        :format(layout, barText, chat, set, o.guide and ApplyGuide() or "off", o.rxpFrames ~= false and YS.ApplyRXP(ui.rxp) or "off"))
+    YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. Key bindings: %s. RestedXP guide: %s. RestedXP windows: %s.")
+        :format(layout, barText, chat, set, keys, o.guide and ApplyGuide() or "off", o.rxpFrames ~= false and YS.ApplyRXP(ui.rxp) or "off"))
     if YS.UIStale(ui) then
-        YS.Print(("this interface was saved by an older Headstart: whether the damage meter is on and RestedXP's look are not in it."
+        YS.Print(("this interface was saved by an older Headstart: your key bindings, whether the damage meter is on and RestedXP's look are not in it."
             .. " Save it again on %s (Character setup, Save interface), then Apply interface here."):format(tostring(YS.UISource() or "the character it came from")))
     end
     -- the old way taints until a reload; the game's own functions don't, but get checked a moment later

@@ -21,7 +21,7 @@ local function RaceBit()
 end
 YR.RaceBit = RaceBit        -- the Trainer page lists what your race is taught
 
-local function Coins(c) return (GetCoinTextureString and GetCoinTextureString(c)) or (c .. "c") end
+local function Coins(c) return YR.Money(c) end
 
 -- ---------------------------------------------------------------------------
 -- Trainer
@@ -127,14 +127,167 @@ function YR.UnspentTalents()
     if ok then return n end
 end
 
+-- ---------------------------------------------------------------------------
+-- Talent points to spend: said on your screen, not in chat
+-- ---------------------------------------------------------------------------
+-- A small icon with a line of words beside it, near the top of the screen: no box round it, nothing
+-- that takes a click away from the game. It is there while you have a point to spend and are out of
+-- a fight, and goes the moment the last point is spent. A click on it puts it away until the number
+-- changes (a new level).
+--   YippRouteDB.talentNotice: "both" (the icon and the words; as it comes), "text", "icon", or "chat"
+--   - the one line in chat this used to be. talentPos = { left, top } once you have moved it (Arrange).
+--   Nothing of it is made until there is a point to tell of: its frame, and the three events it
+--   listens to while it is up (the talents changing, a fight starting and ending).
+local TALENT_ICON = "Interface\\Icons\\Ability_Marksmanship"
+local notice, noticeN, noticeAway, noticeSample, noticeHears = nil, 0, nil, false, false
+
+function YR.TalentNoticeMode()
+    local m = YippRouteDB.talentNotice
+    return (m == "text" or m == "icon" or m == "chat") and m or "both"
+end
+
+local function NoticePlace()
+    notice:ClearAllPoints()
+    local p = YippRouteDB.talentPos
+    if type(p) == "table" and p[1] and p[2] then
+        notice:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p[1], p[2])
+    else
+        notice:SetPoint("TOP", UIParent, "TOP", 0, -118)
+    end
+end
+
+local function NoticePaint()
+    local mode, n = YR.TalentNoticeMode(), noticeSample and 2 or noticeN
+    local words = mode ~= "icon"
+    notice.icon:SetShown(mode ~= "text")
+    notice.count:SetShown(not words)
+    notice.count:SetText(n)
+    notice.text:SetShown(words)
+    notice.text:SetText(("%d talent point%s to spend"):format(n, n == 1 and "" or "s"))
+    notice.text:ClearAllPoints()
+    notice.text:SetPoint("LEFT", mode == "text" and 2 or 30, 0)
+    local wide = notice.text:GetStringWidth()
+    notice:SetSize((mode == "text" and 4 or 32) + (words and (type(wide) == "number" and wide or 150) or 0), 26)
+end
+
+local function NoticeBuild()
+    notice = CreateFrame("Button", "HeadstartTalentNotice", UIParent)
+    notice:SetFrameStrata("MEDIUM")
+    notice:SetClampedToScreen(true)
+    notice:SetMovable(true)
+    notice.icon = notice:CreateTexture(nil, "ARTWORK")
+    notice.icon:SetSize(24, 24)
+    notice.icon:SetPoint("LEFT", 1, 0)
+    notice.icon:SetTexture(TALENT_ICON)
+    notice.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    notice.count = notice:CreateFontString(nil, "OVERLAY")
+    notice.count:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+    notice.count:SetTextColor(1, 1, 1)
+    notice.count:SetPoint("BOTTOMRIGHT", notice.icon, "BOTTOMRIGHT", 2, -2)
+    notice.text = notice:CreateFontString(nil, "OVERLAY")
+    notice.text:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    notice.text:SetTextColor(1, 0.82, 0.25)
+    notice:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    notice:SetScript("OnClick", function(self)
+        if noticeSample then return end
+        noticeAway = noticeN                -- put away, until there is another number to tell
+        self:Hide()
+    end)
+    notice:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText(("%d talent point%s to spend"):format(noticeN, noticeN == 1 and "" or "s"), 1, 0.82, 0.25)
+        GameTooltip:AddLine("Click to put this away until your next level. It moves in Arrange (/hs move).", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    notice:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    notice:Hide()
+    notice.fade = notice:CreateAnimationGroup()
+    local arrive = notice.fade:CreateAnimation("Alpha")
+    arrive:SetFromAlpha(0)
+    arrive:SetToAlpha(1)
+    arrive:SetDuration(0.6)
+    -- while it is up: gone when the last point is spent, and never over a fight
+    notice:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_REGEN_DISABLED" then
+            if not noticeSample then notice:Hide() end
+        else
+            YR.TalentNotice()
+        end
+    end)
+    NoticePlace()
+end
+
+local function NoticeListen(on)
+    if not notice then return end
+    if on and not noticeHears then
+        noticeHears = true
+        for _, e in ipairs({ "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED" }) do
+            pcall(notice.RegisterEvent, notice, e)
+        end
+    elseif not on and noticeHears then
+        noticeHears = false
+        notice:UnregisterAllEvents()
+    end
+end
+
+--- The notice as it should be now: up while there are points to spend (and it is wanted, on screen,
+--- not put away, not in a fight), else gone. Called at the login and a new level, and by the notice
+--- itself when the talents change.
+function YR.TalentNotice()
+    local wanted = YR.Option("remindTalents") and YR.TalentNoticeMode() ~= "chat"
+    local n = wanted and YR.UnspentTalents() or 0
+    noticeN = type(n) == "number" and n or 0
+    if noticeAway and noticeAway ~= noticeN then noticeAway = nil end
+    if noticeN <= 0 and not noticeSample then
+        if notice then
+            notice:Hide()
+            NoticeListen(false)
+        end
+        return
+    end
+    if not notice then NoticeBuild() end
+    NoticePaint()
+    NoticeListen(noticeN > 0)
+    local show = noticeSample or (noticeAway == nil and not InCombatLockdown())
+    if show and not notice:IsShown() then
+        notice:Show()
+        notice.fade:Play()
+    elseif not show then
+        notice:Hide()
+    end
+end
+
+--- For Arrange: the notice itself, with two sample points on it while it is being placed (sample).
+function YR.TalentNoticeFrame(sample)
+    if not (YR.Option("remindTalents") and YR.TalentNoticeMode() ~= "chat") then return nil end
+    if sample ~= nil then
+        noticeSample = sample and true or false
+        if noticeSample or notice then YR.TalentNotice() end
+    end
+    return notice
+end
+function YR.TalentNoticeSave()
+    if not notice then return end
+    local l, t = notice:GetLeft(), notice:GetTop()
+    if l and t then YippRouteDB.talentPos = { l, t } end
+end
+function YR.TalentNoticeReset()
+    YippRouteDB.talentPos = nil
+    if notice then NoticePlace() end
+end
+
 local function Remind(level)
     if YR.Option("remindTrainer") then
         local line = YR.TrainerLine(level)
         if line then YR.Print(line) end
     end
     if YR.Option("remindTalents") then
-        local n = YR.UnspentTalents()
-        if n and n > 0 then YR.Print(("%d talent point%s to spend."):format(n, n == 1 and "" or "s")) end
+        if YR.TalentNoticeMode() == "chat" then
+            local n = YR.UnspentTalents()
+            if n and n > 0 then YR.Print(("%d talent point%s to spend."):format(n, n == 1 and "" or "s")) end
+        else
+            YR.TalentNotice()
+        end
     end
 end
 

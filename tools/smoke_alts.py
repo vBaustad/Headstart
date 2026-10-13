@@ -57,6 +57,10 @@ def run():
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
     lua.execute(FAKE)
     YR = lua.eval("YR")
+    # the one function of Core.lua this needs, as it is written there: how money is put into words
+    core = open(os.path.join(ROOT, "Core.lua"), encoding="utf-8").read().replace("\r\n", "\n")
+    at = core.index("function YR.Money(copper)")
+    lua.execute(core[at:core.index("\nend\n", at) + 5])
     lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
         open(os.path.join(ROOT, "Alts.lua"), encoding="utf-8").read(), "Alts.lua")("Headstart", YR)
     g = lua.globals()

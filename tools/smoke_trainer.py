@@ -42,9 +42,12 @@ function GetTrainerServiceLevelReq(i) return LIST[i][5] end
 function BuyTrainerService(i) table.insert(BOUGHT, LIST[i][1] .. " " .. LIST[i][2]) end
 function GetTrainerServiceTypeFilter() return true end
 RXP = { settings = { profile = { enableTrainerAutomation = true } } }
+YippSetupCharDB = { trainOK = true }     -- this character has said yes before (the first-time question is checked below)
+StaticPopupDialogs, POPUP = {}, nil
+function StaticPopup_Show(which, text) POPUP = { which = which, text = text } end
 ''')
     YR = lua.table()
-    for f in ("Core.lua", "Trainer.lua"):
+    for f in ("Core.lua", "Data/TrainerSpells.lua", "Trainer.lua"):
         chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
         chunk("Headstart", YR)
@@ -131,6 +134,49 @@ RXP = { settings = { profile = { enableTrainerAutomation = true } } }
 
     check(visit(10000, shift=True) == [], "Shift held: nothing learned")
     check(visit(10000, tradeskill=True) == [], "a profession trainer: nothing learned")
+
+    # Only the class's own spells. A weapon master and a riding trainer open the same window and are
+    # no profession trainers: what they offer is left alone, however much gold there is - and said.
+    kept = lua.eval("LIST")
+    lua.execute("""LIST = {
+        { "Two-Handed Swords", "", "available", 1000, 1 },
+        { "Polearms", "", "available", 1000, 20 },
+        { "Apprentice Riding", "", "available", 800000, 40 },
+    }""")
+    got = visit(5000000)
+    check(got == [] and any("nothing here is one of your class's spells" in g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1)),
+          f"a weapon master or a riding trainer: nothing bought with 500 gold in the bag, and it says why ({got})")
+    lua.execute('LIST[#LIST + 1] = { "Holy Light", "Rank 3", "available", 1000, 12 }')
+    got = visit(5000000)
+    check(got == ["Holy Light Rank 3"], f"a list that mixes them: the class's spell, and none of the others ({got})")
+    g.LIST = kept
+    # no list of the class's spells at all: nothing is bought (it does not fall back to "everything")
+    lua.execute("KEPT_SPELLS = YRT.TrainerSpells YRT.TrainerSpells = nil CLASS_WAS = UnitClass function UnitClass() return 'Monk', 'MONK' end")
+    got = visit(5000000)
+    lua.execute("YRT.TrainerSpells = KEPT_SPELLS UnitClass = CLASS_WAS")
+    check(got == [], f"no spell list for the class: nothing bought ({got})")
+    check(visit(10000) != [], "(and with the class back, it buys again)")
+
+    # The switch is the account's: the first time it would buy on a character, it asks
+    lua.execute("YippSetupCharDB = {} POPUP = nil")
+    got = visit(10000)
+    text = g.POPUP.text if g.POPUP else ""
+    check(got == [] and g.POPUP is not None and "learn 3 spells here for 21s 0c?" in text and "keeps 5s 0c" in text
+          and "every character of this account" in text,
+          f"a character it has not bought on before: nothing bought, asked first with the count and the cost ({text[:60]})")
+    got = visit(10000)
+    check(got == [] and g.YippSetupCharDB.trainOK is None, "not answered (or Not now): nothing bought, asked again at the next visit")
+    lua.execute("BOUGHT = {} StaticPopupDialogs[POPUP.which].OnAccept()")
+    got = [g.BOUGHT[i] for i in range(1, len(g.BOUGHT) + 1)]
+    check(len(got) == 3 and g.YippSetupCharDB.trainOK is True, f"Learn them: bought, and remembered for this character ({got})")
+    lua.execute("POPUP = nil")
+    got = visit(10000)
+    check(len(got) == 3 and g.POPUP is None, "the next visit: bought without asking")
+    lua.execute("YippSetupCharDB = {} POPUP = nil")
+    check(visit(10000, shift=True) == [] and g.POPUP is None, "Shift held: not even asked")
+    lua.execute("LIST_WAS = LIST LIST = {} YippSetupCharDB = {} StaticPopupDialogs.HEADSTART_TRAIN_FIRST.OnAccept() LIST = LIST_WAS")
+    check([g.BOUGHT[i] for i in range(1, len(g.BOUGHT) + 1)] == [], "said yes after the trainer was shut: nothing to buy, nothing bought")
+    lua.execute("YippSetupCharDB = { trainOK = true }")
 
     lua.execute("YippRouteDB.autoTrain = false; YRT:SyncRxpTrainer()")
     check(g.RXP.settings.profile.enableTrainerAutomation is True, "ours off: RestedXP's back on")

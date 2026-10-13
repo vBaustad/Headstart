@@ -5,9 +5,10 @@
 --     Routes of your own      Off / On          your runs recorded as you level and saved as routes of your
 --                             own, played back in RestedXP; level splits (a reload). Headstart ships no routes
 --     On your screen          Nothing / Essentials / Everything
---                             Essentials: XP bar, flight timer, camp icon, loot feed, chat log, death recap,
---                             instance tracker, better-gear notes. Everything: the swing timer, trinket
---                             buttons, Invite and Leave buttons and the movable talent window too
+--                             Essentials: flight timer, camp icon, loot feed, chat log, death recap,
+--                             instance tracker, better-gear notes. Everything: the XP bar (many have
+--                             another addon draw theirs, so it is not among the essentials), the swing
+--                             timer, trinket buttons, Invite and Leave buttons and the movable talent window
 --     Does things for you     Nothing / For friends / Everything
 --                             For friends: accepts invites and shared quests from guildies and friends, invites
 --                             the ones who whisper "inv" - no gold, no items. Everything: also restock and
@@ -17,6 +18,11 @@
 --   left unanswered (click the picked answer again) is left as it is. What another addon you have
 --   already does (its feature on) is left off whatever you answer, and named.
 --   Three quick picks answer all four at once: Minimal, Recommended, Everything.
+--   Then: Before you play. Once the answers are applied (and any time, from its button) the window
+--   lists what is now on that deserves a look before the first quest - what spends gold, what moves
+--   your things, what stands where one of Blizzard's bars was, what Character setup can and can't put
+--   back - each in two lines with a button that opens its settings. Only what is on is listed, so
+--   with nothing risky on it is one line: installing changed nothing of yours.
 --   Shown once on a new install, a few seconds after the first login (not in a fight), and any time
 --   by /headstart start. Nothing is locked in: every one of these has its switch in the window.
 --   Part of Headstart_Options (the load-on-demand window addon): none of it is in memory until then.
@@ -39,7 +45,7 @@ local function Features()
     local function F(key, label, q, level, get, set) return { key = key, label = label, q = q, level = level, get = get, set = set } end
     FEATURES = {
         F("routes", "run recording, routes of your own, level splits", "routes", 1, function() return YR.RoutesOn() end, function(on) YR.SetRoutesOn(on) end),
-        F("xpbar", "XP bar", "screen", 1, function() return YR.XPBarOn() end, function(on) YR.XPBarDB().on = on YR.XPBarApply() end),
+        F("xpbar", "XP bar", "screen", 2, function() return YR.XPBarOn() end, function(on) YR.XPBarDB().on = on YR.XPBarApply() end),
         F("flightTimer", "flight timer", "screen", 1, Key("flightTimer", function(on) YR:SetFlightTimer(on) end)),
         F("camp", "camp icon", "screen", 1, Key("camp", function(on) YR.SetCampIcon(on) end)),
         F("lootFeed", "loot feed", "screen", 1, Key("lootFeed", function() YR.LootFeedApply() end)),
@@ -59,6 +65,11 @@ local function Features()
         F("restock", "vendor restock", "acts", 2, Key("restock")),
         F("autoTrain", "spells learned at the trainer", "acts", 2, Key("autoTrain", function() YR:SyncRxpTrainer() end)),
         F("bankAuto", "mats banked", "acts", 2, Key("bankAuto")),
+        F("pickRewards", "quest rewards picked up to level 10", "acts", 2, function() return YR:RewardSettings().on == true end,
+            function(on)
+                YippRouteDB.pickRewards = on and true or false          -- (what a class starts with)
+                YR:RewardSettings().on = on and true or false           -- and this class now
+            end),
         F("levelShot", "a screenshot at every ding", "acts", 2, Key("levelShot")),
         F("setupOn", "Character setup", "setup", 1, function() return YR.SetupOn() end, function(on) YR.SetSetupOn(on) end),
     }
@@ -76,15 +87,15 @@ local QUESTIONS = {
         { "On", "Records your runs and saves them as your own routes for RestedXP. Takes a reload." } } },
     { key = "screen", title = "On screen", icon = 236562, choices = {
         { "Nothing", "No bars, buttons or panels from Headstart." },
-        { "Essentials", "XP bar, flight timer, camp icon, loot feed, chat log, death recap, instance tracker, upgrade alerts, and your other characters' bags and gold." },
-        { "Everything", "Adds the swing timer, trinket buttons, and Invite and Leave buttons." } } },
+        { "Essentials", "Flight timer, camp icon, loot feed, chat log, death recap, instance tracker, upgrade alerts, and your other characters' bags and gold." },
+        { "Everything", "Adds the XP bar (in place of Blizzard's), the swing timer, trinket buttons, and Invite and Leave buttons." } } },
     { key = "acts", title = "Automation", icon = 133784, choices = {
-        { "Nothing", "Headstart never acts on your behalf." },
+        { "Nothing", "Headstart never acts for you: it buys, moves, accepts and picks nothing." },
         { "Friends only", "Accepts invites and shared quests from friends and guild members, and invites them when they whisper \"inv\". Never spends gold or moves items." },
-        { "Everything", "Adds restock and auto-train (spend gold), bank deposit (moves items), and a screenshot on level-up." } } },
+        { "Everything", "Adds restock and auto-train (they spend gold), bank deposit (moves items), quest rewards picked, level-up screenshots." } } },
     { key = "setup", title = "New characters", icon = 134166, choices = {
-        { "Off", "Nothing is placed on your bars." },
-        { "On", "Bar profiles and the planner, and your bars, macros and interface applied to new characters." } } },
+        { "Off", "Nothing is placed on your bars. Right for a character you have already set up." },
+        { "On", "Bar profiles and the planner, and your bars, macros and interface put on new characters. Nothing changes until you press Apply there." } } },
 }
 function YR.WelcomeQuestions() return QUESTIONS end
 
@@ -166,6 +177,70 @@ function YR.WelcomeLine(q, plan)
     local line = #on > 0 and ("On: " .. table.concat(on, ", ") .. ".") or "Nothing of it on."
     if #left > 0 then line = line .. " Left off: " .. table.concat(left, ", ") .. "." end
     return line
+end
+
+-- ---------------------------------------------------------------------------
+-- Before you play: what is on that deserves a look, with where to set it
+-- ---------------------------------------------------------------------------
+--- { { name, note, page, section }, ... }: only what is on now, what costs most first. page: the
+--- settings page its button opens; section: the card on it (nil: the page). Six of these at most
+--- (the window has eight lines), then two that are there whatever is on: what installing did not
+--- touch, and what is new on your screen. A note is two lines of the window: some 220 letters.
+local MOST = 6
+function YR.WelcomeChecks()
+    local list = {}
+    local function Add(name, note, page, section) list[#list + 1] = { name = name, note = note, page = page, section = section } end
+    if YR.Option("autoTrain") then
+        Add("Class trainer spends gold", "Buys your class's spells as you open your class trainer, on every character (it asks the"
+            .. " first time on each). Silver to keep starts at 2 silver and is per class: set it, or set spells to Never. Shift"
+            .. " skips it.", "trainer", "Class trainer")
+    end
+    if YR.Option("restock") then
+        Add("Restock spends gold", "Buys reagents, ammo and your own list at every vendor, on every character. Gold to keep is 0"
+            .. " until you set it. Hold Shift as you open a vendor to skip it.", "vendors", "Restock")
+    end
+    if YippRouteDB.mailAuto == true then
+        Add("Mail to alt sends without asking", "Every character on the realm mails its mats to the name you gave, at every"
+            .. " mailbox. Check the name: mail to a wrong name is gone. Hold Shift as you open the mailbox to skip it.",
+            "bags", "Mail to alt")
+    end
+    if YR.Option("bankAuto") then
+        Add("Bank deposit moves your items", "Crafting mats and recipes you can't learn yet go into the bank when you open it."
+            .. " Nothing is lost: look in the bank before you miss something. Which mats is set on its page; Shift skips it.",
+            "bags", "Bank deposit")
+    end
+    if YR:RewardSettings().on == true then
+        Add("Quest rewards are picked for you", "Up to the level on its page (10), a reward is chosen and the quest handed in."
+            .. " The pick is final. It leaves the choice to you when a green is offered; hold Shift to choose yourself.",
+            "gear", "Quest rewards")
+    end
+    if YR.AcceptInvitesSet() ~= "off" or YR.WhisperInviteSet() ~= "off" then
+        Add("Invites are answered for you", "Group invites from friends and guild members are accepted, and one of them who"
+            .. " whispers \"inv\" is invited. Keep both off Anyone on a character strangers can whisper.", "group", "Invites")
+    end
+    if YR.SetupOn() then
+        Add("Character setup changes bars only when you say so", "Nothing changes until you press Apply, and a character in play"
+            .. " is asked first. Bars and macros are kept before every change (/ysetup undo, /ysetup undo first). Chat and Edit"
+            .. " Mode can't be put back: answer Bars only.", "character")
+    end
+    if YR.RoutesOn() then
+        Add("Routes: what acts for you is still off", "Release at a death skip, abandoning skipped quests and sharing or accepting"
+            .. " route quests each have their own switch on the route's settings, off until you turn them on.", "route")
+    end
+    if YR.XPBarOn() then
+        Add("The XP bar stands in for Blizzard's", "Blizzard's XP bar is hidden while ours shows. If another addon already draws"
+            .. " your XP bar, turn ours off. It moves in Arrange (/hs move).", "xpbar", "XP bar")
+    end
+    for i = #list, MOST + 1, -1 do list[i] = nil end
+    if #list == 0 then
+        Add("Nothing here needs setting", "Nothing that spends gold, moves your items or answers for you is on.")
+    end
+    Add("Installing changed nothing of yours", "No action bar, macro, key binding, Edit Mode layout, chat window or game setting was"
+        .. " touched, and no other addon's settings. Character setup is the only part that changes those, and only when you"
+        .. " press Apply there.")
+    Add("New on your screen", "The camp icon, the instance counter and, while you fly, the flight timer (it stands in for"
+        .. " RestedXP's). Drag them where you want them with /hs move, or turn each off on its page. Journey counts quietly.")
+    return list
 end
 
 -- ---------------------------------------------------------------------------
@@ -253,6 +328,76 @@ local function Paint()
     win.apply:SetEnabled(changes > 0)
 end
 
+-- A check's button: its page opened, and the card on it (found as the search finds it, which opens
+-- a folded card).
+local function OpenCheck(check)
+    if not check.page then return end
+    win:Hide()
+    YR:ShowSettingsTab(check.page)
+    if not check.section then return end
+    for _, e in ipairs(YR.SettingsIndex()) do
+        if e.card and e.key == check.page and e.label == check.section then YR.SettingsGo(e) return end
+    end
+end
+
+local ROWS, ROW_H = 8, 54
+local view          -- the "Before you play" list, once it has been asked for
+--- Before you play, over the questions: the list as it stands now.
+local function ShowChecks()
+    local S = YR.Style
+    local v = view
+    if not v then
+        v = CreateFrame("Frame", nil, win)
+        v:SetPoint("TOPLEFT", 1, -49)
+        v:SetPoint("BOTTOMRIGHT", -1, 1)
+        v:SetFrameLevel(win:GetFrameLevel() + 20)
+        v:EnableMouse(true)
+        S.Fill(v, S.C.window)
+        v.title = S.Text(v, 17)
+        v.title:SetPoint("TOPLEFT", 20, -14)
+        v.title:SetText("Before you play")
+        v.sub = S.Text(v, 12, S.C.muted)
+        v.sub:SetPoint("LEFT", v.title, "RIGHT", 12, -1)
+        v.sub:SetText("what is on now that is worth a look first - each with where to set it")
+        v.rows = {}
+        for i = 1, ROWS do
+            local r = CreateFrame("Frame", nil, v)
+            r:SetPoint("TOPLEFT", 20, -44 - (i - 1) * ROW_H)
+            r:SetSize(W - 40, ROW_H - 6)
+            S.Fill(r, S.C.card)
+            S.Border(r, S.C.line)
+            r.name = S.Text(r, 14)
+            r.name:SetPoint("TOPLEFT", 14, -7)
+            r.note = S.Text(r, 11, S.C.muted)
+            r.note:SetPoint("TOPLEFT", 14, -25)
+            r.note:SetWidth(W - 40 - 28 - 96)
+            r.note:SetWordWrap(true)
+            r.note:SetJustifyV("TOP")
+            r.open = S.Button(r, "Open", function() OpenCheck(r.check) end, nil, 80)
+            r.open:SetPoint("RIGHT", -10, 0)
+            v.rows[i] = r
+        end
+        local done = S.Button(v, "Done", function() win:Hide() end, "primary", 110)
+        done:SetPoint("BOTTOMRIGHT", -19, 15)
+        local back = S.Button(v, "Back to the choices", function() v:Hide() end, nil, 160)
+        back:SetPoint("RIGHT", done, "LEFT", -8, 0)
+        view = v
+    end
+    local list = YR.WelcomeChecks()
+    for i, r in ipairs(v.rows) do
+        local check = list[i]
+        r:SetShown(check ~= nil)
+        if check then
+            r.check = check
+            r.name:SetText(check.name)
+            r.note:SetText(check.note)
+            r.open:SetShown(check.page ~= nil)
+        end
+    end
+    v:Show()
+end
+YR.WelcomeShowChecks = function() if win then ShowChecks() end end
+
 local function Build()
     if win then return end
     local S = YR.Style
@@ -313,9 +458,15 @@ local function Build()
 
     win.apply = S.Button(win, "Apply and reload", function()
         local on, off, reload = YR.WelcomeApply(answers)
-        win:Hide()
         YR.Print(("%d turned on, %d turned off. Change anything in /hs."):format(on, off))
-        if reload and ReloadUI then ReloadUI() end
+        if reload and ReloadUI then
+            YR.Print("after the reload, /headstart start has Before you play: what is on that is worth a look first.")
+            win:Hide()
+            ReloadUI()
+            return
+        end
+        -- what is on now that deserves a look before the first quest
+        ShowChecks()
     end, "primary", 170)
     win.apply:SetPoint("BOTTOMRIGHT", -20, 16)
     local each = S.Button(win, "All settings", function()
@@ -324,6 +475,9 @@ local function Build()
     end, nil, 120)
     each:SetPoint("RIGHT", win.apply, "LEFT", -8, 0)
     each.tip = "Headstart's window: a page for each of these, with every choice it has"
+    local checks = S.Button(win, "Before you play", function() ShowChecks() end, nil, 150)
+    checks:SetPoint("RIGHT", each, "LEFT", -8, 0)
+    checks.tip = "What is on now that is worth a look first: what spends gold, what moves your things, what Character setup can and can't put back"
 end
 
 --- The welcome window. A new install (nothing answered yet) opens on Recommended; after that on what
@@ -336,6 +490,7 @@ function YR.WelcomeShow()
         for k, v in pairs(q) do answers[k] = v end
     end
     YippRouteDB.welcomeSeen = true
+    if view then view:Hide() end
     Paint()
     win:Show()
     return true

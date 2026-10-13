@@ -124,7 +124,7 @@ function GetMoney() return MONEY end
 function GetCoinTextureString(c) return c .. "c" end
 function SendMail(to, subject) local l = {} for _, v in pairs(LETTER) do table.insert(l, v) end table.insert(SENT, { to = to, items = l }) LETTER = {} end
 -- the options that are off until turned on, on: the features are what is tested here
-YippRouteDB = { restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
+YippRouteDB = { bankButton = true, mailButton = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
 SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end

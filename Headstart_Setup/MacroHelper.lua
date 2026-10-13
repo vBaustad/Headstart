@@ -585,13 +585,16 @@ function YS.MacroOwn()
 end
 
 --- Write a macro you have over with a new name and text. Returns its index, or nil and why not.
-function YS.MacroSave(index, name, body)
+--- expect: the name it had when you opened it - the macro at that place must still be that one
+--- (they move when one is made, deleted or renamed, and this would write over another).
+function YS.MacroSave(index, name, body, expect)
     if InCombatLockdown() then return nil, "not in combat." end
     name = strtrim(name or "")
     if name == "" then return nil, "it needs a name." end
     if #body > MACRO_MAX then return nil, ("that is %d characters, and a macro holds %d."):format(#body, MACRO_MAX) end
     if not GetMacroInfo(index) then return nil, "that macro is gone." end
     local was = (GetMacroInfo(index))
+    if expect and was ~= expect then return nil, "that macro has moved. Open the macro helper again." end
     EditMacro(index, name:sub(1, NAME_MAX), nil, body)
     if was and was ~= name:sub(1, NAME_MAX) then YS.MacroForget(was) end
     YS.MacroRemember(name:sub(1, NAME_MAX), body)
@@ -949,8 +952,11 @@ local function Build()
     win.save = S.Button(win, "Save changes", function()
         local at = pick.loaded
         if not at then return end
-        local ok, why = YS.MacroSave(at.index, pick.name ~= "" and pick.name or at.name, Text())
+        local ok, why = YS.MacroSave(at.index, pick.name ~= "" and pick.name or at.name, Text(), at.name)
         if ok then
+            -- (renamed, it has a new place in the list: found again by its name)
+            local now = GetMacroIndexByName((pick.name ~= "" and pick.name or at.name):sub(1, 16))
+            if now and now > 0 then at.index = now end
             at.name = (GetMacroInfo(at.index))
             YR.Print(("saved the macro '%s'."):format(tostring(at.name)))
         else
