@@ -85,6 +85,23 @@ def run():
         print(("ok  " if ok else "FAIL"), what)
         bad += not ok
 
+    # The game's sentences in another language: the blanks numbered ("%1$s"), and turned round ("%2$d ...
+    # %1$s"). Escaped with the rest, the "$" left "%1" in the pattern, and every such line raised an error.
+    g.HEADSTART_T = YR
+    r = lua.eval("""(function()
+        local T = HEADSTART_T
+        local p1, o1 = T.SentencePattern("%1$s dies, you gain %2$d experience.")
+        local a, b = T.SentenceMatch("Young Wolf dies, you gain 45 experience.", p1, o1)
+        local p2, o2 = T.SentencePattern("%2$d Erfahrung von %1$s.")
+        local c, d = T.SentenceMatch("45 Erfahrung von Junger Wolf.", p2, o2)
+        local p3, o3 = T.SentencePattern("You receive loot: %sx%d.")
+        local e, f = T.SentenceMatch("You receive loot: [Linen Cloth]x2.", p3, o3)
+        return { a = a, b = b, o1 = o1 == nil, c = c, d = d, o2 = o2 ~= nil, e = e, f = f, none = T.SentencePattern(nil) == nil }
+    end)()""")
+    check(r.a == "Young Wolf" and r.b == "45" and r.o1, "a sentence with numbered blanks is read (it was a broken pattern)")
+    check(r.c == "Junger Wolf" and r.d == "45" and r.o2, "one with its blanks turned round gives them back in their own order")
+    check(r.e == "[Linen Cloth]" and r.f == "2" and r.none, "a plain one as before, and none is none")
+
     def feed():
         g.Tick()
         if not g.HeadstartLootFeed:

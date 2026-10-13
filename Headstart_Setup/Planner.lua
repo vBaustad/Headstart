@@ -808,6 +808,9 @@ local function Save(thenApply)
         Class():lower(), n, Class():lower()))
     if YS.Refresh then YS:Refresh() end
     if YR.RefreshWindow then YR:RefreshWindow() end
+    -- saved and not put on: the plan is the profile, and this character's bars are not it (they were
+    -- written over the plan at the next login at the latest)
+    if not thenApply and YS.Hold then YS.Hold("a plan was saved and not applied") end
     if thenApply then
         if win then win:Hide() end          -- the overlays off the bars, so the real buttons show
         -- only the buttons that differ from the bars: a button you didn't touch is left as it is (also

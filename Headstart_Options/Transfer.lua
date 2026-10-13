@@ -27,7 +27,27 @@ local YR = _G.HeadstartNS
 
 local HEAD = "HEADSTART-SETTINGS 1"
 local DROP_DB = { runs = true, place = true, instanceRuns = true, scan = true, welcome = true, welcomeSeen = true, quiet = true,
-    rxpTrainerWasOn = true, transferKept = true }
+    rxpTrainerWasOn = true, transferKept = true, splits = true }
+-- What acts for you: spends gold, sends or moves your things, answers for you, or says who gets your
+-- mail. A text from someone else must not be able to switch any of it on (with the mail ones it could
+-- send your mats to its writer's character at the next mailbox): Import leaves each of these as it is
+-- here, and only "All of it" - for a text of your own - takes them.
+local ACTING = { mailAuto = true, mailTo = true, mailCustom = true, mailMats = true, mailButton = true,
+    restock = true, restockCustom = true, restockCounts = true, restockReserve = true, restockAmmo = true, restockAmmoBy = true,
+    autoTrain = true, trainer = true, bankAuto = true, bankMats = true, bankButton = true,
+    deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true, shareAll = true,
+    acceptInvites = true, whisperInvite = true, acceptFrom = true, levelShot = true, trinketAuto = true,
+    pickRewards = true, rewardClasses = true, setupOn = true, routes = true }
+-- The words for the ones that are switches, for the line that says what a text would turn on.
+local ACTS = { { "mailAuto", "mail to another character" }, { "restock", "restock" }, { "autoTrain", "the class trainer" },
+    { "bankAuto", "bank deposit" }, { "deathSkipRelease", "release at death skips" }, { "skipQuests", "abandoning skipped quests" },
+    { "groupAccept", "accepting shared quests" }, { "groupShare", "sharing quests" }, { "shareAll", "sharing every quest" },
+    { "acceptInvites", "accepting invites" }, { "whisperInvite", "inviting on a whisper" }, { "levelShot", "screenshots" },
+    { "trinketAuto", "trinket swaps" } }
+-- What the addon reads as a table: anything else under these names, and the login stopped at it.
+local TABLES = { custom = true, myRoutes = true, extra = true, swing = true, xpbar = true, trainer = true, rewardClasses = true,
+    mailTo = true, mailCustom = true, restockCustom = true, restockCounts = true, minimap = true, anchor = true,
+    windowScale = true, trainerCosts = true }
 local DROP_SETUP = { uiPrev = true }
 local MAX_LINES, MAX_DEPTH = 400000, 40
 
@@ -49,7 +69,12 @@ local function KeyText(k)
     return s
 end
 local function KeyOf(text)
-    if text:sub(1, 1) == "#" then return tonumber(text:sub(2)) end
+    if text:sub(1, 1) == "#" then
+        local n = tonumber(text:sub(2))
+        -- (not a number that is none: "nan" reads as one, and a table has no place for it)
+        if not n or n ~= n or n == math.huge or n == -math.huge then return nil end
+        return n
+    end
     return Unesc(text)
 end
 
@@ -102,29 +127,55 @@ end
 -- Whether a macro's text runs code when pressed.
 local CODE = { run = true, script = true, console = true, dump = true }
 local function Runs(body)
+    body = body:gsub("\r", "\n")
     for line in (body .. "\n"):gmatch("([^\n]*)\n") do
         local cmd = line:match("^%s*/(%a+)")
         if cmd and CODE[cmd:lower()] then return true end
     end
     return false
 end
+-- A route's text: RestedXP makes a button of a line like ".macro Name,Icon >>/run ...", so there the
+-- command stands in the middle of a line.
+local function RouteRuns(text)
+    text = text:gsub("\r", "\n")
+    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+        local low = line:lower()
+        if low:find(".macro", 1, true) then
+            for cmd in pairs(CODE) do
+                if low:find("/" .. cmd .. "%f[%A]") then return true end
+            end
+        end
+    end
+    return false
+end
 -- The macros that run code taken out of what was read (a table with such a body, or such a text by
 -- itself): how many.
-local function Strip(t, depth)
+-- kind: "lib" for the table of remembered macros (a list per class), "list" for one of those lists -
+-- the one place a hole must be closed up, since it is read in order and ends at a hole. (A bar's
+-- slots are numbered places: taking one out moves nothing.)
+local function Strip(t, depth, kind)
     local n = 0
     if depth > MAX_DEPTH then return 0 end
+    local list, gone = kind == "list" and #t or 0, {}
     for k, v in pairs(t) do
         if type(v) == "table" then
-            if type(v.body) == "string" and Runs(v.body) then
-                t[k] = nil
-                n = n + 1
+            if (type(v.body) == "string" and Runs(v.body)) or (type(v.text) == "string" and RouteRuns(v.text)) then
+                gone[#gone + 1] = k
             else
-                n = n + Strip(v, depth + 1)
+                n = n + Strip(v, depth + 1, (kind == "lib" and "list") or (k == "macroLib" and "lib") or nil)
             end
-        elseif type(v) == "string" and v:find("/", 1, true) and Runs(v) and k ~= "text" then
-            t[k] = nil
-            n = n + 1
+        elseif type(v) == "string" and v:find("/", 1, true) and k ~= "text" and Runs(v) then
+            gone[#gone + 1] = k
         end
+    end
+    -- from a list, the ones after it move up: a hole ends the list for whatever reads it in order
+    table.sort(gone, function(a, b)
+        if type(a) == "number" and type(b) == "number" then return a > b end
+        return type(a) == "number"
+    end)
+    for _, k in ipairs(gone) do
+        if type(k) == "number" and k >= 1 and k <= list and k % 1 == 0 then table.remove(t, k) else t[k] = nil end
+        n = n + 1
     end
     return n
 end
@@ -261,6 +312,26 @@ local function Summed(data)
     data.profiles = Count(data.setup, function(v) return type(v.slots) == "table" end, 1)
     data.macros = Count(data.setup, function(v) return type(v.body) == "string" end, 1)
     data.code = Count(data.setup, function(v) return type(v.body) == "string" and Runs(v.body) end, 1)
+        + Count(data.db, function(v) return (type(v.body) == "string" and Runs(v.body)) or (type(v.text) == "string" and RouteRuns(v.text)) end, 1)
+    -- what it would switch on that acts for you, in words (the mail's with who it goes to)
+    local acts = {}
+    for _, a in ipairs(ACTS) do
+        local v = data.db[a[1]]
+        if v ~= nil and v ~= false and v ~= "off" then
+            local words = a[2]
+            if a[1] == "mailAuto" and type(data.db.mailTo) == "table" then
+                local to = {}
+                for _, name in pairs(data.db.mailTo) do if type(name) == "string" and name ~= "" then to[#to + 1] = name end end
+                table.sort(to)
+                if #to > 0 then words = "mail to " .. table.concat(to, ", ") end
+            end
+            acts[#acts + 1] = words
+        end
+    end
+    for _, r in pairs(type(data.db.rewardClasses) == "table" and data.db.rewardClasses or {}) do
+        if type(r) == "table" and r.on == true then acts[#acts + 1] = "quest rewards picked" break end
+    end
+    data.acts = acts
     data.routes = 0
     for _ in pairs(type(data.db.myRoutes) == "table" and data.db.myRoutes or {}) do data.routes = data.routes + 1 end
     return data
@@ -299,6 +370,7 @@ function YR.TransferRead(text)
     end
     local root, from, day = {}, nil, nil
     local stack = { root }
+    local ok, a, b = pcall(function()
     for i = 2, #lines - 1 do
         local line = lines[i]
         local kind, rest = line:sub(1, 1), line:sub(3)
@@ -338,15 +410,38 @@ function YR.TransferRead(text)
     if #stack ~= 1 then return nil, "the text is not whole: something in it is never closed." end
     if type(root.db) ~= "table" or type(root.setup) ~= "table" then return nil, "the text holds no settings." end
     return Summed({ db = root.db, setup = root.setup, from = from, date = day })
+    end)
+    if not ok then return nil, "the text could not be read (" .. tostring(a):sub(1, 80) .. ")." end
+    return a, b
 end
 
 --- What was read put in place: each thing the text holds replaces what you had under that name; what
---- it doesn't hold stays. code: the macros that run code too (left out otherwise). Returns how many
---- things were put in, and how many such macros were left out. Takes a /reload to be what is running.
-function YR.TransferImport(data, code)
+--- it doesn't hold stays. own: all of it, as a text of your own - the macros and routes that run code
+--- and the settings that act for you too. Without it those are left out, and what acts for you stays
+--- as it is here. Returns how many things were put in, how many macros and routes that run code were
+--- left out, and how many settings that act for you. Takes a /reload to be what is running.
+function YR.TransferImport(data, own)
     if type(data) ~= "table" or type(data.db) ~= "table" or type(data.setup) ~= "table" then return nil, "nothing was read." end
-    local left = 0
-    if not code then left = Strip(data.setup, 1) + Strip(data.db, 1) end
+    local left, stayed = 0, 0
+    if not own then
+        left = Strip(data.setup, 1) + Strip(data.db, 1)
+        for k in pairs(ACTING) do
+            if data.db[k] ~= nil then data.db[k] = nil stayed = stayed + 1 end
+        end
+    end
+    -- a thing of the wrong shape is not taken at all: a table where the addon reads a table, and no
+    -- table put where there was none (one such line stopped the login for every part after it)
+    for k, v in pairs(data.db) do
+        local have = YippRouteDB[k]
+        if (TABLES[k] and type(v) ~= "table") or (have ~= nil and (type(have) == "table") ~= (type(v) == "table")) then
+            data.db[k] = nil
+        end
+    end
+    for _, k in ipairs({ "custom", "myRoutes", "extra" }) do
+        for name, route in pairs(type(data.db[k]) == "table" and data.db[k] or {}) do
+            if type(route) ~= "table" then data.db[k][name] = nil end
+        end
+    end
     _G.YippSetupDB = type(_G.YippSetupDB) == "table" and _G.YippSetupDB or {}
     local kept = { at = time(), db = {}, setup = {}, noDb = {}, noSetup = {} }
     local n = 0
@@ -362,7 +457,7 @@ function YR.TransferImport(data, code)
     Put(YippRouteDB, data.db, DROP_DB, kept.db, kept.noDb)
     Put(_G.YippSetupDB, data.setup, DROP_SETUP, kept.setup, kept.noSetup)
     YippRouteDB.transferKept = kept
-    return n, left
+    return n, left, stayed
 end
 
 --- Whether there is an import to take back (when it was made), and taking it back: everything it
@@ -409,7 +504,7 @@ local function Paint()
     win.readB:SetShown(taking)
     win.import:SetShown(taking)
     win.import:SetEnabled(read ~= nil)
-    win.importAll:SetShown(taking and read ~= nil and read.code > 0)
+    win.importAll:SetShown(taking and read ~= nil and (read.code > 0 or #read.acts > 0))
     win.undo:SetShown(YR.TransferKept() ~= nil)
 end
 
@@ -532,27 +627,32 @@ local function Build()
         if not data then
             Say("Not read: " .. tostring(why), true)
         else
+            local more = {}
+            if #data.acts > 0 then more[#more + 1] = "it would switch on " .. table.concat(data.acts, ", ") end
+            if data.code > 0 then more[#more + 1] = ("%d of its macros or routes run code (/run, /script)"):format(data.code) end
             Say(("Read: %d settings, %d bar %s, %d %s, %d of your own %s. Import puts them in place of what you have here (kept,"
                 .. " to undo) and reloads.%s"):format(data.settings, data.profiles, data.profiles == 1 and "profile" or "profiles",
                 data.macros, data.macros == 1 and "macro" or "macros", data.routes, data.routes == 1 and "route" or "routes",
-                data.code > 0 and ((" %d of its macros run code (/run, /script): Import leaves them out, the red button takes"
-                    .. " them too - right only for a text of your own."):format(data.code)) or ""))
+                #more > 0 and (" But " .. table.concat(more, ", and ") .. ": Import leaves those out, and what acts for you stays"
+                    .. " as it is here. The red button takes all of it - right only for a text of your own.") or ""), #data.acts > 0)
         end
         Paint()
     end, "primary", 90)
     win.readB:SetPoint("BOTTOMLEFT", 20, 16)
-    local function Bring(code)
+    local function Bring(own)
         if not read then return end
         if InCombatLockdown() then Say("Not in a fight.", true) return end
-        local n, left = YR.TransferImport(read, code)
+        local n, left, stayed = YR.TransferImport(read, own)
         read = nil
-        YR.Print(("imported %d things%s. Reloading. To take it back: /headstart transfer, Undo last import."):format(n or 0,
-            (left or 0) > 0 and (", %d macros that run code left out"):format(left) or ""))
+        YR.Print(("imported %d things%s%s. Reloading. To take it back: /headstart transfer, Undo last import."):format(n or 0,
+            (left or 0) > 0 and (", %d macros or routes that run code left out"):format(left) or "",
+            (stayed or 0) > 0 and (", %d settings that act for you left as they were"):format(stayed) or ""))
         if ReloadUI then ReloadUI() end
     end
     win.import = S.Button(win, "Import and reload", function() Bring(false) end, nil, 150)
     win.import:SetPoint("LEFT", win.readB, "RIGHT", 8, 0)
-    win.importAll = S.Button(win, "With the code macros too", function() Bring(true) end, "danger", 190)
+    win.importAll = S.Button(win, "All of it (my own text)", function() Bring(true) end, "danger", 190)
+    win.importAll.tip = "Also what acts for you (mail, restock, trainer, invites...) and macros and routes that run code. Only for a text you exported yourself"
     win.importAll:SetPoint("LEFT", win.import, "RIGHT", 8, 0)
     win.undo = S.Button(win, "Undo last import", function()
         if InCombatLockdown() then return end

@@ -291,7 +291,7 @@ local function Skin(window, force)
             local points = b.GetNumPoints and b:GetNumPoints()
             local to
             if not (issecretvalue and issecretvalue(points)) and points == 1 then to = select(2, b:GetPoint(1)) end
-            if to == nil or (issecretvalue and issecretvalue(to)) or not rawequal(to, k.over) then
+            if (issecretvalue and issecretvalue(to)) or to == nil or not rawequal(to, k.over) then
                 still = false
                 break
             end

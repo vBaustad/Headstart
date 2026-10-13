@@ -105,7 +105,7 @@ StaticPopupDialogs["HEADSTART_BUY_LATER"] = {
 }
 
 local function AtVendor()
-    if not YR.Option("buyLater") or IsShiftKeyDown() or not GetMerchantNumItems then return end
+    if not YR.Option("buyLater") or not GetMerchantNumItems then return end
     local wanted = YR.ShoppingList()
     if #wanted == 0 then return end             -- nothing on the list: the vendor's goods aren't read
     local money = GetMoney()
@@ -139,7 +139,8 @@ YR.Part(function() return YR.RoutesOn() and YR.Option("buyLater") end,
     function(_, event)
         if #YR.ShoppingList() == 0 then return end
         if event == "MERCHANT_SHOW" then
-            C_Timer.After(0.2, AtVendor)
+            -- (Shift read now, while it is down for the click on the vendor - not a moment later)
+            if not IsShiftKeyDown() then C_Timer.After(0.2, AtVendor) end
         elseif not pending then
             pending = true
             C_Timer.After(0.5, Settled)

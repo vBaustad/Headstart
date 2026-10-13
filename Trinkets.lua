@@ -211,7 +211,9 @@ function YR.TrinketEquip(id, slot)
     end
     if Busy() then
         pending[slot] = id
-        C_Timer.After(1, function() if pending[slot] == id and not InCombatLockdown() then YR.TrinketEquip(id, slot) end end)
+        -- (asked again whatever has happened since: if a fight began meanwhile, the branch above keeps it
+        -- for the fight's end. Left alone in a fight, it was never put on at all - the Carrot stayed on.)
+        C_Timer.After(1, function() if pending[slot] == id then YR.TrinketEquip(id, slot) end end)
         return
     end
     pending[slot] = nil
@@ -785,8 +787,17 @@ local function EverySecond()
 end
 -- The swaps turned off (or all of quality of life) while one of them has something of yours off:
 -- what you wore goes back on, as it would at the next second had they stayed on.
+local swapsLate
 local function SwapsStop()
-    if not InCombatLockdown() then YR.TrinketWhen() end
+    if not InCombatLockdown() then YR.TrinketWhen() return end
+    -- turned off in a fight: gear can't be changed now, so it goes back on when the fight ends (the part
+    -- is off by then and hears nothing: a listener of its own, for that one moment)
+    swapsLate = swapsLate or CreateFrame("Frame")
+    swapsLate:RegisterEvent("PLAYER_REGEN_ENABLED")
+    swapsLate:SetScript("OnEvent", function(self)
+        self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+        YR.TrinketWhen()
+    end)
 end
 
 local started

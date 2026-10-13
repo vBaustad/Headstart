@@ -23,6 +23,7 @@ F.__index = F
 function F:RegisterEvent(e) self.ev = self.ev or {} self.ev[e] = true end
 function F:SetScript(_, fn) self.fn = fn end
 function F:UnregisterAllEvents() self.ev = nil end
+function F:UnregisterEvent(e) if self.ev then self.ev[e] = nil end end
 function F:SetAlpha(a) self.alpha = a self.sets = (self.sets or 0) + 1 end
 function F:GetAlpha() return self.alpha or 1 end
 function F:IsMouseOver() return self.over or false end

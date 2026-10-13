@@ -686,16 +686,13 @@ local function Build()
     if p and p[1] and p[2] then
         hud:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p[1], p[2])
     else
-        -- Nowhere chosen yet: at the left of the quest list, by its top - out of the way on any
-        -- screen, and where the eye goes anyway. (It was right of the middle of the screen, in the
-        -- way of the fight.) Hung on the list, so it keeps its place beside it when that is moved in
-        -- Edit Mode; with no such list, the same corner of the screen. Dragged, it is where you left it.
-        local list = _G.ObjectiveTrackerFrame
-        if type(list) == "table" and list.GetObjectType then
-            hud:SetPoint("TOPRIGHT", list, "TOPLEFT", -6, 0)
-        else
-            hud:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -330, -170)
-        end
+        -- Nowhere chosen yet: by the top right, left of where the minimap and the quest list stand as
+        -- Blizzard has them - out of the way of the fight, and where the eye goes anyway. (It was
+        -- right of the middle of the screen. Then it was hung on the quest list's own frame, to follow
+        -- it in Edit Mode: on a new character with no quest that frame had no place of its own yet, and
+        -- the icon sat in the top LEFT corner - seen 2026-10-13, with the list at the right all along.
+        -- A place on the screen cannot be lost that way.) Dragged, it is where you left it.
+        hud:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -250, -212)
     end
 
     statRows, buffRows = {}, {}
@@ -826,8 +823,10 @@ local function OursAmong(added)
 end
 local function Later(_, event, _, info)
     if event == "UNIT_AURA" then
-        -- in a fight the auras can't be read: the reading is taken when it ends
-        if InCombatLockdown() then return end
+        -- in a fight the auras can't be read: the reading is taken when it ends. (Asked as the scan
+        -- asks it: out of a fight too the game keeps them back in places - a battleground, an
+        -- encounter - and what comes with this event is then not to be looked into either.)
+        if AurasBlocked() then return end
         -- auras were only added, and none is a camp's: a food buff, a potion, somebody's blessing
         if type(info) == "table" and not info.isFullUpdate and info.addedAuras
                 and not info.removedAuraInstanceIDs and not info.updatedAuraInstanceIDs and not OursAmong(info.addedAuras) then
@@ -885,7 +884,9 @@ end
 -- stop trusting the reading, one to take a fresh one. The login's own reading is taken when the part
 -- comes on; entering the world takes another, when the auras are surely there.
 local EVENTS = { { "UNIT_AURA", "player" }, "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_ENTERING_WORLD" }
-local function Wanted() return YR.Option("camp") end
+-- (not while Campfire's own icon is the one showing: ours was only hidden then, and went on reading
+-- every change of your auras for nothing)
+local function Wanted() return YR.Option("camp") and not YR.CampfireShowsCamp() end
 local function Fresh() YR.RefreshCamp() end
 local part
 function YR.StartCamp()

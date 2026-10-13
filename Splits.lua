@@ -644,7 +644,11 @@ local function OnEvent(_, event, level, atLevel)
         C_Timer.After(1, AskPlayed)          -- and check our count against the server's
         local pb = Fastest()
         local theirs = pb and pb.levels[level]
-        YR.Print(("level %d at %s%s"):format(level, Clock(rec.elapsed), theirs and ("  " .. Delta(rec.elapsed - theirs)) or ""))
+        -- (the splits' own line: this part is on for the XP bar's numbers too, and with the splits
+        -- off it said so at every level all the same)
+        if YR.Option("showSplits") then
+            YR.Print(("level %d at %s%s"):format(level, Clock(rec.elapsed), theirs and ("  " .. Delta(rec.elapsed - theirs)) or ""))
+        end
     end
     Refresh()
 end

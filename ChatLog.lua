@@ -469,9 +469,14 @@ end
 function YR.StartChatLog()
     -- Off (or not kept between sessions): what the saved file still holds goes now, so it isn't read
     -- in at every login for nothing. This runs as Headstart loads, when the saved file has just been read.
-    if not YR.ChatLogOn() or YippRouteDB.chatLogKeep == false then _G.HeadstartChatLog = nil end
+    -- (the log's own switch, not the main one: quality of life switched off for a while keeps your
+    -- settings, and the log with them)
+    if not YR.OptionSet("chatLog") or YippRouteDB.chatLogKeep == false then _G.HeadstartChatLog = nil end
     local began = false
     YR.Part(YR.ChatLogOn, { "PLAYER_LOGOUT" }, function()
+        -- not kept between sessions: not written to the file at all (it was, and read in again at the
+        -- next login only to be dropped)
+        if YippRouteDB.chatLogKeep == false then _G.HeadstartChatLog = nil return end
         if on then Trim(true) end
     end, {
         start = function()

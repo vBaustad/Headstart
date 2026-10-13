@@ -180,6 +180,12 @@ local function Recheck(u)
 end
 
 local function ShowNext()
+    -- switched off with offers waiting: they are let go (the window's own closing asks for the next one)
+    if not (YR.Option("upgrades") and YR.Option("upgradeButton")) then
+        for i = #queue, 1, -1 do queue[i] = nil end
+        if win and win:IsShown() then win:Hide() end
+        return
+    end
     if not win or win:IsShown() or InCombatLockdown() then return end
     local u
     while #queue > 0 and not u do u = Recheck(table.remove(queue, 1)) end
@@ -226,8 +232,10 @@ local function Equip(u)
         YR.Print(u.link .. " will be equipped when the fight ends.")
         return
     end
+    -- Into the slot it was compared with: a ring, a trinket or a one-hand weapon has two, and left to
+    -- the game it goes into the first - taking off the better of the two you wear, not the one it beat.
     local fn = (C_Item and C_Item.EquipItemByName) or EquipItemByName
-    if fn then fn(u.link) end
+    if fn then fn(u.link, u.slot) end
     C_Timer.After(1, function()
         if not Worn(u.link) and InBags(u.link) then
             table.insert(queue, 1, u)
@@ -320,7 +328,8 @@ function YR.ScanUpgrades()
             local old, better, s, link, how
             if seen and not told[seen] and not checked[seen] then
                 old, better, s, link, how = YR.CheckUpgrade(bag, slot)
-                if not link then checked[seen] = true end
+                -- (looked at for good only once its text was there to read: Sim.lua)
+                if not link and (not YR.SimItemRead or YR.SimItemRead(seen)) then checked[seen] = true end
             end
             if link and not told[link] then
                 -- two for one slot (two pairs of boots from one quest): only the better one is offered
@@ -388,5 +397,5 @@ function YR.StartUpgrades()
     declared = true
     YR.Part(function() return YR.Option("upgrades") end, { "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED",
         "PLAYER_REGEN_ENABLED", "PLAYER_LEVEL_UP", "TRAIT_CONFIG_UPDATED", "PLAYER_TALENT_UPDATE" }, OnEvent,
-        { start = function() wipe(checked) end })
+        { start = function() wipe(checked) end, stop = ShowNext })      -- (off: its window goes, with what waited)
 end

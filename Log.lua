@@ -131,7 +131,7 @@ end
 -- The NPC you are talking to while a quest window is open: the quest giver or the turn-in.
 local function Npc()
     local ok, name = pcall(UnitName, "npc")
-    return ok and name or nil
+    return ok and YR.Open(name) or nil      -- (a name the game keeps from addons - in an instance - is no name, not an error)
 end
 
 -- The first pass after login only records what is already complete: those were finished in an
@@ -198,22 +198,21 @@ local NPC_WINDOWS = { MERCHANT_SHOW = "vendor", TRAINER_SHOW = "trainer", TAXIMA
 
 -- Your own loot, from the chat line the game prints ("You receive loot: [item]x2."): the patterns
 -- come from the game's own strings, so they work in any language. Made the first time recording is on.
-local LOOT_PATTERNS, SKILL_UP = {}, nil
-local function Pattern(s)
-    return "^" .. s:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1"):gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)") .. "$"
-end
+local LOOT_PATTERNS, SKILL_UP, SKILL_ORDER = {}, nil, nil
+-- (Core.lua's, which reads a sentence whose blanks are numbered too: a second value says their order)
+local function Pattern(s) return YR.SentencePattern(s) end
 local function MakePatterns()
     for _, s in ipairs({ LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_SELF, LOOT_ITEM_PUSHED_SELF_MULTIPLE, LOOT_ITEM_PUSHED_SELF }) do
-        if type(s) == "string" then LOOT_PATTERNS[#LOOT_PATTERNS + 1] = Pattern(s) end
+        if type(s) == "string" then LOOT_PATTERNS[#LOOT_PATTERNS + 1] = { Pattern(s) } end
     end
     -- "Your skill in %s has increased to %d."
-    SKILL_UP = type(ERR_SKILL_UP_SI) == "string" and Pattern(ERR_SKILL_UP_SI)
+    if type(ERR_SKILL_UP_SI) == "string" then SKILL_UP, SKILL_ORDER = Pattern(ERR_SKILL_UP_SI) end
 end
 local QUEST_ITEM = Enum and Enum.ItemClass and Enum.ItemClass.Questitem or 12
 
 local function Looted(msg)
     for _, pat in ipairs(LOOT_PATTERNS) do
-        local link, count = msg:match(pat)
+        local link, count = YR.SentenceMatch(msg, pat[1], pat[2])
         local item = link and tonumber(link:match("item:(%d+)"))
         if item then
             local _, _, _, _, _, classID = C_Item.GetItemInfoInstant(item)
@@ -236,7 +235,7 @@ local function Profession(name)
 end
 
 local function SkillUp(msg)
-    local name, rank = msg:match(SKILL_UP)
+    local name, rank = YR.SentenceMatch(msg, SKILL_UP, SKILL_ORDER)
     if name and Profession(name) then Add("skill", nil, { name = name, rank = tonumber(rank) }) end
 end
 
@@ -439,12 +438,25 @@ end
 -- Looking after the saved logs, once a login, recording on or not (a log kept from when it was on
 -- still takes the room). On an account with no logs there is nothing to do, and nothing is written.
 local tidied = false
+-- Whether this character's key can be made: its name and the second part of it both known. A brand-new
+-- character is "Unknown" for its first moments. And with only the second part missing the key was made
+-- from the realm's name as it is displayed - another key than the one made a moment later, so a log
+-- could be attached under one and written under the other (a log under "Unknown-<realm>" was found in
+-- a saved file, 2026-10-13). Waited for half a minute at most: a client that never gives the second
+-- part gets the key it always got.
+local waited = 0
+local function Named()
+    local name, second = UnitFullName("player")
+    if not name or name == UNKNOWNOBJECT or name == "Unknown" then return false end
+    if second and second ~= "" then return true end
+    waited = waited + 1
+    return waited > 15
+end
+
 local function Tidy()
     if tidied then return end
-    -- a brand-new character is "Unknown" for its first moments: wait for the real name, or the clean-up
-    -- below can't tell which log is yours
-    local name = UnitFullName("player")
-    if not name or name == UNKNOWNOBJECT or name == "Unknown" then
+    -- wait for the real name, or the clean-up below can't tell which log is yours
+    if not Named() then
         C_Timer.After(2, Tidy)
         return
     end
@@ -476,10 +488,8 @@ local part, hooked
 -- Recording comes on: this character's log, made now if it has none.
 local function Begin()
     if not (part and part.on) or run then return end
-    -- a brand-new character is "Unknown" for its first moments: wait for the real name, or every new
-    -- character's run lands under the same key
-    local name = UnitFullName("player")
-    if not name or name == UNKNOWNOBJECT or name == "Unknown" then
+    -- wait for the real name, or every new character's run lands under the same key
+    if not Named() then
         C_Timer.After(2, Begin)
         return
     end

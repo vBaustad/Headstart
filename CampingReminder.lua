@@ -44,8 +44,12 @@ local function Complete(q) return C_QuestLog.IsComplete and C_QuestLog.IsComplet
 
 local function Say(msg)
     YR.Print(msg)
-    if RaidNotice_AddMessage and RaidWarningFrame and ChatTypeInfo then
-        RaidNotice_AddMessage(RaidWarningFrame, "Headstart: " .. msg, ChatTypeInfo["RAID_WARNING"])
+    -- On the game's own line for messages, mid-screen. (It went into Blizzard's raid warning frame
+    -- through RaidNotice_AddMessage: code of Blizzard's run from here, which leaves what it writes on
+    -- that frame ours - and a real raid warning, whose text the game keeps from addons in an instance,
+    -- then failed in that same code with the blame on Headstart.)
+    if UIErrorsFrame and UIErrorsFrame.AddMessage then
+        UIErrorsFrame:AddMessage("Headstart: " .. msg, 1, 0.3, 0.2)
     end
 end
 

@@ -116,8 +116,12 @@ end
 
 local function Warn(msg)
     YR.Print(msg)
-    if YR.Option("instanceWarn") and RaidNotice_AddMessage and RaidWarningFrame and ChatTypeInfo then
-        RaidNotice_AddMessage(RaidWarningFrame, "Headstart: " .. msg, ChatTypeInfo["RAID_WARNING"])
+    -- On the game's own line for messages, mid-screen. (It went into Blizzard's raid warning frame
+    -- through RaidNotice_AddMessage: code of Blizzard's run from here, which leaves what it writes on
+    -- that frame ours - and a real raid warning, whose text the game keeps from addons in an instance,
+    -- then failed in that same code with the blame on Headstart.)
+    if YR.Option("instanceWarn") and UIErrorsFrame and UIErrorsFrame.AddMessage then
+        UIErrorsFrame:AddMessage("Headstart: " .. msg, 1, 0.3, 0.2)
     end
 end
 
@@ -163,7 +167,8 @@ end
 --- The copy a GUID is of, when it is one of this map's creatures or objects and the game lets it be
 --- read: "Creature-0-4379-36-1234-639-00001A2B3C" on map 36 is copy 1234. nil otherwise.
 function YR.InstanceCopyID(guid, map)
-    if guid == nil or (issecretvalue and issecretvalue(guid)) or type(guid) ~= "string" then return nil end
+    -- (whether it is one the game keeps from addons is asked first: nothing else may be asked of such a value)
+    if (issecretvalue and issecretvalue(guid)) or type(guid) ~= "string" then return nil end
     local kind, m, copy = guid:match("^(%a+)%-%d+%-%d+%-(%d+)%-(%d+)%-")
     if kind ~= "Creature" and kind ~= "Vehicle" and kind ~= "GameObject" then return nil end
     if tonumber(m) ~= map then return nil end           -- a pet called out elsewhere carries that place's
@@ -227,8 +232,8 @@ function YR.InstanceIDDebug()
         local ok, guid = pcall(UnitGUID, unit)
         local what
         if not ok then what = "the game refused"
-        elseif guid == nil then what = "nothing there"
         elseif issecretvalue and issecretvalue(guid) then what = "kept secret by the game"
+        elseif guid == nil then what = "nothing there"
         else what = guid .. " -> copy " .. tostring(YR.InstanceCopyID(guid, map)) end
         YR.Print(("  %s: %s"):format(unit, what))
     end

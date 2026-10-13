@@ -27,7 +27,7 @@ local holder, win
 local rows = {}                 -- the lines on screen, newest first: { key, kind, what, count, icon, till }
 local waking = false            -- a timer is set for when the oldest line runs out
 local lastXP, lastMax, lastLevel
-local LOOT, COIN, REP           -- the patterns, made when the feed is first on
+local LOOT, COIN, REP, REP_ORDER    -- the patterns, made when the feed is first on
 local issecret = issecretvalue
 
 function YR.LootFeedOn() return YR.Option("lootFeed") end
@@ -76,29 +76,27 @@ end
 -- Reading the game's sentences
 -- ---------------------------------------------------------------------------
 -- A pattern from one of the game's sentences: "%s" a text, "%d" a number, the rest literal.
-local function Pattern(fmt, loose)
-    if type(fmt) ~= "string" then return nil end
-    local p = fmt:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1")
-    p = p:gsub("%%%d?%$?s", "(.+)"):gsub("%%%d?%$?d", "(%%d+)")
-    return loose and p or ("^" .. p .. "$")
-end
+-- (Core.lua's, which reads a sentence whose blanks are numbered too: a second value says their order)
+local function Pattern(fmt, loose) return YR.SentencePattern(fmt, loose) end
 
 local function Patterns()
     if LOOT then return end
     LOOT = {}
     for _, s in ipairs({ LOOT_ITEM_SELF_MULTIPLE, LOOT_ITEM_PUSHED_SELF_MULTIPLE, LOOT_ITEM_SELF, LOOT_ITEM_PUSHED_SELF }) do
-        LOOT[#LOOT + 1] = Pattern(s)
+        local p, order = Pattern(s)
+        if p then LOOT[#LOOT + 1] = { p, order } end
     end
     -- an amount's own words inside a longer sentence ("... 5 Silver, 74 Copper"): not anchored
-    COIN = { { Pattern(GOLD_AMOUNT, true), 10000 }, { Pattern(SILVER_AMOUNT, true), 100 }, { Pattern(COPPER_AMOUNT, true), 1 } }
-    REP = Pattern(FACTION_STANDING_INCREASED) or false
+    COIN = { { (Pattern(GOLD_AMOUNT, true)), 10000 }, { (Pattern(SILVER_AMOUNT, true)), 100 }, { (Pattern(COPPER_AMOUNT, true)), 1 } }
+    REP, REP_ORDER = Pattern(FACTION_STANDING_INCREASED)
+    REP = REP or false
 end
 
 --- The item link and how many, from "You receive loot: [item]x2." (nil for anyone else's loot).
 function YR.LootFromText(msg)
     Patterns()
     for i = 1, #LOOT do
-        local link, n = msg:match(LOOT[i])
+        local link, n = YR.SentenceMatch(msg, LOOT[i][1], LOOT[i][2])
         if link and link:find("|Hitem:", 1, true) then return link, tonumber(n) or 1 end
     end
 end
@@ -141,6 +139,8 @@ local Wake
 -- not per frame.
 local function Layout()
     if not holder then return end
+    -- switched off with a line still up: the line's own timer came back here and put the feed up again
+    if not on then holder:Hide() return end
     local now, n, soonest = GetTime(), 0, nil
     for i = 1, ROWS do
         local r = rows[i]
@@ -370,7 +370,7 @@ local function OnEvent(_, event, msg)
         local copper = YR.MoneyFromText(msg)
         if copper > 0 then GotMoney(copper) end
     elseif REP then
-        local faction, amount = msg:match(REP)
+        local faction, amount = YR.SentenceMatch(msg, REP, REP_ORDER)
         if faction and tonumber(amount) then GotRep(faction, tonumber(amount)) end
     end
 end
@@ -510,7 +510,9 @@ end
 function YR.StartLootFeed()
     -- Off: what the saved file still holds goes now, so it isn't read in at every login for nothing.
     -- (This runs as Headstart loads, when the saved file has just been read.)
-    if not YR.LootFeedOn() then _G.HeadstartLootLog = nil end
+    -- (the feed's own switch: with all of quality of life switched off for a while your settings are
+    -- kept, and so is this - it deleted the log of every character that logged in meanwhile)
+    if not YR.OptionSet("lootFeed") then _G.HeadstartLootLog = nil end
     YR.Part(YR.LootFeedOn, { "CHAT_MSG_LOOT", "CHAT_MSG_MONEY", "CHAT_MSG_COMBAT_FACTION_CHANGE", "PLAYER_XP_UPDATE" }, OnEvent, {
         start = function()
             on = true

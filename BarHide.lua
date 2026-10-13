@@ -37,9 +37,25 @@ local function Frame(key)
     return type(f) == "table" and f.SetAlpha and f or nil
 end
 
+-- What could not be done in a fight, done when it ends - also where the part itself is off by then
+-- and hears nothing (a bar set back to shown, or all of this switched off, in a fight: its buttons
+-- stayed dead to the mouse until a reload).
+local retrying
+local function Retry()
+    if InCombatLockdown() then C_Timer.After(1, Retry) return end      -- (looked at once a second, for as long as the fight lasts)
+    retrying = false
+    if late and YR.BarHideApply then YR.BarHideApply() end
+end
+local function Later()
+    late = true
+    if retrying then return end
+    retrying = true
+    C_Timer.After(1, Retry)
+end
+
 -- The bar's buttons take the mouse, or don't. Only the ones we turned off are turned on again.
 local function Mouse(key, frame, on)
-    if InCombatLockdown() then late = true return false end
+    if InCombatLockdown() then Later() return false end
     local off = quiet[key]
     if on then
         if off then

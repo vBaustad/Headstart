@@ -218,9 +218,11 @@ local function IsMe(sender)
 end
 
 -- The party's steps: with the routes on.
-local function OnShare(_, event, a, b, _, d)
+local function OnShare(_, event, a, b, c, d)
     if event == "CHAT_MSG_ADDON" then
-        if a == PREFIX and type(b) == "string" and type(d) == "string" then
+        -- the party's or the raid's channel only: a whisper or a guild message with our prefix is not a
+        -- party member's hello (anyone could make chat say "X has Headstart 9.9" with one)
+        if a == PREFIX and type(b) == "string" and type(d) == "string" and (c == "PARTY" or c == "RAID" or c == "INSTANCE_CHAT") then
             local ok, me = pcall(IsMe, d)
             if not (ok and me) then Heard(d, b) end
         end
@@ -325,8 +327,20 @@ function YR:RefreshParty()
     if not panel then
         panel = CreateFrame("Frame", "HeadstartParty", UIParent)
         panel:SetSize(260, 20)
-        panel:SetPoint("TOPLEFT", HeadstartSplitsFrame or UIParent, "BOTTOMLEFT", 0, -8)
         panel.lines = {}
+    end
+    -- under the splits box where there is one, else a place of its own. (It was hung under the box or,
+    -- with the box never shown, under the whole screen: below the bottom edge, never seen.) Looked at
+    -- every time, so the box turned on later takes it along.
+    local under = _G.HeadstartSplitsFrame or false
+    if panel.under ~= under then
+        panel.under = under
+        panel:ClearAllPoints()
+        if under then
+            panel:SetPoint("TOPLEFT", under, "BOTTOMLEFT", 0, -8)
+        else
+            panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 20, -260)
+        end
     end
     table.sort(members, ByRole)
     local guide, step = Current()       -- as it is now: the step check may not have run since you joined

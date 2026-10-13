@@ -241,7 +241,11 @@ YR.Part(PickingNow, { "QUEST_COMPLETE" }, function() Choose(10) end)
 -- The quest windows are hooked for RestedXP's sake alone (see below): once, with RestedXP loaded and
 -- quality of life on.
 local windowsHooked
-YR.Part(function() return type(_G.RXP) == "table" and YR.QoLOn() end, nil, nil, { start = function()
+YR.Part(function()
+    -- (only where one of the two things it is for is on: the routes, or reward picking. With neither,
+    -- RestedXP's windows are not hooked and its settings are never touched.)
+    return type(_G.RXP) == "table" and YR.QoLOn() and (YR.RoutesOn() or YR:RewardSettings().on == true)
+end, nil, nil, { start = function()
     if windowsHooked then return end
     windowsHooked = true
     YR:HookQuestWindows()
@@ -266,7 +270,7 @@ function YR:HookQuestWindows()
         local frame = _G[name]
         if frame and frame.HookScript then
             frame:HookScript("OnShow", function()
-                if IsShiftKeyDown() and YR.QoLOn() then Pause("enableQuestAutomation") end
+                if IsShiftKeyDown() and YR.QoLOn() and YR.RoutesOn() then Pause("enableQuestAutomation") end
             end)
         end
     end

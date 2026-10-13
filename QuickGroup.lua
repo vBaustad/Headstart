@@ -43,7 +43,7 @@ function YR.InviteTarget()
     local ok, why = CanInvite()
     if not ok then YR.Print("can't invite: " .. why .. ".") return end
     local name = GetUnitName("target", true)
-    if not name or (issecretvalue and issecretvalue(name)) then
+    if (issecretvalue and issecretvalue(name)) or not name then
         YR.Print("the game doesn't tell addons who that is here: invite them from their portrait.")
         return
     end

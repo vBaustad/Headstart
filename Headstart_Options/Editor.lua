@@ -2265,7 +2265,9 @@ end
 -- Settings, Trainer: the auto trainer (Trainer.lua) and, for this character's class, what it learns
 -- ---------------------------------------------------------------------------
 local trainer = { controls = {} }
-local TRAIN_TO = 30          -- the spells listed: up to Forever's level cap
+-- The spells listed: every level there is. (It stopped at 30, the beta's cap: a spell first trained
+-- later had no row, so it could not be set - and "All spells: Never" did not reach it, so it was bought.)
+local TRAIN_TO = 60
 
 local function ChoiceLabel(v)
     for _, c in ipairs(YR.TRAINER_CHOICES) do if c[1] == v then return c[2] end end
@@ -2276,12 +2278,14 @@ local function BuildTrainer(page)
     local c = L.c
     local Section, Row = L.Section, L.Row
     Section("Class trainer", "spells learned as the trainer opens", { icon = 133741 })
-    Row("Auto-train", S.Switch(c, function() return YR.Option("autoTrain") end,
+    -- (as it is set, not as it runs: with all of quality of life off this read "off" whatever it was, and
+    -- a click then wrote "on")
+    Row("Auto-train", S.Switch(c, function() return YR.OptionSet("autoTrain") end,
         function(on) YippRouteDB.autoTrain = on YR:SyncRxpTrainer() end),
         "Buys your class's spells the moment you open your class trainer: every spell below that isn't set to"
         .. " Never, as far as your gold goes above Silver to keep. It is on for every character of the account,"
-        .. " while the choices and the amount to keep are each class's - so it asks the first time on each"
-        .. " character. Weapon skills, riding and professions are never bought. Hold Shift as you open the"
+        .. " while the choices and the amount to keep are each class's. It doesn't ask: chat says what it learned"
+        .. " and for how much. Weapon skills, riding and professions are never bought. Hold Shift as you open the"
         .. " trainer to do it yourself. RestedXP's trainer automation is turned off while this is on.")
     local reserve = S.Stepper(c, function() return math.floor((YR.TrainerData().reserve or 0) / 100) end,
         function(v) YR.TrainerData().reserve = v * 100 end, 0, 100000, 1, 120)
@@ -2565,7 +2569,11 @@ local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
             onCommit = function(t)
                 local item = YR.ItemFromText(t)
                 local count = tonumber((t:gsub("|H.-|h.-|h", "")):match("(%d+)%s*$"))
-                if item and count and count ~= item then
+                -- typed, not clicked: "6265 20" is item 6265 and 20 of it (it took no typed ID at all:
+                -- two numbers were no item, and one number was its own count)
+                local id, n = t:match("^%s*(%d+)%s+(%d+)%s*$")
+                if id then item, count = tonumber(id), tonumber(n) end
+                if item and count and (id or count ~= item) then
                     YR.SetRestockCustom(item, count)
                     YR:RefreshWindow()
                 end
@@ -2575,7 +2583,7 @@ local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
         hooksecurefunc("HandleModifiedItemClick", function(link)
             if input:HasFocus() and IsShiftKeyDown() and link then input:Insert(link .. " ") end
         end)
-        Row("Add an item", custom, "Shift-click an item into the box (or type its ID), then the number to keep, then Enter. Enter"
+        Row("Add an item", custom, "Shift-click an item into the box (or type its ID), then a space and the number to keep, then Enter. Enter"
             .. " the same item with 0 to remove it.")
         local list = CreateFrame("Frame", nil, c)
         list:SetSize(300, 24)
@@ -3710,8 +3718,18 @@ local BuildJourney = QoLPage("journey", function(L, c, Section, Row)
             if on then YippRouteDB.journeyToast = nil else YippRouteDB.journeyToast = false end
         end), "A small note at the top of the screen for a few seconds when you reach level 20, 30, 40, 50 or 60. Click it to read the"
             .. " chapter. Off: the chapter is written all the same.")
-        Row("Start over", S.Button(c, "Reset", function() YR.JourneyReset() end, nil, 90),
-            "Forgets everything logged for this character. It counts again from now.")
+        -- (asked first, as every other button that deletes: it went at one click, with the chapters written)
+        StaticPopupDialogs["HEADSTART_JOURNEY_RESET"] = {
+            text = "Headstart: forget this character's whole journey, the chapters already written too?",
+            button1 = "Forget it",
+            button2 = "Cancel",
+            OnAccept = function() YR.JourneyReset() YR:RefreshWindow() end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+        }
+        Row("Start over", S.Button(c, "Reset", function() StaticPopup_Show("HEADSTART_JOURNEY_RESET") end, nil, 90),
+            "Forgets everything logged for this character, the chapters too. It counts again from now. Asks first.")
 end)
 
 local function BuildInstances(outer)
@@ -4099,6 +4117,13 @@ local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
             YR.MoverReset("bag")
             YR.MoverReset("reagentBag")
         end, nil, 90), "Both bags open where Blizzard puts them again.")
+
+        -- (its only switch was on the routes' settings page, which is not there while the routes are off -
+        -- as on every new install)
+        Section("Headstart's minimap button", "the button by the minimap", { find = "minimap icon button hide", icon = 134269 })
+        Row("Minimap button", S.Switch(c, function() return YR.OptionSet("minimapButton") end, function(on) YR:ShowMinimapButton(on) end),
+            "Headstart's own button by the minimap: left click opens this window, right click a menu of its windows. Off: /headstart"
+            .. " and /hs still open them.")
 
         Section("Cinematics", "skipped as they start", { find = "skip cinematic intro movie opening", icon = 133885 })
         Row("Skip cinematics", S.Switch(c, Opt("skipCinematic"), function(on) YippRouteDB.skipCinematic = on end),
@@ -4507,7 +4532,7 @@ local CATEGORIES = {
       desc = "Said when something needs doing: the trainer, talent points to spend (on screen), repairs, items to craft." },
     { key = "trainer", label = "Trainer", build = BuildTrainer, refresh = function() trainer.refresh() end, icon = 133741,
       status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
-      desc = "Buys your class's spells as the trainer opens, as far as your gold goes above what you keep. Asks the first time on each character." },
+      desc = "Buys your class's spells as the trainer opens, as far as your gold goes above what you keep." },
     { key = "journey", label = "Journey", build = BuildJourney, refresh = QoLRefresh("journey"), icon = 134939,
       status = function() return YippRouteDB.journey ~= false end, scope = "Every character; each has its own journey",
       desc = "Your road logged as you play: distance, time, gold, loot, zones. Told as a story you click through." },

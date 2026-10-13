@@ -44,6 +44,7 @@ C_Timer = { After = function(_, fn) fn() end }
 function UnitLevel() return 1 end
 IN_CINEMATIC = false
 function CinematicFrame_CancelCinematic() IN_CINEMATIC = false; CANCELLED = (CANCELLED or 0) + 1 end
+function StopCinematic() IN_CINEMATIC = false; CANCELLED = (CANCELLED or 0) + 1 end       -- (the game's own: what is called now)
 strsplit = function(_, s) local a, b = s:match("^(%S*)%s*(.*)$") return a, b ~= "" and b or nil end
 strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
 tinsert = table.insert
@@ -330,7 +331,8 @@ YS.Apply(YS, None, None, SURE)
 ok = g.RXP.loaded is not None
 print(("ok  " if ok else "FAIL"), "old layout without ui: RestedXP guide still loaded")
 bad += not ok
-lua.execute(r'''ME.name = "Main"; GUID = "Player-1-0000MAIN"''')
+# (one saved table stands in for both characters here: taken as the main's own, not as another character's left behind)
+lua.execute(r'''ME.name = "Main"; GUID = "Player-1-0000MAIN"; YippSetupCharDB.guid = nil''')
 events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
 ok = g.YippSetupDB.ui is not None and g.YippSetupDB.ui.cvars is not None
 print(("ok  " if ok else "FAIL"), "logging in on the main fills in the missing ui")
@@ -1532,7 +1534,7 @@ scanned = YS.ScanUI(YS)["keys"]            # (["keys"]: .keys on a Lua table is 
 report(scanned is not None and scanned.ACTIONBUTTON1[1] == "1", "and are part of the interface that Save interface saves")
 # the main's keys: E moves forward (W is strafe on the main, here nothing), 1 and 2 swapped, the bag key taken off
 main = lua.eval('{ MOVEFORWARD = { "E", false }, JUMP = { "SPACE", false }, ACTIONBUTTON1 = { "2", false }, ACTIONBUTTON2 = { "1", "Q" }, TOGGLEBAG = { false, false } }')
-lua.execute("YippSetupCharDB.uiBackup = { at = 1 } SAVED_SETS = 0")
+lua.execute("YippSetupCharDB.uiBackup = { at = 1, last = 4000000000 } SAVED_SETS = 0")
 n = YS.ApplyKeys(main, g.YippSetupCharDB.uiBackup)
 now = g.KEYS()
 report(n == 4 and now.MOVEFORWARD == "E,-" and now.ACTIONBUTTON1 == "2,-" and now.ACTIONBUTTON2 == "1,Q" and now.TOGGLEBAG == "-,-"
@@ -1584,7 +1586,7 @@ report(YS.UISig(saved) == YS.UISig(other) and other.machine.Sound_MasterVolume =
 g.MACHINE = m
 lua.execute("""CVARS.graphicsQuality = "3" CVARS.graphicsShadowQuality = "2" CVARS.graphicsViewDistance = "3"
     CVARS.Sound_MasterVolume = "1" CVARS.Sound_MusicVolume = "0.4" SETS = {} SAID = {}
-    YippSetupCharDB.uiBackup = { at = 1 }
+    YippSetupCharDB.uiBackup = { at = 1, last = 4000000000 }
     local p = YR_SETUP.Print YR_SETUP.Print = function(text) SAID[#SAID + 1] = text end""")
 YS.ApplyUI(YS, lua.eval("{ cvars = {}, bars = {}, v = 5, machine = MACHINE }"), YS.Options(YS))
 c = g.CVARS
@@ -1616,4 +1618,25 @@ YS.ApplyUI(YS, lua.eval("{ cvars = {}, bars = {}, v = 4 }"), YS.Options(YS))
 said = " ".join(g.SAID.values())
 report(c.Sound_MasterVolume == "1" and "Graphics and sound: none saved" in said and "graphics and sound are not in it" in said and "key bindings" not in said.split("older Headstart:")[1],
        f"an interface saved before this: nothing set, and it says what to do - naming only what that one lacks ({said[-170:]})")
+
+# The automatic save holds off where the bars and the profile are known not to be the same thing (a
+# profile deleted under the character, an undo, a plan saved and not applied): the profile had no
+# other copy, and the bars were written over it four seconds later.
+same = lua.eval("function(a, b) return rawequal(a, b) end")
+lua.execute("YippSetupCharDB.applied = true YippSetupCharDB.hold = nil SAID = {}")
+YS.Scan(YS)
+before = YS.Profile(YS)
+YS.Hold("the profile it was on was deleted")
+YS.BarsStale()
+YS.RememberNow()
+report(g.YippSetupCharDB.hold == "the profile it was on was deleted" and same(YS.Profile(YS), before),
+       "held: the bars are not saved over the profile by themselves")
+YS.Hold("again")
+report(g.YippSetupCharDB.hold == "the profile it was on was deleted", "said once: a second reason does not replace the first")
+YS.Scan(YS)
+report(g.YippSetupCharDB.hold is None and not same(YS.Profile(YS), before), "saved by hand: these bars are the profile, and the hold is off")
+# Blizzard's own placing of new spells is stopped by a bars-only apply too
+lua.execute('CVARS.AutoPushSpellToActionBar = "1"')
+YS.Apply(YS, None, None, lua.eval("{ sure = true, barsOnly = true }"))
+report(g.CVARS.AutoPushSpellToActionBar == "0", f"Bars only: Blizzard's own placing of new spells is stopped at once, not at the next login ({g.CVARS.AutoPushSpellToActionBar})")
 sys.exit(1 if bad else 0)

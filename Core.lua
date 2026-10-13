@@ -69,13 +69,43 @@ function YR.Money(copper)
     return c .. "c"
 end
 
+--- A pattern from one of the game's own sentences ("%s dies, you gain %d experience."): "%s" a text,
+--- "%d" a number, the rest literal - so what is read works in any language. Other languages number
+--- their blanks ("%1$s ... %2$d"), and may turn them round ("%2$d ... %1$s"): the number is taken out
+--- first (escaped with the rest, its "$" left "%1" in the pattern, which is no pattern at all - every
+--- such line raised an error in those languages), and the order the blanks stand in is the second
+--- value where it is not 1, 2, 3 (YR.SentenceMatch puts what was read back in the blanks' own order).
+--- loose: not anchored at either end.
+function YR.SentencePattern(fmt, loose)
+    if type(fmt) ~= "string" then return nil end
+    local order, n, turned = {}, 0, false
+    for pos in fmt:gmatch("%%(%d?)%$?[sd]") do
+        n = n + 1
+        order[n] = tonumber(pos) or n
+        if order[n] ~= n then turned = true end
+    end
+    local p = fmt:gsub("%%%d%$", "%%")
+    p = p:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1")
+    p = p:gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)")
+    return loose and p or ("^" .. p .. "$"), turned and order or nil
+end
+
+--- What a sentence's blanks hold in msg (up to three), in the blanks' own order.
+function YR.SentenceMatch(msg, pattern, order)
+    local a, b, c = msg:match(pattern)
+    if not order or a == nil then return a, b, c end
+    local got, out = { a, b, c }, {}
+    for i = 1, 3 do if order[i] then out[order[i]] = got[i] end end
+    return out[1], out[2], out[3]
+end
+
 --- Quality of life on or off, for the whole account. What's on screen follows at once where it can;
 --- the rest (hooks already made, bars already built) follows a /reload.
 function YR.SetQoLOn(on)
     local was = YR.QoLOn()
     YippRouteDB.qolOff = (not on) and true or nil
     if (on and true or false) == was then return end
-    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply", "BarHideApply", "SwingApply", "WindowScaleApply", "RecapApply", "ChatLogApply", "LootFeedApply" }) do
+    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply", "BarHideApply", "SwingApply", "WindowScaleApply", "RecapApply", "ChatLogApply", "LootFeedApply", "TalentNotice" }) do
         if YR[apply] then pcall(YR[apply]) end
     end
     for _, key in ipairs({ "bag", "reagentBag", "talents" }) do
@@ -234,8 +264,14 @@ function YR.OptionSet(key)
 end
 
 -- An option from the options page: on unless turned off (and off while its main switch is).
+-- What is the routes' own: with the routes off none of it runs, whatever it is set to. (Recording and
+-- the splits box ran on with the routes off on every account that had them written down as on - the
+-- routes' page then says "none of it runs", and had no switch left to stop them.)
+local ROUTES_OWN = { logging = true, showSplits = true, deathSkipRelease = true, campReminder = true, buyLater = true,
+    sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true, skipQuests = true }
 function YR.Option(key)
     if YippRouteDB.qolOff == true and not LEVELLING[key] then return false end
+    if ROUTES_OWN[key] and YR.RoutesOn and not YR.RoutesOn() then return false end
     return YR.OptionSet(key)
 end
 
@@ -286,16 +322,27 @@ local function PartOff(p)
     if p.opt.stop then p.opt.stop(p) end
 end
 
+local function Look(p)
+    local want = p.want() and true or false
+    if want ~= p.on then
+        p.on = want
+        if want then PartOn(p) else PartOff(p) end
+    elseif want and p.opt.again then
+        p.opt.again(p)                          -- still on, and a setting changed: as it is now
+    end
+end
+
 function YR.ApplyParts()
     partsSoon = false
     if not YR.partsReady then return end            -- before the login: nothing is on yet
     for _, p in ipairs(parts) do
-        local want = p.want() and true or false
-        if want ~= p.on then
-            p.on = want
-            if want then PartOn(p) else PartOff(p) end
-        elseif want and p.opt.again then
-            p.opt.again(p)                          -- still on, and a setting changed: as it is now
+        -- Each by itself: a part that fails (a frame of Blizzard's that another build hasn't got) must
+        -- not leave every part declared after it as it was until a reload. The error is not lost: it
+        -- is raised again a moment later, by itself, for the game and any error catcher to show.
+        local ok, err = pcall(Look, p)
+        if not ok then
+            YR.partError = err                      -- (the last one, for the tests)
+            C_Timer.After(0, function() error(err, 0) end)
         end
     end
 end
@@ -596,6 +643,25 @@ end
 -- down as what it was then. A new install starts quiet, and is asked what it wants (the welcome window).
 local WAS_ON = { "restock", "bankAuto", "levelShot", "trinketBar", "groupBar", "upgrades", "talentMove", "talentFadeSlider" }
 local WAS_ON_3 = { "bankButton", "mailButton", "deathSkipRelease", "skipQuests", "groupShare", "groupAccept" }
+-- "On, unless another addon did it" cannot be answered as Headstart loads: the addons that sort after
+-- it (Leatrix Plus, Naowh Forever, NovaInstanceTracker) are not in yet, and each of these was written
+-- down as on whatever they did - for good, since the latch runs once. So those keys wait for the login
+-- (YR.LatchOthers); until then they are unset, which reads as off, and no part is on before the login.
+local latchLater = {}
+function YR.LatchOthers()
+    local db = YippRouteDB
+    if #latchLater == 0 then return end
+    YR.EllesmereForget()                            -- (what another addon has, asked afresh)
+    for _, key in ipairs(latchLater) do
+        if key == "xpbar" then
+            if type(db.xpbar) ~= "table" then db.xpbar = {} end
+            if db.xpbar.on == nil then db.xpbar.on = YR.OtherHas("xpbar") == nil end
+        elseif db[key] == nil then
+            db[key] = YR.OtherHas(key) == nil
+        end
+    end
+    latchLater = {}
+end
 function YR.Latch(fresh)
     local db = YippRouteDB
     local was = tonumber(db.quiet) or 0
@@ -605,7 +671,7 @@ function YR.Latch(fresh)
     -- you turn on. An account that had Headstart keeps each as it was (on, unless another addon did it).
     if not fresh then
         for _, key in ipairs(WAS_ON_3) do
-            if db[key] == nil then db[key] = YR.OtherHas(key) == nil end
+            if db[key] == nil then latchLater[#latchLater + 1] = key end
         end
         if db.pickRewards == nil then db.pickRewards = true end
     end
@@ -618,7 +684,7 @@ function YR.Latch(fresh)
         return
     end
     for _, key in ipairs(WAS_ON) do
-        if db[key] == nil then db[key] = YR.OtherHas(key) == nil end
+        if db[key] == nil then latchLater[#latchLater + 1] = key end
     end
     for _, key in ipairs({ "acceptInvites", "whisperInvite", "acceptFrom" }) do
         if db[key] == nil then db[key] = "friends" end
@@ -626,7 +692,7 @@ function YR.Latch(fresh)
     if db.showSplits == nil then db.showSplits = true end
     if db.logging == nil then db.logging = true end
     if type(db.xpbar) ~= "table" then db.xpbar = {} end
-    if db.xpbar.on == nil then db.xpbar.on = YR.OtherHas("xpbar") == nil end
+    if db.xpbar.on == nil then latchLater[#latchLater + 1] = "xpbar" end
 end
 
 SLASH_HEADSTARTSETTINGS1 = "/hs"
@@ -643,6 +709,7 @@ local started
 f:SetScript("OnEvent", function(_, event, name)
     if event == "PLAYER_LOGIN" then
         f:UnregisterEvent("PLAYER_LOGIN")
+        YR.LatchOthers()
         YR.partsReady = true
         YR.ApplyParts()
         YR.WelcomeFirst()
@@ -679,42 +746,53 @@ f:SetScript("OnEvent", function(_, event, name)
             for other in pairs(t) do if other ~= class then t[other] = nil end end
         end
     end
-    YR:RegisterGuides()
-    YR:RegisterExtras()
-    YR:StartLog()
-    YR.StartRunStore()
-    YR:HookTooltips()
-    YR:StartSplits()
-    YR:StartGroup()
-    YR.StartCamp()
-    YR.StartBank()
-    YR.StartMail()
-    YR.StartRestock()
-    YR.StartReminders()
-    YR.StartWhisper()
-    YR.StartSim()
-    YR.StartUpgrades()
-    YR.StartTrinkets()
-    YR.StartInstances()
-    YR.StartXPBar()
-    YR.StartRXPSkin()
-    YR.StartDamageSkin()
-    YR.StartMovers()
-    YR.StartTalentFade()
-    YR.StartBarHide()
-    YR.StartPowerFlash()
-    YR.StartSwing()
-    YR.StartJourney()
-    YR.StartRecap()
-    YR.StartChatLog()
-    YR.StartLootFeed()
-    YR.StartQuestLFG()
-    YR.StartAlts()
-    YR.StartCraftRemind()
-    YR.StartQuickGroup()
+    -- Each start by itself: one that fails (a saved value of the wrong shape, a frame of Blizzard's that
+    -- another build hasn't got) must not keep everything after it from starting. The error is raised
+    -- again a moment later, for the game and any error catcher to show.
+    local function Start(fn, ...)
+        if type(fn) ~= "function" then return end
+        local ok, err = pcall(fn, ...)
+        if not ok then
+            YR.partError = err
+            C_Timer.After(0, function() error(err, 0) end)
+        end
+    end
+    Start(YR.RegisterGuides, YR)
+    Start(YR.RegisterExtras, YR)
+    Start(YR.StartLog, YR)
+    Start(YR.StartRunStore)
+    Start(YR.HookTooltips, YR)
+    Start(YR.StartSplits, YR)
+    Start(YR.StartGroup, YR)
+    Start(YR.StartCamp)
+    Start(YR.StartBank)
+    Start(YR.StartMail)
+    Start(YR.StartRestock)
+    Start(YR.StartReminders)
+    Start(YR.StartWhisper)
+    Start(YR.StartSim)
+    Start(YR.StartUpgrades)
+    Start(YR.StartTrinkets)
+    Start(YR.StartInstances)
+    Start(YR.StartXPBar)
+    Start(YR.StartRXPSkin)
+    Start(YR.StartDamageSkin)
+    Start(YR.StartMovers)
+    Start(YR.StartTalentFade)
+    Start(YR.StartBarHide)
+    Start(YR.StartPowerFlash)
+    Start(YR.StartSwing)
+    Start(YR.StartJourney)
+    Start(YR.StartRecap)
+    Start(YR.StartChatLog)
+    Start(YR.StartLootFeed)
+    Start(YR.StartQuestLFG)
+    Start(YR.StartAlts)
+    Start(YR.StartCraftRemind)
+    Start(YR.StartQuickGroup)
     if YR.Style then YR.Style.Changed = YR.SettingChanged end
-    YR:BuildMinimapButton()
-    YR:BuildOptions()   -- last: Blizzard's options API is the part most likely to differ on this client
+    Start(YR.BuildMinimapButton, YR)
+    Start(YR.BuildOptions, YR)   -- last: Blizzard's options API is the part most likely to differ on this client
     -- every part that is wanted comes on at the login proper, when every other addon is in too (what
     -- another addon does decides some of our defaults) and the character can be asked about
     -- scan results still in the account's file: the window's addon is loaded once, a little after the
@@ -723,6 +801,7 @@ f:SetScript("OnEvent", function(_, event, name)
         C_Timer.After(10, function() if YippRouteDB.scan ~= nil and not InCombatLockdown() then YR.LoadWindow() end end)
     end
     if IsLoggedIn and IsLoggedIn() then
+        YR.LatchOthers()
         YR.partsReady = true
         YR.ApplyParts()
     else

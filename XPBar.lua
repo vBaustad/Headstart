@@ -95,6 +95,9 @@ function YR.XPBarLayoutNow()
         end
         return true
     end
+    -- (your own, when that is what was picked: its words still being a preset's read as that preset, so
+    -- the card for writing your own stayed greyed and could never be chosen from one)
+    if db.textLayout == "own" then return "own" end
     if db.textLayout and LAYOUTS[db.textLayout] and Is(LAYOUTS[db.textLayout]) then return db.textLayout end
     for _, o in ipairs(YR.XPBAR_LAYOUTS) do
         if LAYOUTS[o[1]] and Is(LAYOUTS[o[1]]) then return o[1] end
@@ -690,7 +693,13 @@ local function EverySecond()
     end
 end
 
-local function Wanted() return YR.XPBarOn() and YR.QoLOn() end
+-- (not at the last level with "hide at the last level" on: the bar can never show there, and it was
+-- listened and ticked for all the same)
+local function Wanted()
+    if not (YR.XPBarOn() and YR.QoLOn()) then return false end
+    local level, last = UnitLevel("player") or 1, GetMaxPlayerLevel and GetMaxPlayerLevel() or 60
+    return not (YR.XPBarDB().maxHide ~= false and level >= last)
+end
 
 -- Edit Mode puts Blizzard's bar back on show when it closes: hide it again then. A hook can't be
 -- taken off again, so it's put on the first time the bar is on and does nothing while the bar is off.

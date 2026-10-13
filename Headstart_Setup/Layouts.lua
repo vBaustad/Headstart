@@ -100,7 +100,11 @@ function YS.LayoutDelete(name)
     local c = Data()
     if not (c.layouts and c.layouts[name]) then return false, "the class's first profile stays: rename it, or empty it in the planner." end
     c.layouts[name] = nil
-    if YippSetupCharDB.layoutName == name then YippSetupCharDB.layoutName = nil end
+    if YippSetupCharDB.layoutName == name then
+        YippSetupCharDB.layoutName = nil
+        -- on the first profile now, wearing the deleted one's bars: not to be saved over the first
+        if YS.Hold then YS.Hold("the profile it was on was deleted") end
+    end
     for spec, n in pairs(YippSetupCharDB.specLayouts or {}) do
         if n == name then YippSetupCharDB.specLayouts[spec] = nil end
     end

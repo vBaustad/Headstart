@@ -55,10 +55,16 @@ YR.JourneyOn = Wanted
 
 local function Record()
     local j = _G.HeadstartJourney
+    -- a character made again under a deleted one's name is handed the old one's file: its journey is
+    -- not this one's to go on with (told apart by the character's own ID, where the game gives it)
+    local ok, id = pcall(UnitGUID, "player")
+    id = ok and YR.Open(id) or nil
+    if type(j) == "table" and type(id) == "string" and type(j.guid) == "string" and j.guid ~= id then j = nil end
     if type(j) ~= "table" then
         j = {}
         _G.HeadstartJourney = j
     end
+    if type(id) == "string" then j.guid = id end
     for _, k in ipairs({ "t", "d", "zone", "hours", "days", "gold", "spent", "loot", "mobs", "deathZone", "levels", "mates", "need", "chat", "mobId", "chapters" }) do
         if type(j[k]) ~= "table" then j[k] = {} end
     end
@@ -193,7 +199,7 @@ local function Looted(msg)
     end
 end
 
-local KILL
+local KILL, KILL_ORDER
 local function Killed(msg)
     msg = Plain(msg)
     if type(msg) ~= "string" then return end
@@ -202,11 +208,13 @@ local function Killed(msg)
         local fmt = _G.COMBATLOG_XPGAIN_FIRSTPERSON
         KILL = false
         if type(fmt) == "string" then
-            local p = fmt:gsub("([%(%)%.%[%]%-%+%*%?%^%$])", "%%%1")
-            KILL = "^" .. p:gsub("%%%d?%$?s", "(.+)"):gsub("%%%d?%$?d", "(%%d+)")
+            -- (from its start only: the longer sentences, with a rested or a group bonus, begin the same)
+            local p, order = YR.SentencePattern(fmt, true)
+            KILL, KILL_ORDER = "^" .. p, order
         end
     end
-    local name, xp = msg:match(KILL or "^(.+) dies, you gain (%d+)")
+    local name, xp
+    if KILL then name, xp = YR.SentenceMatch(msg, KILL, KILL_ORDER) else name, xp = msg:match("^(.+) dies, you gain (%d+)") end
     if not name then return end
     Add(J, "kills", 1)
     Add(J, "xpKill", tonumber(xp) or 0)

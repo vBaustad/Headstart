@@ -129,8 +129,23 @@ def run():
           "Everything applied: all of it, and the routes turned on take a reload")
     turned = YR.WelcomeApply(mini)
     check(not YR.XPBarOn() and not YR.Option("lootFeed") and not YR.Option("flightTimer") and not YR.Option("camp") and not YR.Option("restock")
-          and YR.AcceptInvitesSet() == "off" and not YR.RoutesOn() and not YR.SetupOn() and turned[1] == len(plan(full)),
+          and YR.AcceptInvitesSet() == "off" and not YR.RoutesOn() and not YR.SetupOn()
+          and turned[1] == len([k for k, f in plan(full).items() if not f.quiet]),
           f"Minimal applied: every one of them off ({turned[1]})")
+    # "Nothing" is nothing: what no answer turns on but acts for you all the same goes off with it, and
+    # stays as it is under the other answers; "Friends only" narrows a wider choice
+    db.mailAuto, db.shareAll, db.trinketAuto = True, True, True
+    check(plan(T(None, None, 2, None))["mailAuto"].on is True and plan(T(None, None, 1, None))["trinketAuto"].on is True
+          and plan(T(None, None, 0, None))["mailAuto"].on is False,
+          "mail to another character, sharing every quest, trinket swaps: left on by For friends and Everything, off with Nothing")
+    check(YR.WelcomeNow().acts != 0, "and with one of them on, what you have is not read as Nothing")
+    YR.WelcomeApply(T(None, None, 0, None))
+    check(db.mailAuto is None and db.shareAll is None and db.trinketAuto is None and YR.WelcomeNow().acts == 0,
+          "Nothing applied: all three off")
+    db.acceptInvites, db.whisperInvite = "anyone", "party"
+    YR.WelcomeApply(T(None, None, 1, None))
+    check(db.acceptInvites == "friends" and db.whisperInvite == "friends", "Friends only applied over Anyone: narrowed to friends")
+    YR.WelcomeApply(mini)
     check(YR.Option("durability") and YR.Option("remindTalents"), "what is seen and harmless (the durability line, the talent reminder) isn't touched")
 
     # another addon does it: left off whatever the answer, and named

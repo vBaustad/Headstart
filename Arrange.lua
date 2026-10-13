@@ -162,6 +162,14 @@ local function Beside(h)
 end
 
 local function Pick(h)
+    -- a number being typed belongs to the element it was typed for: the box is left (which writes it)
+    -- before another element is the picked one - it went to whichever was picked when Enter came
+    if panel and h ~= picked then
+        for _, key in ipairs({ "x", "y", "w", "h" }) do
+            local box = panel[key]
+            if box and box.HasFocus and box:HasFocus() then box:ClearFocus() end
+        end
+    end
     local was = picked
     picked = h
     if was then Paint(was) end

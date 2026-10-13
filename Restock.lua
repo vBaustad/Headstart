@@ -151,13 +151,22 @@ end
 --- The shopping list at this vendor: { { item, index, want, each, why } } in the order to buy.
 function YR.RestockPlan()
     local offer = Offer()
-    local plan = {}
+    local plan, at = {}, {}
     local function Add(item, target, have, why)
         local o = offer[item]
         if not o or target <= 0 then return end
         local want = target - (have or Count(item))
         if o.avail >= 0 then want = math.min(want, o.avail) end
-        if want > 0 then plan[#plan + 1] = { item = item, index = o.index, want = want, each = o.each, why = why } end
+        if want <= 0 then return end
+        local p = at[item]
+        if p then
+            -- On two lists (a class reagent, or your ammo, that is on your own list too): bought once, up
+            -- to the larger of the two counts. Each was counted from the same bags, so both were bought.
+            if want > p.want then p.want, p.why = want, why end
+            return
+        end
+        p = { item = item, index = o.index, want = want, each = o.each, why = why }
+        plan[#plan + 1], at[item] = p, p
     end
     for _, r in ipairs(YR.RestockReagents()) do
         if r.wanted then Add(r.item, YR.RestockCount(r.item, r.default), nil, r.why) end

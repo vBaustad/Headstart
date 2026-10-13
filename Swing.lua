@@ -833,7 +833,7 @@ end
 -- and dressed as the other bars of ours are (its key: "range").
 local rangeBar
 local RANGE_IN, RANGE_MELEE, RANGE_OUT = { 0.28, 0.60, 0.34 }, { 0.80, 0.56, 0.24 }, { 0.62, 0.20, 0.20 }
-local function Truly(v) return v and not (issecretvalue and issecretvalue(v)) and true or false end
+local function Truly(v) return not (issecretvalue and issecretvalue(v)) and v and true or false end
 -- How far the target is, as near as an addon can tell. The game gives no distance, but it does say
 -- whether an item's use would reach a target, and that for an item you do not have: so one item of each
 -- reach (5 yards, 10, 15 ... 40) is asked about, and the answer is a span: farther than the longest
@@ -862,12 +862,16 @@ local function Reaches(ids)
     if not ask then return nil end
     for _, id in ipairs(ids) do
         local ok, r = pcall(ask, id, "target")
-        if ok and r ~= nil and not (issecretvalue and issecretvalue(r)) then return r and true or false end
+        if ok and not (issecretvalue and issecretvalue(r)) and r ~= nil then return r and true or false end
     end
     return nil
 end
 -- more than `least` yards, at most `most` (either nil where it could not be told)
 local function Yards()
+    -- Only of something you can attack. Asked about a friend in a fight, the game takes the question
+    -- for an action an addon may not take (it is allowed of an enemy, or out of a fight) - and with a
+    -- party member clicked on in a fight that was thirteen of them, five times a second.
+    if not (Truly(UnitExists("target")) and Truly(UnitCanAttack("player", "target"))) then return nil, nil end
     local least, most
     for _, step in ipairs(YARDS) do
         local r = Reaches(step[2])
@@ -949,6 +953,18 @@ local function RangeBarApply()
     rangeBar.yards:SetFont(Face(), db.font or 12, "OUTLINE")
     local target = Truly(UnitExists("target")) and Truly(UnitCanAttack("player", "target")) and not Truly(UnitIsDead("target"))
     rangeBar.said, rangeBar.told = nil, nil
+    RangePaint()
+    rangeBar:SetShown(not db.lock or (target and rangeBar.known) and true or false)
+end
+
+-- The range bar's words and whether it shows, as things are now: what a target changing or the range
+-- flipping asks for. (All of RangeBarApply - placed, dressed, its fonts set - is for a setting changing;
+-- at the edge of melee range it ran several times a second.)
+local function RangeBarNow()
+    local db = YippRouteDB.swing
+    if not (rangeBar and YR.SwingOn() and type(db) == "table" and db.rangeBar == true) then return RangeBarApply() end
+    db = YR.SwingDB()
+    local target = Truly(UnitExists("target")) and Truly(UnitCanAttack("player", "target")) and not Truly(UnitIsDead("target"))
     RangePaint()
     rangeBar:SetShown(not db.lock or (target and rangeBar.known) and true or false)
 end
@@ -1167,7 +1183,11 @@ function PreviewShow()
         return DressTest()
     end
     if sampler then sampler:SetScript("OnUpdate", nil) sampler:Hide() end
-    if not Own() then return false, "turn the swing timer on first." end
+    if not Own() then
+        -- (the timer switched off under a running preview: it ran on, a frame at a time, with nothing to show)
+        if previewer then previewer:SetScript("OnUpdate", nil) end
+        return false, "turn the swing timer on first."
+    end
     Build()
     previewer = previewer or CreateFrame("Frame")
     previewer:SetScript("OnUpdate", function(self)
@@ -1225,7 +1245,7 @@ local function OnEvent(_, event, a, b, c)
                 Colour(bars[a], YR.SwingDB())
             end
         end
-        if changed then RangeBarApply() end
+        if changed then RangeBarNow() end
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         inCombat = event == "PLAYER_REGEN_DISABLED"
         if inCombat then RangeChecks() end
@@ -1233,7 +1253,7 @@ local function OnEvent(_, event, a, b, c)
         YR.SwingLayout()
     elseif event == "PLAYER_TARGET_CHANGED" then
         RangeChecks()
-        RangeBarApply()
+        RangeBarNow()
     elseif event == "PLAYER_EQUIPMENT_CHANGED" then
         -- a weapon slot (main hand, off hand, ranged): nothing else you put on changes a swing bar
         if type(a) == "number" and (a < 16 or a > 18) then return end
@@ -1335,8 +1355,14 @@ local function Say(bar, value, most, ask)
         bar.pct:SetText(most > 0 and (math.floor(value / most * 100 + 0.5) .. "%") or "")
         return
     end
+    -- (two plain calls, not a function made for the purpose: this runs at every change of health or
+    -- power in a fight, which is when the numbers are kept from addons)
     local curve = type(CurveConstants) == "table" and CurveConstants.ScaleTo100 or nil
-    if not (curve and ask and pcall(function() bar.pct:SetFormattedText("%.0f%%", ask(curve)) end)) then bar.pct:SetText("") end
+    if curve and ask then
+        local ok, pct = pcall(ask, curve)
+        if ok and pcall(bar.pct.SetFormattedText, bar.pct, "%.0f%%", pct) then return end
+    end
+    bar.pct:SetText("")
 end
 local function AskHealth(curve) return UnitHealthPercent("player", true, curve) end
 local function AskPower(curve) return UnitPowerPercent("player", nil, false, curve) end
@@ -1443,10 +1469,13 @@ local function ComboFlash(part, r, g, b)
 end
 local function ComboFeed(quiet)
     if not (combo and combo:IsShown()) then return end
-    local points = GetComboPoints and GetComboPoints("player", "target") or UnitPower("player", COMBO)
+    -- (the count may be one the game keeps from addons: it is not asked whether it is there by testing
+    -- it, only what kind of thing it is)
+    local points = GetComboPoints and GetComboPoints("player", "target")
+    if type(points) ~= "number" then points = UnitPower("player", COMBO) end
     -- (the points you had on something stay on its corpse: clicked on, a dead target shows none)
     local dead = UnitExists("target") and UnitIsDead("target")
-    if dead and not (issecretvalue and issecretvalue(dead)) then points = 0 end
+    if not (issecretvalue and issecretvalue(dead)) and dead then points = 0 end
     for _, part in ipairs(combo.parts) do
         if part:IsShown() then
             if EASE then pcall(part.SetValue, part, points, EASE) else pcall(part.SetValue, part, points) end

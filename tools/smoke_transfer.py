@@ -116,23 +116,64 @@ def run():
         setup = { classes = { MAGE = { profile = { slots = { [1] = { kind = "macro", name = "Bad", body = "/script RAN = RAN + 1" },
             [2] = { kind = "macro", name = "Fine", body = "/cast Frostbolt" } } } } }, macroLib = { MAGE = { "/run RAN = 5", "/cast Fireball" } } } }
         BEFORE_DB, BEFORE_SETUP = Copy(YippRouteDB), Copy(YippSetupDB)""")
-    n, left = YR.TransferImport(g.THEIRS)
+    n, left, stayed = YR.TransferImport(g.THEIRS)
     db, setup = g.YippRouteDB, g.YippSetupDB
-    check(db.autoTrain is False and db.newThing == "new" and db.trainer.MAGE.reserve == 7 and db.trainer.PALADIN is None
-          and db.restock is False and db.campPos is not None and db.runs["Flody-Stagheart"] is not None and db.runs.evil is None and db.quiet == 3,
+    check(db.newThing == "new" and db.restock is False and db.campPos is not None and db.runs["Flody-Stagheart"] is not None
+          and db.runs.evil is None and db.quiet == 3,
           "imported: each thing the text holds is in place, what it doesn't hold is as it was, and it can't touch the run logs or where this install is at")
+    check(db.autoTrain is True and db.trainer.MAGE is None and db.trainer.PALADIN is not None and stayed == 2,
+          f"but what acts for you is not a stranger's to set: the class trainer and its choices stay as they are here ({stayed} left)")
     slots = setup.classes.MAGE.profile.slots
-    check(left == 2 and slots[1] is None and slots[2] is not None and slots[2].body == "/cast Frostbolt" and setup.macroLib.MAGE[1] is None
-          and setup.macroLib.MAGE[2] == "/cast Fireball" and setup.uiPrev is not None and g.RAN == 0,
-          f"macros that run code are left out ({left}), the others come in, and nothing ran")
+    check(left == 2 and slots[1] is None and slots[2] is not None and slots[2].body == "/cast Frostbolt"
+          and setup.macroLib.MAGE[1] == "/cast Fireball" and setup.macroLib.MAGE[2] is None and setup.uiPrev is not None and g.RAN == 0,
+          f"macros that run code are left out ({left}), the others come in - a list closed up behind the one taken out - and nothing ran")
     check(YR.TransferKept() == 1791849098 and YR.TransferUndo() is True and lua.eval("Same")(g.YippRouteDB, g.BEFORE_DB)
           and lua.eval("Same")(g.YippSetupDB, g.BEFORE_SETUP) and YR.TransferKept() is None and YR.TransferUndo() is False,
           "Undo: everything it replaced is as it was, what it added is gone, and there is nothing left to take back")
-    lua.execute("""THEIRS.setup.classes.MAGE.profile.slots[1] = { kind = "macro", name = "Bad", body = "/script RAN = RAN + 1" }""")
-    n, left = YR.TransferImport(g.THEIRS, True)
-    check(left == 0 and g.YippSetupDB.classes.MAGE.profile.slots[1] is not None and g.RAN == 0,
-          "asked for with the code macros: they come in too (as text: still nothing is run)")
+    lua.execute("""THEIRS = { db = { autoTrain = false, newThing = "new", trainer = { MAGE = { reserve = 7 } } },
+        setup = { classes = { MAGE = { profile = { slots = { [1] = { kind = "macro", name = "Bad", body = "/script RAN = RAN + 1" } } } } } } }""")
+    n, left, stayed = YR.TransferImport(g.THEIRS, True)
+    db = g.YippRouteDB
+    check(left == 0 and stayed == 0 and g.YippSetupDB.classes.MAGE.profile.slots[1] is not None and db.autoTrain is False
+          and db.trainer.MAGE.reserve == 7 and db.trainer.PALADIN is None and g.RAN == 0,
+          "All of it, for a text of your own: the code macros and what acts for you come in too (as text: still nothing is run)")
     YR.TransferUndo()
+
+    # A text from a stranger: it would have your mailbox send your mats to its writer's character
+    lua.execute("""THEFT = { db = { mailAuto = true, mailTo = { ["Realm-Alliance"] = "Their Alt" }, mailMats = "all", mailCustom = { [2589] = true },
+        restock = true, restockReserve = 0, acceptInvites = "anyone", lootFeed = true, rewardClasses = { PALADIN = { on = true } } }, setup = {} }
+        BEFORE_DB = Copy(YippRouteDB)""")
+    lua.execute("local d = YR.TransferRead(YR.TransferExport()) SUMMED = d")
+    theirs_text = lua.eval("""(function()
+        local keep = YippRouteDB
+        YippRouteDB = THEFT.db
+        local text = YR.TransferExport()
+        YippRouteDB = keep
+        return text
+    end)()""")
+    d, why = read(theirs_text)
+    said = ", ".join(d.acts.values()) if d else ""
+    check(d is not None and "mail to Their Alt" in said and "restock" in said and "accepting invites" in said and "quest rewards picked" in said,
+          f"read: what it would switch on is said, with who the mail would go to ({said})")
+    n, left, stayed = YR.TransferImport(d)
+    db = g.YippRouteDB
+    check(db.mailAuto is None and db.mailTo is None and db.mailCustom is None and db.restock is False and db.acceptInvites is None
+          and db.rewardClasses is None and db.lootFeed is True and stayed >= 7,
+          f"imported the plain way: none of it is switched on, nobody is named for your mail, and the rest comes in ({stayed} left as they were)")
+    YR.TransferUndo()
+
+    # A text that is not shaped as settings: where the addon reads a table it gets a table or nothing
+    lua.execute("""ODD = { db = { custom = "x", myRoutes = { Fine = { text = "step" }, Broken = "not a route" }, swing = true, campPos = "nowhere",
+        whisperSound = { "a table where a word was" }, lootFeed = true }, setup = {} }""")
+    n, left, stayed = YR.TransferImport(g.ODD, True)
+    db = g.YippRouteDB
+    check(db.custom is None and db.swing is None and db.myRoutes.Fine is not None and db.myRoutes.Broken is None
+          and db.campPos[1] == 1562.666870117188 and db.whisperSound == "bell|loud: one%two\ttab" and db.lootFeed is True,
+          "the wrong shape under a name is not taken: no word where a table is read, no table where a word was, a route that is no route dropped")
+    YR.TransferUndo()
+    head = ["HEADSTART-SETTINGS 1", "F:x:2026-10-13", "T:db", "S:#nan:x", "E", "T:setup", "E", "END:8"]
+    d, why = read("\n".join(head))
+    check(d is None and isinstance(why, str), f"a name that is no number at all: not read, and no error ({why})")
     # a route's lines are not macros: a route that has "/run" in its words stays whole
     d, _ = read(text)
     YR.TransferImport(d)
@@ -203,7 +244,7 @@ HeadstartAlts = {
     check(d.db.runs is None and d.db.quiet is None and d.setup.uiPrev is None and d.setup.classes.PALADIN.profile.slots[2].name == "Evil"
           and d.profiles == 1 and d.macros == 1 and d.code == 1 and d.__getitem__("from") == "a saved file" and g.RAN == 0,
           "what stays behind stays behind in a saved file too, its macros are counted, and nothing ran")
-    n, left = YR.TransferImport(d)
+    n, left, stayed = YR.TransferImport(d)
     check(left == 1 and g.YippRouteDB.trainer.PALADIN.reserve == 500000 and g.YippSetupDB.classes.PALADIN.profile.slots[2] is None and g.RAN == 0,
           "and imported like any other: in place, the macro that runs code left out")
     YR.TransferUndo()

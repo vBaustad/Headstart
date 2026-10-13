@@ -15,10 +15,10 @@
 --   that opens this same window is not a profession trainer either, and "every spell you can afford"
 --   there would be every weapon skill, or riding the moment the window opened. What isn't a class
 --   spell is left to you, and named. With no list for your class, nothing is bought at all.
---   And the switch is the whole account's while the choices and the reserve are each class's: so the
---   first time it would buy on a character, it asks - how many spells, for how much, and what it
---   keeps (YippSetupCharDB.trainOK, per character). Not now: nothing is bought, and it asks again at
---   the next visit. After a yes it never asks on that character again.
+--   It does not ask. On is on: for a while (0.10.0-beta6 as first tagged) it asked the first time on
+--   each character, with the cost, and the user met that at his own trainer (2026-10-13): "hvis det er
+--   på, så er det på, skal ikke få melding her når jeg prøver å trene". It starts off, is turned on by
+--   you, and says in chat what it learned and for how much. Don't put a question back.
 local _, YR = ...
 
 YR.TRAINER_CHOICES = { { "always", "Always" }, { "gold", "If I can afford it" }, { "first", "First rank only" }, { "never", "Never" } }
@@ -156,22 +156,8 @@ end
 
 local function Gold(c) return YR.Money(c) end
 
--- this character's own saved table (the one thing kept there: that it said yes)
-local function Char() return type(YippSetupCharDB) == "table" and YippSetupCharDB or {} end
-
-local Train
-StaticPopupDialogs["HEADSTART_TRAIN_FIRST"] = {
-    text = "%s", button1 = "Learn them", button2 = "Not now",
-    OnAccept = function()
-        Char().trainOK = true
-        -- (planned again from what the trainer offers now: the window may have been shut meanwhile)
-        C_Timer.After(0, function() Train(true) end)
-    end,
-    timeout = 0, whileDead = false, hideOnEscape = true, preferredIndex = 3,
-}
-
-function Train(agreed)
-    if not YR.Option("autoTrain") or (IsShiftKeyDown() and not agreed) or not GetNumTrainerServices then return end
+local function Train()
+    if not YR.Option("autoTrain") or not GetNumTrainerServices then return end
     if IsTradeskillTrainer and IsTradeskillTrainer() then return end
     -- a Hunter's pet trainer is a trainer too, with the pet's name on it
     local title = ClassTrainerFrame and ClassTrainerFrame.TitleContainer and ClassTrainerFrame.TitleContainer.TitleText
@@ -180,14 +166,6 @@ function Train(agreed)
         SetTrainerServiceTypeFilter("available", 1)
     end
     local buy, short, other = YR.TrainerPlan(GetMoney())
-    -- the first time on this character: asked, with what it would cost and what is kept
-    if #buy > 0 and not agreed and not Char().trainOK then
-        local cost = 0
-        for _, w in ipairs(buy) do cost = cost + w.cost end
-        StaticPopup_Show("HEADSTART_TRAIN_FIRST", ("Headstart: learn %d %s here for %s?\n\nThe class trainer is switched on for every character of this account. It learns your class's spells as the trainer opens and keeps %s; what to learn and how much to keep are set per class in Headstart's settings (Trainer). It asks only this once on this character."):format(
-            #buy, #buy == 1 and "spell" or "spells", Gold(cost), Gold(YR.TrainerData().reserve or 0)))
-        return
-    end
     -- bought from the bottom of the list up: a line learned leaves the list and moves the ones below it
     local order = {}
     for _, w in ipairs(buy) do order[#order + 1] = w end
@@ -223,6 +201,9 @@ local function Wanted()
 end
 
 YR.Part(Wanted, { "TRAINER_SHOW" }, function()
+    -- Shift is read now, while the key is down for the click on the trainer: read a moment later, a
+    -- key let go at once had not been held at all, and it does not ask - Shift is the one way to say no
+    if IsShiftKeyDown() then return end
     -- the list fills a moment after the window opens
     C_Timer.After(0.2, Train)
 end, { start = function() YR:SyncRxpTrainer() end })

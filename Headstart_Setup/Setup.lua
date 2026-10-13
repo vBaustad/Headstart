@@ -475,8 +475,15 @@ function YS:ApplyInterface()
         YS.Print("no interface saved yet. Use Save interface on the character whose interface you want (/hs, Character setup).")
         return
     end
-    -- its own copy to undo, apart from the bars' (an older Set up's bars are not what this undoes)
-    YippSetupCharDB.uiBackup = { at = time() }
+    -- its own copy to undo, apart from the bars' (an older Set up's bars are not what this undoes).
+    -- One copy for however many times it is applied: a new one each time recorded what the last apply
+    -- had already made of things, and what you had before the first was gone.
+    local kept = YippSetupCharDB.uiBackup
+    if type(kept) ~= "table" then
+        kept = { at = time() }
+        YippSetupCharDB.uiBackup = kept
+    end
+    kept.last = time()
     YS.UIApplied()
     YS:ApplyUI(ui, YS:Options())
     if YR.RefreshWindow then YR:RefreshWindow() end
@@ -760,6 +767,7 @@ function YS:ScanBars()
 end
 
 function YS:Scan()
+    if YippSetupCharDB then YippSetupCharDB.hold = nil end          -- (said by hand: these bars are the profile)
     local n, kept = YS:ScanBars()
     -- the bars are this class's; the interface is the account's, and only the character it comes from
     -- changes it (saving a healer's bars used to make every new character's screen the healer's)
@@ -1202,10 +1210,24 @@ end
 --            second Set up overwrote the only record of the bars you had built by hand.)
 -- Each also says whether the character counted as set up then (was), which undo puts back with it.
 local OLDER = 4
+--- This character's bars and its profile are not the same thing any more, and must not be made so by
+--- the automatic save: a profile deleted under it, an undo, a plan saved but not put on, an apply that
+--- stopped halfway. (Each of those left the bars to be written over the saved profile four seconds
+--- later - the profile there was no other copy of.) Until the profile is applied or the bars are saved
+--- to it by hand, which is you saying which of the two it is to be. Said once.
+function YS.Hold(why)
+    local c = YippSetupCharDB
+    if type(c) ~= "table" or c.hold or not c.applied then return end
+    c.hold = why or true
+    Print("this character's bars are no longer saved into its profile by themselves (" .. tostring(why or "they differ from it")
+        .. "): apply the profile, or save the bars to it, and they are again.")
+end
+
 local function Backup()
     local c = YippSetupCharDB
     local b = { at = time(), slots = (YS.ReadBars(true)), macros = CharacterMacros(),
-        was = { applied = c.applied, layout = c.layout, placed = c.placed and Copy(c.placed) or nil } }
+        was = { applied = c.applied, layout = c.layout, placed = c.placed and Copy(c.placed) or nil,
+            onLayout = c.layoutName or false } }       -- (the profile it was on: an undo goes back onto it)
     if c.backup then
         c.older = type(c.older) == "table" and c.older or {}
         table.insert(c.older, 1, c.backup)
@@ -1334,7 +1356,10 @@ function YS:Apply(force, only, how)
     -- before anything goes: the bars and this character's macros as they are, for /ysetup undo. Also
     -- for the planner and a switch of profile (only): those change buttons too, and had no way back.
     Backup()
-    if not only then YippSetupCharDB.uiBackup = nil end
+    -- (an apply that puts the interface on itself takes its copy into the bars' own, below; one that
+    -- leaves the interface alone - Bars only, after Apply interface - must not throw that copy away:
+    -- it is what /ysetup undo was promised to put back)
+    if not only and not how.barsOnly then YippSetupCharDB.uiBackup = nil end
     if o.clearBars and not only then ClearBars() end
     -- which slots hold a spell we put there: a slot you empty yourself afterwards is left empty
     local placedSet = only and YippSetupCharDB.placed or {}
@@ -1435,12 +1460,23 @@ function YS:Apply(force, only, how)
     end
     -- The planner's apply and "Bars only" stop here: no game setting, Edit Mode, chat window, camera
     -- or RestedXP guide is touched on a character in play.
-    if only or how.barsOnly then return true, full end
-    if o.noAutoPush and not NoAutoPush() then
+    -- Blizzard's own placing of new spells is stopped by every apply, the bars-only ones too: it stayed
+    -- on until the next login there, and each spell trained in that first session was placed twice.
+    if o.noAutoPush and not NoAutoPush() and not (only or how.barsOnly) then
         Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
     end
+    YippSetupCharDB.hold = nil
+    if full then YS.Hold("the macro list was full, so not every button is on") end
+    if only or how.barsOnly then return true, full end
     YS.UIApplied()
     YS:ApplyUI(YS:SharedUI(), o)
+    -- the copy kept for good was taken before the interface went on: the game settings and keys that
+    -- changed are part of what "as it was before Headstart" means (undo first put back none of them)
+    local c = YippSetupCharDB
+    if type(c.first) == "table" and type(c.backup) == "table" and c.first.at == c.backup.at then
+        if c.first.cvars == nil and c.backup.cvars then c.first.cvars = Copy(c.backup.cvars) end
+        if c.first.keys == nil and c.backup.keys then c.first.keys = Copy(c.backup.keys) end
+    end
     return true, full
 end
 
@@ -1469,6 +1505,10 @@ function YS:Undo(first, bars)
     -- "Apply interface" was the last thing done: that alone is undone, and the bars stay as they are
     -- (bars: the bars are what is asked for - a switch of profile taking itself back)
     local uiOnly = not first and not bars and YippSetupCharDB.uiBackup
+    -- (only where it is the later of the two: an interface applied last week is not what undo means
+    -- after the bars were changed today)
+    local barsAt = type(YippSetupCharDB.backup) == "table" and YippSetupCharDB.backup.at or 0
+    if uiOnly and (uiOnly.last or uiOnly.at or 0) < barsAt then uiOnly = nil end
     if uiOnly then
         local settings = PutBack(uiOnly.cvars or {})
         if uiOnly.keys and YS.ApplyKeys then YS.ApplyKeys(uiOnly.keys) end           -- and your keys as they were
@@ -1552,6 +1592,10 @@ function YS:Undo(first, bars)
     -- the character is what it was then: set up or not, on the layout it was on
     local was = b.was or {}
     c.applied, c.layout, c.placed = was.applied, was.layout, was.placed and Copy(was.placed) or nil
+    -- back on the profile these bars were of (a switch of profile undone left the character on the new
+    -- one wearing the old one's bars, which were then saved over the new one)
+    if was.onLayout ~= nil then c.layoutName = was.onLayout or nil end
+    YS.Hold("after an undo")
     if first then
         c.backup, c.older = nil, nil            -- (the first stays: it can be put back again)
     else
@@ -1863,7 +1907,8 @@ end
 local function SkipIntro()
     if UnitLevel("player") > 1 or not (YippSetupDB and YS:Options().skipIntro) then return end
     if InCinematic and InCinematic() then
-        if CinematicFrame_CancelCinematic then CinematicFrame_CancelCinematic() elseif StopCinematic then StopCinematic() end
+        -- (the game's own function: seen to end the opening flight, 2026-10-13. Blizzard's frame code is not called from here.)
+        if StopCinematic then StopCinematic() end
     end
     if MovieFrame and MovieFrame:IsShown() then
         MovieFrame:StopMovie()
@@ -1960,7 +2005,7 @@ f:RegisterEvent("UPDATE_MACROS")                     -- a macro edited: what a b
 -- and once for however many buttons changed (a login changes a hundred). The spells planned for
 -- levels you haven't reached keep their buttons (YS:ScanBars). Account option "remember" (on unless
 -- turned off).
-local rememberSoon = false
+local rememberSoon, rememberLate = false, false
 function YS.Remembers() return not (YippSetupDB and YippSetupDB.remember == false) end
 -- The game says "a button changed" for much that changes nothing we keep: a macro that shows another
 -- spell for your target, a button going grey. What each button holds (its kind and what of) is noted,
@@ -1989,9 +2034,10 @@ function YS.BarsStale() heldAny = false end
 local function Remember()
     rememberSoon = false
     if not (YippSetupCharDB and YippSetupCharDB.applied and YS.Remembers() and YS:Profile()) then return end
+    if YippSetupCharDB.hold then return end             -- (YS.Hold)
     if InCombatLockdown() then
-        waiting = true              -- looked at again when the fight ends
-        return
+        rememberLate = true         -- looked at again when the fight ends (its own flag: `waiting` sets
+        return                      -- the whole pass that places new spells going, after every fight)
     end
     if GetCursorInfo and GetCursorInfo() then return end        -- mid-drag: the drop changes a button again
     if not ButtonsChanged() then return end
@@ -2000,7 +2046,7 @@ local function Remember()
 end
 YS.RememberNow = Remember
 local function RememberSoon()
-    if rememberSoon or not (YippSetupCharDB and YippSetupCharDB.applied) then return end
+    if rememberSoon or not (YippSetupCharDB and YippSetupCharDB.applied and YS.Remembers()) then return end
     rememberSoon = true
     C_Timer.After(4, Remember)
 end
@@ -2012,8 +2058,24 @@ local function UpgradeSoon()
     C_Timer.After(0.2, function() upgradeSoon = false if YippSetupCharDB then YS:Upgrade() end end)
 end
 f:SetScript("OnEvent", function(self, event, arg1, arg2)
+    -- Character setup switched off since this was loaded: nothing more is placed, saved or followed
+    -- (it said so, and went on doing all three until the reload)
+    if YR.SetupOn and not YR.SetupOn() then return end
     if event == "PLAYER_ENTERING_WORLD" and (arg1 or arg2) then   -- login or reload only
         self:UnregisterEvent("PLAYER_ENTERING_WORLD")
+        -- A character made again under a deleted one's name is handed the old one's saved file: "set up
+        -- already", on a profile, with the dead character's bars and macros to undo to - and the first
+        -- automatic save wrote the new character's empty bars over its class's profile. What is kept
+        -- here belongs to the character it was written for (emptied in place: the same table).
+        local id, c = CharacterID(), YippSetupCharDB
+        if id and type(c) == "table" then
+            if c.guid and c.guid ~= id then
+                for k in pairs(c) do c[k] = nil end
+                Print("a new character under an old one's name: what was kept for the old one (set up, its bars to undo to) is let go.")
+                if UnitLevel("player") == 1 then YS.earlyLater = true end
+            end
+            c.guid = id
+        end
         if YS.earlyLater and UnitLevel("player") == 1 and YS.EarlyBars then YippSetupCharDB.earlyBars = YS.EarlyBars() end
         YS.earlyLater = nil
         SkipIntro()
@@ -2036,6 +2098,9 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
     elseif event == "SPELLS_CHANGED" or (event == "PLAYER_REGEN_ENABLED" and waiting) then
         UpgradeSoon()
         if event == "PLAYER_REGEN_ENABLED" then RememberSoon() end
+    elseif event == "PLAYER_REGEN_ENABLED" and rememberLate then
+        rememberLate = false
+        RememberSoon()
     end
 end)
 
@@ -2066,7 +2131,7 @@ function YS.Start(fresh)
     -- leaving Edit Mode: what you changed there is the account's interface, on the character it comes from
     local registry = _G.EventRegistry
     if type(registry) == "table" and registry.RegisterCallback then
-        registry:RegisterCallback("EditMode.Exit", function() YS.FollowUI() end, YS)
+        registry:RegisterCallback("EditMode.Exit", function() if not YR.SetupOn or YR.SetupOn() then YS.FollowUI() end end, YS)
     end
     if YippSetupCharDB and YippSetupCharDB.applied then
         C_Timer.After(4, function() YS.PlaceholderIcons() end)

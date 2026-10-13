@@ -113,6 +113,9 @@ def run():
             bad += 1
 
     load = lua.eval("function(src, name) local f = assert(loadstring(src, name)) f('Headstart', YR) end")
+    # Core.lua's reader of the game's sentences (the kill line is read with it): those two functions alone
+    core = open(os.path.join(ROOT, "Core.lua"), encoding="utf-8").read()
+    lua.execute(core[core.index("--- A pattern from one of the game's own sentences"):core.index("--- Quality of life on or off")])
     load(open(os.path.join(ROOT, "Journey.lua"), encoding="utf-8").read(), "Journey.lua")
     YR = g.YR
     YR.StartJourney()

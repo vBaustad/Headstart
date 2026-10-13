@@ -55,7 +55,7 @@ local ROLE_WORD = { melee = "DPS", ranged = "DPS", caster = "damage", healer = "
 local function Class() local _, c = UnitClass("player") return c or "WARRIOR" end
 
 local function Num(v)
-    if v == nil or (issecretvalue and issecretvalue(v)) then return nil end
+    if (issecretvalue and issecretvalue(v)) or v == nil then return nil end      -- (asked first whether it is kept from addons)
     return tonumber(v)
 end
 
@@ -134,18 +134,23 @@ local EQUIP_LINES = {
 }
 
 --- Everything about an item the sim weighs: str agi sta int spi ap rap sp heal mp5 crit scrit hit dps
---- speed armor (missing ones are 0). Read once per item and kept.
-local cache = {}
+--- speed armor (missing ones are 0). Read once per item and kept - once there was something to read:
+--- an item's text arrives a moment after its link, and one looked at in that moment was kept as an item
+--- with nothing on it until you next changed gear (and never offered as an upgrade: YR.SimItemRead).
+local cache, unread = {}, {}
 function YR.SimItemStats(link)
     if not link then return {} end
     if cache[link] then return cache[link] end
     local s = setmetatable({}, { __index = function() return 0 end })
+    local read = false
     for key, v in pairs(C_Item.GetItemStats(link) or {}) do
+        read = true
         local k = STAT_KEYS[key]
         if k and tonumber(v) then rawset(s, k, rawget(s, k) and rawget(s, k) + v or v) end
     end
     local ok, data = pcall(function() return C_TooltipInfo and C_TooltipInfo.GetHyperlink(link) end)
     for _, line in ipairs(ok and data and data.lines or {}) do
+        read = true
         for _, text in ipairs({ line.leftText, line.rightText }) do
             if type(text) == "string" then
                 local speed = text:match("^Speed (%d+%.%d+)")
@@ -163,9 +168,16 @@ function YR.SimItemStats(link)
             end
         end
     end
-    cache[link] = s
+    if read then
+        cache[link], unread[link] = s, nil
+    else
+        unread[link] = (unread[link] or 0) + 1
+    end
     return s
 end
+--- Whether an item can be taken as looked at: false only where its text was asked for and had not
+--- arrived - and then only a few times, so an item that never has any is not asked about for ever.
+function YR.SimItemRead(link) return not (link and unread[link] and unread[link] < 5) end
 
 -- ---------------------------------------------------------------------------
 -- Your numbers, and the value of a set of changes
@@ -184,6 +196,10 @@ local function ReadNumbers()
         scrit = math.max(scrit, Num(GetSpellCritChance(school)) or 0)
     end
     local _, armor = UnitArmor("player")
+    -- Whether they could be read at all: in a battleground or an instance the game keeps them from
+    -- addons out of a fight too, and what came back as nothing was kept as a character with no attack
+    -- power and no armor - every item then read as a great upgrade.
+    local whole = Num(base) ~= nil and Num(armor) ~= nil
     local s = {
         level = Num(UnitLevel("player")) or 1,
         ap = (Num(base) or 0) + (Num(pos) or 0) + (Num(neg) or 0),
@@ -193,14 +209,15 @@ local function ReadNumbers()
         hp = Num(UnitHealthMax("player")) or 100, armor = Num(armor) or 0,
         spi = Num(select(2, UnitStat("player", 5))) or 0,
     }
-    return s
+    return s, whole
 end
 
 --- Your numbers now, from the game. Kept from the last time they could be read.
 function YR.SimSnapshot()
     if InCombatLockdown() and me then return me end
-    local ok, snap = pcall(ReadNumbers)
-    if ok and snap then me = snap end
+    local ok, snap, whole = pcall(ReadNumbers)
+    -- (a read with holes in it replaces nothing that was read whole; with nothing yet, it is all there is)
+    if ok and snap and (whole or not me) then me = snap end
     return me
 end
 
@@ -437,7 +454,7 @@ local function OnTooltip(tooltip)
 end
 
 --- Drop the item stats kept (a new item's text arrives later than its link, and gear changes).
-function YR.SimForget() wipe(cache) wipe(memo) worn = nil end
+function YR.SimForget() wipe(cache) wipe(unread) wipe(memo) worn = nil end
 
 local pending = false
 local function Read() pending = false YR.SimSnapshot() wipe(memo) end

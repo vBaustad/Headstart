@@ -589,6 +589,7 @@ function YS.KeepUnapplied(ui, saved, o)
     if not o.camera then ui.camera = saved.camera end
     if o.rxpFrames == false then ui.rxp = saved.rxp end
     if o.graphics == false then ui.machine = saved.machine end
+    if o.keys == false then ui.keys = saved.keys end        -- (its switch off: this character's keys are not everybody's)
     return ui
 end
 

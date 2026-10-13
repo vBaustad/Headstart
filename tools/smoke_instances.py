@@ -58,7 +58,8 @@ YippRouteDB = { restock = true, bankAuto = true, levelShot = true, trinketBar = 
 PRINTS, NOTICES = {}, {}
 function print(m) table.insert(PRINTS, m) end
 RaidWarningFrame, ChatTypeInfo = {}, { RAID_WARNING = {} }
-function RaidNotice_AddMessage(_, m) table.insert(NOTICES, m) end
+function RaidNotice_AddMessage(_, m) RAID_NOTICES = (RAID_NOTICES or 0) + 1 end      -- (no longer called: counted, to say so)
+UIErrorsFrame = { AddMessage = function(_, m) table.insert(NOTICES, m) end }
 NOW, INSIDE, MAP, NAME, LEADER = 100000, false, 36, "The Deadmines", nil
 XP, XPMAX, LEVEL, MONEY = 100, 1000, 18, 500
 ME = "Tester"
@@ -188,6 +189,7 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
     YR.InstanceHudApply()
     check(shown(hud().wait) and text(hud().wait) not in (None, ""), f"the icon shows the wait under it ({text(hud().wait)})")
     check(len(g.NOTICES) >= 2, f"warned on screen at 4 and at 5 ({len(g.NOTICES)})")
+    check(g.RAID_NOTICES is None, "on the game's own message line: nothing of Blizzard's raid warning code is run from here")
     # asked every second: the week's log is walked once, then not again until the clock or the log says so
     lua.execute("WALKS = 0 local key = YR_CHARKEY YR_SET(function() WALKS = WALKS + 1 return key() end)")
     for _ in range(60):

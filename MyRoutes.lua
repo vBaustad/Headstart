@@ -450,7 +450,12 @@ function YR.RunToRouteSteps(char)
     end)
     local out = {}
     for _, k in ipairs(kept) do
-        local text = k.text:gsub("\n[ \t]*#requires%s+(%S+)[^\n]*", function(l) return labels[l] and nil or "" end)
+        local text = k.text:gsub("\n[ \t]*#requires%s+(%S+)[^\n]*", function(l)
+            -- (kept where the step it names was kept: "labels[l] and nil or ''" is '' either way, and
+            -- every such line was taken out)
+            if labels[l] then return nil end
+            return ""
+        end)
         text = text:gsub("(#completewith%s+)(%S+)", function(pre, l)
             if l == "next" or labels[l] then return nil end
             return pre .. "next"

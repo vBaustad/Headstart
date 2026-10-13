@@ -71,6 +71,14 @@ local function Features()
                 YR:RewardSettings().on = on and true or false           -- and this class now
             end),
         F("levelShot", "a screenshot at every ding", "acts", 2, Key("levelShot")),
+        -- What no answer turns on, but "Nothing" turns off (level false): they act for you all the same,
+        -- and the card says Headstart then buys, moves, accepts and picks nothing.
+        F("mailAuto", "mail to another character", "acts", false, function() return YippRouteDB.mailAuto == true end,
+            function(on) YippRouteDB.mailAuto = on and true or nil end),
+        F("shareAll", "every quest shared", "acts", false, function() return YippRouteDB.shareAll == true end,
+            function(on) YippRouteDB.shareAll = on and true or nil end),
+        F("trinketAuto", "trinket swaps", "acts", false, function() return YippRouteDB.trinketAuto == true end,
+            function(on) YippRouteDB.trinketAuto = on and true or nil if YR.TrinketPaint then YR.TrinketPaint() end end),
         F("setupOn", "Character setup", "setup", 1, function() return YR.SetupOn() end, function(on) YR.SetSetupOn(on) end),
     }
     -- a feature that is shelved isn't asked about (QuestLFG.lua)
@@ -122,8 +130,11 @@ function YR.WelcomePlan(answers)
         local answer = answers[f.q]
         local other = YR.OtherHas(f.key)
         local on = now
-        if answer ~= nil then on = f.level <= answer and not other end
-        plan[#plan + 1] = { key = f.key, label = f.label, q = f.q, on = on, now = now, other = other }
+        if answer ~= nil then
+            -- (level false: left as it is by every answer but the first, which turns it off)
+            if f.level == false then on = answer > 0 and now else on = f.level <= answer and not other end
+        end
+        plan[#plan + 1] = { key = f.key, label = f.label, q = f.q, on = on, now = now, other = other, quiet = f.level == false }
     end
     return plan
 end
@@ -135,7 +146,9 @@ function YR.WelcomeNow()
         for answer = 0, #q.choices - 1 do
             local same = true
             for _, f in ipairs(Features()) do
-                if f.q == q.key then
+                if f.q == q.key and f.level == false then
+                    if answer == 0 and f.get() then same = false break end      -- (on: this is not "Nothing")
+                elseif f.q == q.key then
                     local want = f.level <= answer and not YR.OtherHas(f.key)
                     if want ~= (f.get() and true or false) then same = false break end
                 end
@@ -159,6 +172,17 @@ function YR.WelcomeApply(answers)
             if f.key == "routes" then reload = true end
         end
     end
+    -- "Friends only" is friends only: a wider choice made before ("Anyone") is narrowed to it - it was
+    -- left as it was, with the card lit as what you have
+    if answers and answers.acts == 1 then
+        for _, key in ipairs({ "acceptInvites", "whisperInvite", "acceptFrom" }) do
+            local v = YippRouteDB[key]
+            if type(v) == "string" and v ~= "off" and v ~= "friends" then
+                YippRouteDB[key] = "friends"
+                off = off + 1
+            end
+        end
+    end
     YippRouteDB.welcome = nil               -- answered
     YR.SettingChanged()
     YR:RefreshWindow()
@@ -169,7 +193,7 @@ end
 function YR.WelcomeLine(q, plan)
     local on, left = {}, {}
     for _, p in ipairs(plan) do
-        if p.q == q then
+        if p.q == q and not p.quiet then
             if p.on then on[#on + 1] = p.label
             elseif p.other then left[#left + 1] = p.label .. " (" .. p.other .. " does it)" end
         end
@@ -191,8 +215,8 @@ function YR.WelcomeChecks()
     local list = {}
     local function Add(name, note, page, section) list[#list + 1] = { name = name, note = note, page = page, section = section } end
     if YR.Option("autoTrain") then
-        Add("Class trainer spends gold", "Buys your class's spells as you open your class trainer, on every character (it asks the"
-            .. " first time on each). Silver to keep starts at 2 silver and is per class: set it, or set spells to Never. Shift"
+        Add("Class trainer spends gold", "Buys your class's spells as you open your class trainer, on every character, without"
+            .. " asking. Silver to keep starts at 2 silver and is per class: set it, or set spells to Never. Shift"
             .. " skips it.", "trainer", "Class trainer")
     end
     if YR.Option("restock") then
@@ -262,7 +286,7 @@ end
 local function Skipped(q, answer)
     local out
     for _, f in ipairs(Features()) do
-        local other = f.q == q and f.level <= answer and YR.OtherHas(f.key)
+        local other = f.q == q and f.level and f.level <= answer and YR.OtherHas(f.key)
         if other then out = (out and out .. ", " or "") .. f.label .. " (" .. other .. " has it)" end
     end
     return out

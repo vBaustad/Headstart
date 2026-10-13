@@ -31,7 +31,8 @@ YippRouteDB = {}
 PRINTS, NOTICES = {}, {}
 function print(m) table.insert(PRINTS, m) end
 RaidWarningFrame, ChatTypeInfo = {}, { RAID_WARNING = {} }
-function RaidNotice_AddMessage(_, m) table.insert(NOTICES, m) end
+function RaidNotice_AddMessage(_, m) RAID_NOTICES = (RAID_NOTICES or 0) + 1 end      -- (no longer called: counted, to say so)
+UIErrorsFrame = { AddMessage = function(_, m) table.insert(NOTICES, m) end }
 ONQUEST, COMPLETE, BAGS, SKILLS, SUBZONE = {}, {}, {}, {}, ""
 C_QuestLog = { IsOnQuest = function(q) return ONQUEST[q] == true end, IsComplete = function(q) return COMPLETE[q] == true end }
 C_Item = { GetItemCount = function(i) return BAGS[i] or 0 end }

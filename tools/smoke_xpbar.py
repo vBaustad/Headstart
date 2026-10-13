@@ -257,6 +257,11 @@ function print() end
     lua.execute("YippRouteDB = { runs = {} }")
     YR.Latch(False)
     db = g.YippRouteDB
+    # what depends on another addon waits for the login: the addons that sort after Headstart are not in
+    # yet as it loads, and each of these was written down as on whatever they did
+    check(db.restock is None and db.bankButton is None and db.xpbar.on is None and db.quiet == 3 and db.setupOn is True,
+          "as Headstart loads: what another addon may have is not answered yet (the rest of the latch is)")
+    YR.LatchOthers()
     check(db.welcome is None and db.restock is True and db.bankAuto is True and db.trinketBar is True
           and db.acceptInvites == "friends" and db.acceptFrom == "friends" and db.xpbar.on is True and db.showSplits is True,
           "an account that had Headstart: each option never touched is written down as it was (on)")
@@ -266,14 +271,28 @@ function print() end
     # an account already latched once (quiet 2) gets only the newer ones written down, and what it turned off stays off
     lua.execute("YippRouteDB = { runs = {}, quiet = 2, mailButton = false }")
     YR.Latch(False)
+    YR.LatchOthers()
     db = g.YippRouteDB
     check(db.quiet == 3 and db.bankButton is True and db.mailButton is False and db.pickRewards is True and db.restock is None,
           "an account from the version before: the newer ones kept on, a choice of its own left alone, nothing older written again")
+    # another addon that loads after Headstart does one of them: seen at the login, and ours is left off
+    g.HEADSTART_T = YR
+    lua.execute("""YippRouteDB = { runs = {}, quiet = 2 }
+        OTHER_WAS = HEADSTART_T.OtherHas
+        HEADSTART_T.OtherHas = function(key) if key == "groupAccept" or key == "bankButton" then return "Another addon" end return OTHER_WAS(key) end""")
+    YR.Latch(False)
+    YR.LatchOthers()
+    db = g.YippRouteDB
+    lua.execute("HEADSTART_T.OtherHas = OTHER_WAS")
+    check(db.groupAccept is False and db.bankButton is False and db.mailButton is True and db.groupShare is True,
+          "another addon does it (one that loads after Headstart): ours is written down as off, the rest as on")
     lua.execute("YippRouteDB = { runs = {} } ")
     YR.Latch(False)
+    YR.LatchOthers()
     db = g.YippRouteDB
     lua.execute("YippRouteDB.restock = nil")
     YR.Latch(False)
+    YR.LatchOthers()
     check(g.YippRouteDB.restock is None, "once only: it isn't written again on a later login")
     lua.execute("YippRouteDB = KEPT_DB")
     # colours and text come as sets

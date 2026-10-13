@@ -203,7 +203,7 @@ function YR.StepTemplates()
     local map, x, y = YR.Position()
     local here = map and ("%d,%.2f,%.2f"):format(map, x, y) or "1426,50,50"
     local ok, target = pcall(UnitName, "target")
-    target = ok and target or nil
+    target = ok and YR.Open(target) or nil      -- (a name the game keeps from addons is no name: it errored in the texts below)
     local level = UnitLevel("player")
     return {
         { "quest",  "Accept a quest here",  { head = "", lines = { { k = "cmd", cmd = "goto", args = here },

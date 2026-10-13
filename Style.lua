@@ -387,11 +387,15 @@ function S.OpenMenu(anchor, options, onPick, width, side)
         -- a menu in their own layer opened behind them
         catcher:SetFrameStrata("FULLSCREEN_DIALOG")
         catcher:SetFrameLevel(9000)
+        catcher:RegisterForClicks("AnyUp")          -- (the right button too: it was swallowed, and closed nothing)
         catcher:SetScript("OnClick", CloseMenu)
-        catcher:RegisterEvent("PLAYER_REGEN_DISABLED")
+        -- a fight closes the menu: listened for only while it is up
+        catcher:SetScript("OnShow", function(self) self:RegisterEvent("PLAYER_REGEN_DISABLED") end)
+        catcher:SetScript("OnHide", function(self) self:UnregisterEvent("PLAYER_REGEN_DISABLED") end)
         catcher:SetScript("OnEvent", CloseMenu)
         menu = CreateFrame("Frame", "HeadstartDropMenu", UIParent)
         menu:SetFrameStrata("TOOLTIP")
+        menu:SetClampedToScreen(true)
         -- Three ways out besides picking something: the button again (above), Esc, and a click anywhere
         -- that isn't the menu. The click is heard from the game itself, whatever frame it lands on: the
         -- catcher alone could end up under a window and then nothing closed the menu.
@@ -462,9 +466,18 @@ function S.OpenMenu(anchor, options, onPick, width, side)
     -- rows past this menu's length stay in the pool, hidden, for the next long menu
     for i = shown + 1, #menu.items do menu.items[i]:Hide() end
     menu.count = shown
-    menu:SetSize(width or anchor:GetWidth(), shown * 22 + 2)
+    menu:SetSize(width or (anchor and anchor:GetWidth()) or 220, shown * 22 + 2)
     menu:ClearAllPoints()
-    menu:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -2)
+    if anchor then
+        menu:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -2)
+    else
+        -- no button it belongs to (a key, a slash command): where the pointer is. (It was hung under
+        -- the whole screen, so it opened below the bottom edge with the click catcher up: nothing to
+        -- see, and the next click swallowed.)
+        local x, y = GetCursorPosition()
+        local scale = UIParent:GetEffectiveScale()
+        menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale, y / scale)
+    end
     menu:Fill()
     catcher:Show()
     menu:Show()

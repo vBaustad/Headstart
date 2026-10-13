@@ -174,7 +174,7 @@ function YR.WindowList()
 end
 
 function YR.WindowMenu(anchor)
-    YR.Style.OpenMenu(anchor or UIParent, YR.WindowList(), function(open) open() end, 260)
+    YR.Style.OpenMenu(anchor, YR.WindowList(), function(open) open() end, 260)        -- (no anchor: at the pointer)
 end
 
 --- The button, at the login: made only when it is to be shown (turned off, there is no button at all

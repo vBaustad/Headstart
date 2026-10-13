@@ -277,6 +277,8 @@ end
 local registered = {}
 function YR:RegisterRole(role)
     if not (RXPGuides and RXPGuides.RegisterGuide) or not role or role == "solo" or registered[role] then return end
+    -- (as RegisterGuides: picking a role with the routes off gave RestedXP every group route all the same)
+    if not YR.RoutesOn() or UnitFactionGroup("player") == "Horde" then return end
     registered[role] = true
     for _, g in ipairs(YR.shipped) do
         for _, text in ipairs(YR.RoleVersions(YR:GuideText(g.key), role)) do

@@ -25,7 +25,7 @@ Headstart does not come with levelling routes: you make your own from your runs,
 
 ## Done for you, by your rules (all off until you turn them on)
 
-- **Class trainer.** Buys your class's spells as the trainer opens: each spell Always, If I can afford it, First rank only or Never, with an amount of silver to keep. It asks the first time on each character, and never buys weapon skills, riding or professions.
+- **Class trainer.** Buys your class's spells as the trainer opens: each spell Always, If I can afford it, First rank only or Never, with an amount of silver to keep. It never buys weapon skills, riding or professions, and chat says what it learned and for how much.
 - **Quest rewards** picked from a priority list per class up to a level you choose. It remembers what you picked by hand, and leaves the choice to you when a green is offered.
 - **Restock.** Reagents, ammo and your own list bought back up to what you carry, above an amount of gold you keep.
 - **Bank and mail.** Crafting mats and recipes you can't use yet moved to the bank, or mailed to another character. Quest items always stay.
@@ -74,7 +74,7 @@ The game keeps an addon's settings separately for every installed client: the be
 
 from the old client's folder to the same place in the new one. The account folder appears in the new client the first time you log in there, and its name may differ between clients (on a test client it can be a number where the live game uses your account name). This is the account's file: the files further down, under a realm and a character's name, belong to those characters and are not needed. The next time you enter the world everything is there.
 
-**2. As a text, in the game.** In the old install: `/headstart transfer`, **Export**, and save the text in a text file. In the new one, once you are in the world: `/headstart transfer`, paste, **Read**, **Import**. If the old install can no longer be opened, paste the whole of its `Headstart.lua` file instead: it is read the same way. Nothing in the text is ever run, and what an import replaced can be put back with **Undo last import**.
+**2. As a text, in the game.** In the old install: `/headstart transfer`, **Export**, and save the text in a text file. In the new one, once you are in the world: `/headstart transfer`, paste, **Read**, **Import**. If the old install can no longer be opened, paste the whole of its `Headstart.lua` file instead: it is read the same way. Nothing in the text is ever run, and what an import replaced can be put back with **Undo last import**. A text from someone else is safe to import: what acts for you (mail, restock, the trainer, invites) stays as you have it and macros that run code are left out; **All of it** is for a text you exported yourself.
 
 Then, on a new character, Headstart's window comes up two seconds after its first login: **Apply both** puts your bars, macros, key bindings and interface on.
 

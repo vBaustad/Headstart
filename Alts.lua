@@ -325,6 +325,7 @@ local CELL, GAP = 36, 5
 local COLS = math.floor((W - LEFT - 56) / (CELL + GAP))
 local CATS = { "Crafting materials", "Recipes", "Gear", "Consumables", "Other" }
 local cells, heads = {}, {}
+local asked = {}            -- item IDs whose name has been asked for (once each: see the list below)
 local picked = "*all"           -- the character shown ("*all": every one)
 local view = "items"            -- "items" or "cur"
 local search = ""
@@ -369,7 +370,12 @@ function YR.AltsItems(key, words)
     for id, e in pairs(sums) do
         if YR.AltsUseful(id) then
             e.name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)
-            if not e.name and C_Item.RequestLoadItemDataByID then pcall(C_Item.RequestLoadItemDataByID, id) end
+            -- (asked for once: an item this build has no name for answers "no" each time, and each
+            -- answer drew the window again, which asked again - three times a second while it was open)
+            if not e.name and not asked[id] and C_Item.RequestLoadItemDataByID then
+                asked[id] = true
+                pcall(C_Item.RequestLoadItemDataByID, id)
+            end
             e.cat = Cat(id)
             e.quality = C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(id) or 1
             if not words or (e.name and e.name:lower():find(words, 1, true)) then out[#out + 1] = e end

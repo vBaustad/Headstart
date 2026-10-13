@@ -8,6 +8,10 @@ loads what Headstart.toc loads (not the load-on-demand addons), logs in, and cou
 running: the events listened for, the tickers, the frames made, the hooks put on the game. Then it
 fires every event a thousand times and measures the memory that makes.
 
+And a third login, for "off means off" in the middle of a session: everything is switched on, then
+everything is switched off again without a reload, and what still listens, ticks or runs per frame is
+counted. Nothing may, but the loader and the one event that moves a run log to its file at logout.
+
 The budgets are a ratchet: they are what the addon does today, and a change that makes a new install
 listen for more, tick more or allocate more fails here. Lower them when the addon gets leaner; never
 raise one without saying in the commit why a new install has to pay for it.
@@ -59,10 +63,100 @@ BUDGET = {
     # 41, frames 13.
     "new": {"hot": 9, "events": 42, "tickers": 1, "onupdate": 0, "frames": 14, "hooks": 4, "kb": 1},
 }
+# Everything switched on, as the settings would do it (each feature's own switch, then what the settings
+# call to make it show), and everything switched off again (the main switches, as the settings do it).
+SWITCH_ON = """
+    local db, T = YippRouteDB, HEADSTART
+    for key in pairs(T.STARTS_OFF) do if key ~= "xpbar" then db[key] = true end end       -- (xpbar: a table of its own)
+    for _, key in ipairs({ "camp", "flightTimer", "instanceTrack", "remindTrainer", "remindTalents", "durability",
+        "craftRemind", "levelUpStats", "simTooltip", "skipCinematic", "minimapButton", "logging", "showSplits",
+        "campReminder", "buyLater", "sellGuard", "groupPanel", "trinketAuto", "mailAuto", "shareAll", "moveBag",
+        "moveReagentBag" }) do db[key] = true end
+    db.routes, db.bagBar, db.microMenu, db.chatStrip, db.whisperSound, db.talentFade = true, "hover", "hide", "slim", "ring", 40
+    local s = T.SwingDB() s.on, s.health, s.power, s.cast, s.combo, s.range = true, true, true, true, true, true
+    T.XPBarDB().on = true
+    T:RewardSettings().on = true
+    for _, apply in ipairs({ "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply",
+        "BarHideApply", "SwingApply", "WindowScaleApply", "RecapApply", "ChatLogApply", "LootFeedApply", "TrinketPaint" }) do
+        if T[apply] then pcall(T[apply]) end
+    end
+    T.ApplyParts()
+    RunLater()
+"""
+SWITCH_OFF = """
+    local db, T = YippRouteDB, HEADSTART
+    T.Print = function() end
+    T.SetQoLOn(false)
+    db.routes, db.minimapButton, db.logging, db.showSplits = false, false, false, false
+    for _, key in ipairs({ "deathSkipRelease", "campReminder", "buyLater", "sellGuard", "groupPanel", "groupAccept",
+        "groupShare", "skipQuests" }) do db[key] = false end
+    T.ApplyParts()
+    RunLater()
+"""
+# Each feature by itself: switched on and off again (or, for what a new install has on, off and on
+# again), and what is listened for and what ticks must be what it was before. Returns the ones that
+# were not, as text. (A run log begun by "logging" is moved to its file at logout whatever is switched
+# off afterwards: that one event is taken as it comes.)
+EACH = """
+    local db, T = YippRouteDB, HEADSTART
+    T.Print = function() end
+    local APPLY = { "XPBarApply", "TalentFadeApply", "InstanceHudApply", "RXPSkinApply", "DamageSkinApply", "BarHideApply",
+        "SwingApply", "WindowScaleApply", "RecapApply", "ChatLogApply", "LootFeedApply", "TrinketPaint" }
+    local function Apply()
+        for _, a in ipairs(APPLY) do if T[a] then pcall(T[a]) end end
+        T.ApplyParts()
+        RunLater()
+    end
+    local function Count()
+        local ev, tick, upd = 0, 0, 0
+        for _, f in ipairs(FRAMES) do for e in pairs(f.ev or {}) do if e ~= "PLAYER_LOGOUT" then ev = ev + 1 end end end
+        for _, t in ipairs(TICKERS) do if not t.dead then tick = tick + 1 end end
+        for f in pairs(ONUPDATE) do if not f.hidden then upd = upd + 1 end end
+        return ev, tick, upd
+    end
+    local list = {}
+    local function Key(k) list[#list + 1] = { k, function() db[k] = true end, function() db[k] = false end } end
+    for k in pairs(T.STARTS_OFF) do if k ~= "xpbar" then Key(k) end end
+    for _, k in ipairs({ "trinketAuto", "mailAuto", "shareAll", "moveBag", "moveReagentBag", "logging", "showSplits",
+        "campReminder", "buyLater", "sellGuard", "groupPanel" }) do Key(k) end
+    for _, k in ipairs({ "camp", "flightTimer", "instanceTrack", "remindTrainer", "remindTalents", "durability",
+        "craftRemind", "levelUpStats", "simTooltip", "skipCinematic", "minimapButton", "journey" }) do
+        list[#list + 1] = { k, function() db[k] = false end, function() db[k] = nil end }
+    end
+    for _, v in ipairs({ { "routes", true, false }, { "bagBar", "hover" }, { "microMenu", "hide" }, { "chatStrip", "slim" },
+        { "whisperSound", "ring" }, { "talentFade", 40 } }) do
+        list[#list + 1] = { v[1], function() db[v[1]] = v[2] end, function() db[v[1]] = v[3] end }
+    end
+    list[#list + 1] = { "xpbar", function() T.XPBarDB().on = true end, function() T.XPBarDB().on = false end }
+    for _, part in ipairs({ "on", "health", "power", "cast" }) do
+        list[#list + 1] = { "swing." .. part, function() local s = T.SwingDB() s.on = true s[part] = true end,
+            function() local s = T.SwingDB() s[part] = nil s.on = false end }
+    end
+    list[#list + 1] = { "rewards", function() T:RewardSettings().on = true end, function() T:RewardSettings().on = false end }
+    list[#list + 1] = { "quality of life", function() T.SetQoLOn(false) end, function() T.SetQoLOn(true) end }
+    table.sort(list, function(a, b) return a[1] < b[1] end)
+    local e0, t0, u0 = Count()
+    local bad, moved = {}, 0
+    for _, f in ipairs(list) do
+        f[2]() Apply()
+        local e1, t1 = Count()
+        if e1 ~= e0 or t1 ~= t0 then moved = moved + 1 end
+        f[3]() Apply()
+        local e2, t2, u2 = Count()
+        if e2 ~= e0 or t2 ~= t0 or u2 ~= u0 then
+            bad[#bad + 1] = ("%s (%d events, %d tickers, %d per-frame; before: %d, %d, %d)"):format(f[1], e2, t2, u2, e0, t0, u0)
+        end
+    end
+    EACH_N, EACH_MOVED, EACH_BAD = #list, moved, table.concat(bad, "; ")
+"""
+# what may still be listened for after that: the loader, and a run log begun while logging was on,
+# which is moved to this character's own file at logout (RunStore.lua) whatever is switched off since
+LEFT_ON = {"ADDON_LOADED", "PLAYER_LOGOUT"}
+
 OFF = "{ qolOff = true, routes = false, setupOn = false, quiet = 2, minimapButton = false, logging = false, showSplits = false }"
 
 
-def measure(saved="nil"):
+def measure(saved="nil", toggled=False, each=False):
     src = open(os.path.join(ROOT, "tools", "smoke.py"), encoding="utf-8").read()
     env = {"__name__": "smoke_head", "__file__": os.path.join(ROOT, "tools", "smoke.py")}
     exec(compile(src.split("YR = lua.table()")[0], "smoke.py (head)", "exec"), env)
@@ -104,6 +198,29 @@ def measure(saved="nil"):
         load(open(os.path.join(ROOT, f), encoding="utf-8").read(), f)("Headstart", YR)
     lua.execute("""Fire("ADDON_LOADED", "Headstart") Fire("PLAYER_LOGIN") Fire("PLAYER_ENTERING_WORLD", true, false) RunLater()""")
     g = lua.globals()
+    if toggled:
+        g.HEADSTART = YR
+        count = lua.eval("""function()
+            local ev, tick, upd = 0, 0, 0
+            for _, f in ipairs(FRAMES) do for _ in pairs(f.ev or {}) do ev = ev + 1 end end
+            for _, t in ipairs(TICKERS) do if not t.dead then tick = tick + 1 end end
+            for f in pairs(ONUPDATE) do if not f.hidden then upd = upd + 1 end end       -- (a hidden frame's does not run)
+            return ev, tick, upd
+        end""")
+        lua.execute(SWITCH_ON)
+        on = count()
+        lua.execute(SWITCH_OFF)
+        off = count()
+        left = lua.eval("""(function()
+            local out = {}
+            for _, f in ipairs(FRAMES) do for e in pairs(f.ev or {}) do out[#out + 1] = e end end
+            return out
+        end)()""")
+        return on, off, sorted(left.values())
+    if each:
+        g.HEADSTART = YR
+        lua.execute(EACH)
+        return g.EACH_N, g.EACH_MOVED, g.EACH_BAD
     events = lua.eval("""(function()
         local out = {}
         for _, f in ipairs(FRAMES) do for e in pairs(f.ev or {}) do out[#out + 1] = e end end
@@ -167,6 +284,18 @@ def run(listing=False):
         bad += failed
         if listing or failed:
             print(by)
+    # switched on and off again in one session
+    on, off, left = measure("nil", toggled=True)
+    extra = [e for e in left if e not in LEFT_ON]
+    ok = on[0] > 100 and not extra and off[1] == 0 and off[2] == 0
+    print(("ok  " if ok else "FAIL"), f"everything switched on ({on[0]} events, {on[1]} tickers), then off again without a reload: "
+          f"{len(left)} events ({', '.join(left)}), {off[1]} tickers, {off[2]} per-frame scripts on shown frames")
+    bad += not ok
+    n, moved, left = measure("nil", each=True)
+    ok = left == "" and moved > 30
+    print(("ok  " if ok else "FAIL"), f"each of {n} features switched by itself and back: what listens and ticks is as before"
+          f" ({moved} of them change it while switched)" + ("" if left == "" else f" - NOT for: {left}"))
+    bad += not ok
     return bad
 
 
