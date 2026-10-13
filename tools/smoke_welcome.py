@@ -147,6 +147,7 @@ def run():
     YR.WelcomeApply(mini)
 
     # the window itself: a new install opens on Recommended, after that on what you have
+    lua.execute("getmetatable(UIParent).HookScript = function(self, _, fn) self.hook = fn end")     # (kept, to press below)
     db.welcome, db.welcomeSeen = True, None
     check(YR.WelcomeShow() is True and g.HeadstartWelcomeWindow is not None and db.welcomeSeen is True, "the window opens, and is marked as seen")
     check(YR.WelcomeToggle() is False and YR.WelcomeToggle() is True, "/headstart start: closed when open, open when closed")
@@ -161,6 +162,74 @@ def run():
           f"everything on: eight lines, what can cost you first ({names})")
     YR.WelcomeShowChecks()
     check(True, "and the list is put up in the window without an error")
+
+    # The first, unasked showing (Core.lua, YR.WelcomeFirst). A new install's very first login is a new
+    # character's, and that plays its flight over the zone with the interface hidden: the window was put
+    # up under it, closed by the Escape that ended the flight, and written down as seen (2026-10-13).
+    lua.execute("""UI_UP, IN_MOVIE, LATER = false, true, {}
+        UIParent.IsVisible = function() return UI_UP end
+        function InCinematic() return IN_MOVIE end
+        WIN = HeadstartWelcomeWindow
+        WIN.IsVisible = function(self) return UI_UP and self:IsShown() end
+        function Tick() local l = LATER LATER = {} for _, w in ipairs(l) do w[2]() end return #LATER end
+        function First() WIN:Hide() LATER = {} YippRouteDB.welcome, YippRouteDB.welcomeSeen = true, nil
+            HeadstartNS.WelcomeFirst() end""")
+    was, YR.windowLoaded = YR.windowLoaded, True
+    win = g.WIN
+    g.First()
+    check(len(g.LATER) == 1 and g.LATER[1][1] == 5, "a new install: looked for five seconds after the login")
+    left = g.Tick()
+    check(win.hidden and db.welcomeSeen is None and left == 1 and g.LATER[1][1] == 2,
+          "the interface is hidden (a new character's opening flight): not put up under it, looked for again in two seconds")
+    lua.execute("UI_UP = true")
+    g.Tick()
+    check(win.hidden and db.welcomeSeen is None, "nor over a cinematic that leaves the interface up")
+    lua.execute("IN_MOVIE = false")
+    g.Tick()
+    check(not win.hidden and db.welcomeSeen is None, "the screen is there: put up - and not counted as seen for that")
+    lua.execute("WIN:Hide()")                   # Escape, or whatever closes every window
+    g.Tick()
+    check(not win.hidden and db.welcomeSeen is None, "closed before it could be read: put up once more")
+    g.Tick()
+    check(db.welcomeSeen is None, "up at one look: not yet")
+    left = g.Tick()
+    check(db.welcomeSeen is True and left == 0, "up at two: seen, and nothing looks any more")
+    # closed twice: left alone for now, and the next login asks again
+    g.First()
+    g.Tick()
+    lua.execute("WIN:Hide()")
+    g.Tick()
+    lua.execute("WIN:Hide()")
+    left = g.Tick()
+    check(win.hidden and db.welcomeSeen is None and left == 0, "closed twice: not put up a third time, still not seen (the next login asks)")
+    # a click in it is an answer
+    for name, press in (("a quick pick", "WIN.quick.minimal.fn(WIN.quick.minimal)"), ("a card", "WIN.blocks[1].cards[1].fn(WIN.blocks[1].cards[1])"),
+                        ("its Close button", "WIN.close.hook(WIN.close)")):
+        g.First()
+        g.Tick()
+        shown = not win.hidden and db.welcomeSeen is None
+        lua.execute(press)
+        check(shown and db.welcomeSeen is True, f"{name} pressed: seen")
+        check(g.Tick() == 0, "and nothing looks any more")
+    # asked for by hand (/headstart start, the button in the settings): seen at once, as before
+    g.First()
+    YR.WelcomeShow()
+    check(db.welcomeSeen is True, "asked for by hand: seen")
+    # in a fight at the login: not then, and looked for again
+    lua.execute("function InCombatLockdown() return true end")
+    g.First()
+    left = g.Tick()
+    check(win.hidden and left == 1, "in a fight: not put up, looked for again")
+    lua.execute("function InCombatLockdown() return false end")
+    g.Tick()
+    check(not win.hidden, "the fight over: put up")
+    # the window's addon is not there: said once, and not asked for every two seconds
+    lua.execute("SAID = 0 local p = HeadstartNS.Print HeadstartNS.Print = function(...) SAID = SAID + 1 end WIN:Hide()")
+    YR.windowLoaded = None
+    g.First()
+    left = g.Tick()
+    check(g.SAID == 1 and left == 0 and db.welcomeSeen is None, "the window's addon missing: said once, not asked for again this login")
+    YR.windowLoaded = was
     return bad
 
 

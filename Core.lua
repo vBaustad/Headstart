@@ -206,6 +206,8 @@ function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 -- items, joins or forms a group for you, takes screenshots, puts a bar or buttons of ours on your
 -- screen or changes one of Blizzard's windows. Nobody should find those out by installing Headstart.
 -- What stays on is seen and harmless: tooltips, the flight timer, the camp icon, lines in chat.
+--   The one thing done for you unasked is a cinematic skipped (Cinematic.lua; the user's choice,
+--   2026-10-13): it takes nothing and changes nothing of yours, and says in chat that it did.
 --   The buttons under the bank and mail windows are ours on Blizzard's windows (and float on their own
 --   where a bag addon hides the bank's). The routes' own automation - release at a death skip, abandon
 --   a skipped quest, share and accept route quests - acts for you, so turning the routes on is not
@@ -383,13 +385,41 @@ function YR:ToggleSettings() if YR.LoadWindow() then YR:ToggleSettings() end end
 function YR:ShowSettingsTab(key) if YR.LoadWindow() then YR:ShowSettingsTab(key) end end
 --- A new install is asked once how much of Headstart it wants: the welcome window, a few seconds
 --- after the first login and not in a fight (the next login, then). Welcome.lua, in the window's addon.
+--- It is put up when the screen is really there, and counts as seen only once it has stayed up for a
+--- few seconds or been answered. (A new character's first login plays its flight over the zone with
+--- the interface hidden: the window was put up under it, the Escape that ended the flight closed it
+--- with every other window, and it was written down as seen without ever having been - the user,
+--- 2026-10-13, a new install's very first login.) Closed before that, it is put up once more; still
+--- not seen, the next login asks again.
 function YR.WelcomeFirst()
     local db = YippRouteDB
     if not db.welcome or db.welcomeSeen then return end
-    C_Timer.After(5, function()
-        if db.welcomeSeen or InCombatLockdown() then return end
-        if YR.LoadWindow() and YR.WelcomeShow then YR.WelcomeShow() end
-    end)
+    local looks, shows, up = 0, 0, 0
+    local function Look()
+        if db.welcomeSeen then return end
+        looks = looks + 1
+        local win = _G.HeadstartWelcomeWindow
+        local showing = win and win:IsVisible() or false
+        if showing then
+            up = up + 1
+            if up >= 2 then db.welcomeSeen = true return end
+        else
+            up = 0
+            local there = UIParent:IsVisible() and not (InCinematic and InCinematic()) and not InCombatLockdown()
+            if there and shows < 2 then
+                shows = shows + 1
+                if YR.LoadWindow() and YR.WelcomeShow then
+                    YR.WelcomeShow(true)
+                    showing = true
+                else
+                    shows = 2           -- the window's addon isn't there (said once, in chat): not asked for again
+                end
+            end
+        end
+        -- (two minutes of looking at most, and none once it has been closed twice)
+        if looks < 60 and (showing or shows < 2) then C_Timer.After(2, Look) end
+    end
+    C_Timer.After(5, Look)
 end
 function Headstart_OnAddonCompartmentClick(_, which, from)
     if which == "RightButton" then YR.WindowMenu(type(from) == "table" and from or nil) else YR:ToggleWindow() end

@@ -49,6 +49,7 @@ DamageSkin.lua
 Movers.lua
 TalentFade.lua
 BarHide.lua
+Cinematic.lua
 ChatLog.lua
 LootFeed.lua
 QuestLFG.lua

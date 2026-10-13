@@ -1557,4 +1557,63 @@ YS.Options(YS).keys = False
 YS.ApplyUI(YS, lua.eval('{ cvars = {}, bars = {}, keys = { MOVEFORWARD = { "E", false } } }'), YS.Options(YS))
 report(g.KEYS().MOVEFORWARD == "W,UP", "with Key bindings switched off: yours are left alone")
 YS.Options(YS).keys = True
+
+# Graphics and sound: the machine's own settings, which matter on another install (the live game after
+# the beta). Saved with the interface, put on by its switch, the quality preset before what is under it.
+lua.execute("""CVARS.graphicsQuality = "7" CVARS.graphicsShadowQuality = "1" CVARS.graphicsViewDistance = "7"
+    CVARS.Sound_MasterVolume = "0.15" CVARS.Sound_MusicVolume = "0" CVARS.maxFPS = "160" CVARS.GxMaximize = "1"
+    CVARS.GxAdapter = "a card" CVARS.Sound_OutputDriverName = "a headset"
+    SETS = {} local set = C_CVar.SetCVar
+    C_CVar.SetCVar = function(k, v)
+        SETS[#SETS + 1] = k
+        -- (as the game does it: a quality preset sets what is under it)
+        if k == "graphicsQuality" then CVARS.graphicsShadowQuality = "3" CVARS.graphicsViewDistance = v == "7" and "7" or "3" end
+        return set(k, v)
+    end""")
+saved = YS.ScanUI(YS)
+m = saved.machine
+report(m is not None and m.graphicsQuality == "7" and m.graphicsShadowQuality == "1" and m.Sound_MasterVolume == "0.15" and m.maxFPS == "160",
+       "Save interface saves graphics and sound: the quality, the volumes, the frame rate limit")
+report(m.GxMaximize is None and m.GxAdapter is None and m.Sound_OutputDriverName is None and m.MSAAQuality is None,
+       "not the window, the graphics card or the sound device - and not a setting this client hasn't got")
+report(saved.v == 5 and not YS.UIStale(saved) and YS.UIStale(lua.eval("{ v = 4 }")), "an interface saved before this is known as an older one")
+other = lua.eval("(function(ui) local c = {} for k, v in pairs(ui) do c[k] = v end c.machine = { Sound_MasterVolume = '1' } return c end)")(saved)
+report(YS.UISig(saved) == YS.UISig(other) and other.machine.Sound_MasterVolume == "1",
+       "a volume turned down is not a changed screen: the other characters are not asked to take it")
+# another install: the game's own defaults, with one thing set by hand
+g.MACHINE = m
+lua.execute("""CVARS.graphicsQuality = "3" CVARS.graphicsShadowQuality = "2" CVARS.graphicsViewDistance = "3"
+    CVARS.Sound_MasterVolume = "1" CVARS.Sound_MusicVolume = "0.4" SETS = {} SAID = {}
+    YippSetupCharDB.uiBackup = { at = 1 }
+    local p = YR_SETUP.Print YR_SETUP.Print = function(text) SAID[#SAID + 1] = text end""")
+YS.ApplyUI(YS, lua.eval("{ cvars = {}, bars = {}, v = 5, machine = MACHINE }"), YS.Options(YS))
+c = g.CVARS
+report(c.graphicsQuality == "7" and c.graphicsShadowQuality == "1" and c.graphicsViewDistance == "7" and c.Sound_MasterVolume == "0.15" and c.Sound_MusicVolume == "0",
+       f"Apply interface puts them on ({c.graphicsQuality}, {c.graphicsShadowQuality}, {c.graphicsViewDistance}, {c.Sound_MasterVolume}, {c.Sound_MusicVolume})")
+sets = list(g.SETS.values())
+report(sets[0] == "graphicsQuality" and "graphicsShadowQuality" in sets and "maxFPS" not in sets and "GxMaximize" not in sets,
+       f"the quality preset first, then what is under it; what is the same already is not set ({sets})")
+said = " ".join(g.SAID.values())
+report("Graphics and sound: 5 changed" in said, f"and chat says how many ({said[:200]})")
+kept = g.YippSetupCharDB.uiBackup.cvars
+report(kept is not None and kept.graphicsQuality == "3" and kept.graphicsShadowQuality == "2" and kept.Sound_MasterVolume == "1" and kept.maxFPS == "160",
+       "what you had is kept for undo - as it was before the preset touched it, and all of them")
+YS.Undo(YS)
+report(c.graphicsQuality == "3" and c.graphicsShadowQuality == "2" and c.graphicsViewDistance == "3" and c.Sound_MasterVolume == "1" and c.Sound_MusicVolume == "0.4",
+       f"/ysetup undo: your own graphics and sound back, the setting under a preset too ({c.graphicsQuality}, {c.graphicsShadowQuality}, {c.Sound_MasterVolume})")
+# applied where they are the same already: nothing set, nothing said to have changed
+lua.execute('CVARS.graphicsQuality = "7" CVARS.graphicsShadowQuality = "1" CVARS.graphicsViewDistance = "7" CVARS.Sound_MasterVolume = "0.15" CVARS.Sound_MusicVolume = "0" SETS, SAID = {}, {}')
+YS.ApplyUI(YS, lua.eval("{ cvars = {}, bars = {}, v = 5, machine = MACHINE }"), YS.Options(YS))
+report(len(list(g.SETS.values())) == 0 and "Graphics and sound: 0 changed" in " ".join(g.SAID.values()), "on the install it was saved on: nothing to change")
+# its switch off, and an interface that has none saved
+lua.execute('CVARS.Sound_MasterVolume = "1" SETS, SAID = {}, {}')
+YS.Options(YS).graphics = False
+YS.ApplyUI(YS, lua.eval("{ cvars = {}, bars = {}, v = 5, machine = MACHINE }"), YS.Options(YS))
+report(c.Sound_MasterVolume == "1" and "Graphics and sound: off" in " ".join(g.SAID.values()), "with Graphics and sound switched off: yours are left alone")
+YS.Options(YS).graphics = True
+lua.execute("SAID = {}")
+YS.ApplyUI(YS, lua.eval("{ cvars = {}, bars = {}, v = 4 }"), YS.Options(YS))
+said = " ".join(g.SAID.values())
+report(c.Sound_MasterVolume == "1" and "Graphics and sound: none saved" in said and "graphics and sound are not in it" in said and "key bindings" not in said.split("older Headstart:")[1],
+       f"an interface saved before this: nothing set, and it says what to do - naming only what that one lacks ({said[-170:]})")
 sys.exit(1 if bad else 0)

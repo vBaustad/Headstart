@@ -2,8 +2,10 @@
 
     python tools/live_move.py backup
     python tools/live_move.py check <live client folder>
-    python tools/live_move.py plan  <live client folder> [--account NAME] [--all-addons] [--game-files] [--addons]
+    python tools/live_move.py plan  <live client folder> [--account NAME] [--all-addons] [--config] [--game-files] [--addons]
     python tools/live_move.py go    <live client folder> [the same] [--replace]
+    python tools/live_move.py rehearse
+    python tools/live_move.py restore
 
 The game keeps settings per installed client, under <client>/WTF/Account/<account>/. The beta is closed
 a week before the live game opens, so the two are never open together: what is left of the beta is its
@@ -14,7 +16,25 @@ interface on.
 
   backup   The beta's whole WTF folder copied to S:/forever-data/backup/wtf/classic_beta_<date>. Do this
            while the beta is still installed: an uninstall may take the folder with it. Never writes
-           over an earlier copy.
+           over an earlier copy: a second one the same day gets the time in its name.
+  rehearse The launch day tried in the beta, while it can still be opened. The beta's WTF folder is
+           given the name WTF.kept (moved as it is, nothing deleted, and a copy is kept as `backup`
+           does first), so the next start finds a client with no addon settings and no chat windows.
+           The game's own are NOT gone: its servers hold the account's Edit Mode layouts, macros,
+           key bindings and game settings, and hand them back at that login (seen 2026-10-13: the
+           Edit Mode and macro files came back byte for byte, the keys as they were when the client
+           last sent them). So this rehearses a new install of Headstart, and the saved file put
+           in; for the Edit Mode layout made from nothing, give the layout another name in Edit Mode
+           before Apply both (and afterwards delete the one Headstart made and give the old one its
+           name back, so your other characters keep it).
+           While WTF.kept is there, check / plan / go take the settings from it, and the beta's own
+           folder is the stand-in for the live client:
+               rehearse; start the game, look, quit; check <beta folder>; go <beta folder> --replace;
+               start the game, make a new character, Apply both; quit; restore.
+           Play only the new character while it is on: an old character's buttons point at macros
+           that are not there.
+  restore  The rehearsal over: the made-new WTF is put aside as WTF.rehearsal-<time> (kept, to look
+           at) and WTF.kept is WTF again, as it was.
   check    Looks at the live client as it stands and says what is ready: the version it runs and the
            interface number that makes (against the number in Headstart's TOC files: a mismatch lists
            the addon as out of date, which looks like lost settings and is not), the account folders it
@@ -33,6 +53,12 @@ interface on.
                          makes it). The beta's is 101117295#1; the other live clients on this disk use
                          DONALD11, and the live game will most likely do the same.
   --all-addons           Every addon's saved file, not only Headstart's.
+  --config               This machine's own settings too: graphics, sound, frame rate, window mode, mouse
+                         (WTF/Config.wtf, which the game reads as it starts - so they are right from the
+                         login screen on). The beta's lines are put into the live client's file one by
+                         one; what says which game and region the client is, its caches and its switches
+                         for keeping settings on the servers stay the live client's own (NOT_OURS below).
+                         The file that was there is kept beside it as Config.wtf.before-move.
   --game-files           The game's own account files too: key bindings, account macros, settings and
                          Edit Mode layouts (bindings-cache.wtf, macros-cache.txt, config-cache.wtf,
                          edit-mode-cache-account.txt). The game may prefer what its servers hold over
@@ -53,16 +79,32 @@ import sys
 BETA = "S:/Blizzard/World of Warcraft/_classic_beta_"
 BACKUPS = "S:/forever-data/backup/wtf"
 OURS = ("Headstart.lua", "Headstart_Options.lua")
+# Config.wtf lines that are the client's own and never taken from another: which game, region and
+# language it is, what it has measured of the machine, what it has cached, the mode it is in, and whether
+# it keeps settings on the servers (the beta's say no, which is how its server copy of the keys went stale).
+NOT_OURS = ("portal", "agentuid", "textlocale", "audiolocale", "hwdetect", "videooptionsversion", "enginesurvey",
+            "enginesurveypatch", "currentgamemode", "plunderstormrealm", "gametip", "lastaddonversion", "accountname",
+            "accountlist", "gameaccountname", "realmname", "realmlist", "lastcharacterindex", "lastselectedrealm",
+            "playintromovie")
+NOT_OURS_STARTS = ("cache-", "synchronize")
 GAME_FILES = ("bindings-cache.wtf", "macros-cache.txt", "config-cache.wtf", "edit-mode-cache-account.txt")
 LINKS = ("Headstart", "Headstart_Options", "Headstart_Setup", "Headstart_Routes")
 
 
+def kept():
+    """Where a rehearsal keeps the beta's real WTF folder while the client runs as if new."""
+    return BETA + "/WTF.kept"
+
+
 def source_wtf():
-    """The beta's own folder while it is there (it has the last session in it); else the newest copy kept."""
+    """The beta's own folder while it is there (it has the last session in it); else the newest copy kept.
+    While a rehearsal is on, the folder it moved aside: the one in the client is the made-new one."""
+    if os.path.isdir(kept()):
+        return kept()
     if glob.glob(BETA + "/WTF/Account/*/SavedVariables/Headstart.lua"):
         return BETA + "/WTF"
-    kept = sorted(glob.glob(BACKUPS + "/classic_beta_*"))
-    return kept[-1] if kept else BETA + "/WTF"
+    copies = sorted(glob.glob(BACKUPS + "/classic_beta_*"))
+    return copies[-1] if copies else BETA + "/WTF"
 
 
 def source_account(wtf):
@@ -164,20 +206,127 @@ def check(args):
     return 0 if ready else 2
 
 
+def config_lines(path):
+    """A Config.wtf as its lines, and where each setting's line is: ([line, ...], {name in lower case: index})."""
+    try:
+        lines = open(path, encoding="utf-8", errors="replace").read().splitlines()
+    except OSError:
+        return [], {}
+    at = {}
+    for i, line in enumerate(lines):
+        parts = line.split(" ", 2)
+        if len(parts) == 3 and parts[0] == "SET":
+            at[parts[1].lower()] = i
+    return lines, at
+
+
+def config_merge(src, dst, write):
+    """The machine's settings from one Config.wtf into another, line by line. Returns (changed, added, same, left)."""
+    ours, _ = config_lines(src)
+    lines, at = config_lines(dst)
+    changed = added = same = left = 0
+    for line in ours:
+        parts = line.split(" ", 2)
+        if len(parts) != 3 or parts[0] != "SET":
+            continue
+        name = parts[1].lower()
+        if name in NOT_OURS or name.startswith(NOT_OURS_STARTS):
+            left += 1
+        elif name not in at:
+            lines.append(line)
+            at[name] = len(lines) - 1
+            added += 1
+        elif lines[at[name]] != line:
+            lines[at[name]] = line
+            changed += 1
+        else:
+            same += 1
+    if write and (changed or added):
+        if os.path.exists(dst):
+            shutil.copy2(dst, dst + ".before-move")
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        nl = chr(10)
+        with open(dst, "w", encoding="utf-8", newline=nl) as f:
+            f.write(nl.join(lines) + nl)
+    return changed, added, same, left
+
+
 def backup():
-    src = BETA + "/WTF"
+    # (while a rehearsal is on, the real settings are in the folder it moved aside)
+    src = kept() if os.path.isdir(kept()) else BETA + "/WTF"
     if not os.path.isdir(src):
         print("no beta WTF folder at", src)
         return 1
-    dst = f"{BACKUPS}/classic_beta_{datetime.date.today().isoformat()}"
+    now = datetime.datetime.now()
+    dst = f"{BACKUPS}/classic_beta_{now.date().isoformat()}"
     if os.path.exists(dst):
-        print("already kept today:", dst, "(nothing written)")
-        return 0
+        # a second copy the same day: the settings have been saved since, and that is the one wanted
+        dst += now.strftime("_%H%M")
+        if os.path.exists(dst):
+            print("already kept this minute:", dst, "(nothing written)")
+            return 0
     os.makedirs(BACKUPS, exist_ok=True)
     shutil.copytree(src, dst)
     files = sum(len(f) for _, _, f in os.walk(dst))
     size = sum(os.path.getsize(os.path.join(b, f)) for b, _, fs in os.walk(dst) for f in fs)
     print(f"kept   {src}\n  as   {dst}  ({files} files, {size / 1e6:.0f} MB)")
+    return 0
+
+
+def rehearse():
+    wtf = BETA + "/WTF"
+    if os.path.isdir(kept()):
+        print(f"a rehearsal is on already: the real settings are in {kept()}. `restore` puts them back.")
+        return 1
+    if not glob.glob(wtf + "/Account/*/SavedVariables/Headstart.lua"):
+        print("no Headstart settings under", wtf, "- nothing to rehearse with.")
+        return 1
+    if running():
+        print("a WoW client is running: close the game first. It writes its settings when it closes, and"
+              " would write them into a folder that is no longer there.")
+        return 1
+    if backup() != 0:
+        return 1
+    try:
+        os.rename(wtf, kept())
+    except OSError as e:
+        print(f"could not move {wtf}: {e}\nSomething has it open (a file window, an editor). Nothing was changed: close that and try again.")
+        return 1
+    client = BETA.replace("/", os.sep)
+    print(f"moved  {wtf}\n   to  {kept()}  (as it was: nothing deleted)")
+    print("The beta now starts with no addon settings (the game's own keys, macros and Edit Mode layouts come")
+    print("back from its servers). Next:")
+    print("  1. Start the game and enter the world on a NEW character. Headstart greets you as new: its welcome")
+    print("     window comes up once the opening flight is over. Quit the game.")
+    print(f'  2. python tools/live_move.py check "{client}"')
+    print(f'  3. python tools/live_move.py go "{client}" --replace')
+    print("  4. Start the game, make another new character of a class with saved bars. In Edit Mode give the")
+    print("     layout another name (so Headstart has to make it), then press Apply both.")
+    print("  5. In Edit Mode delete the layout Headstart made and give the old one its name back.")
+    print("  6. Quit the game, then: python tools/live_move.py restore")
+    return 0
+
+
+def restore():
+    wtf = BETA + "/WTF"
+    if not os.path.isdir(kept()):
+        print("no rehearsal is on: there is no", kept())
+        return 1
+    if running():
+        print("a WoW client is running: close the game first (it writes its settings when it closes).")
+        return 1
+    # (two moves; if the second is refused, running this again does only that one)
+    try:
+        if os.path.isdir(wtf):
+            aside = BETA + "/WTF.rehearsal-" + datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+            os.rename(wtf, aside)
+            print(f"aside  {aside}  (the rehearsal's own settings: kept to look at, safe to delete)")
+        os.rename(kept(), wtf)
+    except OSError as e:
+        print(f"could not move a folder: {e}\nSomething has it open (a file window, an editor). The real settings are still"
+              f" whole in {kept()}: close that and run restore again.")
+        return 1
+    print(f"back   {wtf}  is the beta's real settings folder again.")
     return 0
 
 
@@ -197,7 +346,7 @@ def move(args, write):
     if not src:
         print("no Headstart settings found under", wtf)
         return 1
-    print(f"from   {src}")
+    print(f"from   {src}" + ("   (a rehearsal is on: the settings it moved aside)" if wtf == kept() else ""))
     if not os.path.isdir(live):
         print(f"       {live} is not there yet: nothing can be copied into it.")
         return 1
@@ -243,6 +392,15 @@ def move(args, write):
                 shutil.copy2(b, b + ".before-move")
             shutil.copy2(a, b)
         done += 1
+    if "--config" in flags:
+        a, b = f"{wtf}/Config.wtf", f"{live}/WTF/Config.wtf"
+        if not os.path.isfile(a):
+            print(f"  none   Config.wtf  (there is none at {a})")
+        else:
+            changed, added, same, left = config_merge(a, b, write)
+            print(f"  {'merge' if write else 'would merge'}  WTF/Config.wtf  (graphics, sound, frame rate, window, mouse): {changed} changed,"
+                  f" {added} added, {same} the same already; {left} left as the client's own"
+                  + ("; the one that was there kept as .before-move" if write and (changed or added) and os.path.exists(b + ".before-move") else ""))
     if "--addons" in flags:
         for name in LINKS:
             link, here = f"{live}/Interface/AddOns/{name}", f"{BETA}/Interface/AddOns/{name}"
@@ -263,11 +421,15 @@ def move(args, write):
 
 
 def main(args):
-    if not args or args[0] not in ("backup", "check", "plan", "go"):
+    if not args or args[0] not in ("backup", "check", "plan", "go", "rehearse", "restore"):
         print(__doc__)
         return 1
     if args[0] == "backup":
         return backup()
+    if args[0] == "rehearse":
+        return rehearse()
+    if args[0] == "restore":
+        return restore()
     if args[0] == "check":
         return check(args[1:])
     return move(args[1:], args[0] == "go")

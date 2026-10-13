@@ -2208,10 +2208,15 @@ local function BuildSetup(page)
     Row("Apply interface", applyUI, "Applies the saved interface to this character, limited by the switches below, after asking. Bars"
         .. " and macros are not touched. Game settings can be undone; chat windows and the Edit Mode layout can't, and a"
         .. " chat tab the saved interface doesn't have is closed.")
-    Row("Game settings", Sw("settings"), "Auto loot, interact on click, nameplates, raid frames, map coordinates and similar.")
+    Row("Game settings", Sw("settings"), "What the Options window's own pages set: controls, mouse and camera, combat, names and nameplates,"
+        .. " raid frames, social, map coordinates, accessibility. Not the language, the network or which help tips you have seen.")
     Row("Key bindings", Sw("keys"), "Your keys as they were where the interface was saved, action by action - a default you took off"
         .. " stays off. Saved as the game saves them (the account's, unless you use character-specific bindings). /ysetup undo"
         .. " puts back the keys you had. An interface saved before this was added has none: press Save interface once.")
+    Row("Graphics and sound", Sw("graphics"), "The Options window's Graphics and Audio settings: quality, effects, frame rate limits, volumes and"
+        .. " which sounds play. The game keeps these per install, so this matters on another one - the live game after the beta."
+        .. " Not the monitor, window, resolution or sound device. /ysetup undo puts back what you had. An interface saved before"
+        .. " this was added has none: press Save interface once.")
     Row("Edit Mode layout", Sw("editMode"), "Skipped when a UI suite like ElvUI or EllesmereUI is loaded.")
     Row("Visible action bars", Sw("barVisibility"), "Skipped when a bar addon like Bartender or Dominos is loaded.")
     Row("Chat windows", Sw("chat"), "Chat tabs with their names, channels, font size, colours, and docked or floating position.")
@@ -4094,6 +4099,11 @@ local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
             YR.MoverReset("bag")
             YR.MoverReset("reagentBag")
         end, nil, 90), "Both bags open where Blizzard puts them again.")
+
+        Section("Cinematics", "skipped as they start", { find = "skip cinematic intro movie opening", icon = 133885 })
+        Row("Skip cinematics", S.Switch(c, Opt("skipCinematic"), function(on) YippRouteDB.skipCinematic = on end),
+            "Ends a cinematic as it starts: a new character's opening flight over its zone. Hold Shift as it"
+            .. " starts (as you enter the world) to watch that one. On unless you turn it off.")
 end)
 
 local function QoLRefresh(key, extra)
@@ -4222,6 +4232,8 @@ local function HomeFeatures()
                 function() return OnOff(type(YippRouteDB.windowScale) == "table" and next(YippRouteDB.windowScale) ~= nil) end),
             State(F(134939, "RestedXP skin", "Another look for RestedXP's window.", "rxpskin", "RestedXP skin"),
                 function() return OnOff(YR.RXPSkinMode() ~= "off") end),
+            F(133885, "Skip cinematics", "A new character's opening flight, ended as it starts.", "windows", "Cinematics",
+                Toggle("skipCinematic")),
             setup,
         },
     }
@@ -4529,10 +4541,10 @@ local CATEGORIES = {
     { group = "Interface" },
     { key = "windows", label = "Bars & windows", build = BuildWindows, refresh = QoLRefresh("windows"), icon = 136243,
       status = function() return YR.TalentFade() > 0 or YR.Option("talentMove") or YippRouteDB.moveBag == true or YippRouteDB.moveReagentBag == true
-          or YippRouteDB.bagBar ~= nil or YippRouteDB.microMenu ~= nil
+          or YippRouteDB.bagBar ~= nil or YippRouteDB.microMenu ~= nil or YR.Option("skipCinematic")
           or (type(YippRouteDB.windowScale) == "table" and next(YippRouteDB.windowScale) ~= nil) end,
       scope = "Every character on this account",
-      desc = "Blizzard's bag bar and micro menu hidden, and its windows moved, scaled or see-through." },
+      desc = "Blizzard's bag bar and micro menu hidden, its windows moved, scaled or see-through, and cinematics skipped." },
     { key = "rxpskin", label = "RestedXP", build = BuildRXPSkin, refresh = QoLRefresh("rxpskin"), icon = 134939,
       status = function() return YR.RXPSkinMode() ~= "off" end, scope = "Every character on this account",
       desc = "Another look for RestedXP's guide window, with your own accent colour." },

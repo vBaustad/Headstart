@@ -60,6 +60,7 @@ local OPTION_DEFAULTS = {
     clearBars = true, clearMacros = true,
     settings = true, editMode = true, barVisibility = true, guide = true, noAutoPush = true,
     swap = true, rankUp = true, popup = true, skipIntro = true, chat = true, camera = true, keys = true,
+    graphics = true,
 }
 
 -- Everything is kept per class: a warrior main's bars and choices don't land on a new paladin.
@@ -291,8 +292,9 @@ local function Sig(ui)
             parts[#parts + 1] = "{"
             for _, k in ipairs(keys) do
                 -- not the camera or the data's version; not RestedXP's window sizes, two of which it
-                -- changes by itself at every step of a guide
-                if not (depth == 0 and (k == "camera" or k == "v")) and not (depth == 1 and under == "rxp" and k == "sizes") then
+                -- changes by itself at every step of a guide; not graphics and sound, which every
+                -- character on this install has already (a volume turned down is not a changed screen)
+                if not (depth == 0 and (k == "camera" or k == "v" or k == "machine")) and not (depth == 1 and under == "rxp" and k == "sizes") then
                     parts[#parts + 1] = tostring(k) .. "="
                     Walk(v[k], depth + 1, k)
                 end
@@ -485,9 +487,10 @@ end
 -- (The first-login window and the "changed elsewhere" window are questions already.)
 StaticPopupDialogs["YIPPSETUP_INTERFACE"] = {
     text = "Headstart: put the saved interface on this character?\n\nIt changes your chat windows (a chat tab the saved"
-        .. " interface doesn't have is closed), the Edit Mode layout, which action bars show, your key bindings and game"
-        .. " settings, each as its switch on this page says. No action button and no macro is touched.\n\nGame settings and"
-        .. " key bindings can be put back (/ysetup undo). Chat windows and the Edit Mode layout can't be put back by an addon.",
+        .. " interface doesn't have is closed), the Edit Mode layout, which action bars show, your key bindings, game"
+        .. " settings, and graphics and sound, each as its switch on this page says. No action button and no macro is"
+        .. " touched.\n\nGame settings, graphics, sound and key bindings can be put back (/ysetup undo). Chat windows and the"
+        .. " Edit Mode layout can't be put back by an addon.",
     button1 = "Apply interface",
     button2 = "Cancel",
     OnAccept = function() YS:ApplyInterface() end,
@@ -1447,14 +1450,27 @@ end
 --- pet's) can't be put back by an addon: those slots are said.
 ---   Nothing is touched unless every macro it has to make again fits: the bars are cleared to put the
 ---   old ones back, and with the macro list full that used to leave them empty and the copy gone.
+-- Game settings put back as they were. The two graphics quality presets first: setting a preset sets
+-- everything under it, so each of those has to come after it. Returns how many were set.
+local PRESETS = { "graphicsQuality", "raidGraphicsQuality" }       -- (as SetupUI.lua's MACHINE_CVARS spells them)
+local function PutBack(cvars)
+    local n = 0
+    for _, name in ipairs(PRESETS) do
+        if cvars[name] ~= nil and pcall(C_CVar.SetCVar, name, cvars[name]) then n = n + 1 end
+    end
+    for name, v in pairs(cvars) do
+        if name ~= PRESETS[1] and name ~= PRESETS[2] and pcall(C_CVar.SetCVar, name, v) then n = n + 1 end
+    end
+    return n
+end
+
 function YS:Undo(first, bars)
     if InCombatLockdown() then Print("can't change action bars in combat.") return end
     -- "Apply interface" was the last thing done: that alone is undone, and the bars stay as they are
     -- (bars: the bars are what is asked for - a switch of profile taking itself back)
     local uiOnly = not first and not bars and YippSetupCharDB.uiBackup
     if uiOnly then
-        local settings = 0
-        for name, v in pairs(uiOnly.cvars or {}) do if pcall(C_CVar.SetCVar, name, v) then settings = settings + 1 end end
+        local settings = PutBack(uiOnly.cvars or {})
         if uiOnly.keys and YS.ApplyKeys then YS.ApplyKeys(uiOnly.keys) end           -- and your keys as they were
         YippSetupCharDB.uiBackup = nil
         -- taken back: this character's screen is its own again, and is not saved into the interface
@@ -1531,8 +1547,7 @@ function YS:Undo(first, bars)
             lost = lost + 1
         end
     end
-    local settings = 0
-    for name, v in pairs(b.cvars or {}) do if pcall(C_CVar.SetCVar, name, v) then settings = settings + 1 end end
+    local settings = PutBack(b.cvars or {})
     if b.keys and YS.ApplyKeys then YS.ApplyKeys(b.keys) end                         -- and your keys as they were
     -- the character is what it was then: set up or not, on the layout it was on
     local was = b.was or {}

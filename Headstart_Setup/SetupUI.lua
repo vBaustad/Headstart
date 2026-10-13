@@ -44,9 +44,85 @@ local CVARS = {
     -- says: the swing timer, the cooldown viewer, encounter warnings, external defensives. Their size and
     -- place are Edit Mode's. (The Personal Resource Display's switch is the class's: CLASS_CVARS.)
     "cooldownViewerEnabled", "combatWarningsEnabled", "externalDefensivesEnabled",
+    -- The rest of what the Options window's own pages set (the user, 2026-10-13: "vi kan jo ta med alt"),
+    -- by the names Blizzard's pages use (Blizzard_SettingsDefinitions_Frame). Not what says a help tip
+    -- or a tutorial was seen, the language, the network, or the spoken combat alerts.
+    -- Controls, mouse and camera:
+    "autoClearAFK", "softTargettingInteractKeySound", "ClipCursor", "mouseInvertPitch", "cameraYawMoveSpeed",
+    "cameraPitchMoveSpeed", "autointeract", "cameraSmoothStyle", "cameraWaterCollision", "combinedBags",
+    -- Interface:
+    "showInGameNavigation", "Outline", "chatBubbles", "chatBubblesParty", "chatBubblesRaid",
+    "ReplaceOtherPlayerPortraits", "ReplaceMyPlayerPortrait",
+    -- Combat:
+    "doNotFlashLowHealthWarning", "lossOfControl", "enableMouseoverCast", "empowerTapControls",
+    "spellActivationOverlayOpacity", "displaySpellActivationOverlays", "ActionButtonUseKeyHeldSpell", "softTargetEnemy",
+    "findYourselfModeCircle", "findYourselfModeOutline", "findYourselfModeIcon", "findYourselfAnywhere",
+    "occludedSilhouettePlayer", "assistedCombatHighlight", "assistedCombatReduceHighlights",
+    -- Names and nameplates:
+    "nameplateStyle", "UnitNameFriendlySpecialNPCName", "UnitNameHostleNPC", "UnitNameInteractiveNPC",
+    "ShowQuestUnitCircles", "UnitNameNonCombatCreatureName", "UnitNameFriendlyPlayerName", "UnitNameFriendlyMinionName",
+    "UnitNameEnemyPlayerName", "UnitNameEnemyMinionName", "nameplateShowAll", "nameplateShowEnemyMinions",
+    "nameplateShowEnemyMinus", "nameplateShowFriendlyPlayers", "nameplateShowFriendlyPlayerMinions",
+    "nameplateShowOnlyNameForFriendlyPlayerUnits", "nameplateUseClassColorForFriendlyPlayerUnitNames",
+    "nameplateShowFriendlyRealmName", "nameplateShowFriendlyNpcs", "nameplateShowOffscreen", "nameplateStackingTypes",
+    "nameplateSize", "nameplateAuraScale", "nameplateInfoDisplay", "nameplateCastBarDisplay", "nameplateThreatDisplay",
+    "nameplateEnemyNpcAuraDisplay", "nameplateEnemyPlayerAuraDisplay", "nameplateFriendlyPlayerAuraDisplay",
+    "nameplateDebuffPadding", "nameplateSimplifiedTypes", "nameplateShowFriendlyClassColor", "nameplateShowClassColor",
+    -- Social:
+    "profanityFilter", "guildMemberNotify", "blockTrades", "blockChannelInvites", "showToastOnline", "showToastOffline",
+    "showToastBroadcast", "showToastFriendRequest", "showToastWindow", "autoAcceptQuickJoinRequests",
+    -- Pings:
+    "enablePings", "pingMode", "showPingsInChat", "showPingsOnRaidFrames",
+    -- Accessibility and colour blindness, subtitles, quest text:
+    "WorldTextMinSize", "enableMovePad", "CameraKeepCharacterCentered", "CameraReduceUnexpectedMovement",
+    "ShakeStrengthCamera", "ShakeStrengthUI", "cursorSizePreferred", "SoftTargetTooltipEnemy", "SoftTargetTooltipInteract",
+    "SoftTargetIconEnemy", "SoftTargetIconInteract", "SoftTargetIconGameObject", "SoftTargetLowPriorityIcons",
+    "overrideScreenFlash", "colorblindMode", "colorblindSimulator", "colorblindWeaknessFactor",
+    "movieSubtitle", "movieSubtitleBackground", "movieSubtitleBackgroundAlpha", "questTextContrast",
+    -- Encounters (Options, Advanced):
+    "encounterWarningsEnabled", "encounterTimelineEnabled", "encounterWarningsLevel",
+    "encounterWarningsHideIfNotTargetingPlayer", "encounterTimelineHideLongCountdowns",
+    "encounterTimelineHideQueuedCountdowns", "encounterTimelineHideForOtherRoles",
 }
 -- Settings kept per class, not for the account (Setup.lua, YS.SaveClassUI): whether the Personal
 -- Resource Display is on (the user, 2026-10-10: "vi lagrer basert på class"). Per character in the game.
+-- This machine's settings: graphics and sound, as the Options window has them (System: Graphics, Audio),
+-- with the frame rate limits and the mouse. The game keeps them per installed client and not per
+-- character, so where they were saved every character has them already; they matter on another install
+-- - the live game after the beta (the user, 2026-10-13, after Apply both on a client made new: "eneste
+-- jeg savner er nok graphic settings og audio settings"). Names this client hasn't got are passed over.
+--   Not the monitor, the window and its resolution, the graphics card and its API, or the sound and
+--   voice devices: those are the machine's own, and wrong on another.
+--   In this order: the two quality presets first (setting a preset sets everything under it), then each.
+--   The names are the ones Blizzard's own Graphics and Audio pages set (Blizzard_SettingsDefinitions_Shared,
+--   Graphics.lua and Audio.lua), with the quality settings this client writes to its Config.wtf.
+local MACHINE_CVARS = {
+    "graphicsQuality", "raidGraphicsQuality", "RAIDsettingsEnabled",
+    "graphicsShadowQuality", "graphicsLiquidDetail", "graphicsPBRLiquidDetail", "graphicsParticleDensity", "graphicsSSAO",
+    "graphicsDepthEffects", "graphicsComputeEffects", "graphicsOutlineMode", "graphicsTextureResolution",
+    "graphicsSpellDensity", "graphicsProjectedTextures", "graphicsViewDistance", "graphicsEnvironmentDetail",
+    "graphicsGroundClutter", "graphicsLightMode", "graphicsBloomUserMult",
+    "raidGraphicsShadowQuality", "raidGraphicsLiquidDetail", "raidGraphicsPBRLiquidDetail", "raidGraphicsParticleDensity",
+    "raidGraphicsSSAO", "raidGraphicsDepthEffects", "raidGraphicsComputeEffects", "raidGraphicsOutlineMode",
+    "raidGraphicsTextureResolution", "raidGraphicsSpellDensity", "raidGraphicsProjectedTextures", "raidGraphicsViewDistance",
+    "raidGraphicsEnvironmentDetail", "raidGraphicsGroundClutter", "raidGraphicsLightMode", "raidGraphicsBloomUserMult",
+    -- frame rate, sync, latency, anti-aliasing, render scale, sharpening, brightness, the field of view,
+    -- and the size of the interface (Edit Mode's places are measured in it)
+    "maxFPS", "useMaxFPS", "maxFPSBk", "useMaxFPSBk", "targetFPS", "useTargetFPS", "vsync", "LowLatencyMode",
+    "ffxAntiAliasingMode", "MSAAQuality", "msaaAlphaTest", "RenderScale", "ResampleQuality", "ResampleSharpness",
+    "textureFilteringMode", "shadowrt", "Gamma", "Brightness", "Contrast", "physicsLevel", "cameraFov",
+    "useUiScale", "uiscale",
+    -- sound: what is on, and how loud
+    "Sound_EnableAllSound", "Sound_MasterVolume", "Sound_SFXVolume", "Sound_MusicVolume", "Sound_AmbienceVolume",
+    "Sound_DialogVolume", "Sound_EnableSFX", "Sound_EnableMusic", "Sound_EnableAmbience", "Sound_EnableDialog",
+    "Sound_EnableErrorSpeech", "Sound_EnableEmoteSounds", "Sound_EnablePetSounds", "Sound_ZoneMusicNoDelay",
+    "Sound_EnableSoundWhenGameIsInBG", "Sound_EnableReverb", "Sound_EnablePositionalLowPassFilter",
+    "Sound_NumChannels",
+    -- the mouse
+    "rawMouseEnable", "mouseSpeed", "enableMouseSpeed",
+}
+YS.MACHINE_CVARS = MACHINE_CVARS
+
 local CLASS_CVARS = { "nameplateShowSelf", "showSwingTimer" }       -- and the swing timer (same day)
 YS.CLASS_CVARS = CLASS_CVARS
 local IS_CLASS_CVAR = {}
@@ -125,7 +201,8 @@ end
 -- only the character it came from can add them: YS.UIStale says so, for the window and for Apply.
 -- 2: whether the damage meter is on, and RestedXP's look.
 -- 3: the on/off switches of the swing timer, cooldown viewer, encounter warnings, external defensives.
-YS.UI_VERSION = 4          -- 4: the key bindings are in it
+-- 4: the key bindings are in it.
+YS.UI_VERSION = 5          -- 5: graphics and sound are in it (ui.machine)
 function YS.UIStale(ui)
     return type(ui) == "table" and (ui.v or 1) < YS.UI_VERSION
 end
@@ -249,6 +326,11 @@ function YS:ScanUI()
     for _, name in ipairs(CVARS) do
         local v = C_CVar.GetCVar(name)
         if v ~= nil then ui.cvars[name] = v end
+    end
+    ui.machine = {}
+    for _, name in ipairs(MACHINE_CVARS) do
+        local v = C_CVar.GetCVar(name)
+        if v ~= nil then ui.machine[name] = v end
     end
     if GetCameraZoom then ui.camera = GetCameraZoom() end
     ui.chat = YS.ScanChat()
@@ -506,6 +588,7 @@ function YS.KeepUnapplied(ui, saved, o)
     if not o.chat then ui.chat = saved.chat end
     if not o.camera then ui.camera = saved.camera end
     if o.rxpFrames == false then ui.rxp = saved.rxp end
+    if o.graphics == false then ui.machine = saved.machine end
     return ui
 end
 
@@ -593,6 +676,34 @@ function YS:ApplyUI(ui, o)
         end
     end
     if YS.ClassUINoted then YS.ClassUINoted() end        -- put on, not changed by the player
+    -- Graphics and sound. What each is now is read before anything is set: a quality preset sets what
+    -- is under it, and what undo goes back to is what you had, not what the preset made of it.
+    local machine = nil
+    if o.graphics ~= false and type(ui.machine) == "table" then
+        machine = 0
+        local had, touched = {}, false
+        for _, name in ipairs(MACHINE_CVARS) do had[name] = C_CVar.GetCVar(name) end
+        for _, name in ipairs(MACHINE_CVARS) do
+            local v, was = ui.machine[name], had[name]
+            if v ~= nil and was ~= nil then
+                -- (asked again: a preset set a moment ago may have put it right already)
+                local ok = C_CVar.GetCVar(name) == v
+                if not ok then
+                    ok = pcall(C_CVar.SetCVar, name, v)
+                    touched = touched or ok
+                end
+                if ok and was ~= v then machine = machine + 1 end
+            end
+        end
+        -- kept for /ysetup undo: all of them as they were, not only those that differ - a preset put
+        -- back sets what is under it again, and each has to be put back after it (Setup.lua, PutBack)
+        if touched and backup then
+            backup.cvars = backup.cvars or {}
+            for _, name in ipairs(MACHINE_CVARS) do
+                if had[name] ~= nil and backup.cvars[name] == nil then backup.cvars[name] = had[name] end
+            end
+        end
+    end
     local barsDone = not barAddon and o.barVisibility
     local taint = false            -- the old way ran: only a reload clears it
     local cleanBars = barsDone and ApplyBarsClean(ui.bars or {})
@@ -624,11 +735,18 @@ function YS:ApplyUI(ui, o)
         keys = n and (n .. " changed") or (ui.keys and "not now" or "none saved")
     end
     local barText = barAddon and ("left to " .. barAddon) or (o.barVisibility and (tostring(bars) .. " changed") or "off")
-    YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. Key bindings: %s. RestedXP guide: %s. RestedXP windows: %s.")
-        :format(layout, barText, chat, set, keys, o.guide and ApplyGuide() or "off", o.rxpFrames ~= false and YS.ApplyRXP(ui.rxp) or "off"))
+    local machineText = o.graphics == false and "off" or (machine and (machine .. " changed") or "none saved")
+    YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. Key bindings: %s. Graphics and sound: %s. RestedXP guide: %s. RestedXP windows: %s.")
+        :format(layout, barText, chat, set, keys, machineText, o.guide and ApplyGuide() or "off", o.rxpFrames ~= false and YS.ApplyRXP(ui.rxp) or "off"))
     if YS.UIStale(ui) then
-        YS.Print(("this interface was saved by an older Headstart: your key bindings, whether the damage meter is on and RestedXP's look are not in it."
-            .. " Save it again on %s (Character setup, Save interface), then Apply interface here."):format(tostring(YS.UISource() or "the character it came from")))
+        -- what an older save lacks, by the version it was saved with (the list above UI_VERSION)
+        local v, lacks = ui.v or 1, {}
+        if v < 2 then lacks[#lacks + 1] = "whether the damage meter is on and RestedXP's look" end
+        if v < 4 then lacks[#lacks + 1] = "your key bindings" end
+        if v < 5 then lacks[#lacks + 1] = "graphics and sound" end
+        YS.Print(("this interface was saved by an older Headstart: %s are not in it."
+            .. " Save it again on %s (Character setup, Save interface), then Apply interface here.")
+            :format(table.concat(lacks, ", "), tostring(YS.UISource() or "the character it came from")))
     end
     -- the old way taints until a reload; the game's own functions don't, but get checked a moment later
     if taint then

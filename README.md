@@ -2,7 +2,7 @@
 
 Quality of life, levelling tools and one-click character setup for **WoW: Forever**, in one addon. A new character gets your action bars, macros, key bindings and interface in one click; your trainer, vendors, bank and mailbox can be handled for you by rules you set; and the screen gets the bars and notes you ask for and nothing else.
 
-**Nothing acts for you until you turn it on.** Installing Headstart does not touch your action bars, macros, key bindings, Edit Mode layout, chat windows or game settings, and it buys, moves, accepts and picks nothing. A welcome window asks what you want; everything that spends gold, moves items or answers for you starts off, and says what it does before you switch it on.
+**Nothing acts for you until you turn it on.** Installing Headstart does not touch your action bars, macros, key bindings, Edit Mode layout, chat windows or game settings, and it buys, moves, accepts and picks nothing. A welcome window asks what you want; everything that spends gold, moves items or answers for you starts off, and says what it does before you switch it on. The one thing it does unasked is skip a cinematic, which on a new character is the opening flight over its zone: it says so in chat, and Skip cinematics is a switch (hold Shift as you enter the world to watch).
 
 Headstart does not come with levelling routes: you make your own from your runs, or paste in one someone shared.
 
@@ -16,7 +16,7 @@ Headstart does not come with levelling routes: you make your own from your runs,
 ## New characters and your interface
 
 - **Character setup.** Save your bars once per class, as a profile, and put them on every new character of that class in one click: class spells up to a level, racials, professions, your own macros, items. Spells you haven't learned yet get a place that fills in as you train them.
-- **Your interface, once for the account.** Edit Mode layout, which action bars show, chat windows, game settings, camera distance and **key bindings**, saved from one character and applied to the next.
+- **Your interface, once for the account.** Edit Mode layout, which action bars show, chat windows, game settings, camera distance, **key bindings**, and **graphics and sound**, saved from one character and applied to the next - on another install too.
 - **Profiles.** Several bar layouts per class under names of your own (Tank, DPS), switched from the window, the minimap button, a key or `/headstart profile Tank`.
 - **A planner** to lay out a whole class's bars on a level 1 character, on your real action bars, with no main to copy from.
 - **A macro helper** that makes your class's usual macros by ticking boxes.
@@ -49,6 +49,7 @@ Hold Shift as you open a trainer, vendor, bank or mailbox to do it yourself that
 - **Chat log** to search and copy from, past sessions included, a whisper sound of your own, and fewer buttons beside chat.
 - **Arrange** (`/hs move`): every bar, button and icon of Headstart's on a grid, moved by dragging, the arrow keys or typed numbers.
 - Looks for the game's damage meter and for RestedXP's window; the bag bar and micro menu hidden or on mouseover; the talent window movable and see-through.
+- **Skip cinematics:** a new character's opening flight ended as it starts. On unless you turn it off.
 
 ## Journey
 

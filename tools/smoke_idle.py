@@ -53,7 +53,11 @@ BUDGET = {
     # Down the same day: reward picking, the bank and mail buttons and the routes' automation start off
     # (a new install acts for you in nothing), so their events, frames and the reward hook are not there.
     # Was: events 50, frames 16, hooks 5, kb 2.
-    "new": {"hot": 9, "events": 41, "tickers": 1, "onupdate": 0, "frames": 13, "hooks": 4, "kb": 1},
+    # Raised later that day for Skip cinematics, which the owner asked to have on for a new install
+    # ("svaert faa ser cinematic med mindre de er nye. og da bruker de ikke denne addonen"): one frame and
+    # one event, CINEMATIC_START, which comes once on a new character and otherwise never. Before: events
+    # 41, frames 13.
+    "new": {"hot": 9, "events": 42, "tickers": 1, "onupdate": 0, "frames": 14, "hooks": 4, "kb": 1},
 }
 OFF = "{ qolOff = true, routes = false, setupOn = false, quiet = 2, minimapButton = false, logging = false, showSplits = false }"
 

@@ -39,6 +39,8 @@ C_Timer = { NewTicker = function(_, fn) local t = { fn = fn, Cancel = function(s
 function RunTickers() for _, t in ipairs(TICKERS) do if not t.dead then t.fn() end end end
 function GetTime() return NOW end
 function InCombatLockdown() return false end
+function IsShiftKeyDown() return false end   -- (a part that asks it must not fail for want of it)
+function StopCinematic() end
 C_UnitAuras = { GetAuraDataByIndex = function() return nil end }   -- no buffs: the camp HUD rests
 SHOTS = 0
 function Screenshot() SHOTS = SHOTS + 1 end   -- the QoL screenshot at a ding
@@ -1494,6 +1496,8 @@ import smoke_pins
 bad += smoke_pins.run()
 import smoke_welcome
 bad += smoke_welcome.run()
+import smoke_cinematic
+bad += smoke_cinematic.run()
 import smoke_questlfg
 bad += smoke_questlfg.run()
 import smoke_alts

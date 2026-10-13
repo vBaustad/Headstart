@@ -90,7 +90,7 @@ local QUESTIONS = {
         { "Essentials", "Flight timer, camp icon, loot feed, chat log, death recap, instance tracker, upgrade alerts, and your other characters' bags and gold." },
         { "Everything", "Adds the XP bar (in place of Blizzard's), the swing timer, trinket buttons, and Invite and Leave buttons." } } },
     { key = "acts", title = "Automation", icon = 133784, choices = {
-        { "Nothing", "Headstart never acts for you: it buys, moves, accepts and picks nothing." },
+        { "Nothing", "Headstart buys, moves, accepts and picks nothing for you." },
         { "Friends only", "Accepts invites and shared quests from friends and guild members, and invites them when they whisper \"inv\". Never spends gold or moves items." },
         { "Everything", "Adds restock and auto-train (they spend gold), bank deposit (moves items), quest rewards picked, level-up screenshots." } } },
     { key = "setup", title = "New characters", icon = 134166, choices = {
@@ -282,6 +282,10 @@ local function Lit(card, sel)
     card.sel = sel
 end
 
+-- The welcome has been seen: asked for by hand, or a click in it. (Not for having been put up: a new
+-- install's was put up under a new character's opening flight and closed unseen. Core.lua, WelcomeFirst.)
+local function Seen() YippRouteDB.welcomeSeen = true end
+
 local function Card(parent, w, h, name, onClick)
     local S = YR.Style
     local card = CreateFrame("Button", nil, parent)
@@ -303,7 +307,7 @@ local function Card(parent, w, h, name, onClick)
     a:SetToAlpha(1)
     a:SetDuration(0.22)
     a:SetSmoothing("OUT")
-    card:SetScript("OnClick", onClick)
+    card:SetScript("OnClick", function(...) Seen() return onClick(...) end)
     return card
 end
 
@@ -456,7 +460,10 @@ local function Build()
         win.blocks[n] = block
     end
 
+    -- its own Close button is an answer too (Escape and whatever else closes every window is not)
+    win.close:HookScript("OnClick", Seen)
     win.apply = S.Button(win, "Apply and reload", function()
+        Seen()
         local on, off, reload = YR.WelcomeApply(answers)
         YR.Print(("%d turned on, %d turned off. Change anything in /hs."):format(on, off))
         if reload and ReloadUI then
@@ -470,26 +477,29 @@ local function Build()
     end, "primary", 170)
     win.apply:SetPoint("BOTTOMRIGHT", -20, 16)
     local each = S.Button(win, "All settings", function()
+        Seen()
         win:Hide()
         if not (_G.HeadstartWindow and _G.HeadstartWindow:IsShown()) then YR:ToggleSettings() end
     end, nil, 120)
     each:SetPoint("RIGHT", win.apply, "LEFT", -8, 0)
     each.tip = "Headstart's window: a page for each of these, with every choice it has"
-    local checks = S.Button(win, "Before you play", function() ShowChecks() end, nil, 150)
+    local checks = S.Button(win, "Before you play", function() Seen() ShowChecks() end, nil, 150)
     checks:SetPoint("RIGHT", each, "LEFT", -8, 0)
     checks.tip = "What is on now that is worth a look first: what spends gold, what moves your things, what Character setup can and can't put back"
 end
 
 --- The welcome window. A new install (nothing answered yet) opens on Recommended; after that on what
 --- you have now, a question whose things you set one by one left unanswered.
-function YR.WelcomeShow()
+--- first: put up unasked, on a new install (Core.lua, YR.WelcomeFirst) - then it is not seen yet for
+--- having been put up: that is said by a click in it (Seen) or by its staying up (WelcomeFirst).
+function YR.WelcomeShow(first)
     Build()
     answers = YR.WelcomeNow()
     if YippRouteDB.welcome and not YippRouteDB.welcomeSeen then
         local q = YR.WelcomeQuick("recommended")
         for k, v in pairs(q) do answers[k] = v end
     end
-    YippRouteDB.welcomeSeen = true
+    if not first then Seen() end
     if view then view:Hide() end
     Paint()
     win:Show()
