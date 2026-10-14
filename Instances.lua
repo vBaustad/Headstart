@@ -14,7 +14,8 @@
 --   /headstart instances id says what could be read where you stand.
 --   The limit: Forever's isn't known, so it's a setting (5 an hour and 30 a day, as on Classic). The
 --   game saying "too many instances" is noted with the count at that moment, so you can see where it is.
---   Account options (YippRouteDB, Settings, QoL, Instances): instanceTrack (on unless turned off),
+--   Account options (YippRouteDB, Settings, QoL, Instances): instanceTrack (off until turned on, since
+--   2026-10-14; an account from before keeps it as it was),
 --   instanceWarn (on unless turned off), instanceAccount (off: each character on its own), instanceHour
 --   (5), instanceDay (30), instanceSame (minutes, 30). The log: YippRouteDB.instanceRuns (every
 --   character's, a week of them), YippRouteDB.instanceLocks.
@@ -36,6 +37,12 @@ local function WatchXP(on)
 end
 
 local function Now() return GetServerTime and GetServerTime() or time() end
+
+-- Logging out matters only inside one (the run stays open): listened for from going in until coming out.
+local function WatchOut(on)
+    if not frame then return end
+    if on then frame:RegisterEvent("PLAYER_LOGOUT") else frame:UnregisterEvent("PLAYER_LOGOUT") end
+end
 
 local function Runs()
     YippRouteDB.instanceRuns = YippRouteDB.instanceRuns or {}
@@ -242,13 +249,43 @@ end
 local function Leave()
     entry = nil
     WatchID(false)
+    WatchOut(false)
     if not cur then return end
     XPTick()
     cur.left = Now()
     cur.money = (cur.money or 0) + (GetMoney() - (cur.money0 or GetMoney()))
-    cur.money0 = nil
+    cur.money0, cur.seen = nil, nil
     cur = nil
     WatchXP(false)
+end
+
+-- Logging out or reloading inside one. The run isn't over (a login inside carries it on), but when
+-- you were last in it is written down, and the money so far is counted in: what comes after the
+-- login is counted from the purse as it is then. (Neither was done: the money of a run before a
+-- reload was dropped, and a run you logged out of and never came back into never ended.)
+local function Seen()
+    if not cur then return end
+    XPTick()
+    local money = GetMoney()
+    cur.money = (cur.money or 0) + (money - (cur.money0 or money))
+    cur.money0, cur.seen = money, Now()
+end
+
+-- Outside, with a run of this character's still open: you logged out inside it and are not in it
+-- now (it was reset, or the game put you at its door). It ended when you were last seen in it.
+-- Once a session is enough: a run you walk out of is closed as you do.
+local swept
+local function CloseOpen()
+    if swept then return end
+    swept = true
+    local me, closed = YR.CharKey(), false
+    for _, r in ipairs(Runs()) do
+        if r.char == me and not r.left then
+            r.left, r.seen, r.money0 = r.seen or r.entered, nil, nil
+            closed = true
+        end
+    end
+    if closed then Recount() end
 end
 
 local function Prune()
@@ -284,8 +321,10 @@ local function Check()
             if r.map == map and r.char == YR.CharKey() then last = r break end
         end
         local resets = YippRouteDB.instanceResets or {}
-        -- or never left at all: a reload or a login inside it carries on with the same run
-        local stillIn = last and not last.left and now - last.entered < 4 * HOUR
+        -- or never left at all: a reload or a login inside it carries on with the same run (by when
+        -- you were last seen in it, not when you first went in: a reload five hours into a long run
+        -- was told as a new instance)
+        local stillIn = last and not last.left and now - (last.seen or last.entered) < 4 * HOUR
         local same = last and (stillIn or (last.left and now - last.left < Limit("instanceSame", 30) * 60
             and last.leader == leader and not ((resets[map] or 0) >= last.left)))
         if same then
@@ -311,8 +350,10 @@ local function Check()
         SeeUnit("target")
         xpLast, xpMaxLast, levelLast = UnitXP("player"), UnitXPMax("player"), UnitLevel("player")
         WatchXP(true)
+        WatchOut(true)
     else
         Leave()
+        CloseOpen()
     end
     if YR.RefreshWindow then YR:RefreshWindow() end
     if YR.InstanceHudPaint then YR.InstanceHudPaint() end
@@ -544,7 +585,7 @@ local function HudBuild()
         self:StopMovingOrSizing()
         YippRouteDB.instanceHudPos = { math.floor(self:GetLeft() + 0.5), math.floor(self:GetTop() - UIParent:GetTop() + 0.5) }
     end)
-    hud:SetScript("OnClick", function() if YR.ToggleWindow then YR:ToggleWindow("instances") end end)
+    hud:SetScript("OnClick", function() if YR.LoadWindow and YR.LoadWindow() and YR.InstanceLogToggle then YR.InstanceLogToggle() end end)
     hud:SetScript("OnEnter", HudEnter)
     hud:SetScript("OnLeave", HudLeave)
     hud.icon = hud:CreateTexture(nil, "ARTWORK")
@@ -623,6 +664,7 @@ local function OnEvent(_, event, a, b)
     if event == "UI_ERROR_MESSAGE" then
         if not (issecretvalue and issecretvalue(b)) and b == TOO_MANY then OnMessage(b, true) end
     elseif event == "PLAYER_XP_UPDATE" then XPTick()
+    elseif event == "PLAYER_LOGOUT" then Seen()
     elseif event == "PLAYER_TARGET_CHANGED" then SeeUnit("target")
     elseif event == "UPDATE_MOUSEOVER_UNIT" then SeeUnit("mouseover")
     elseif event == "NAME_PLATE_UNIT_ADDED" then SeeUnit(a)

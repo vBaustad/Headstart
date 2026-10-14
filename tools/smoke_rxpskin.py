@@ -104,7 +104,9 @@ function MakeRXP()
     RXP.RXPFrame = frame
     function RXP:RegisterTheme(theme) self.themes[theme.name] = theme end
     function RXP:LoadActiveTheme() self.activeTheme = self.themes[self.settings.profile.activeTheme] end
-    function RXP.RenderFrame() RENDERS = RENDERS + 1 RXP:LoadActiveTheme() RXP.RXPFrame:UpdateVisuals() end
+    -- (RestedXP's own ends in ReloadGuide unless it is loading: the guide's steps worked out anew)
+    RELOADS = 0
+    function RXP.RenderFrame(_, loading) RENDERS = RENDERS + 1 if not loading then RELOADS = RELOADS + 1 end RXP:LoadActiveTheme() RXP.RXPFrame:UpdateVisuals() end
     function RXP.SetupGuideWindow() end
 end
 '''
@@ -177,7 +179,16 @@ def run():
     g.YippRouteDB.rxpSkinClass = True
     YR.RXPSkinApply()
     check(abs(g.RXP.themes.Headstart.mapPins[2] - 0.55) < 0.01, "the class colour as the accent")
+    # a colour, and quality of life off and on, draw the window again but leave the guide as it is (RestedXP's
+    # redraw reloaded it: what the guide showed changed); only a new look reloads it, as RestedXP's theme list does
+    reloads, renders = g.RELOADS, g.RENDERS
+    YR.RXPSkinApply()
+    YR.SetQoLOn(False)
+    YR.SetQoLOn(True)
+    check(g.RELOADS == reloads and g.RENDERS > renders,
+          f"a colour, quality of life off and on: the window drawn again, the guide not loaded again ({g.RELOADS - reloads})")
     YR.SetRXPSkin("blizzard")
+    check(g.RELOADS == reloads + 1, "a new look picked: the guide drawn again in it")
     check(YR.RXPSkinMode() == "blizzard" and edge.edgeSize == 12 and g.YippRouteDB.rxpSkinPrev == "RXP Green",
           "Blizzard picked: the game's border size, and the theme before is still RestedXP's")
     t = raw(f.GuideName.text, "text")

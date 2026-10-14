@@ -826,14 +826,28 @@ local function Register()
     return ok
 end
 
-local function Redraw()
+-- RestedXP's own redraw loads the guide again (RenderFrame ends in ReloadGuide, and ReloadTheme calls
+-- RenderFrame): its steps are worked out anew, and what the guide shows changes. Only a new look asks for
+-- that (full) - as RestedXP's own theme list does. A colour changed, quality of life back on and the login
+-- draw the frames in the look and leave the guide as it is (RenderFrame's second argument, "loading",
+-- skips the reload). Until 0.10.0-beta7 every one of them reloaded the guide: the owner saw RestedXP's
+-- content change as he turned quality of life off and on (2026-10-15).
+local function Redraw(full)
     local rxp = Rxp()
     if not rxp then return end
     Borders()
     pcall(function()
-        if type(rxp.RenderFrame) == "function" then rxp.RenderFrame("themeReload") end
+        if type(rxp.RenderFrame) == "function" then rxp.RenderFrame("themeReload", not full) end
         if rxp.v2 and rxp.v2.ConvertThemes then rxp.v2:ConvertThemes() end
-        if rxp.v2 and rxp.v2.IsGuideWindowEnabled and rxp.v2:IsGuideWindowEnabled() and rxp.ReloadTheme then rxp:ReloadTheme() end
+        if rxp.v2 and rxp.v2.IsGuideWindowEnabled and rxp.v2:IsGuideWindowEnabled() then
+            if full and rxp.ReloadTheme then
+                rxp:ReloadTheme()
+            else
+                local w = rxp.v2.GetGuideWindow and rxp.v2:GetGuideWindow()
+                if w and w.UpdateTheme then w:UpdateTheme({}) end
+                if rxp.v2.UpdateActiveStepTheme then rxp.v2:UpdateActiveStepTheme() end
+            end
+        end
     end)
     Paint()
 end
@@ -886,7 +900,7 @@ function YR.SetRXPSkin(mode)
     profile.activeTheme = mode == "headstart" and HEADSTART or mode == "blizzard" and BLIZZARD
         or YippRouteDB.rxpSkinPrev or "RXP Blue"
     if YR.RXPSkinMode() ~= "off" then Hooks() end
-    Redraw()
+    Redraw(true)            -- (a new look: the guide drawn again in it, as RestedXP's own theme list does)
     return true
 end
 

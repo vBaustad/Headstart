@@ -9,8 +9,7 @@ Headstart does not come with levelling routes: you make your own from your runs,
 ## Getting started
 
 - `/headstart` (or the minimap button) opens the window. It has three tabs: **QoL**, **Levelling** and **Character setup**. `/hs` goes straight to the settings.
-- The first time, a welcome window asks four things: your own routes, what goes on screen, what is done for you, and Character setup. Pick one of three quick answers or each by itself. `/headstart start` brings it back.
-- After you answer, **Before you play** lists what is now on that deserves a look first - what spends gold, what moves your items, what answers for you - each with a button to its settings.
+- The first time, a short **tour** over the window: a hint at a time points at where things are - the search, All features, the Automation group (everything that spends gold, moves items or answers for you), General, Character setup. It turns nothing on. Skip it whenever you like; the Tour button or `/headstart start` brings it back.
 - The settings can be searched, and every feature is one card with its switch in its head.
 
 ## New characters and your interface
@@ -25,7 +24,7 @@ Headstart does not come with levelling routes: you make your own from your runs,
 
 ## Done for you, by your rules (all off until you turn them on)
 
-- **Class trainer.** Buys your class's spells as the trainer opens: each spell Always, If I can afford it, First rank only or Never, with an amount of silver to keep. It never buys weapon skills, riding or professions, and chat says what it learned and for how much.
+- **Class trainer.** Buys your class's spells as the trainer opens: each spell Always, If I can afford it, First rank only or Never, up to a level you choose. The nice-to-have spells leave you half your money (and a sum you save, for a weapon or a mount); what they left is a Learn button under the trainer's window. It never buys weapon skills, riding or professions, and chat says what it learned and for how much.
 - **Quest rewards** picked from a priority list per class up to a level you choose. It remembers what you picked by hand, and leaves the choice to you when a green is offered.
 - **Restock.** Reagents, ammo and your own list bought back up to what you carry, above an amount of gold you keep.
 - **Bank and mail.** Crafting mats and recipes you can't use yet moved to the bank, or mailed to another character. Quest items always stay.
@@ -43,6 +42,7 @@ Hold Shift as you open a trainer, vendor, bank or mailbox to do it yourself that
 - **Camp icon** lit near a camp or while its buff runs, and a **flight timer** while you fly.
 - **Instance tracker.** Dungeon entries this hour and today against the limits, and a log of every run.
 - **Loot feed** and a loot log with session totals.
+- **Glimmer:** herbs, ore, chests, quest objects and your fishing bobber light up as you walk up to them, coloured by your chance of a skill-up. Five looks, size and brightness, with a preview in the settings; the game's own sparkle on lootable quest items can come back too.
 - **Upgrade notes.** Every item's tooltip says what it would do for you, and an upgrade in your bags gets an Equip button.
 - **Reminders.** Trainer spells waiting and what they cost, talent points to spend, low durability, stones, oils and bandages you could make.
 - **Your other characters'** bags, bank and gold.
@@ -86,7 +86,7 @@ In a beta client the top of All features says this too, with a button to the win
 |---|---|
 | `/headstart` | The window |
 | `/hs` | The settings |
-| `/headstart start` | The welcome window, and Before you play |
+| `/headstart start` | The tour |
 | `/hs move` | Arrange what is on your screen |
 | `/hs journey` | Your journey |
 | `/headstart transfer` | Your settings as a text, to take to another install |

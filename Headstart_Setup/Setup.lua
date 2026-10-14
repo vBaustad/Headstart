@@ -606,6 +606,11 @@ local OwnSpellOf        -- (below, with MacroFor)
 local function ReadMacroSlot(slot, id)
     local mname = GetActionText(slot)
     local idx = (mname and GetMacroIndexByName(mname)) or id
+    -- Two macros of one name: by the name, both buttons are the first of them. Where the game's own
+    -- number for the button is a macro of that very name, that one is the button's.
+    -- (asked only of a number a macro can have: for some buttons the game's number is a spell's)
+    local most = Constants.MacroConsts.MAX_ACCOUNT_MACROS + (Constants.MacroConsts.MAX_CHARACTER_MACROS or 30)
+    if mname and type(id) == "number" and id > 0 and id <= most and id ~= idx and (GetMacroInfo(id)) == mname then idx = id end
     if not idx or idx == 0 then return nil end
     local name, icon, body = GetMacroInfo(idx)
     if not name then return nil end
@@ -795,13 +800,89 @@ local function MOUSEOVER_SET(o)
     end
     return mouseoverSet
 end
--- Macro names are the last part of the spell ("Crusader", "Might"); these would clash, so they get their own.
+-- Macro names are the last part of the spell ("Crusader", "Touch"); these would clash, so they get their own.
 local SHORT = { ["Divine Protection"] = "Divine" }
 
-local function ShortName(spell)
+-- (as every macro was named until 0.10.0-beta7, and as one still is whose last part no other spell
+-- of the class shares)
+local function LastPart(spell)
     local short = SHORT[spell] or spell:match(" of the (.+)$") or spell:match(" of (.+)$") or spell:match("(%S+)$")
     return short:sub(1, MACRO_NAME_MAX)
 end
+
+-- A spell's whole name in the sixteen letters a macro's name may have: "of" and "the" go first, then
+-- the longest word loses letters until it fits (of two as long, the later one, and the last word
+-- last of all): "Frost Resi Totem", "Shield Specializ".
+local function Fit(spell)
+    if #spell <= MACRO_NAME_MAX then return spell end
+    local words = {}
+    for w in spell:gsub(" of the ", " "):gsub(" of ", " "):gmatch("%S+") do words[#words + 1] = w end
+    local function Length()
+        local n = #words - 1
+        for _, w in ipairs(words) do n = n + #w end
+        return n
+    end
+    while Length() > MACRO_NAME_MAX do
+        local longest = #words
+        for i = 1, #words - 1 do
+            if #words[i] >= #words[longest] then longest = i end
+        end
+        if #words[longest] <= 1 then break end
+        words[longest] = words[longest]:sub(1, -2)
+    end
+    return table.concat(words, " "):sub(1, MACRO_NAME_MAX)
+end
+
+-- The name of each of the class's spells as a macro. Many spells of a class end in the same word - a
+-- priest's Heal, Flash Heal and Greater Heal, a paladin's Holy Light and Flash of Light, a hunter's
+-- eight Shots, a shaman's nineteen Totems - and all of those were named by it alone. A macro on a bar
+-- is read back by its name, so with two of them made (the two macro modes, or two spells on the
+-- mouseover list) both buttons were read as the first, and saved so: one spell on two buttons, the
+-- other gone from the profile. Those are named in full now; a spell that shares its last part with
+-- no other keeps the short name. Over every race's racials, so a class's names are the same on every
+-- character of it. Worked out once for a class.
+local macroNames = {}
+local function MacroNames()
+    local _, class = UnitClass("player")
+    if macroNames[class or ""] then return macroNames[class or ""] end
+    local all, seen = {}, {}
+    for _, t in ipairs({ YS.SPELL_LEVELS[class] or {}, (YR.PlannerGeneral or {})[class] or {}, YS.RACIALS or {} }) do
+        for spell in pairs(t) do
+            if type(spell) == "string" and not seen[spell] then
+                seen[spell] = true
+                all[#all + 1] = spell
+            end
+        end
+    end
+    table.sort(all)
+    local shared = {}
+    for _, spell in ipairs(all) do
+        local last = LastPart(spell)
+        shared[last] = (shared[last] or 0) + 1
+    end
+    local names, taken = {}, {}
+    for _, spell in ipairs(all) do
+        local last = LastPart(spell)
+        local name = shared[last] > 1 and Fit(spell) or last
+        -- (two that still come out the same: the later one numbered. None does on today's data -
+        -- tools/smoke_setup.py says so for every class.)
+        local n = 1
+        while taken[name] do
+            n = n + 1
+            name = name:sub(1, MACRO_NAME_MAX - #tostring(n)) .. n
+        end
+        taken[name] = true
+        names[spell] = name
+    end
+    macroNames[class or ""] = names
+    return names
+end
+
+local function ShortName(spell)
+    return MacroNames()[spell] or LastPart(spell)
+end
+YS.SpellMacroName = ShortName       -- for tests
+YS.SpellMacroNameWas = LastPart
 
 --- The rank a downranked button is kept at (a number), or nil. Saved with it (e.rank); a button saved
 --- before that has only the rank's spell ID, which the planner's rank list turns back into a number.
@@ -865,7 +946,9 @@ function OwnSpellOf(e)
     local entry = { kind = "spell", name = spell, level = level, racial = YS.RACIALS[spell] or nil, general = general or nil,
         down = rank and true or nil, rank = rank }
     local name, _, body = MacroFor(entry)
-    if name ~= e.name or body ~= e.body then return nil end
+    -- (or under the name it was made with before spells that end alike were named in full: it is
+    -- that spell's macro all the same, and is given its name at the next login - RenameSpellMacros)
+    if body ~= e.body or (name ~= e.name and LastPart(REPLACE[spell] or spell) ~= e.name) then return nil end
     return entry
 end
 YS.OwnSpellOf = function(e) return OwnSpellOf(e) end
@@ -1236,6 +1319,20 @@ local function Backup()
     c.backup = b
     if not c.first then c.first = Copy(b) end
     return b
+end
+
+--- This character's bars and macros kept for good the first time Character setup is looked at here (its
+--- page, the planner), before anything can be moved or applied: Put back (YS:Undo(true)) brings them
+--- back whatever was done since. It was kept at the first change Headstart made, which is the same
+--- bars - but nobody knew there was such a copy before trying the planner (the owner, 2026-10-14: "the
+--- first time they go to a character, save, so if they move something and press Apply they lose
+--- nothing"). Returns whether it kept them now.
+function YS.KeepFirst()
+    local c = YippSetupCharDB
+    if type(c) ~= "table" or c.first or InCombatLockdown() then return false end
+    c.first = { at = time(), slots = (YS.ReadBars(true)), macros = CharacterMacros(),
+        was = { applied = c.applied, layout = c.layout, placed = c.placed and Copy(c.placed) or nil, onLayout = c.layoutName or false } }
+    return true
 end
 
 -- A character in play, not a new one: Set up asks first, and offers the bars alone.
@@ -1902,10 +1999,13 @@ local function ChangedElsewhere()
     YS:Toggle()
 end
 
--- The intro cinematic (or movie) a new character logs in to: cancelled at once while level 1, when the
--- option is on. It can start before we load, so the first login checks for one running too.
+-- The intro cinematic (or movie) a new character logs in to: cancelled at once while level 1, when
+-- Headstart's Skip cinematics is on (Cinematic.lua). It can start before we load, so the first login
+-- checks for one running too. (It had a switch of its own, skipIntro, beside that one: turning Skip
+-- cinematics off left this one skipping the opening flight. That option is no longer read.)
 local function SkipIntro()
-    if UnitLevel("player") > 1 or not (YippSetupDB and YS:Options().skipIntro) then return end
+    if UnitLevel("player") > 1 or not YippSetupDB then return end
+    if YR.SkipsCinematics and not YR.SkipsCinematics() then return end
     if InCinematic and InCinematic() then
         -- (the game's own function: seen to end the opening flight, 2026-10-13. Blizzard's frame code is not called from here.)
         if StopCinematic then StopCinematic() end
@@ -2119,9 +2219,37 @@ function YS.PlaceholderIcons()
         local spell = name and icon ~= DYNAMIC_ICON and type(body) == "string" and body:match("^#showtooltip ([^\n]+)\n/cast ")
         spell = spell and spell:gsub("%(Rank %d+%)$", "")
         -- ours: named as we name it, with the very icon the plan has for that spell
-        if spell and name == ShortName(spell) and icon == PlanIcon(spell) and pcall(EditMacro, i, nil, DYNAMIC_ICON, nil) then
+        if spell and (name == ShortName(spell) or name == LastPart(spell)) and icon == PlanIcon(spell)
+            and pcall(EditMacro, i, nil, DYNAMIC_ICON, nil) then
             done = done + 1
         end
+    end
+    return done
+end
+
+--- The macros Headstart made for a spell under the name they had before spells that end alike were
+--- named in full (two "Heal"s, two "Light"s: see MacroNames) are given their name of now. Only a
+--- macro that is exactly Headstart's own for a spell of your class, text and old name; the buttons
+--- they are on keep them. Once a login, out of a fight. Returns how many.
+function YS.RenameSpellMacros()
+    if InCombatLockdown() or not (GetNumMacros and EditMacro) then return 0 end
+    local base = Constants.MacroConsts.MAX_ACCOUNT_MACROS
+    local done = 0
+    -- (a macro renamed moves in the list, which is kept in order of name: looked through again from
+    -- the top after each, and no more often than there are macros)
+    for _ = 1, Constants.MacroConsts.MAX_CHARACTER_MACROS or 30 do
+        local _, numChar = GetNumMacros()
+        local renamed = false
+        for i = base + 1, base + (numChar or 0) do
+            local name, _, body = GetMacroInfo(i)
+            local spell = name and OwnSpellOf({ kind = "macro", name = name, body = body })
+            local now = spell and ShortName(REPLACE[spell.name] or spell.name)
+            if now and now ~= name and pcall(EditMacro, i, now, nil, nil) then
+                done, renamed = done + 1, true
+                break
+            end
+        end
+        if not renamed then break end
     end
     return done
 end
@@ -2134,7 +2262,10 @@ function YS.Start(fresh)
         registry:RegisterCallback("EditMode.Exit", function() if not YR.SetupOn or YR.SetupOn() then YS.FollowUI() end end, YS)
     end
     if YippSetupCharDB and YippSetupCharDB.applied then
-        C_Timer.After(4, function() YS.PlaceholderIcons() end)
+        C_Timer.After(4, function()
+            YS.RenameSpellMacros()
+            YS.PlaceholderIcons()
+        end)
     end
     -- a new character: the main's action bars now, so Blizzard shows them while logging in
     -- (level 1 and nothing else: should the game not know the level this early and say 0, that must

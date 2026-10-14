@@ -198,7 +198,9 @@ local OTHERS = {
         { "EllesmereUI", function() return Loaded("EllesmereUIChat") end },
         { "Leatrix Plus", function() return Leatrix("NoChatButtons") or Leatrix("NoSocialButton") or Leatrix("UnclampChat") end },
     },
-    blizzardBars = { { "EllesmereUI", function() return Loaded("EllesmereUIActionBars") end } },
+    -- chat put back in the windows after a reload (ChatLog.lua): two doing it is every line twice
+    chatRestore = { { "Leatrix Plus", function() return Leatrix("RestoreChatMessages") end } },
+    blizzardBars ={ { "EllesmereUI", function() return Loaded("EllesmereUIActionBars") end } },
     windowScale = { { "EllesmereUI", function() return Loaded("EllesmereUIQoL") and Flat("EllesmereUIDB", "shifterEnabled") == true end } },
     moveBag = {
         { "EllesmereUI", function() return Loaded("EllesmereUIBags") end },
@@ -211,6 +213,12 @@ local OTHERS = {
     },
     whisperSound = { { "EllesmereUI", function() return Loaded("EllesmereUIChat") end } },
     lootFeed = { { "Naowh Forever", function() return Loaded("NaowhForever") end } },
+    -- (Naowh Forever's Glimmer is an addon of its own beside it; the other two do nothing else)
+    glimmer = {
+        { "Naowh Forever", function() return Loaded("NaowhForever_Glimmer") end },
+        { "Forever Loot Sparkles", function() return Loaded("ForeverLootSparkles") end },
+        { "Lueur", function() return Loaded("Lueur") end },
+    },
 }
 
 --- The other addon that does what this option does, with that feature on (its name), else nil.
@@ -244,7 +252,7 @@ function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 --   enough to turn those on. (Quest rewards are picked per class, off the same way: Rewards.lua.)
 local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true,
     groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true,
-    deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true,
+    deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true, glimmer = true, instanceTrack = true,
     bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
 YR.STARTS_OFF = STARTS_OFF
 
@@ -430,26 +438,63 @@ end
 function YR:ToggleWindow(page) if YR.LoadWindow() then YR:ToggleWindow(page) end end
 function YR:ToggleSettings() if YR.LoadWindow() then YR:ToggleSettings() end end
 function YR:ShowSettingsTab(key) if YR.LoadWindow() then YR:ShowSettingsTab(key) end end
---- A new install is asked once how much of Headstart it wants: the welcome window, a few seconds
---- after the first login and not in a fight (the next login, then). Welcome.lua, in the window's addon.
+--- A new install is shown around once: the tour (hints over Headstart's window), a few seconds after
+--- the first login and not in a fight (the next login, then). Welcome.lua, in the window's addon.
 --- It is put up when the screen is really there, and counts as seen only once it has stayed up for a
 --- few seconds or been answered. (A new character's first login plays its flight over the zone with
 --- the interface hidden: the window was put up under it, the Escape that ended the flight closed it
 --- with every other window, and it was written down as seen without ever having been - the user,
 --- 2026-10-13, a new install's very first login.) Closed before that, it is put up once more; still
 --- not seen, the next login asks again.
+--- What Headstart says by itself at a login (the reminders: trainer, talents, repairs, crafts) waits on
+--- that login until the welcome is answered or closed: the first thing on a new install is the question
+--- of what to turn on, not four lines from things nobody turned on yet (YR.AfterWelcome).
+local welcomeLive, welcomeLooking, afterWelcome, welcomeHooked = false, false, nil, false
+local function WelcomeDone()
+    if not welcomeLive or welcomeLooking then return end
+    local win = _G.HeadstartTour
+    if win and win:IsVisible() then
+        -- still up (seen, not yet answered): when it goes
+        if not welcomeHooked then
+            welcomeHooked = true
+            win:HookScript("OnHide", function() C_Timer.After(0, WelcomeDone) end)
+        end
+        return
+    end
+    welcomeLive = false
+    local list = afterWelcome
+    afterWelcome = nil
+    for _, fn in ipairs(list or {}) do C_Timer.After(3, fn) end
+end
+--- fn now, or a few seconds after the welcome of this login is answered or closed.
+function YR.AfterWelcome(fn)
+    if not welcomeLive then fn() return end
+    afterWelcome = afterWelcome or {}
+    afterWelcome[#afterWelcome + 1] = fn
+end
+--- Whether this login's welcome is still to be answered (what would speak up by itself waits).
+function YR.WelcomeHolds() return welcomeLive end
+
 function YR.WelcomeFirst()
     local db = YippRouteDB
     if not db.welcome or db.welcomeSeen then return end
+    welcomeLive, welcomeLooking = true, true
     local looks, shows, up = 0, 0, 0
+    local function Stop()
+        welcomeLooking = false
+        WelcomeDone()
+    end
     local function Look()
-        if db.welcomeSeen then return end
+        if db.welcomeSeen then return Stop() end
         looks = looks + 1
-        local win = _G.HeadstartWelcomeWindow
+        local win = _G.HeadstartTour
         local showing = win and win:IsVisible() or false
         if showing then
             up = up + 1
-            if up >= 2 then db.welcomeSeen = true return end
+            if up >= 2 then
+                db.welcomeSeen = true
+                return Stop()               -- (what waits: once it is closed or answered)
+            end
         else
             up = 0
             local there = UIParent:IsVisible() and not (InCinematic and InCinematic()) and not InCombatLockdown()
@@ -464,7 +509,7 @@ function YR.WelcomeFirst()
             end
         end
         -- (two minutes of looking at most, and none once it has been closed twice)
-        if looks < 60 and (showing or shows < 2) then C_Timer.After(2, Look) end
+        if looks < 60 and (showing or shows < 2) then C_Timer.After(2, Look) else Stop() end
     end
     C_Timer.After(5, Look)
 end
@@ -550,7 +595,11 @@ SlashCmdList.HEADSTART = function(msg)
     elseif cmd == "inv" or cmd == "invite" then
         YR.InviteTarget()
     elseif cmd == "instances" or cmd == "inst" then
-        if arg == "id" then YR.InstanceIDDebug() else YR:ToggleWindow("instances") end
+        if arg == "id" then YR.InstanceIDDebug() elseif YR.LoadWindow() then YR.InstanceLogToggle() end
+    elseif cmd == "glimmer" then
+        YR.GlimmerDebug()
+    elseif cmd == "repair" then
+        YR.RepairDebug()
     elseif cmd == "perf" then
         -- what Headstart costs, by the game's own count (the code for it is in the window's addon)
         if YR.LoadWindow() then YR.Perf() end
@@ -665,8 +714,12 @@ end
 function YR.Latch(fresh)
     local db = YippRouteDB
     local was = tonumber(db.quiet) or 0
+    if was >= 4 then return end
+    db.quiet = 4
+    -- 4: the instance tracker became something you turn on (the owner, 2026-10-14). An account that had
+    -- Headstart keeps it as it was (on, unless another addon did it).
+    if not fresh and db.instanceTrack == nil then latchLater[#latchLater + 1] = "instanceTrack" end
     if was >= 3 then return end
-    db.quiet = 3
     -- 3: the bank and mail buttons, the routes' own automation and quest reward picking became things
     -- you turn on. An account that had Headstart keeps each as it was (on, unless another addon did it).
     if not fresh then
@@ -789,6 +842,7 @@ f:SetScript("OnEvent", function(_, event, name)
     Start(YR.StartQuestLFG)
     Start(YR.StartAlts)
     Start(YR.StartCraftRemind)
+    Start(YR.StartGlimmer)
     Start(YR.StartQuickGroup)
     if YR.Style then YR.Style.Changed = YR.SettingChanged end
     Start(YR.BuildMinimapButton, YR)

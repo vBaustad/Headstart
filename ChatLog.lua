@@ -264,7 +264,7 @@ local function Build()
     if win then return end
     local S = YR.Style
     win = S.Window("HeadstartChatLogWindow", W, H, "Chat log")
-    win:SetFrameStrata("HIGH")
+    -- (the windows' own layer, as Headstart's window: a layer under it, it opened under the settings)
     -- which window, a search, and the two ways to look at it
     local pick
     pick = S.Dropdown(win, 170, YR.ChatLogWindows, function(v)
@@ -400,8 +400,10 @@ function YR.ChatLogRestoreLines() return math.max(10, math.min(500, tonumber(Yip
 
 --- The old text back in the chat windows: the last lines each window showed, oldest first, as chat
 --- showed them. Once, at a login or a reload, before anything new is said. Returns how many went in.
+--- (Not while another addon puts chat back after a reload too - Leatrix Plus's "Restore chat messages":
+--- every line would be there twice.)
 function YR.ChatLogRestore()
-    if not on or YippRouteDB.chatLogRestore == false or n == 0 then return 0 end
+    if not on or YippRouteDB.chatLogRestore == false or n == 0 or YR.OtherHas("chatRestore") then return 0 end
     local per = YR.ChatLogRestoreLines()
     local frames, from, count = {}, {}, {}
     for frame, w in pairs(hooked) do frames[w] = frame end

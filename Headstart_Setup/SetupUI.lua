@@ -360,6 +360,28 @@ local function List(t)
     return out
 end
 
+-- The channels a chat window shows. Its own list (frame.channelList) loses a channel as you leave it:
+-- walk out of a city and Trade is gone from it, and saved there, Trade was taken out of the chat of
+-- every character the interface was put on. The game keeps a list of its own for each window
+-- (GetChatWindowChannels: name, zone, name, zone... - what Blizzard's chat frame fills its list from
+-- at the login), so that is read too, and a channel in either is saved.
+local function AddNames(out, has, ...)
+    for k = 1, select("#", ...), 2 do
+        local name = select(k, ...)
+        if type(name) == "string" and name ~= "" and not has[name] then
+            has[name] = true
+            out[#out + 1] = name
+        end
+    end
+end
+
+local function Channels(frame, i)
+    local out, has = {}, {}
+    if GetChatWindowChannels then AddNames(out, has, GetChatWindowChannels(i)) end
+    for _, name in ipairs(List(frame.channelList)) do AddNames(out, has, name) end
+    return out
+end
+
 function YS.ScanChat()
     local chat = {}
     for i = 1, NUM_CHAT_WINDOWS or 10 do
@@ -370,7 +392,7 @@ function YS.ScanChat()
             local w = { id = i, name = name, size = size, r = r, g = g, b = b, a = a, locked = locked and true or false,
                 uninteractable = uninteractable and true or false,
                 docked = (docked or i == 1) and true or false, groups = List(frame.messageTypeList),
-                channels = List(frame.channelList) }
+                channels = Channels(frame, i) }
             if i == 1 or not docked then
                 local point, _, relPoint, x, y = frame:GetPoint(1)
                 if point then w.point = { point, relPoint, x, y } end

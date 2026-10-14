@@ -61,14 +61,16 @@ BUDGET = {
     # ("svaert faa ser cinematic med mindre de er nye. og da bruker de ikke denne addonen"): one frame and
     # one event, CINEMATIC_START, which comes once on a new character and otherwise never. Before: events
     # 41, frames 13.
-    "new": {"hot": 9, "events": 42, "tickers": 1, "onupdate": 0, "frames": 14, "hooks": 4, "kb": 1},
+    # Lowered 2026-10-14: the instance tracker starts off on a new install (the owner's choice): three events,
+    # a frame and a hot path fewer.
+    "new": {"hot": 8, "events": 39, "tickers": 1, "onupdate": 0, "frames": 13, "hooks": 4, "kb": 1},
 }
 # Everything switched on, as the settings would do it (each feature's own switch, then what the settings
 # call to make it show), and everything switched off again (the main switches, as the settings do it).
 SWITCH_ON = """
     local db, T = YippRouteDB, HEADSTART
     for key in pairs(T.STARTS_OFF) do if key ~= "xpbar" then db[key] = true end end       -- (xpbar: a table of its own)
-    for _, key in ipairs({ "camp", "flightTimer", "instanceTrack", "remindTrainer", "remindTalents", "durability",
+    for _, key in ipairs({ "camp", "flightTimer", "remindTrainer", "remindTalents", "durability",
         "craftRemind", "levelUpStats", "simTooltip", "skipCinematic", "minimapButton", "logging", "showSplits",
         "campReminder", "buyLater", "sellGuard", "groupPanel", "trinketAuto", "mailAuto", "shareAll", "moveBag",
         "moveReagentBag" }) do db[key] = true end
@@ -119,7 +121,7 @@ EACH = """
     for k in pairs(T.STARTS_OFF) do if k ~= "xpbar" then Key(k) end end
     for _, k in ipairs({ "trinketAuto", "mailAuto", "shareAll", "moveBag", "moveReagentBag", "logging", "showSplits",
         "campReminder", "buyLater", "sellGuard", "groupPanel" }) do Key(k) end
-    for _, k in ipairs({ "camp", "flightTimer", "instanceTrack", "remindTrainer", "remindTalents", "durability",
+    for _, k in ipairs({ "camp", "flightTimer", "remindTrainer", "remindTalents", "durability",
         "craftRemind", "levelUpStats", "simTooltip", "skipCinematic", "minimapButton", "journey" }) do
         list[#list + 1] = { k, function() db[k] = false end, function() db[k] = nil end }
     end

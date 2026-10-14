@@ -91,6 +91,7 @@ function ReloadUI() RELOADED = true end
 function RequestTimePlayed() ASKED_PLAYED = (ASKED_PLAYED or 0) + 1 end
 UISpecialFrames, StaticPopupDialogs = {}, {}
 function HasAction() return false end
+function GetNumMacros() return 0, 0 end        -- (no macros: Character setup's first look keeps the bars, and none)
 tinsert = table.insert
 function StaticPopup_Show(which) POPUP = which end
 GameTooltip = setmetatable({}, { __index = function() return function() end end })
@@ -758,8 +759,16 @@ check(bad_import[0] is None and "no #name" in bad_import[1], "text that isn't a 
 YR.RevertGuide(YR, "coldridge")
 YR.ToggleWindow(YR, "settings")          # the settings page with the reward picker builds and fills
 YR.ToggleWindow(YR, "instances")         # the instances page builds and fills
+# the tracker's page is its settings, the switch first; the runs are a window of their own
+_inst = [e.label for e in YR.SettingsIndex().values() if e.key == "instances"]
+check("Instance tracker" in _inst and "Instance log" in _inst and "Hourly limit" in _inst,
+      f"the Instance tracker page: its switch, the log's button and the limits, nothing behind a Settings chip ({len(_inst)})")
+YR.InstanceLogShow()
+check(g.HeadstartInstanceLog is not None and g.HeadstartInstanceLog.hidden is False, "the instance log opens in a window of its own")
+YR.InstanceLogToggle()
+check(g.HeadstartInstanceLog.hidden is True, "and shuts again (/headstart instances, the on-screen icon)")
 check(len(g.SEEN_ICONS) == 0, "Settings builds a page the first time it's opened: the trainer's isn't yet")
-for key in ("camps", "bags", "vendors", "group", "reminders", "gear", "trinkets", "xpbar", "character", "trainer", "route"):
+for key in ("camps", "bags", "vendors", "group", "quests", "reminders", "gear", "trinkets", "xpbar", "character", "trainer", "route"):
     YR.ShowSettingsTab(YR, key)        # every page builds, and fills, without an error
 icons = [g.SEEN_ICONS[i] for i in range(1, len(g.SEEN_ICONS) + 1)]
 check(any("Seal of" in t or "Holy Light" in t for t in icons), f"trainer rows carry the spell's icon: {icons[:2]}")
@@ -781,7 +790,8 @@ dimmed = lua.eval("""(function()
     for _, f in ipairs(FRAMES) do if f.alpha == 0.40 then n = n + 1 end end
     return n end)()""")
 check(dimmed > 0, f"Vendor restock off: its rows are dimmed ({dimmed})")
-# the features stand on All features in the order of their cards on the page
+# the features stand on All features in the order of their cards on the page - within a group (Automation
+# stands first, whatever pages its features are on)
 _order = {}
 for e in YR.SettingsIndex().values():
     _order.setdefault(e.key, {"top": [], "cards": []})["cards" if e.card else "top"].append(e.label)
@@ -790,9 +800,9 @@ for group in YR.HomeFeatures().values():
     for i in range(2, len(list(group.values())) + 1):
         f = group[i]
         if f.get and f.set and not f.plain and f.section != "On this page":
-            _feats.setdefault(f.page, []).append(f.section)
+            _feats.setdefault((group[1], f.page), []).append(f.section)
 _wrong = []
-for page, sections in _feats.items():
+for (_group, page), sections in _feats.items():
     cards = [c for c in _order.get(page, {}).get("cards", []) if c in sections]
     seen = []
     for sec in sections:
@@ -827,8 +837,9 @@ YR.RefreshWindow(YR)
 _idx = [e for e in YR.SettingsIndex().values() if e.key == "trinkets"]
 check(not any(e.label == "On this page" for e in _idx) and any(e.card and e.label == "Trinket auto-swap" for e in _idx),
       "no block of switches at the top of a page: each card has its own")
-# Cards fold. A page of several cards opens as a list of their heads; a click on a head opens that
-# card and it is remembered; the cards under it move, and so does what a page keeps under its cards.
+# Cards fold. A page of several cards opens with every card open (it opened as a list of heads, with an
+# "Open all" at the right - the owner, 2026-10-14); a click on a head folds that card and it is
+# remembered; the cards under it move, and so does what a page keeps under its cards.
 g.YippRouteDB.cardsOpen = None
 YR.ShowSettingsTab(YR, "swing")
 YR.RefreshWindow(YR)
@@ -837,14 +848,15 @@ def _hidden(page, card):
     return [e.row.hidden is True for e in YR.SettingsIndex().values() if e.key == page and not e.card and e.of and e.of.title == card]
 def _heads(page):
     return sorted([e.y for e in YR.SettingsIndex().values() if e.key == page and e.card and e.of and e.label == e.of.title], reverse=True)
+check(_L.AnyShut() is False and len(_hidden("swing", "Cast bar")) > 3 and not any(_hidden("swing", "Cast bar")),
+      f"a page of several cards starts open: every setting in sight, nothing to press first ({len(_hidden('swing', 'Cast bar'))})")
+_L.FoldAll(False)
 _ys = _heads("swing")
-check(_L.AnyShut() is True and len(_hidden("swing", "Cast bar")) > 3 and all(_hidden("swing", "Cast bar")),
-      f"a page of several cards starts folded: the Cast bar's rows are away ({len(_hidden('swing', 'Cast bar'))})")
 check(len(_ys) == 3 and all(a - b == 54 for a, b in zip(_ys, _ys[1:])), f"folded, each head stands right under the one before ({_ys})")
 _cast = [cd for cd in _L.cards.values() if cd.title == "Cast bar"][0]
-_cast.head.fn()                     # a click on the card's head
-check(g.YippRouteDB.cardsOpen["swing:Cast bar"] is True and not any(_hidden("swing", "Cast bar")) and _cast.shut is False,
-      "a click on its head opens the card: its rows are back, and it is remembered")
+_cast.head.fn()                     # a click on the folded card's head
+check(g.YippRouteDB.cardsOpen["swing:Cast bar"] is None and not any(_hidden("swing", "Cast bar")) and _cast.shut is False,
+      "a click on a folded card's head opens it: its rows are back")
 _cast.head.fn()
 _first = max(_L.cards.values(), key=lambda cd: cd.top + (cd.shift or 0))       # the card at the top of the page
 _first.head.fn()
@@ -853,20 +865,18 @@ check(_first.span > 54 and _ys2[0] == _ys[0] and _ys[1] - _ys2[1] == _first.span
       f"an open card takes its room: the heads under it move down by what it grew ({_ys} to {_ys2}, {_first.span})")
 _first.head.fn()
 check(_heads("swing") == _ys, "and back up when it is folded again")
-check(g.YippRouteDB.cardsOpen["swing:Cast bar"] is None and all(_hidden("swing", "Cast bar")), "clicked again: folded, and that is remembered too")
+check(g.YippRouteDB.cardsOpen["swing:Cast bar"] is False and all(_hidden("swing", "Cast bar")), "clicked again: folded, and that is remembered")
 found = YR.SettingsSearch("show out of range")
 YR.SettingsGo(found[1])
-check(g.YippRouteDB.cardsOpen["swing:Swing timer"] is True and found[1].row.hidden is not True,
+check(g.YippRouteDB.cardsOpen["swing:Swing timer"] is None and found[1].row.hidden is not True,
       "the search opens the card of the setting it leads to")
 _L.FoldAll(True)
-check(_L.AnyShut() is False and not any(_hidden("swing", "Health and power bars")), "Open all: every card of the page open")
-_L.FoldAll(False)
-check(_L.AnyShut() is True and all(_hidden("swing", "Health and power bars")) and g.YippRouteDB.cardsOpen["swing:Swing timer"] is None,
-      "Fold all: every one folded again")
+check(_L.AnyShut() is False and not any(_hidden("swing", "Health and power bars")) and g.YippRouteDB.cardsOpen["swing:Cast bar"] is None,
+      "every card open again, and none kept as folded")
 YR.SettingsSearch("")
-YR.ShowSettingsTab(YR, "journey")
-_J = YR.SettingsLayout("journey")
-check(_J.AnyShut() is None and not any(_hidden("journey", "Journey")) and len(_hidden("journey", "Journey")) > 2,
+YR.ShowSettingsTab(YR, "recap")
+_J = YR.SettingsLayout("recap")
+check(_J.AnyShut() is None and not any(_hidden("recap", "Death recap")) and len(_hidden("recap", "Death recap")) > 2,
       "a page with one card: it is all there is on it, and it does not fold")
 # /hs journey: with nothing after it (the window), and a made-up journey at a level
 UnitRace = g.UnitRace
@@ -903,12 +913,13 @@ check(g.HeadstartTransferWindow is not None and g.HeadstartTransferWindow.hidden
       and _back.d is not None and _back.d.settings > 3 and _back.d.db.runs is None and g.YippRouteDB.runs is not None,
       f"/headstart transfer: the window, and this account's settings written and read back ({len(_text)} letters, {_back.why})")
 g.HeadstartTransferWindow.Hide(g.HeadstartTransferWindow)
-YR.ShowSettingsTab(YR, "gear")
-_G = YR.SettingsLayout("gear")
+YR.ShowSettingsTab(YR, "quests")
+_G = YR.SettingsLayout("quests")
+check(_G.lift == 0, "the page opens with its cards open: what it keeps under them stays where it is")
+_G.FoldAll(False)
 _lift = _G.lift
 _G.FoldAll(True)
 check(_lift > 0 and _G.tail is not None and _G.lift == 0, f"what a page keeps under its cards comes up with them as they fold ({_lift}), and goes back down")
-_G.FoldAll(False)
 g.YippRouteDB.restock = None
 check(True, "settings page with reward settings opens")
 YR.ShowSettingsTab(YR, "trainer")        # the Trainer tab: the class's spells with a choice each
@@ -954,6 +965,7 @@ check(YR.WindowTab() == "qol", "the Trainer page is on the QoL tab")
 for key in ("start", "xpbar", "swing", "chat", "windows", "instances", "main", "rxpskin", "dmgskin", "skins", "talentwin"):
     YR.ShowSettingsTab(YR, key)
 check(True, "Chat, Bars & windows, the two skins and the pages' old names open")
+check(lua.eval('HeadstartNS.WindowTab()') == "qol", "the old names of the merged pages (the skins, the camps) open their page")
 found = YR.SettingsSearch("hourly limit")
 check(found is not None and len(found) == 1 and found[1].key == "instances",
       "the instance tracker's settings are found on the Instances page")
@@ -963,7 +975,8 @@ found = YR.SettingsSearch("micro menu")
 check(found is not None and len(found) >= 1 and all(found[i].key == "windows" for i in range(1, len(found) + 1)),
       "the bag bar and micro menu are on Bars & windows")
 # a feature is found by the name a player would type, and by words that aren't in its name
-for words, page in (("death recap", "recap"), ("died", "recap"), ("altoholic", "alts"), ("campfire", "camps")):
+for words, page in (("death recap", "recap"), ("died", "recap"), ("altoholic", "alts"), ("campfire", "journey"), ("flight timer", "journey"), ("rxp guide", "skins"), ("dps details", "skins"),
+                    ("skip cinematic", "general"), ("minimap button", "general"), ("accent colour", "general")):
     found = YR.SettingsSearch(words)
     check(found is not None and len(found) >= 1 and found[1].key == page, f"searching \"{words}\" finds the {page} page")
 # All features: the first page, a card for everything, each leading to a section that is there
@@ -987,6 +1000,32 @@ missing = lua.eval("""(function()
     end
     return table.concat(out, ", ") end)()""")
 check(missing == "", f"every card on All features opens a section that exists, and its switch works ({missing})")
+# one grouping for All features and the menu: every card stands in the group its page is in
+wrong = lua.eval("""(function()
+    local YR, out = HeadstartNS, {}
+    local of = YR.SettingsMenuGroups()
+    for _, group in ipairs(YR.HomeFeatures()) do
+        for i = 2, #group do
+            local f = group[i]
+            if f.page and of[f.page] ~= group[1] then out[#out + 1] = f.name .. " (" .. tostring(of[f.page]) .. ")" end
+        end
+    end
+    return table.concat(out, ", ") end)()""")
+check(wrong == "", f"All features and the menu have one grouping: every card stands in its page's group ({wrong})")
+# the tour over the window: every hint finds the part it points at, and the window stays on All features for
+# the ones on the QoL tab
+missing = lua.eval("""(function()
+    local YR, out = HeadstartNS, {}
+    for i, st in ipairs(YR.TourSteps()) do
+        if st.at and not YR.TourTarget(st.at) then out[#out + 1] = st.at end
+    end
+    return table.concat(out, ", ") end)()""")
+check(missing == "", f"the tour: every hint has the part of the window it points at ({missing})")
+YR.WelcomeShow()
+lua.execute("local b = HeadstartTour.next for i = 1, 8 do b.fn(b) end")
+check(g.HeadstartTour.title.text == "Quality of life" and YR.WindowTab() == "qol", "the tour runs through in the window, on the QoL tab")
+lua.execute("local b = HeadstartTour.next b.fn(b)")
+check(g.HeadstartTour.hidden, "and is gone at Done")
 # the news on the first page names cards that exist; the XP bar's samples; the accents
 news_missing = lua.eval("""(function()
     local YR = HeadstartNS
@@ -1498,6 +1537,8 @@ import smoke_welcome
 bad += smoke_welcome.run()
 import smoke_cinematic
 bad += smoke_cinematic.run()
+import smoke_glimmer
+bad += smoke_glimmer.run()
 import smoke_questlfg
 bad += smoke_questlfg.run()
 import smoke_alts

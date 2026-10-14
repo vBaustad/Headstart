@@ -201,7 +201,7 @@ def slot(s):
 expect = {
     1: ("spell", "Holy Light"),                                        # known: the spell itself
     2: None,                                                           # Flash of Light is level 20
-    3: ("Fury", "#showtooltip Seal of Fury\n/cast Seal of Fury"),      # all three seals kept
+    3: ("Seal of Fury", "#showtooltip Seal of Fury\n/cast Seal of Fury"),      # all three seals kept
     4: ("Crusader", "#showtooltip Seal of the Crusader\n/cast Seal of the Crusader"),
     5: ("Purify", "#showtooltip Purify\n/cast [@mouseover,help,nodead][] Purify"),   # known, but mouseover stays a macro
     6: ("Divine", "#showtooltip Divine Protection\n/cast Divine Protection"),
@@ -391,7 +391,7 @@ events._OnEvent(events, "PLAYER_REGEN_ENABLED")
 ok = slot(4) == ("spell", "Seal of the Crusader") and "Crusader" not in [g.MACROS[k][1] for k in g.MACROS]
 print(("ok  " if ok else "FAIL"), f"learned Seal of the Crusader: slot 4 is now {slot(4)}, placeholder macro deleted")
 bad += not ok
-ok = slot(3) == ("Fury", "#showtooltip Seal of Fury\n/cast Seal of Fury")
+ok = slot(3) == ("Seal of Fury", "#showtooltip Seal of Fury\n/cast Seal of Fury")
 print(("ok  " if ok else "FAIL"), "an unlearned seal keeps its placeholder")
 bad += not ok
 
@@ -844,18 +844,18 @@ ok = YS.Options(YS, "PALADIN")["items"] is True
 print(("ok  " if ok else "FAIL"), "and changing the warrior's choices leaves the paladin's alone")
 bad += not ok
 
-# The intro cinematic a new character logs in to is cancelled while level 1 (an option, on by default)
+# The intro cinematic a new character logs in to is cancelled while level 1 (with Skip cinematics, on by default)
 lua.execute("IN_CINEMATIC = true; CANCELLED = 0")
 YS.SkipIntro()
 ok = g.CANCELLED == 1 and not g.IN_CINEMATIC
 print(("ok  " if ok else "FAIL"), "the intro cinematic is cancelled on a level-1 character")
 bad += not ok
-lua.execute("IN_CINEMATIC = true; CANCELLED = 0; YR_SETUP:Options().skipIntro = false")
+lua.execute("IN_CINEMATIC = true; CANCELLED = 0; KEPT_SKIPS = HeadstartNS.SkipsCinematics; HeadstartNS.SkipsCinematics = function() return false end")
 YS.SkipIntro()
 ok = g.CANCELLED == 0
-print(("ok  " if ok else "FAIL"), "... unless the option is off")
+print(("ok  " if ok else "FAIL"), "... unless Skip cinematics is off (it had a switch of its own here)")
 bad += not ok
-lua.execute("YR_SETUP:Options().skipIntro = true; IN_CINEMATIC = false")
+lua.execute("HeadstartNS.SkipsCinematics = KEPT_SKIPS; IN_CINEMATIC = false")
 
 
 def report(ok, what):
@@ -976,6 +976,19 @@ report(abs(loot.r - 0.1) < 1e-6 and abs(loot.b - 0.6) < 1e-6, f"a tab's backgrou
 report(loot.noClick is True and not whis.noClick, "uninteractable where the main had it, and only there")
 report(not whis.isDocked and whis.size == 16 and whis.w == 400 and whis.point is not None,
        "a floating window: undocked, its font size, size and position")
+# Saved outside a city: the window's own list has lost Trade (a hole where it was), the game's list
+# for the window still has it - and a channel only the window's list has is saved too.
+lua.execute('''ResetChats()
+ChatFrame1.channelList = { "General", nil, "LocalDefense", "World" }
+function GetChatWindowChannels(i) if i == 1 then return "General", 1, "Trade", 2, "LocalDefense", 22 end end
+OUTSIDE_CHAT = YR_SETUP.ScanChat()
+GetChatWindowChannels = nil
+OWN_LIST_CHAT = YR_SETUP.ScanChat()
+ResetChats()''')
+got = list(g.OUTSIDE_CHAT[1].channels.values())
+report(got == ["General", "Trade", "LocalDefense", "World"], f"chat saved outside a city: Trade is still in it ({got})")
+got = list(g.OWN_LIST_CHAT[1].channels.values())
+report(got == ["General", "LocalDefense", "World"], f"... and where the game has no such list, the window's own, across the hole ({got})")
 
 # A new character's first login: the main's bars are set while Headstart loads (Blizzard shows them
 # at SETTINGS_LOADED), so Set up layout has no bars left to change and asks for no reload.
@@ -1040,6 +1053,65 @@ slots = YS.Profile(YS).slots
 report(n == 1 and slots[5].kind == "spell" and slots[5].name == "Exorcism" and slots[7].kind == "macro",
        f"a plan saved with such a macro in it is put right: the spell, and your own macro left ({n})")
 lua.execute("YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE2")
+
+# A spell's macro has a name no other spell of the class has. (They were named by the spell's last
+# part alone: a priest's five heals were all "Heal", and a button's macro is read back by its name.)
+KEPT_CLASS = lua.eval("ME.class")
+GENERAL = lua.eval("HeadstartNS.PlannerGeneral")
+worst, classes, spells = [], 0, 0
+for cls in sorted(YS.SPELL_LEVELS.keys()):
+    lua.execute(f"ME.class = '{cls}'")
+    names = set(YS.SPELL_LEVELS[cls].keys()) | set(YS.RACIALS.keys())
+    if GENERAL is not None and GENERAL[cls] is not None:
+        names |= set(GENERAL[cls].keys())
+    by = {}
+    for n in names:
+        by.setdefault(YS.SpellMacroName(n), []).append(n)
+    classes, spells = classes + 1, spells + len(names)
+    worst += [f"{cls} {k!r}: {v}" for k, v in by.items() if len(v) > 1 or len(k) > 16 or k == ""]
+    # (the numbering that parts two names still alike is not needed on this data)
+    worst += [f"{cls} {k!r} numbered" for k, v in by.items()
+              if k not in (v[0], YS.SpellMacroNameWas(v[0])) and k[-1:].isdigit()]
+report(classes == 9 and spells > 800 and not worst,
+       f"every spell of every class has a macro name of its own, of 16 letters at most ({classes} classes, {spells} spells; {worst[:4]})")
+lua.execute("ME.class = 'PRIEST'")
+heals = [YS.SpellMacroName(n) for n in ("Heal", "Flash Heal", "Greater Heal", "Lesser Heal", "Renew", "Power Word: Shield")]
+report(heals == ["Heal", "Flash Heal", "Greater Heal", "Lesser Heal", "Renew", "Shield"],
+       f"a priest's heals: each its own name, and a spell that shares its last word with none keeps the short one ({heals})")
+lua.execute("ME.class = 'SHAMAN'")
+totems = [YS.SpellMacroName(n) for n in ("Fire Resistance Totem", "Frost Resistance Totem", "Disease Cleansing Totem", "Mana Tide Totem")]
+report(len(set(totems)) == 4 and max(len(t) for t in totems) <= 16 and totems[3] == "Mana Tide Totem",
+       f"a shaman's totems: long names made to fit, still apart ({totems})")
+lua.execute(f"ME.class = '{KEPT_CLASS}'")
+a = lua.eval('(YR_SETUP.MacroFor({ kind = "spell", name = "Holy Light", level = 1 }))')
+b = lua.eval('(YR_SETUP.MacroFor({ kind = "spell", name = "Flash of Light", level = 20 }))')
+report((a, b) == ("Holy Light", "Flash of Light"), f"a paladin's two heals as macros: two names ({a}, {b})")
+# ... and the macros made under the old names are those spells still, and are given their names
+lua.execute("""RENAMED = {}
+    KEPT_EDIT = EditMacro
+    function EditMacro(i, name, icon, body) if name then RENAMED[#RENAMED + 1] = MACROS[i][1] .. " -> " .. name MACROS[i][1] = name end if icon then MACROS[i][2] = icon end end
+    MACROS = { [121] = { "Light", 134400, "#showtooltip Holy Light\\n/cast Holy Light" },
+        [122] = { "Light", 134400, "#showtooltip Flash of Light\\n/cast Flash of Light" },
+        [123] = { "Light", 134400, "/cast Holy Light\\n/say mine" },
+        [124] = { "Purify", 134400, "#showtooltip Purify\\n/cast Purify" },
+        [125] = { "Exorcism", 134400, "#showtooltip Exorcism\\n/cast Exorcism" } }""")
+own = lua.eval('YR_SETUP.OwnSpellOf({ kind = "macro", name = "Light", body = "#showtooltip Flash of Light\\n/cast Flash of Light" })')
+report(own is not None and own.name == "Flash of Light", "a macro made under the old name is that spell's macro still")
+n = YS.RenameSpellMacros()
+got = sorted(g.MACROS[i][1] for i in range(121, 126))
+report(n == 2 and got == ["Exorcism", "Flash of Light", "Holy Light", "Light", "Purify"] and g.MACROS[123][1] == "Light",
+       f"at the login they are given their names: the two that shared one, not your own macro of that name, not one named right already ({n}: {list(g.RENAMED.values())})")
+report(YS.RenameSpellMacros() == 0, "and nothing the next time")
+lua.execute("COMBAT = true MACROS[124][1] = 'Light' MACROS[124][3] = '#showtooltip Seal of Light\\n/cast Seal of Light'")
+report(YS.RenameSpellMacros() == 0 and g.MACROS[124][1] == "Light", "not in a fight")
+lua.execute("COMBAT = false EditMacro = KEPT_EDIT")
+# Two macros of your own under one name, on two buttons: each read as itself where the game says which
+lua.execute("""MACROS = { [121] = { "Dup", 134400, "/say one" }, [122] = { "Dup", 134400, "/say two" } }
+    KEPT_BAR = BAR
+    BAR = { [5] = { kind = "macro", id = 121 }, [6] = { kind = "macro", id = 122 } }""")
+now, _ = YS.ReadBars()
+report(now[5].body == "/say one" and now[6].body == "/say two", f"two macros of one name on two buttons: each is read as itself ({now[5].body}, {now[6].body})")
+lua.execute("BAR = KEPT_BAR")
 # Copy this layout over a saved one asks first - a plan, another character's, or this one's own
 lua.execute("""ASKED = nil StaticPopup_Show = function(w, text) ASKED = { which = w, text = text } end
     SCANNED_BEFORE = YippSetupDB.classes.PALADIN.profile.scanned""")
@@ -1446,6 +1518,30 @@ report(lua.eval("StaticPopupDialogs.YIPPSETUP_BARS.enterClicksFirstButton == tru
                 " and StaticPopupDialogs.YIPPSETUP_AGAIN.button1 == 'Bars only'"),
        "and Enter is the answer that changes least: the bars alone")
 lua.execute("UnitLevel = OLD_LEVEL")
+# "Apply bars" on a new character (nothing asked there): the bars, and no interface - no chat, Edit Mode,
+# keys or game settings (the settings window's button put the interface on too, until 0.10.0-beta7)
+lua.execute("""Fresh(); YippSetupCharDB.applied = nil ASKED = nil
+    UI_PUT = 0 YS_REAL_APPLYUI = YR_SETUP.ApplyUI
+    YR_SETUP.ApplyUI = function(...) UI_PUT = UI_PUT + 1 return YS_REAL_APPLYUI(...) end""")
+ok = YS.Apply(YS, None, None, lua.eval("{ barsOnly = true }"))
+report(ok and g.ASKED is None and g.UI_PUT == 0, f"Apply bars on a new character: the bars on, the interface left alone ({g.UI_PUT})")
+lua.execute("Fresh(); YippSetupCharDB.applied = nil ASKED = nil UI_PUT = 0")
+YS.Apply(YS)
+report(g.UI_PUT == 1, f"(where plain Apply, the first login's Apply both, puts the interface on too: {g.UI_PUT})")
+lua.execute("YR_SETUP.ApplyUI = YS_REAL_APPLYUI")
+# Character setup looked at on a character the first time (its page, the planner): its bars and macros kept
+# for good before anything can be moved or applied - Put back brings them back
+lua.execute("""Fresh(); YippSetupCharDB.first = nil YippSetupCharDB.backup = nil YippSetupCharDB.applied = nil
+    BAR[3] = { kind = 'spell', id = 635 }""")
+kept = YS.KeepFirst()
+report(kept is True and g.YippSetupCharDB.first is not None and g.YippSetupCharDB.first.slots[3] is not None
+       and g.YippSetupCharDB.backup is None, "Character setup opened here the first time: the bars as they are kept for good (and no undo step made)")
+lua.execute("BAR[3] = nil BAR[7] = { kind = 'spell', id = 20594 }")
+report(YS.KeepFirst() is False and g.YippSetupCharDB.first.slots[3] is not None and g.YippSetupCharDB.first.slots[7] is None,
+       "only the first time: what was kept stays as it was")
+lua.execute("ClearCursor = ClearCursor or function() end")
+YS.Undo(YS, True)
+report(lua.eval("BAR[3] ~= nil and BAR[7] == nil"), "Put back: the bars as they were when Character setup was first opened here")
 
 # a switch of profile on a character whose bars were never set up with Headstart: asked first, and a copy kept
 lua.execute("Fresh()")

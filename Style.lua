@@ -695,6 +695,9 @@ function S.Window(name, w, h, title)
     head:SetScript("OnDragStop", function() f:StopMovingOrSizing() end)
     tinsert(UISpecialFrames, name)
     f:SetScript("OnHide", CloseMenu)
+    -- a window opened comes up over the others of ours (a loot log opened from the settings came up
+    -- under them - the owner, 2026-10-14)
+    f:SetScript("OnShow", f.Raise)
     f:Hide()
     return f
 end

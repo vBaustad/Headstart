@@ -165,11 +165,13 @@ function YR.WindowList()
                 if not ok and why then YR.Print(why) end
             end)
         end
+        -- (it was three clicks deep: Character setup, Interface, the third row)
+        Add(YS.SaveInterface ~= nil, "Save interface", function() YS:SaveInterface() end)
     end
-    Add(YR.Option("instanceTrack"), "Instances", function() YR:ShowSettingsTab("instances") end)
+    Add(YR.Option("instanceTrack"), "Instance log", function() if YR.LoadWindow() then YR.InstanceLogShow() end end)
     Add(YR.Option("deathRecap"), "The last time you died", function() YR.RecapShow() end)
     Add(true, "Settings", function() YR:ToggleSettings() end)
-    Add(true, "Welcome: what do you want of Headstart", function() if YR.LoadWindow() then YR.WelcomeShow() end end)
+    Add(true, "Headstart tour", function() if YR.LoadWindow() then YR.WelcomeShow() end end)
     return out
 end
 

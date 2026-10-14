@@ -281,6 +281,7 @@ local function Build()
     local S = YR.Style
     panel = CreateFrame("Frame", "HeadstartDeathRecap", UIParent)
     panel:SetFrameStrata("DIALOG")
+    panel:SetToplevel(true)                     -- (over Headstart's window when opened from it)
     panel:SetWidth(W)
     panel:SetClampedToScreen(true)
     panel:EnableMouse(true)
@@ -526,6 +527,7 @@ function YR.RecapShow(d)
     panel:SetHeight(-y + 12)
     Place()
     panel:Show()
+    panel:Raise()
     local fade = rawget(panel, "fade")
     if not was and fade then fade:Play() end
     return true

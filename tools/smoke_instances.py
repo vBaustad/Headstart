@@ -54,7 +54,7 @@ strtrim = function(s) return s end
 floor = math.floor
 wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
 -- the options that are off until turned on, on: the features are what is tested here
-YippRouteDB = { restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
+YippRouteDB = { instanceTrack = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true, groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, acceptInvites = "friends", whisperInvite = "friends", acceptFrom = "friends", showSplits = true, logging = true, xpbar = { on = true } }
 PRINTS, NOTICES = {}, {}
 function print(m) table.insert(PRINTS, m) end
 RaidWarningFrame, ChatTypeInfo = {}, { RAID_WARNING = {} }
@@ -258,6 +258,58 @@ TRANSFER_ABORT_TOO_MANY_INSTANCES = "You have entered too many instances recentl
     go_in()
     check(runs[len(runs)].id == 888 and runs[len(runs)].again == 1 and not g.Listening("PLAYER_TARGET_CHANGED") and counts()[1] == day0 + 2,
           "the same copy again, read as you come in: the same instance, nothing more to listen for")
+
+    # logging out inside one: when you were last in it is written down, and the run ends there if
+    # you are not in it at the next login
+    def fresh():
+        Y = lua.table()
+        chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
+            open(os.path.join(ROOT, "Instances.lua"), encoding="utf-8").read(), "Instances.lua")
+        chunk("Headstart", Y)
+        for k in ("Print", "CharKey", "Option", "Open", "Style", "Part"):
+            Y[k] = YR[k]
+        lua.execute("for i = #FRAMES, 1, -1 do FRAMES[i] = nil end")
+        Y.StartInstances()
+        YR.ApplyParts()
+        lua.execute("Fire('PLAYER_ENTERING_WORLD')")
+
+    same = lua.eval("function(a, b) return rawequal(a, b) end")
+    go_out(60)
+    lua.execute("GUIDS = {} NOW = NOW + 7200")
+    check(not g.Listening("PLAYER_LOGOUT"), "outside: the logout isn't listened for")
+    day0 = counts()[1]
+    lua.execute("MONEY = 1000")
+    go_in("Shadowfang Keep", 33)
+    run = runs[len(runs)]
+    check(g.Listening("PLAYER_LOGOUT") and counts()[1] == day0 + 1, "inside: it is")
+    lua.execute("NOW = NOW + 600 MONEY = 1300 Fire('PLAYER_LOGOUT')")
+    check(run.seen == g.NOW and run.money == 300 and run.left is None,
+          f"logged out inside: last seen there noted, the money so far counted in, the run still open ({run.seen}, {run.money})")
+    lua.execute("NOW = NOW + 30")
+    fresh()
+    check(counts()[1] == day0 + 1 and run.left is None and run.again is None, "a reload inside: the same run, not counted again")
+    lua.execute("MONEY = 1500")
+    go_out(60)
+    check(run.money == 500 and run.seen is None, f"and the money from before the reload isn't dropped ({run.money})")
+    # ... and not there at the next login: it was reset, or the game put you at the door
+    lua.execute("NOW = NOW + 7200")
+    go_in("Blackfathom Deeps", 48)
+    run = runs[len(runs)]
+    lua.execute("NOW = NOW + 600 Fire('PLAYER_LOGOUT') NOW = NOW + 1800 INSIDE = false")
+    fresh()
+    check(run.left == run.entered + 600 and run.seen is None,
+          f"logged out inside and outside at the next login: the run ended when you were last in it ({run.left - run.entered} s)")
+    day0 = counts()[1]
+    go_in()
+    check(counts()[1] == day0 + 1 and not same(runs[len(runs)], run),
+          "back in forty minutes after that logout: a new instance (it was told as the one never left, for four hours)")
+    # a long run, reloaded five hours in
+    run = runs[len(runs)]
+    lua.execute("NOW = NOW + 5 * 3600 Fire('PLAYER_LOGOUT') NOW = NOW + 20")
+    day0 = counts()[1]
+    fresh()
+    check(same(runs[len(runs)], run) and run.left is None and counts()[1] == day0,
+          "a reload five hours into a run: the same run (it was counted as a new instance)")
     return bad
 
 

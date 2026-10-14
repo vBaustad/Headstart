@@ -65,7 +65,7 @@ end
 local function Gold(c)
     c = math.floor(c or 0)
     local g, s, k = math.floor(c / 10000), math.floor(c % 10000 / 100), c % 100
-    if g > 0 then return ("|cff7a4e00%sg|r |cff4a4a52%ds|r"):format(Num(g), s) end
+    if g > 0 then return ("|cff5e3b00%sg|r |cff4a4a52%ds|r"):format(Num(g), s) end
     if s > 0 then return ("|cff4a4a52%ds|r |cff73390f%dc|r"):format(s, k) end
     return ("|cff73390f%dc|r"):format(k)
 end

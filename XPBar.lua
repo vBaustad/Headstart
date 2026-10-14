@@ -30,7 +30,7 @@ local DEFAULT = {
     questColor = { 1.0, 0.69, 0.0, 0.9 }, restColor = { 0.3, 0.6, 1.0, 0.4 }, bgAlpha = 0.75,
     left = "Level {level}", center = "{xp} / {max} ({left})", right = "{pct}% ({pctq}%)",
     over = true, left0 = "Time this level: {levelplayed}", center0 = "", right0 = "Time this session: {session}",
-    under = true, left2 = "Leveling in: {ding} ({rate} XP/Hour)", center2 = "",
+    under = true, left2 = "Levelling in: {ding} ({rate} XP/Hour)", center2 = "",
     right2 = "Completed: |cffffb000{questpct}%|r - Rested: |cff5ab4ff{restedpct}|r",
     maxHide = true,
 }
@@ -62,7 +62,7 @@ local LAYOUTS = {
         center0 = DEFAULT.center0, right0 = DEFAULT.right0, under = true, left2 = DEFAULT.left2, center2 = DEFAULT.center2,
         right2 = DEFAULT.right2 },
     levelling = { left = "Level {level}", center = "{xp} / {max} ({left})", right = "{pct}%", over = false, left0 = "", center0 = "",
-        right0 = "", under = true, left2 = "Leveling in: {ding} ({rate} XP/Hour)", center2 = "",
+        right0 = "", under = true, left2 = "Levelling in: {ding} ({rate} XP/Hour)", center2 = "",
         right2 = "Completed: |cffffb000{questpct}%|r - Rested: |cff5ab4ff{restedpct}|r" },
     xp = { left = "Level {level}", center = "{xp} / {max}", right = "{pct}%", over = false, left0 = "", center0 = "", right0 = "",
         under = false, left2 = "", center2 = "", right2 = "" },
@@ -138,6 +138,8 @@ local SECOND = { xpColor = { 0.09, 0.47, 0.85, 1 }, restColor = { 0.55, 0.3, 0.9
 -- The third look: one flat purple, fewer words, nothing over the bar.
 local THIRD = { xpColor = { 0.58, 0.0, 0.55, 1 }, center = "{xp} / {max}", right = "{pct}%", left2 = "Time to Level: {ding}",
     center2 = "Completed Quests: |cffffb000{questpct}%|r", right2 = "XP/Hour: {rate}" }
+-- The fourth: "Leveling" under the bar, where the window and every other text say "Levelling".
+local FOURTH = { left2 = "Leveling in: {ding} ({rate} XP/Hour)" }
 local function Same(a, b)
     if type(a) ~= "table" or type(b) ~= "table" then return a == b end
     for i = 1, 4 do if math.abs((a[i] or 0) - (b[i] or 0)) > 0.001 then return false end end
@@ -172,6 +174,10 @@ function YR.XPBarDB()
     if db.look < 4 then
         for k, v in pairs(THIRD) do if Same(db[k], v) then db[k] = nil end end
         db.look = 4
+    end
+    if db.look < 5 then
+        for k, v in pairs(FOURTH) do if Same(db[k], v) then db[k] = nil end end
+        db.look = 5
     end
     for k, v in pairs(DEFAULT) do
         -- "on" is left unset until you set it: its default depends on what else is loaded (YR.XPBarOn)

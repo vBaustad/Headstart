@@ -136,8 +136,17 @@ local pending = false
 local Later
 local waited = {}               -- [kind] = looks spent waiting for its item's name
 
+local held = false
 function YR.CheckCrafts()
     if InCombatLockdown() then return end
+    -- a new install's first login: said once the welcome is answered (YR.AfterWelcome, Core.lua)
+    if YR.WelcomeHolds and YR.WelcomeHolds() then
+        if not held then
+            held = true
+            YR.AfterWelcome(function() held = false YR.CheckCrafts() end)
+        end
+        return
+    end
     for kind, c in pairs(YR.CraftChances()) do
         if not told[kind] then
             local name = Name(c.item)

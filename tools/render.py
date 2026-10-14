@@ -2,6 +2,7 @@
 
     python tools/render.py [page ...]      writes tools/render/<page>.html  (default: a handful of pages)
     python tools/render.py transfer transfer:export transfer:import      the Move settings window, shut and open
+    python tools/render.py tour:1 tour:4                                  the tour, at its first and fourth hints
 
 The smoke test's fake game is used as far as the point where it opens the window; from there every frame,
 texture and text the addon makes is recorded (parent, size, anchors, colour, words) instead of thrown away.
@@ -354,6 +355,13 @@ def main(pages):
         elif page.startswith("transfer"):
             YR.TransferShow(page[9:] or None)       # a window of its own: drawn by itself
             root = "HeadstartTransferWindow"
+        elif page == "instancelog":
+            YR.InstanceLogShow()                          # the instance log: a window of its own
+            root = "HeadstartInstanceLog"
+        elif page.startswith("tour"):
+            YR.WelcomeShow()                              # the tour, at one of its hints (tour:4)
+            for _ in range(int(page[5:] or 1) - 1):
+                lua.execute("local b = HeadstartTour.next b.fn(b)")
         else:
             YR.ShowSettingsTab(YR, page)
         objs = load(lua)

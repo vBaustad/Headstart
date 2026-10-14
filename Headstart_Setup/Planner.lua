@@ -1150,6 +1150,7 @@ end
 --- at all (a bar addon draws its own).
 function YR.OpenPlanner()
     if InCombatLockdown() then YR.Print("not in combat.") return end
+    if YS.KeepFirst then YS.KeepFirst() end     -- (the bars as they are, kept before anything is planned: Put back)
     if not win then Build() end
     Start()
     wipe(lists)      -- spells learned or macros made since the last open

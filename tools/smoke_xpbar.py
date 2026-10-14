@@ -97,7 +97,7 @@ function print() end
     f = YR.XPBarFormat
     db = YR.XPBarDB()
     check(db.left == "Level {level}" and db.center == "{xp} / {max} ({left})" and db.right == "{pct}% ({pctq}%)" and db.under is True
-          and db.over is True and db.left0 == "Time this level: {levelplayed}" and db.left2 == "Leveling in: {ding} ({rate} XP/Hour)",
+          and db.over is True and db.left0 == "Time this level: {levelplayed}" and db.left2 == "Levelling in: {ding} ({rate} XP/Hour)",
           "the first words: level, XP, percent, a line over the bar and one under it")
     check(f("{pct} {pctq}") == "25.0 40.0", f"percent, and percent with the quests done ({f('{pct} {pctq}')})")
     check(f("{quest} {questpct} {quests}") == "600 15.0 2",
@@ -233,8 +233,12 @@ function print() end
           "the look where blue meant nothing: untouched colours take Blizzard's way round, a colour you picked stays")
     g.YippRouteDB.xpbar = lua.eval("{ look = 3, xpColor = { 0.58, 0.0, 0.55, 1 }, center = '{xp} / {max}', right = 'my own', left2 = 'Time to Level: {ding}' }")
     db = YR.XPBarDB()
-    check(abs(db.xpColor[1] - 0.47) < 0.01 and db.center == "{xp} / {max} ({left})" and db.right == "my own" and db.left2.startswith("Leveling in"),
+    check(abs(db.xpColor[1] - 0.47) < 0.01 and db.center == "{xp} / {max} ({left})" and db.right == "my own" and db.left2.startswith("Levelling in"),
           "the look before the gradient: untouched words and colour take the new ones, words you wrote stay")
+    g.YippRouteDB.xpbar = lua.eval("{ look = 4, textLayout = 'detailed', left2 = 'Leveling in: {ding} ({rate} XP/Hour)', right2 = 'mine' }")
+    db = YR.XPBarDB()
+    check(db.left2 == "Levelling in: {ding} ({rate} XP/Hour)" and db.right2 == "mine" and db.look == 5,
+          f"\"Leveling\" as it was spelt under the bar: now as everywhere else, and your own words stay ({db.left2})")
     g.YippRouteDB.xpbar = lua.eval("{ left = 'mine' }")
     db = YR.XPBarDB()
     check(db.left == "mine", "words you wrote yourself are kept")
@@ -251,7 +255,7 @@ function print() end
     db.routes = True
     acting = [k for k in ("bankButton", "mailButton", "deathSkipRelease", "skipQuests", "groupShare", "groupAccept", "autoTrain", "restock",
                           "bankAuto", "levelShot") if YR.Option(k)]
-    check(acting == [] and db.pickRewards is None and db.quiet == 3,
+    check(acting == [] and db.pickRewards is None and db.quiet == 4,
           f"a new install with the routes turned on: still nothing that acts for you, and no button of ours on the bank or the mailbox ({acting})")
     db.routes = None
     lua.execute("YippRouteDB = { runs = {} }")
@@ -259,12 +263,13 @@ function print() end
     db = g.YippRouteDB
     # what depends on another addon waits for the login: the addons that sort after Headstart are not in
     # yet as it loads, and each of these was written down as on whatever they did
-    check(db.restock is None and db.bankButton is None and db.xpbar.on is None and db.quiet == 3 and db.setupOn is True,
+    check(db.restock is None and db.bankButton is None and db.xpbar.on is None and db.quiet == 4 and db.setupOn is True,
           "as Headstart loads: what another addon may have is not answered yet (the rest of the latch is)")
     YR.LatchOthers()
     check(db.welcome is None and db.restock is True and db.bankAuto is True and db.trinketBar is True
           and db.acceptInvites == "friends" and db.acceptFrom == "friends" and db.xpbar.on is True and db.showSplits is True,
           "an account that had Headstart: each option never touched is written down as it was (on)")
+    check(db.instanceTrack is True, "an account that had Headstart keeps its instance tracker on (it starts off on a new install)")
     check(db.bankButton is True and db.mailButton is True and db.deathSkipRelease is True and db.skipQuests is True and db.groupShare is True
           and db.groupAccept is True and db.pickRewards is True,
           "and so are the ones that came to start off later: the bank and mail buttons, the routes' automation, reward picking")
@@ -273,7 +278,7 @@ function print() end
     YR.Latch(False)
     YR.LatchOthers()
     db = g.YippRouteDB
-    check(db.quiet == 3 and db.bankButton is True and db.mailButton is False and db.pickRewards is True and db.restock is None,
+    check(db.quiet == 4 and db.bankButton is True and db.mailButton is False and db.pickRewards is True and db.restock is None,
           "an account from the version before: the newer ones kept on, a choice of its own left alone, nothing older written again")
     # another addon that loads after Headstart does one of them: seen at the login, and ours is left off
     g.HEADSTART_T = YR

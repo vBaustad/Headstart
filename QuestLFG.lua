@@ -324,7 +324,7 @@ local function Build()
     if win then return end
     local S = YR.Style
     win = S.Window("HeadstartQuestLFGWindow", W, H, "Quest group finder")
-    win:SetFrameStrata("HIGH")
+    -- (the windows' own layer, as Headstart's window: a layer under it, it opened under the settings)
     win.area = S.ScrollArea(win, W - 32, H - 48 - 16 - 40)
     win.area:SetPoint("TOPLEFT", 16, -60)
     win.foot = S.Text(win, 12, S.C.muted)

@@ -202,6 +202,7 @@ local function ShowNext()
     local h = tonumber(win.text.GetStringHeight and win.text:GetStringHeight()) or 40
     win:SetHeight(30 + math.max(40, h) + 12 + 28 + 12)
     win:Show()
+    win:Raise()
 end
 
 -- Equip pressed in a fight: put on when it ends.
@@ -256,6 +257,7 @@ local function Window()
     if pos then win:SetPoint("TOPLEFT", UIParent, "TOPLEFT", pos[1], pos[2])
     else win:SetPoint("TOP", UIParent, "TOP", 0, -180) end
     win:SetFrameStrata("DIALOG")
+    win:SetToplevel(true)                       -- (over Headstart's window when it comes up)
     win:SetClampedToScreen(true)
     win:SetMovable(true)
     win:EnableMouse(true)

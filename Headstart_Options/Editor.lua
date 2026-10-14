@@ -24,6 +24,11 @@ local LIST_W, ROW = 480, 24
 local win, pages, current
 local edit = { key = nil, header = nil, steps = nil, parsed = {}, dirty = false, sel = nil, line = nil, filter = "" }
 local ui = {}
+-- What the tour (Welcome.lua) points at, by name: parts of this window, kept as they are made.
+local tourAt = {}
+--- A part of the window for the tour to point at ("search", "menu:general", "automation", "qol", "setup",
+--- "levelling", "arrange"), or nil while it isn't made.
+function YR.TourTarget(name) return tourAt[name] end
 
 StaticPopupDialogs["HEADSTART_DELETE_LOG"] = {
     text = "Headstart: delete the run log of %s? This can't be undone.",
@@ -1122,9 +1127,10 @@ for _, k in ipairs(YR.REWARD_KINDS) do KIND_LABEL[k.key] = k.label end
 -- anything; the (i) after the label still shows the whole text. Every row goes into settings.index for
 -- the search box. controls collects the controls (and the masters' dimmers) for Refresh.
 --   On a QoL page (fold: its key) with more than one card, a card folds to its head: click the head
---   and its rows go, click again and they are back. Folded is how a card starts, so a page opens as a
---   short list of what is on it, each with its switch; which ones you opened is remembered
---   (YippRouteDB.cardsOpen["page:Card"]). The cards under a folded one move up, the page gets as much
+--   and its rows go, click again and they are back. Open is how a card starts - every setting and
+--   switch in sight, nothing to press first (it started folded, with an "Open all" at the page's
+--   right; the owner, 2026-10-14) - and the ones you folded are remembered
+--   (YippRouteDB.cardsOpen["page:Card"] == false). The cards under a folded one move up, the page gets as much
 --   shorter, and whatever a page put under its cards (L.Tail) moves with them. The search and a
 --   page's links open the card they lead to.
 local ROW_H, ROW_TIP_H, CARD_HEAD = 34, 48, 40
@@ -1150,10 +1156,11 @@ local ROW_OTHER = {
     ["Accept invites from"] = "acceptInvites", ["Invite on whisper"] = "whisperInvite",
     ["Durability warning"] = "durability", ["Move by dragging"] = "talentMove",
     ["Sliders on the talent window"] = "talentFadeSlider", ["Unspent talent points"] = "remindTalents",
+    ["Restore chat after reload"] = "chatRestore",
 }
 local CARD_OTHER = {
     ["Flight timer"] = "flightTimer", ["Instance tracker"] = "instanceTrack", ["Restock"] = "restock",
-    ["XP bar"] = "xpbar", ["Trinket buttons"] = "trinketBar", ["Swing timer"] = "swing",
+    ["XP bar"] = "xpbar", ["Trinket buttons"] = "trinketBar", ["Swing timer"] = "swing", ["Glimmer"] = "glimmer",
 }
 
 local function RowPage(page, controls, bottom, fold)
@@ -1180,7 +1187,7 @@ local function RowPage(page, controls, bottom, fold)
     local function Shut(cd)
         if not fold or cd.isTop or #L.cards < 2 then return false end
         local open = YippRouteDB.cardsOpen
-        return not (open and open[fold .. ":" .. cd.title])
+        return open ~= nil and open[fold .. ":" .. cd.title] == false
     end
     --- A card folded or opened (open nil: the other way), and the page laid out again.
     function L.Fold(cd, open)
@@ -1188,8 +1195,8 @@ local function RowPage(page, controls, bottom, fold)
         local kept = YippRouteDB.cardsOpen or {}
         YippRouteDB.cardsOpen = kept
         local key = fold .. ":" .. cd.title
-        if open == nil then open = not kept[key] end
-        kept[key] = open and true or nil
+        if open == nil then open = kept[key] == false end
+        if open then kept[key] = nil else kept[key] = false end
         L.Reflow()
     end
     --- Every card of the page opened, or folded.
@@ -1197,7 +1204,9 @@ local function RowPage(page, controls, bottom, fold)
         if not fold or #L.cards < 2 then return end
         local kept = YippRouteDB.cardsOpen or {}
         YippRouteDB.cardsOpen = kept
-        for _, cd in ipairs(L.cards) do kept[fold .. ":" .. cd.title] = open and true or nil end
+        for _, cd in ipairs(L.cards) do
+            if open then kept[fold .. ":" .. cd.title] = nil else kept[fold .. ":" .. cd.title] = false end
+        end
         L.Reflow()
     end
     --- Whether any card of the page is folded (nil on a page whose cards don't fold).
@@ -1270,7 +1279,6 @@ local function RowPage(page, controls, bottom, fold)
                 area:SetVerticalScroll(math.max(0, range))
             end
         end
-        if L.onFold then L.onFold() end       -- (the page's "Open all" says the other thing once all are open)
     end
     function L.Break() EndCard() end
 
@@ -1899,17 +1907,28 @@ local function BuildSetup(page)
     local function Mine() return ViewClass() == select(2, UnitClass("player")) end
     local function Said(ok, why) if not ok and why then YR.Print(why) end YR:RefreshWindow() end
 
-    -- The top: the profile this character is on, and the two things most people come here to do.
+    -- The top: what this character's bars and its interface are on, and what people come here to do -
+    -- save them on the character they play, put them on a new one. One row for each. (Save interface
+    -- was the third row of the Interface tab, and Save bars a row called "Copy" on the Profiles tab.)
     local card = CreateFrame("Frame", nil, page)
     card:SetPoint("TOPLEFT", 16, -14)
     card:SetPoint("TOPRIGHT", -16, -14)
-    card:SetHeight(72)
+    card:SetHeight(128)
     S.Fill(card, S.C.card)
     S.Border(card)
     setup.saved = S.Text(card, 14)
-    setup.saved:SetPoint("TOPLEFT", 14, -14)
+    setup.saved:SetPoint("TOPLEFT", 14, -12)
     setup.note = S.Text(card, 12, S.C.muted)
-    setup.note:SetPoint("TOPLEFT", 14, -36)
+    setup.note:SetPoint("TOPLEFT", 14, -33)
+    local rule = card:CreateTexture(nil, "BORDER")
+    rule:SetPoint("TOPLEFT", 1, -64)
+    rule:SetPoint("TOPRIGHT", -1, -64)
+    rule:SetHeight(1)
+    rule:SetColorTexture(unpack(S.C.line))
+    setup.ui = S.Text(card, 14)
+    setup.ui:SetPoint("TOPLEFT", 14, -76)
+    setup.uiNote = S.Text(card, 12, S.C.muted)
+    setup.uiNote:SetPoint("TOPLEFT", 14, -97)
     -- the words under it: what a profile is - or, when you've changed a choice since the profile was
     -- last put on this character, that it isn't on your bars yet
     -- One line that says where this character stands, and the one thing to do next (if anything).
@@ -1923,7 +1942,7 @@ local function BuildSetup(page)
         elseif not (p and p.slots and next(p.slots)) then
             text = "This profile is empty. Click Plan bars: it starts from your current bars."
         elseif not (char and char.applied) then
-            text, gold = "Not applied to this character yet. Apply asks first, and can be undone.", true
+            text, gold = "Not on this character yet. Its own bars and macros are kept: Put back, Bars tab.", true
         elseif YS.ChoicesPending and YS.ChoicesPending() then
             text, gold = "Settings changed since the last apply. Click Apply to update your bars.", true
         elseif YS.Remembers and not YS.Remembers() then
@@ -1935,14 +1954,51 @@ local function BuildSetup(page)
         setup.note:SetTextColor(unpack(gold and S.C.gold or S.C.muted))
     end
     setup.Pending()
-    local apply = S.Button(card, "Apply to this character", function() YS:Apply() YR:RefreshWindow() end, "primary")
-    apply:SetPoint("RIGHT", -12, 0)
+    -- The interface's line: which one, and whether it is on this character.
+    function setup.UIPending()
+        local text, gold
+        if not YS:SharedUI() then
+            text = "Nothing saved yet. Save interface on the character whose screen you want on the others."
+        elseif YS.UISource() == YS.PlayerKey() then
+            text = YS.UIFollows() and "Saved from this character, and kept up to date as you change it."
+                or "Saved from this character. Save it again after a change."
+        elseif YS.UIOn() and YS.UIBehind() then
+            text, gold = "Saved again on another character since it was put on here. Apply to take the change.", true
+        elseif YS.UIOn() then
+            text = "On this character."
+        else
+            text, gold = "Not on this character yet. Apply asks first; game settings and keys can be undone.", true
+        end
+        setup.uiNote:SetText(text)
+        setup.uiNote:SetTextColor(unpack(gold and S.C.gold or S.C.muted))
+    end
+    -- (bars only, as it says: plain Apply put the interface on too - chat, Edit Mode, keys, game settings -
+    -- and asked nothing on a new character; found 2026-10-14 going over what Headstart can change)
+    local apply = S.Button(card, "Apply bars", function() YS:Apply(nil, nil, { barsOnly = true }) YR:RefreshWindow() end, "primary", 130)
+    apply:SetPoint("TOPRIGHT", -12, -19)
+    local save = S.Button(card, "Save bars", function() YS:Copy() YR:RefreshWindow() end, nil, 130)
+    save:SetPoint("RIGHT", apply, "LEFT", -8, 0)
+    save.tip = "Saves this character's bars, macros and items into the active profile. Asks before replacing one. With bar"
+        .. " changes saved automatically (Profiles tab), rarely needed"
     local plan = S.Button(card, "Plan bars...", function() YR.OpenPlanner() end, nil, 120)
-    plan:SetPoint("RIGHT", apply, "LEFT", -8, 0)
+    plan:SetPoint("RIGHT", save, "LEFT", -8, 0)
     plan.tip = "Opens the bar planner: drag any spell your class can learn onto a button, also ones you don't know yet"
-    setup.apply, setup.plan = apply, plan
+    local applyUI = S.Button(card, "Apply interface", function() YS:AskInterface() end, "primary", 130)
+    applyUI:SetPoint("TOPRIGHT", -12, -83)
+    applyUI.tip = "Puts the saved interface on this character, after asking. What it brings is chosen on the Interface tab."
+        .. " Bars and macros are not touched. Game settings and keys can be undone; chat windows and the Edit Mode layout can't"
+    local saveUI = S.Button(card, "Save interface", function() YS:SaveInterface() YR:RefreshWindow() end, nil, 130)
+    saveUI:SetPoint("RIGHT", applyUI, "LEFT", -8, 0)
+    saveUI.tip = "Saves this character's chat windows, Edit Mode layout, game settings, key bindings, graphics and sound, camera"
+        .. " and RestedXP look as the interface it uses. Asks first when it was last saved on another character. Bars are not changed"
+    setup.apply, setup.save, setup.plan, setup.applyUI, setup.saveUI = apply, save, plan, applyUI, saveUI
     for _, t in ipairs({ setup.saved, setup.note }) do
         t:SetPoint("RIGHT", plan, "LEFT", -16, 0)
+        t:SetJustifyH("LEFT")
+        t:SetWordWrap(false)
+    end
+    for _, t in ipairs({ setup.ui, setup.uiNote }) do
+        t:SetPoint("RIGHT", saveUI, "LEFT", -16, 0)
         t:SetJustifyH("LEFT")
         t:SetWordWrap(false)
     end
@@ -1959,11 +2015,11 @@ local function BuildSetup(page)
     for _, t in ipairs(TABS) do
         local key = t[1]
         local chip = S.Chip(page, t[2], function() ShowTab(key) end)
-        if prev then chip:SetPoint("LEFT", prev, "RIGHT", 6, 0) else chip:SetPoint("TOPLEFT", 16, -96) end
+        if prev then chip:SetPoint("LEFT", prev, "RIGHT", 6, 0) else chip:SetPoint("TOPLEFT", 16, -152) end
         prev = chip
         chips[key] = chip
         local f = CreateFrame("Frame", nil, page)
-        f:SetPoint("TOPLEFT", 0, -124)
+        f:SetPoint("TOPLEFT", 0, -180)
         f:SetPoint("BOTTOMRIGHT")
         tabs[key] = f
     end
@@ -2049,11 +2105,7 @@ local function BuildSetup(page)
         YR:RefreshWindow()
     end), "Saves a change to your bars into the active profile a few seconds after you make it. Buttons"
         .. " planned for later levels keep their place. Off: the profile only changes when you plan it or"
-        .. " save into it.")
-    local copy = S.Button(L.c, "Copy", function() YS:Copy() YR:RefreshWindow() end, nil, 90)
-    setup.copy = copy
-    Row("Save bars now", copy, "Saves this character's bars, macros and items into the active profile. Asks before replacing"
-        .. " one. Rarely needed with automatic saving on.")
+        .. " save into it (Save bars, at the top).")
     local SPEC = { { "ask", "Ask me" }, { "auto", "Switch by itself" }, { "off", "Nothing" } }
     local spec
     spec = S.Dropdown(L.c, 200, SPEC, function(v) YippSetupDB.specAsk = v ~= "ask" and v or nil spec:Refresh() end)
@@ -2104,6 +2156,8 @@ local function BuildSetup(page)
     function mo:Refresh() if not self:HasFocus() then self:SetValue(o().mouseover) end end
     Row("Mouseover macros", mo, "Spells listed here are placed as /cast [@mouseover] macros: cast on the unit under your mouse,"
         .. " otherwise on yourself. Separate names with commas.")
+    Row("Stop automatic spell placement", Sw("noAutoPush"), "Stops Blizzard from putting new spells on the first empty button, which creates duplicates on"
+        .. " planned bars.")
 
     Section("Macros and items", nil, { icon = 134394 })
     Row("Your own macros", Sw("macros"))
@@ -2131,8 +2185,8 @@ local function BuildSetup(page)
         local char = _G.YippSetupCharDB
         self:SetEnabled(type(char) == "table" and char.first ~= nil)
     end
-    Row("Bars before Headstart", before, "Puts this character's bars and macros back as they were before Headstart first changed"
-        .. " anything on it, whatever was applied since. That copy is kept for good. Also /ysetup undo first")
+    Row("Bars before Headstart", before, "Puts this character's bars and macros back as they were the first time you opened"
+        .. " Character setup on it, whatever was applied since. That copy is kept for good. Also /ysetup undo first")
 
     -- ------------------------------------------------------------------ Interface
     Page("interface")
@@ -2148,17 +2202,7 @@ local function BuildSetup(page)
         self:SetEnabled(#YS.UINames() > 0)
     end
     Row("This character uses", uiPick, "The saved interface this character is on. Picking another changes nothing on screen: Apply interface"
-        .. " puts it on.")
-    local uiSaved = S.Text(L.c, 12, S.C.sub)
-    function uiSaved:Refresh()
-        local from, at = YS.UISource(), YS.UIScanned()
-        self:SetText(from and (from .. (at and ("  -  " .. date("%d %b %H:%M", at)) or "")) or "nothing saved yet")
-    end
-    Row("Last saved", uiSaved, "The character that last saved this interface, and when.")
-    local saveUI = S.Button(L.c, "Save interface", function() YS:SaveInterface() end, nil, 130)
-    Row("Save interface", saveUI, "Saves this character's chat windows, Edit Mode layout, game settings, visible bars, camera and"
-        .. " RestedXP look into the interface it uses. Asks first when the interface was last saved on another character."
-        .. " Bars are not changed.")
+        .. " (at the top) puts it on.")
     local uiNaming = CreateFrame("Frame", nil, L.c)
     uiNaming:SetSize(330, 24)
     uiNaming.input = S.Input(uiNaming, { width = 150, placeholder = "A name: Main, Healer..." })
@@ -2182,12 +2226,6 @@ local function BuildSetup(page)
     function uiNaming:Refresh() self.rename:SetEnabled(YS:SharedUI() ~= nil) end
     Row("New interface", uiNaming, "Type a name and click Save as to keep this character's interface as a second one, for a healer"
         .. " or a tank for example. Rename gives the one this character uses that name.")
-    local uiFirst = S.Dropdown(L.c, 200, UINames, function(name) Said(YS.UISetDefault(name)) end)
-    function uiFirst:Refresh()
-        self:SetValue(YS.UIRecord() and YS.UIDefault() or "none saved yet")
-        self:SetEnabled(#YS.UINames() > 1)
-    end
-    Row("New characters get", uiFirst, "The interface offered on a new character's first login.")
     StaticPopupDialogs["HEADSTART_DELETE_UI"] = {
         text = "Headstart: delete the saved interface %s?\n\nNothing on screen changes. Characters that used it go back to the one new characters get.",
         button1 = "Delete", button2 = "Cancel", timeout = 0, whileDead = true, hideOnEscape = true,
@@ -2203,11 +2241,8 @@ local function BuildSetup(page)
         if on then _G.YippSetupDB.uiFollow = nil else _G.YippSetupDB.uiFollow = false end
     end), "Saves the interface again when you change something on a character that uses it: when you leave Edit Mode"
         .. " and when you log out. The other characters on it are asked whether to take the change at their next login.")
-    local applyUI = S.Button(L.c, "Apply interface", function() YS:AskInterface() end, "primary", 130)
-    function applyUI:Refresh() self:SetEnabled(YS:SharedUI() ~= nil) end
-    Row("Apply interface", applyUI, "Applies the saved interface to this character, limited by the switches below, after asking. Bars"
-        .. " and macros are not touched. Game settings can be undone; chat windows and the Edit Mode layout can't, and a"
-        .. " chat tab the saved interface doesn't have is closed.")
+
+    Section("What Apply interface brings", "for every character", { icon = 134063 })
     Row("Game settings", Sw("settings"), "What the Options window's own pages set: controls, mouse and camera, combat, names and nameplates,"
         .. " raid frames, social, map coordinates, accessibility. Not the language, the network or which help tips you have seen.")
     Row("Key bindings", Sw("keys"), "Your keys as they were where the interface was saved, action by action - a default you took off"
@@ -2219,7 +2254,8 @@ local function BuildSetup(page)
         .. " this was added has none: press Save interface once.")
     Row("Edit Mode layout", Sw("editMode"), "Skipped when a UI suite like ElvUI or EllesmereUI is loaded.")
     Row("Visible action bars", Sw("barVisibility"), "Skipped when a bar addon like Bartender or Dominos is loaded.")
-    Row("Chat windows", Sw("chat"), "Chat tabs with their names, channels, font size, colours, and docked or floating position.")
+    Row("Chat windows", Sw("chat"), "Chat tabs with their names, channels, font size, colours, and docked or floating position."
+        .. " A chat tab the saved interface doesn't have is closed, and chat windows can't be put back by undo.")
     Row("Camera distance", Sw("camera"), "Zooms out as far as on the character you copied from. Also applied once to a new character after"
         .. " the intro.")
     Row("Pick my race's RestedXP route", Sw("guide"))
@@ -2227,15 +2263,20 @@ local function BuildSetup(page)
         function(on) o().rxpFrames = on Recount() end),
         "Places RestedXP's guide window, arrow, and item and target buttons where they were on the"
         .. " character the interface was saved on.")
-    Row("Stop automatic spell placement", Sw("noAutoPush"), "Stops Blizzard from putting new spells on the first empty button, which creates duplicates on"
-        .. " planned bars.")
 
     -- ------------------------------------------------------------------ New characters
     Page("new")
     Section("New characters and levelling", nil, { icon = 132307 })
+    Row("Setup window on new characters", Sw("popup"), "A new character's first login offers Apply both: your bars and your interface.")
+    local uiFirst = S.Dropdown(L.c, 200, UINames, function(name) Said(YS.UISetDefault(name)) end)
+    function uiFirst:Refresh()
+        self:SetValue(YS.UIRecord() and YS.UIDefault() or "none saved yet")
+        self:SetEnabled(#YS.UINames() > 1)
+    end
+    Row("New characters get", uiFirst, "The interface offered on a new character's first login, when you have saved more than one.")
     Row("Place spells as I learn them", Sw("swap"), "Replaces a placeholder with the real spell, or fills the spell's planned button.")
-    Row("Setup window on new characters", Sw("popup"))
-    Row("Skip the intro cinematic", Sw("skipIntro"), "Cancels the cinematic when a level 1 character first logs in.")
+    -- (The intro cinematic had a switch of its own here, beside Quality of life's Skip cinematics: two
+    -- switches for one thing, and turning that one off did not stop this. It follows that one now.)
     L.Break()
     L.c:SetHeight(-L.y + 20)
     ShowTab(setup.tab or "profiles")
@@ -2253,8 +2294,14 @@ local function RefreshSetup()
     -- Copy and Set up act on this character, so only while its own class is shown
     setup.Pending()
     setup.apply:SetEnabled(p ~= nil and view == class)
-    setup.copy:SetEnabled(view == class)
+    setup.save:SetEnabled(view == class)
     setup.plan:SetEnabled(view == class)
+    -- the interface is the account's: its row is the same whichever class is shown
+    local from, at = YS.UISource(), YS.UIScanned()
+    setup.ui:SetText(("Interface |cffffffff%s|r  |cff8a827a%s|r"):format(YS.UIName(),
+        from and ("saved from " .. from .. (at and (", " .. date("%d %b %H:%M", at)) or "")) or "nothing saved"))
+    setup.UIPending()
+    setup.applyUI:SetEnabled(YS:SharedUI() ~= nil)
     setup.apply.tip = view ~= class and ("This character is not a " .. name .. ". Pick its class on the Profiles tab")
         or "Puts the profile's bars on this character, using the settings on the Bars tab. Asks first if the character was set up before"
 
@@ -2283,15 +2330,44 @@ local function BuildTrainer(page)
     Row("Auto-train", S.Switch(c, function() return YR.OptionSet("autoTrain") end,
         function(on) YippRouteDB.autoTrain = on YR:SyncRxpTrainer() end),
         "Buys your class's spells the moment you open your class trainer: every spell below that isn't set to"
-        .. " Never, as far as your gold goes above Silver to keep. It is on for every character of the account,"
-        .. " while the choices and the amount to keep are each class's. It doesn't ask: chat says what it learned"
+        .. " Never, up to the level you set, as far as your gold goes above what you keep. It is on for every character"
+        .. " of the account, while the rest of this page is each class's. It doesn't ask: chat says what it learned"
         .. " and for how much. Weapon skills, riding and professions are never bought. Hold Shift as you open the"
         .. " trainer to do it yourself. RestedXP's trainer automation is turned off while this is on.")
-    local reserve = S.Stepper(c, function() return math.floor((YR.TrainerData().reserve or 0) / 100) end,
-        function(v) YR.TrainerData().reserve = v * 100 end, 0, 100000, 1, 120)
-    Row("Silver to keep", reserve, "Spells set to \"If I can afford it\" are only learned while you keep at least this much. \"Always\""
-        .. " spells are learned whenever you have the gold. It starts at 2 silver and is this class's alone: set it on"
-        .. " every class you play (saving for a mount: put the whole sum here). Shift-click changes it by ten.")
+    -- (These replace "Silver to keep", one sum whatever your level, and "Always up to level" with its
+    -- "Set to Always" button - the owner found both confusing, 2026-10-14.)
+    Row("Train spells up to level", S.Stepper(c, function() return YR.TrainerUpTo() end,
+        function(v) YR.TrainerData().upTo = v < TRAIN_TO and v or nil trainer.refresh() end, 1, TRAIN_TO, 1, 110),
+        "Spells the trainer teaches above this level are left for you to buy (chat names them). 60: every spell.")
+    -- What "If I can afford it" spells leave you (Trainer.lua, TrainerKeep): a share of the money you came
+    -- with, never less than a full repair, and a sum saved for something on top. What they left is one
+    -- click away under the trainer's window. (A sum per level, then a full repair alone, came before it:
+    -- the owner wanted gold left for everything else, and for the mace he buys at 7, 2026-10-14.)
+    Row("Keep part of your money (percent)", RowSlider(c, 0, 100, 10, function() return YR.TrainerShare() end,
+        function(v) YR.TrainerData().share = v end),
+        "Spells set to \"If I can afford it\" are only learned while you leave with this share of the money you came"
+        .. " with, and never less than a full repair of your gear: 50 leaves half, so there is gold left for everything"
+        .. " else, and more of it as you level. What they left is listed under the trainer's window with a Learn them"
+        .. " button. 0: they are learned as far as your gold goes. \"Always\" spells are learned whenever you have the gold.")
+    local save
+    save = S.Input(c, { width = 110, placeholder = "1g 50s", onCommit = function(t)
+        local copper = YR.ParseMoney(t)
+        if copper then
+            YR.TrainerData().save = copper
+        else
+            YR.Print(("\"%s\" isn't an amount: write it as 1g 50s, 75s or 2."):format(t))
+        end
+        save:Refresh()
+    end })
+    function save:Refresh()
+        if not self:HasFocus() then
+            local copper = YR.TrainerSave()
+            self:SetValue(copper > 0 and YR.MoneyText(copper) or "")
+        end
+    end
+    Row("Money to save", save,
+        "Kept on top of that, for something you are saving up for: the weapon you mean to buy at level 7, your mount."
+        .. " Write it as 1g 50s, 75s or 2 (gold); empty it once you have bought it.")
     local _, class = UnitClass("player")
     -- What the class trainer teaches (Data/TrainerSpells.lua: every rank, by level), one row a spell, at
     -- the level of the first rank a trainer has for it. Sinister Strike is here at 6: you start with
@@ -2310,15 +2386,6 @@ local function BuildTrainer(page)
     table.sort(list, function(a, b) if a[2] ~= b[2] then return a[2] < b[2] end return a[1] < b[1] end)
     for _, e in ipairs(list) do names[#names + 1] = e[1] end
 
-    L.Sub("Set several at once")
-    trainer.upTo = trainer.upTo or 10
-    local upTo = S.Stepper(c, function() return trainer.upTo end, function(v) trainer.upTo = v end, 2, TRAIN_TO, 1, 110)
-    Row("Always up to level", upTo, "The level used by the button below: every spell first learned at or below it is set to Always.")
-    local always = S.Button(c, "Set to Always", function()
-        YR.SetTrainerChoices(names, "always", nil, levels, trainer.upTo)
-        trainer.refresh()
-    end, "primary", 130)
-    Row("Set spells up to that level", always)
     -- every spell to one choice: Always, If I can afford it, or Never. It shows what they all are now,
     -- or "Mixed" when they differ.
     local every
@@ -2334,9 +2401,8 @@ local function BuildTrainer(page)
         end
         self:SetValue(mixed and "Mixed" or first and ChoiceLabel(first) or "")
     end
-    Row("All spells", every, "Sets the whole list at once. If I can afford it: learned while you keep your reserve. First rank only:"
-        .. " the spell is learned, its later ranks are not. Never:"
-        .. " nothing is learned until you change a spell.")
+    Row("Set every spell to", every, "Sets the whole list below at once. If I can afford it: learned while you keep the money above."
+        .. " First rank only: the spell is learned, its later ranks are not. Never: nothing is learned until you change a spell.")
     Section(("Spells: %s"):format(UnitClass("player") or class), "what the trainer teaches, from the first rank you pay for",
         { icon = 133742 })
     local icons = (YR.PlannerSpells or {})[class] or {}
@@ -2349,8 +2415,13 @@ local function BuildTrainer(page)
             YR.SetTrainerChoice(name, v)
             trainer.refresh()
         end)
-        function dd:Refresh() self:SetValue(ChoiceLabel(YR.TrainerChoice(name))) end
-        Row(("%d  %s%s%s"):format(lvl, icon and ("|T" .. icon .. ":18:18:0:0:64:64:5:59:5:59|t ") or "", name,
+        local row
+        function dd:Refresh()
+            self:SetValue(ChoiceLabel(YR.TrainerChoice(name)))
+            -- above Train spells up to level: dimmed, the trainer leaves it to you
+            if row and row.SetAlpha then row:SetAlpha(lvl > YR.TrainerUpTo() and 0.45 or 1) end
+        end
+        row = Row(("%d  %s%s%s"):format(lvl, icon and ("|T" .. icon .. ":18:18:0:0:64:64:5:59:5:59|t ") or "", name,
             ranks[name] > 1 and ("  |cff8a827a%d ranks|r"):format(ranks[name]) or ""), dd)
     end
     L.Break()
@@ -2371,14 +2442,14 @@ local qolPages = {}
 local function QoLPage(key, build)   -- (TOP_CARD: the card of switches every page begins with)
     qolPages[key] = { controls = {} }
     return function(page)
-        local L = RowPage(page, qolPages[key].controls, key == "instances" and 94 or 64, key)
+        local L = RowPage(page, qolPages[key].controls, 64, key)
         qolPages[key].L = L
         local c = L.c
         local Section, Row = L.Section, L.Row
         -- what you set, also while the main switch has it all off (it comes back as you left it)
         local function Opt(k) return function() return YR.OptionSet(k) end end
         build(L, c, Section, Row, Opt)
-        if key ~= "gear" and key ~= "trinkets" then     -- those two end with a list of their own
+        if key ~= "quests" and key ~= "trinkets" then   -- those two end with a list of their own
             L.Break()
             L.Length(-L.y + 40)
         end
@@ -2390,18 +2461,9 @@ local function QoLPage(key, build)   -- (TOP_CARD: the card of switches every pa
     end
 end
 
-local BuildCamps = QoLPage("camps", function(L, c, Section, Row, Opt)
-        Section("Camp icon", "lit near a camp, or while its buff runs", { find = "campfire", icon = 135805, master = { Opt("camp"), YR.SetCampIcon } })
-        Row("Show the camp's buffs", S.Switch(c, Opt("campList"), YR.SetCampList),
-            "Lists the stat the camp gives and its shorter buffs with their time left. Buffs can't be read in"
-            .. " combat, so the list dims and shows what it last saw.")
-        Row("Always show", S.Switch(c, Opt("campAlways"), YR.SetCampAlways),
-            "Keeps a grey icon on screen away from camps. Off: the icon only shows near a camp or while its"
-            .. " buff runs.")
-        Row("Lock position", S.Switch(c, Opt("campLocked"), YR.SetCampLocked),
-            "Turn off to drag the icon. A preview with a coloured edge shows while it is unlocked. Also"
-            .. " /headstart camp unlock.")
-
+-- The camp icon (Camp.lua) and the flight timer (Flight.lua): on the Journey page, the things of the
+-- road. (They had a page of their own, two small cards - merged at the owner's asking, 2026-10-14.)
+local function RoadSections(L, c, Section, Row, Opt)
         Section("Flight timer", "time left while you fly", { icon = 132239,
             master = { Opt("flightTimer"), function(on) YippRouteDB.flightTimer = on YR:SetFlightTimer(on) end } })
         Row("Portrait marker", S.Switch(c, Opt("flightFace"), function(on)
@@ -2412,7 +2474,18 @@ local BuildCamps = QoLPage("camps", function(L, c, Section, Row, Opt)
             "Shows where you fly from and to, and the time left. A flight is timed the first time you take"
             .. " it. Before that the bar uses RestedXP's time or an estimate. Drag the bar to move it."
             .. " /headstart flight shows a sample.")
-end)
+
+        Section("Camp icon", "lit near a camp, or while its buff runs", { find = "campfire", icon = 135805, master = { Opt("camp"), YR.SetCampIcon } })
+        Row("Show the camp's buffs", S.Switch(c, Opt("campList"), YR.SetCampList),
+            "Lists the stat the camp gives and its shorter buffs with their time left. Buffs can't be read in"
+            .. " combat, so the list dims and shows what it last saw.")
+        Row("Always show", S.Switch(c, Opt("campAlways"), YR.SetCampAlways),
+            "Keeps a grey icon on screen away from camps. Off: the icon only shows near a camp or while its"
+            .. " buff runs.")
+        Row("Lock position", S.Switch(c, Opt("campLocked"), YR.SetCampLocked),
+            "Turn off to drag the icon. A preview with a coloured edge shows while it is unlocked. Also"
+            .. " /headstart camp unlock.")
+end
 
 local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
         Section("Bank deposit", "hold Shift at the bank to skip it", { find = "auto bank mats", icon = 133639 })
@@ -2603,48 +2676,12 @@ local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
 end)
 
 local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
-        Section("Quest sharing", "share your quests, accept your party's", { find = "party quests auto accept", icon = 134327 })
-        Row("Share quests I accept", S.Switch(c, function() return YippRouteDB.shareAll == true end,
-            function(on) YippRouteDB.shareAll = on end),
-            "Shares every quest you accept from an NPC with your party. Off: only quests from a route are"
-            .. " shared (Route settings, Group play).")
-        local FROM = { { "friends", "Guildies and friends" }, { "party", "Anyone in my party" }, { "off", "Nobody" } }
-        local from
-        from = S.Dropdown(c, 190, FROM, function(v) YippRouteDB.acceptFrom = v from:Refresh() end)
-        function from:Refresh()
-            for _, o in ipairs(FROM) do if o[1] == YR.AcceptFromSet() then self:SetValue(o[2]) end end
-        end
-        Row("Accept shared quests from", from, "Accepts quests and escorts shared by these players. Hold Shift as the quest opens to decide"
-            .. " yourself. Leatrix Plus's \"Block shared quests\" declines them before Headstart can.")
-
-        Section("Invites", "invite, leave and accept in one click", { find = "quick group invite leave", icon = 134149 })
+        Section("Invite and Leave buttons", "group up for a kill, and leave again", { find = "quick group invite leave", icon = 134149 })
         Row("Invite and Leave buttons", S.Switch(c, Opt("groupBar"), YR.SetGroupBar),
             "Shows a small bar with two buttons: Invite your target, and Leave group. Both have key bindings"
             .. " (Key Bindings, AddOns, Headstart), and /headstart inv and /headstart leave.")
         Row("Lock position", S.Switch(c, Opt("groupBarLocked"), YR.SetGroupBarLocked),
             "Turn off to drag the bar.")
-        local WHO = { { "friends", "Guildies and friends" }, { "anyone", "Anyone" }, { "off", "Nobody" } }
-        local function WhoDrop(key, get)
-            local d
-            d = S.Dropdown(c, 190, WHO, function(v) YippRouteDB[key] = v d:Refresh() end)
-            function d:Refresh() for _, o in ipairs(WHO) do if o[1] == get() then self:SetValue(o[2]) end end end
-            return d
-        end
-        Row("Invite on whisper", WhoDrop("whisperInvite", YR.WhisperInviteSet),
-            "Invites these players when they whisper you the keyword. Only while you are solo or lead a group"
-            .. " with room.")
-        local word = CreateFrame("Frame", nil, c)
-        word:SetSize(110, 24)
-        word.input = S.Input(word, { width = 110, placeholder = "inv", onCommit = function(t)
-            YippRouteDB.whisperWord = strtrim(t or "") ~= "" and strtrim(t) or nil
-        end })
-        word.input:SetPoint("RIGHT")
-        function word:Refresh() if not self.input:HasFocus() then self.input:SetText(YippRouteDB.whisperWord or "") end end
-        Row("Keyword", word, "The whole whisper must be this word. Upper or lower case doesn't matter. Default: \"inv\".")
-        Row("Accept invites from", WhoDrop("acceptInvites", YR.AcceptInvitesSet),
-            "Accepts group invites from these players at once. Hold Shift as the invite arrives to decide"
-            .. " yourself.")
-
         if not YR.QuestLFGAvailable then return end         -- (shelved: QuestLFG.lua)
         Section("Quest group finder", "ask chat for a group, see who answers", { find = "lfg looking for group", icon = 133884,
             master = { Opt("questLFG"), function(on) YippRouteDB.questLFG = on end } })
@@ -2821,6 +2858,203 @@ local BuildLoot = QoLPage("loot", function(L, c, Section, Row, Opt)
         Row("Clear the log", S.Button(c, "Empty", function() StaticPopup_Show("HEADSTART_CLEAR_LOOTLOG") end, nil, 90), "Deletes every entry for this character. Asks first.")
 end)
 
+-- Glimmer (Glimmer.lua): the preview is the same effect the world gets, in the three states an object
+-- can be in, drawn as the settings are now.
+local function GlimmerPreview(c)
+    local f = CreateFrame("Frame", nil, c)
+    f:SetClipsChildren(true)
+    S.Fill(f, S.C.field)
+    f.title = S.Text(f, 11, S.C.muted)
+    f.title:SetPoint("TOPRIGHT", -12, -10)
+    f.title:SetText("PREVIEW")
+    -- The object: the game's own Silverleaf (the file the client's GameObjectDisplayInfo gives display
+    -- 270), the same in all three, each turned a different way, standing still. The camera is placed by
+    -- hand once the model has loaded, as Blizzard's own model frames do (MakeCurrentCameraCustom): the
+    -- frame's own camera stood so close a node filled it, and standing it back or shrinking the model
+    -- only moved the plant out of the bottom of the frame (seen 2026-10-14). Where no model can be
+    -- shown, a flat shape of Headstart's own.
+    local ART = "Interface\\AddOns\\Headstart\\art\\glimmer\\"
+    local HERB = 219487
+    -- the plant's middle, and where the camera looks from (yards; 7.5 back drew it a speck, 2026-10-14)
+    local TARGET_Z, CAMERA = 0.4, { 2.4, 0, 1.0 }
+    -- What the settings are for is the colour, so the preview is the colours you will see: your chance of
+    -- a skill-up, and too low. (It was out of reach, in reach and too low - the first two differ only in
+    -- how bright, which you see by walking up to a node.)
+    local SAMPLES = {
+        { state = "ready", label = "Skill-up every time", skill = 10, need = 1, facing = 0.4 },
+        { state = "ready", label = "Most times", skill = 30, need = 1, facing = 1.6 },
+        { state = "ready", label = "Now and then", skill = 60, need = 1, facing = 2.8 },
+        { state = "ready", label = "No skill-up", skill = 120, need = 1, facing = 4.0 },
+        { state = "locked", label = "Too low", skill = 90, need = 125, facing = 5.2 },
+    }
+    local function Aim(model)
+        pcall(model.MakeCurrentCameraCustom, model)
+        pcall(model.SetCameraTarget, model, 0, 0, TARGET_Z)
+        pcall(model.SetCameraPosition, model, CAMERA[1], CAMERA[2], CAMERA[3])
+    end
+    f.samples = {}
+    for i, sm in ipairs(SAMPLES) do
+        local cell = CreateFrame("Frame", nil, f)
+        cell:SetSize(130, 150)
+        cell:SetPoint("TOP", f, "TOP", (i - 3) * 136, 0)
+        cell.label = S.Text(cell, 12, S.C.sub)
+        cell.label:SetPoint("BOTTOM", 0, 8)
+        cell.label:SetText(sm.label)
+        -- the plant stands on its shadow above the label; the glimmer is at its middle
+        local model = CreateFrame("Model", nil, cell)
+        model:SetSize(126, 116)
+        model:SetPoint("BOTTOM", 0, 26)
+        cell.shadow = cell:CreateTexture(nil, "BORDER")
+        cell.shadow:SetSize(60, 14)
+        cell.shadow:SetPoint("BOTTOM", model, "BOTTOM", 0, 14)
+        cell.shadow:SetTexture(ART .. "halo")
+        cell.shadow:SetVertexColor(0, 0, 0, 0.7)
+        cell.icon = cell:CreateTexture(nil, "ARTWORK")
+        cell.icon:SetSize(44, 44)
+        cell.icon:SetPoint("BOTTOM", cell.shadow, "CENTER", 0, -4)
+        cell.icon:SetTexture(ART .. "herb")
+        cell.icon:SetVertexColor(0.47, 0.6, 0.41)
+        model:SetScript("OnModelLoaded", Aim)
+        if pcall(model.SetModel, model, HERB) then
+            Aim(model)
+            pcall(model.SetFacing, model, sm.facing)
+            cell.icon:Hide()
+        else
+            model:Hide()
+        end
+        cell.fx = YR.GlimmerEffect(cell)
+        cell.fx:SetFrameLevel(model:GetFrameLevel() + 2)
+        cell.fx:SetPoint("CENTER", cell.shadow, "CENTER", 0, 0)      -- (a look is drawn from the ground up)
+        cell.sm = sm
+        f.samples[i] = cell
+    end
+    function f:Refresh()
+        for _, cell in ipairs(self.samples) do
+            local sm = cell.sm
+            cell.fx:SetStyle(YR.GlimmerStyle())
+            cell.fx:SetLook(math.max(50, math.min(200, tonumber(YippRouteDB.glimmerSize) or 100)) / 100,
+                math.max(20, math.min(100, tonumber(YippRouteDB.glimmerBright) or 100)) / 100)
+            local mode = YR.GlimmerColorMode()
+            local C = YR.GLIMMER_COLORS
+            local col
+            if mode == "white" then col = C.white
+            elseif mode == "accent" then col = sm.state == "locked" and C.grey or C.accent
+            elseif sm.state == "locked" then col = C.red
+            else col = C[YR.GlimmerSkillColor(sm.skill, sm.need) or "orange"] end
+            cell.fx:SetColor(col[1], col[2], col[3])
+            cell.fx:SetState(sm.state)
+            cell.fx:Show()
+        end
+    end
+    return f
+end
+
+local BuildGlimmer = QoLPage("glimmer", function(L, c, Section, Row, Opt)
+        local function Sub(key)
+            return S.Switch(c, function() return YippRouteDB[key] ~= false end, function(on) YippRouteDB[key] = on YR.SettingChanged() end)
+        end
+        Section("Glimmer", "herbs, ore, chests and quest objects light up as you walk up", {
+            find = "glimmer sparkle glow shine herbs herbalism ore mining vein node chest treasure quest object bobber fishing",
+            icon = 136246, master = { Opt("glimmer"), function(on) YippRouteDB.glimmer = on YR.SettingChanged() end } })
+        local preview = L.Block(GlimmerPreview(c), 150)
+        -- (a change redraws the preview at once: it was drawn only as the page opened)
+        local function Changed() YR.SettingChanged() preview:Refresh() end
+        local look
+        look = S.Dropdown(c, 180, YR.GLIMMER_LOOKS, function(v)
+            YippRouteDB.glimmerStyle = v ~= "glint" and v or nil
+            look:Refresh()
+            Changed()
+        end)
+        function look:Refresh()
+            for _, o in ipairs(YR.GLIMMER_LOOKS) do if o[1] == YR.GlimmerStyle() then self:SetValue(o[2]) end end
+        end
+        Row("Look", look, "Glints: twinkles around the object. Halo: a soft glow. Ripple: rings spreading on the ground."
+            .. " Beam: a pillar of light. Marker: a diamond over it.")
+        local COLOURS = { { "skill", "By chance of a skill-up" }, { "accent", "Headstart orange" }, { "white", "White" } }
+        local colour
+        colour = S.Dropdown(c, 200, COLOURS, function(v)
+            YippRouteDB.glimmerColor = v ~= "skill" and v or nil
+            colour:Refresh()
+            Changed()
+        end)
+        function colour:Refresh()
+            for _, o in ipairs(COLOURS) do if o[1] == YR.GlimmerColorMode() then self:SetValue(o[2]) end end
+        end
+        Row("Colour", colour, "By chance of a skill-up: herbs and ore in the trainer's colours (orange, yellow, green, grey) and"
+            .. " red when your skill is too low; chests gold, quest objects yellow, the bobber blue.")
+        Row("Size (percent)", S.Stepper(c, function() return tonumber(YippRouteDB.glimmerSize) or 100 end,
+            function(v) YippRouteDB.glimmerSize = v ~= 100 and v or nil Changed() end, 50, 200, 10, 110))
+        Row("Brightness (percent)", S.Stepper(c, function() return tonumber(YippRouteDB.glimmerBright) or 100 end,
+            function(v) YippRouteDB.glimmerBright = v ~= 100 and v or nil Changed() end, 20, 100, 10, 110))
+        L.Sub("What lights up")
+        Row("Herbs", Sub("glimmerHerbs"))
+        Row("Ore", Sub("glimmerOre"))
+        Row("Chests", Sub("glimmerChests"))
+        Row("Quest objects", Sub("glimmerQuest"), "Objects one of your quests needs: a crate to search, a plant to pick.")
+        Row("Fishing bobber", Sub("glimmerFishing"))
+        Row("In instances", S.Switch(c, function() return YippRouteDB.glimmerInstances == true end,
+            function(on) YippRouteDB.glimmerInstances = on or nil YR.SettingChanged() end),
+            "Off: nothing lights up in dungeons and raids.")
+        Row("About Glimmer", S.Text(c, 12, S.C.muted),
+            "The object your interact key would use lights up: the game picks one, within some fifteen yards. Nothing in a"
+            .. " fight. Glimmer turns on the game's soft targeting for objects, and shows the object's name plate while it is lit;"
+            .. " both go back as they were when you turn Glimmer off.")
+        L.Sub("Quest loot")
+        Row("Quest loot sparkle", S.Switch(c, function() return YippRouteDB.glimmerLoot == true end,
+            function(on) YippRouteDB.glimmerLoot = on or nil YR.SettingChanged() end),
+            "The game's own sparkle, on quest givers, quest objects and quest loot, seen from far off: the game draws it"
+            .. " only while its outline effect is off, so this turns the outline off (two graphics settings). It is the"
+            .. " game's look - Glimmer's looks and colours are for the one object in front of you, as near as the game"
+            .. " picks it. Turning it off puts the outline back, but the sparkle stays until you restart the game.")
+        -- (a "Put back" button for the game settings was here: the switch does it, and a login with
+        -- Glimmer off puts back anything left over - the owner, 2026-10-14: "doesn't the toggle do?")
+end)
+
+-- Quests & invites: what answers for you in a group - invites accepted and sent on a whisper, quests shared
+-- and accepted - and the quest rewards picked for you. Pages of their own under Automation since 2026-10-15
+-- (they were rows of Group & invites and the end of Upgrades & rewards): everything that acts for you is
+-- where All features has it, one grouping for the menu and that page alike.
+local BuildQuests = QoLPage("quests", function(L, c, Section, Row, Opt)
+        Section("Invites", "accepted, and sent on a whisper", { find = "auto accept invite whisper inv keyword", icon = 134149 })
+        local WHO = { { "friends", "Guildies and friends" }, { "anyone", "Anyone" }, { "off", "Nobody" } }
+        local function WhoDrop(key, get)
+            local d
+            d = S.Dropdown(c, 190, WHO, function(v) YippRouteDB[key] = v d:Refresh() end)
+            function d:Refresh() for _, o in ipairs(WHO) do if o[1] == get() then self:SetValue(o[2]) end end end
+            return d
+        end
+        Row("Invite on whisper", WhoDrop("whisperInvite", YR.WhisperInviteSet),
+            "Invites these players when they whisper you the keyword. Only while you are solo or lead a group"
+            .. " with room.")
+        local word = CreateFrame("Frame", nil, c)
+        word:SetSize(110, 24)
+        word.input = S.Input(word, { width = 110, placeholder = "inv", onCommit = function(t)
+            YippRouteDB.whisperWord = strtrim(t or "") ~= "" and strtrim(t) or nil
+        end })
+        word.input:SetPoint("RIGHT")
+        function word:Refresh() if not self.input:HasFocus() then self.input:SetText(YippRouteDB.whisperWord or "") end end
+        Row("Keyword", word, "The whole whisper must be this word. Upper or lower case doesn't matter. Default: \"inv\".")
+        Row("Accept invites from", WhoDrop("acceptInvites", YR.AcceptInvitesSet),
+            "Accepts group invites from these players at once. Hold Shift as the invite arrives to decide"
+            .. " yourself.")
+
+        Section("Quest sharing", "share your quests, accept your party's", { find = "party quests auto accept", icon = 134327 })
+        Row("Share quests I accept", S.Switch(c, function() return YippRouteDB.shareAll == true end,
+            function(on) YippRouteDB.shareAll = on end),
+            "Shares every quest you accept from an NPC with your party. Off: only quests from a route are"
+            .. " shared (Route settings, Group play).")
+        local FROM = { { "friends", "Guildies and friends" }, { "party", "Anyone in my party" }, { "off", "Nobody" } }
+        local from
+        from = S.Dropdown(c, 190, FROM, function(v) YippRouteDB.acceptFrom = v from:Refresh() end)
+        function from:Refresh()
+            for _, o in ipairs(FROM) do if o[1] == YR.AcceptFromSet() then self:SetValue(o[2]) end end
+        end
+        Row("Accept shared quests from", from, "Accepts quests and escorts shared by these players. Hold Shift as the quest opens to decide"
+            .. " yourself. Leatrix Plus's \"Block shared quests\" declines them before Headstart can.")
+
+        BuildRewards(L)   -- last: its list of hand-picked rewards grows
+end)
+
 local BuildGear = QoLPage("gear", function(L, c, Section, Row, Opt)
         Section("Upgrade estimate", "DPS and toughness change on item tooltips", { find = "gear sim tooltip", icon = 132739,
             master = { Opt("simTooltip"), function(on) YippRouteDB.simTooltip = on end } })
@@ -2861,8 +3095,6 @@ local BuildGear = QoLPage("gear", function(L, c, Section, Row, Opt)
             .. " better with no loss, or fills an empty slot, is always announced.")
         Row("Equip window", S.Switch(c, Opt("upgradeButton"), function(on) YippRouteDB.upgradeButton = on end),
             "Shows a small window with an Equip button. Off: a chat line only.")
-
-        BuildRewards(L)   -- last: its list of hand-picked rewards grows
 end)
 
 -- ---------------------------------------------------------------------------
@@ -3652,6 +3884,19 @@ local BuildInstanceSettings = QoLPage("instances", function(L, c, Section, Row, 
                 YippRouteDB.instanceTrack = on
                 if YR.InstanceHudApply then YR.InstanceHudApply() end
             end } })
+        -- where you stand now, and the runs in a window of their own
+        local now = S.Text(c, 12, S.C.sub)
+        function now:Refresh()
+            local hour, day, wait = YR.InstanceCounts()
+            local perHour, perDay = YR.InstanceLimits()
+            self:SetText(("%d / %d this hour  ·  %d / %d today  ·  %s"):format(hour, perHour, day, perDay,
+                wait and ("next free slot in " .. YR.InstanceClock(wait)) or "a slot is free now"))
+            self:SetTextColor(unpack((hour >= perHour or day >= perDay) and S.C.danger or S.C.sub))
+        end
+        Row("Right now", now, "Counted from the runs in the log: new instances this hour and today, against the limits below.")
+        Row("Instance log", S.Button(c, "Open", function() YR.InstanceLogShow() end, "primary", 90),
+            "Your runs: when you went in, how long you were inside, the XP and gold, and the wait for a free slot. Also"
+            .. " /headstart instances, and a click on the on-screen icon.")
         Row("Hourly limit", S.Stepper(c, function() return YippRouteDB.instanceHour or 5 end,
             function(v) YippRouteDB.instanceHour = v end, 1, 30, 1, 110),
             "How many new instances the game allows per hour. Forever's limit isn't known; 5 is Classic's. If"
@@ -3678,7 +3923,7 @@ local BuildInstanceSettings = QoLPage("instances", function(L, c, Section, Row, 
         end)
         function hudMode:Refresh() for _, o in ipairs(HUD) do if o[1] == YR.InstanceHudMode() then self:SetValue(o[2]) end end end
         Row("Display", hudMode, "Icon: this hour's count, coloured green, yellow or red, with the wait for a free slot. Hover it"
-            .. " for today's count and your latest runs. Log: the same as text. Click either to open this page."
+            .. " for today's count and your latest runs. Log: the same as text. Click either to open the instance log."
             .. " Shift-drag to move.")
         Row("Always show", S.Switch(c, function() return YippRouteDB.instanceHudAlways == true end, function(on)
             YippRouteDB.instanceHudAlways = on
@@ -3695,7 +3940,7 @@ end)
 -- ---------------------------------------------------------------------------
 -- Journey: the logging, and the window that tells it (Journey.lua, and Journey.lua here)
 -- ---------------------------------------------------------------------------
-local BuildJourney = QoLPage("journey", function(L, c, Section, Row)
+local BuildJourney = QoLPage("journey", function(L, c, Section, Row, Opt)
         Section("Journey", "your road logged, and told as a story", { find = "journey wrapped stats log distance gold time played travelled",
             icon = 134939, master = { function() return YippRouteDB.journey ~= false end, function(on)
                 if on then YippRouteDB.journey = nil else YippRouteDB.journey = false end
@@ -3730,40 +3975,31 @@ local BuildJourney = QoLPage("journey", function(L, c, Section, Row)
         }
         Row("Start over", S.Button(c, "Reset", function() StaticPopup_Show("HEADSTART_JOURNEY_RESET") end, nil, 90),
             "Forgets everything logged for this character, the chapters too. It counts again from now. Asks first.")
+        RoadSections(L, c, Section, Row, Opt)
 end)
 
-local function BuildInstances(outer)
-    local page = CreateFrame("Frame", nil, outer)
-    page:SetAllPoints()
-    local opts = CreateFrame("Frame", nil, outer)
-    opts:SetPoint("TOPLEFT", 0, -30)
-    opts:SetPoint("BOTTOMRIGHT")
-    BuildInstanceSettings(opts)
-    local chips = {}
-    function inst.View(view)
-        inst.view = view
-        page:SetShown(view == "log")
-        opts:SetShown(view == "settings")
-        for name, chip in pairs(chips) do chip:SetOn(name == view) end
-    end
-    chips.settings = S.Chip(outer, "Settings", function() inst.View("settings") YR:RefreshWindow() end)
-    chips.settings:SetPoint("TOPRIGHT", -16, -6)
-    chips.log = S.Chip(outer, "Log", function() inst.View("log") YR:RefreshWindow() end)
-    chips.log:SetPoint("RIGHT", chips.settings, "LEFT", -6, 0)
-    for _, chip in pairs(chips) do chip:SetFrameLevel(outer:GetFrameLevel() + 10) end
-    inst.View("log")
+-- The instance log: a window of its own, as the chat log and the loot log are (it was the Instance tracker
+-- page's first view, with the tracker's settings - its switch too - behind a Settings chip at the top right:
+-- the owner, 2026-10-15, "you have to press Instance tracker and then Settings"). This hour's and today's
+-- counts with the wait for a free slot, and the runs.
+local LOG_W, LOG_ROWS = 900, 12
+local logWin
+local function InstanceLog()
+    if logWin then return logWin end
+    logWin = S.Window("HeadstartInstanceLog", LOG_W, 188 + LOG_ROWS * 26 + 60, "Instance log")
+    local page = logWin
     inst.hint = S.Text(page, 12, S.C.muted)
-    inst.hint:SetPoint("TOPLEFT", 16, -10)
-    inst.hint:SetPoint("RIGHT", chips.log, "LEFT", -12, 0)
+    inst.hint:SetPoint("TOPLEFT", 16, -60)
+    inst.hint:SetPoint("RIGHT", -16, 0)
     inst.hint:SetJustifyH("LEFT")
     inst.hint:SetWordWrap(false)
-    inst.hour = Stat(page, 16, -34, "This hour")
-    inst.next = Stat(page, 248, -34, "Next free slot")
-    inst.day = Stat(page, 480, -34, "Today")
+    inst.hour = Stat(page, 16, -84, "This hour")
+    inst.next = Stat(page, 248, -84, "Next free slot")
+    inst.day = Stat(page, 480, -84, "Today")
     -- what the columns are
     local heads = CreateFrame("Frame", nil, page)
-    heads:SetPoint("TOPLEFT", 16, -116)
-    heads:SetSize(CW - 32, 20)
+    heads:SetPoint("TOPLEFT", 16, -166)
+    heads:SetSize(LOG_W - 32, 20)
     for _, h in ipairs({ { 10, "ENTERED" }, { 140, "INSTANCE" }, { 440, "TIME INSIDE" }, { 550, "XP" }, { 650, "MONEY" } }) do
         local t = S.Text(heads, 10, S.C.muted)
         t:SetPoint("LEFT", h[1], 0)
@@ -3773,9 +4009,9 @@ local function BuildInstances(outer)
     rule:SetPoint("BOTTOMLEFT") rule:SetPoint("BOTTOMRIGHT", -8, 0) rule:SetHeight(1)
     rule:SetColorTexture(unpack(S.C.line))
     inst.empty = S.Text(page, 13, S.C.muted)
-    inst.empty:SetPoint("TOPLEFT", 26, -148)
+    inst.empty:SetPoint("TOPLEFT", 26, -198)
     inst.empty:SetText("No runs yet. Dungeons and raids you enter are listed here.")
-    inst.list = List(page, CW - 32, math.floor((CH - 138 - 64) / 26), 26, function(r, i)
+    inst.list = List(page, LOG_W - 32, LOG_ROWS, 26, function(r, i)
         local e = inst.rows[i]
         r:Select(false)
         r.when:SetText(date("%a %d %b  %H:%M", e.entered))
@@ -3805,9 +4041,9 @@ local function BuildInstances(outer)
         r.flag = S.Text(r, 11, S.C.muted)
         r.flag:SetPoint("RIGHT", -10, 0)
     end)
-    inst.list:SetPoint("TOPLEFT", 16, -138)
+    inst.list:SetPoint("TOPLEFT", 16, -188)
     local reset = S.Button(page, "Mark as reset", function() YR.InstanceResetSeen() YR:RefreshWindow() end, nil, 150)
-    reset:SetPoint("BOTTOMLEFT", 136, 14)           -- beside Reload UI
+    reset:SetPoint("BOTTOMLEFT", 16, 14)
     reset.tip = "Use this if you reset your instances and Headstart missed it: your next entry counts as a new instance"
     StaticPopupDialogs["HEADSTART_CLEAR_INSTANCES"] = {
         text = "Headstart: clear the instance log?\n\nThe listed runs and the hourly and daily counts are reset.",
@@ -3820,7 +4056,7 @@ local function BuildInstances(outer)
     }
     local clear = S.Button(page, "Clear the log", function() StaticPopup_Show("HEADSTART_CLEAR_INSTANCES") end, nil, 130)
     clear:SetPoint("LEFT", reset, "RIGHT", 8, 0)
-    -- the countdown runs while the page shows
+    -- the countdown runs while the window shows
     local wait = 0
     page:SetScript("OnUpdate", function(_, elapsed)
         wait = wait - elapsed
@@ -3828,10 +4064,25 @@ local function BuildInstances(outer)
         wait = 1
         if inst.Refresh then inst.Refresh() end
     end)
+    local settings = S.Button(page, "Settings", function() YR:ShowSettingsTab("instances") end, nil, 110)
+    settings:SetPoint("BOTTOMRIGHT", -16, 14)
+    settings.tip = "The tracker's switch, its limits and what it shows on screen"
+    return logWin
+end
+--- The instance log, open (and drawn).
+function YR.InstanceLogShow()
+    local w = InstanceLog()
+    w:Show()
+    inst.Refresh()
+end
+--- The instance log, open or shut (/headstart instances, the on-screen icon).
+function YR.InstanceLogToggle()
+    local w = InstanceLog()
+    if w:IsShown() then w:Hide() else YR.InstanceLogShow() end
 end
 
 function inst.Refresh()
-    if not inst.hour then return end
+    if not (inst.hour and logWin and logWin:IsShown()) then return end
     local hour, day, wait = YR.InstanceCounts()
     local perHour, perDay = YR.InstanceLimits()
     inst.hour.value:SetText(("%d / %d"):format(hour, perHour))
@@ -3844,10 +4095,10 @@ function inst.Refresh()
     local locks = YippRouteDB.instanceLocks
     local last = locks and locks[#locks]
     inst.hint:SetText(not YR.Option("instanceTrack")
-        and "The instance tracker is off, so nothing is counted. Turn it on under Settings, top right."
+        and "The instance tracker is off, so nothing is counted. Its switch is on its page (Settings, below)."
         or ("Each new dungeon or raid counts toward the hourly and daily limits.%s"):format(last and
         (" The game last refused an entry at %d this hour (%s)."):format(last.hour, date("%a %H:%M", last.at)) or
-        " Limits and display: Settings, top right."))
+        " Limits and display: Settings, below."))
     inst.rows = InstanceRows()
     inst.empty:SetShown(#inst.rows == 0)
     inst.list:Refresh()
@@ -3859,98 +4110,100 @@ local function RefreshInstances()
     for _, ctl in ipairs(qolPages.instances.controls) do if ctl.Refresh then ctl:Refresh() end end
 end
 
--- RestedXP's guide window (RXPSkin.lua): which look, and the Headstart look's colours.
-local BuildRXPSkin = QoLPage("rxpskin", function(L, c, Section, Row, Opt)
-        Section("RestedXP skin", "another look for RestedXP's window", { find = "rxp guide", icon = 134939 })
-        local LOOKS = { { "off", "RestedXP's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard" } }
-        local look
-        look = S.Dropdown(c, 190, LOOKS, function(v)
-            if not YR.SetRXPSkin(v) then YR.Print("RestedXP isn't loaded: nothing to skin.") end
-            look:Refresh()
-        end)
-        function look:Refresh() for _, o in ipairs(LOOKS) do if o[1] == YR.RXPSkinModeSet() then self:SetValue(o[2]) end end end
-        Row("Look", look, "Headstart: flat and dark, a thin border and one accent colour. Blizzard: the game's own frame"
-            .. " and gold titles. RestedXP's own: the theme you had before. Both looks are also in RestedXP's"
-            .. " theme list.")
-
-        L.Sub("Colours, for the Headstart look")
-        local function Accent(change)
-            if change then YippRouteDB.rxpSkinAccent = YippRouteDB.rxpSkinAccent or { unpack(YR.RXPSkinAccent()) } end
-            return YippRouteDB.rxpSkinAccent or YR.RXPSkinAccent()
-        end
-        local function Back(change)
-            if change then YippRouteDB.rxpSkinBack = YippRouteDB.rxpSkinBack or { unpack(YR.RXPSkinBack()) } end
-            return YippRouteDB.rxpSkinBack or YR.RXPSkinBack()
-        end
-        Row("Accent colour", Swatch(c, "accent", Accent, YR.RXPSkinApply),
-            "Colours the title, the current step, the scroll bar, map pins and tooltip links in the Headstart"
-            .. " look.")
-        Row("Use class colour", S.Switch(c, function() return YippRouteDB.rxpSkinClass == true end, function(on)
-            YippRouteDB.rxpSkinClass = on
-            YR.RXPSkinApply()
-        end), "Uses each character's class colour as the accent.")
-        Row("Background", Swatch(c, "back", Back, YR.RXPSkinApply), "The window's fill colour and opacity.")
-        local PRESETS = {
-            { { 0.40, 0.66, 1.00 }, "Blue" }, { { 0.25, 0.85, 0.75 }, "Teal" }, { { 0.40, 0.85, 0.45 }, "Green" },
-            { { 1.00, 0.78, 0.25 }, "Gold" }, { { 1.00, 0.55, 0.20 }, "Orange" }, { { 0.95, 0.35, 0.35 }, "Red" },
-            { { 0.95, 0.45, 0.75 }, "Pink" }, { { 0.65, 0.50, 1.00 }, "Purple" },
-        }
-        local preset = S.Dropdown(c, 190, PRESETS, function(v)
-            YippRouteDB.rxpSkinAccent = { v[1], v[2], v[3] }
-            YippRouteDB.rxpSkinClass = nil
-            YR.RXPSkinApply()
-            YR:RefreshWindow()
-        end)
-        preset:SetValue("Pick one")
-        Row("Accent presets", preset)
-        Row("Reset colours", S.Button(c, "Reset", function()
-            YippRouteDB.rxpSkinAccent, YippRouteDB.rxpSkinBack, YippRouteDB.rxpSkinClass = nil, nil, nil
-            YR.RXPSkinApply()
-            YR:RefreshWindow()
-        end, nil, 90))
-end)
-
--- The game's damage meter (DamageSkin.lua): which look, and the Headstart look's colours.
-local BuildDamageSkin = QoLPage("dmgskin", function(L, c, Section, Row, Opt)
-        Section("Damage meter skin", "a tidy top bar for the game's meter", { find = "dps details", icon = 132349 })
-        local LOOKS = { { "off", "Blizzard's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard, tidied" } }
-        local look
-        look = S.Dropdown(c, 190, LOOKS, function(v)
-            YR.SetDamageSkin(v)
-            if v ~= "off" and not YR.DamageSkinAvailable() then
-                YR.Print("the damage meter isn't on screen: turn it on in the game's options and the look is put on it.")
+-- Skins: another look for the game's damage meter (DamageSkin.lua) and for RestedXP's guide window
+-- (RXPSkin.lua) - which look, and the Headstart look's colours. One page for both since 2026-10-14 (each
+-- had its own, two small pages in the menu).
+local BuildSkins = QoLPage("skins", function(L, c, Section, Row, Opt)
+        do
+            Section("Damage meter skin", "a tidy top bar for the game's meter", { find = "dps details", icon = 132349 })
+            local LOOKS = { { "off", "Blizzard's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard, tidied" } }
+            local look
+            look = S.Dropdown(c, 190, LOOKS, function(v)
+                YR.SetDamageSkin(v)
+                if v ~= "off" and not YR.DamageSkinAvailable() then
+                    YR.Print("the damage meter isn't on screen: turn it on in the game's options and the look is put on it.")
+                end
+                look:Refresh()
+            end)
+            function look:Refresh()
+                local set = YippRouteDB.dmgSkin        -- as you picked it, also while quality of life is off
+                set = (set == "headstart" or set == "blizzard") and set or "off"
+                for _, o in ipairs(LOOKS) do if o[1] == set then self:SetValue(o[2]) end end
             end
-            look:Refresh()
-        end)
-        function look:Refresh()
-            local set = YippRouteDB.dmgSkin        -- as you picked it, also while quality of life is off
-            set = (set == "headstart" or set == "blizzard") and set or "off"
-            for _, o in ipairs(LOOKS) do if o[1] == set then self:SetValue(o[2]) end end
-        end
-        Row("Look", look, "Both looks tidy the top bar: the title on the left, the timer and buttons on the right."
-            .. " Headstart: a flat dark card in your colours. Blizzard, tidied: the game's dark fill, thin frame"
-            .. " and gold title. The bars themselves are set in Edit Mode.")
+            Row("Look", look, "Both looks tidy the top bar: the title on the left, the timer and buttons on the right."
+                .. " Headstart: a flat dark card in your colours. Blizzard, tidied: the game's dark fill, thin frame"
+                .. " and gold title. The bars themselves are set in Edit Mode.")
 
-        L.Sub("Colours, for the Headstart look")
-        local function Accent(change)
-            if change then YippRouteDB.dmgSkinAccent = YippRouteDB.dmgSkinAccent or { unpack(YR.DamageSkinAccent()) } end
-            return YippRouteDB.dmgSkinAccent or YR.DamageSkinAccent()
+            L.Sub("Colours, for the Headstart look")
+            local function Accent(change)
+                if change then YippRouteDB.dmgSkinAccent = YippRouteDB.dmgSkinAccent or { unpack(YR.DamageSkinAccent()) } end
+                return YippRouteDB.dmgSkinAccent or YR.DamageSkinAccent()
+            end
+            local function FrameColour(change)
+                if change then YippRouteDB.dmgSkinFrame = YippRouteDB.dmgSkinFrame or { unpack(YR.DamageSkinFrame()) } end
+                return YippRouteDB.dmgSkinFrame or YR.DamageSkinFrame()
+            end
+            Row("Accent colour", Swatch(c, "accent", Accent, YR.DamageSkinApply), "Colours the title and the line under the top bar.")
+            Row("Use class colour", S.Switch(c, function() return YippRouteDB.dmgSkinClass == true end, function(on)
+                YippRouteDB.dmgSkinClass = on
+                YR.DamageSkinApply()
+            end))
+            Row("Background", Swatch(c, "frame", FrameColour, YR.DamageSkinApply), "The window's fill colour and opacity.")
+            Row("Reset colours", S.Button(c, "Reset", function()
+                YippRouteDB.dmgSkinAccent, YippRouteDB.dmgSkinFrame, YippRouteDB.dmgSkinClass = nil, nil, nil
+                YR.DamageSkinApply()
+                YR:RefreshWindow()
+            end, nil, 90))
         end
-        local function FrameColour(change)
-            if change then YippRouteDB.dmgSkinFrame = YippRouteDB.dmgSkinFrame or { unpack(YR.DamageSkinFrame()) } end
-            return YippRouteDB.dmgSkinFrame or YR.DamageSkinFrame()
+        do
+            Section("RestedXP skin", "another look for RestedXP's window", { find = "rxp guide", icon = 134939 })
+            local LOOKS = { { "off", "RestedXP's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard" } }
+            local look
+            look = S.Dropdown(c, 190, LOOKS, function(v)
+                if not YR.SetRXPSkin(v) then YR.Print("RestedXP isn't loaded: nothing to skin.") end
+                look:Refresh()
+            end)
+            function look:Refresh() for _, o in ipairs(LOOKS) do if o[1] == YR.RXPSkinModeSet() then self:SetValue(o[2]) end end end
+            Row("Look", look, "Headstart: flat and dark, a thin border and one accent colour. Blizzard: the game's own frame"
+                .. " and gold titles. RestedXP's own: the theme you had before. Both looks are also in RestedXP's"
+                .. " theme list.")
+
+            L.Sub("Colours, for the Headstart look")
+            local function Accent(change)
+                if change then YippRouteDB.rxpSkinAccent = YippRouteDB.rxpSkinAccent or { unpack(YR.RXPSkinAccent()) } end
+                return YippRouteDB.rxpSkinAccent or YR.RXPSkinAccent()
+            end
+            local function Back(change)
+                if change then YippRouteDB.rxpSkinBack = YippRouteDB.rxpSkinBack or { unpack(YR.RXPSkinBack()) } end
+                return YippRouteDB.rxpSkinBack or YR.RXPSkinBack()
+            end
+            Row("Accent colour", Swatch(c, "accent", Accent, YR.RXPSkinApply),
+                "Colours the title, the current step, the scroll bar, map pins and tooltip links in the Headstart"
+                .. " look.")
+            Row("Use class colour", S.Switch(c, function() return YippRouteDB.rxpSkinClass == true end, function(on)
+                YippRouteDB.rxpSkinClass = on
+                YR.RXPSkinApply()
+            end), "Uses each character's class colour as the accent.")
+            Row("Background", Swatch(c, "back", Back, YR.RXPSkinApply), "The window's fill colour and opacity.")
+            local PRESETS = {
+                { { 0.40, 0.66, 1.00 }, "Blue" }, { { 0.25, 0.85, 0.75 }, "Teal" }, { { 0.40, 0.85, 0.45 }, "Green" },
+                { { 1.00, 0.78, 0.25 }, "Gold" }, { { 1.00, 0.55, 0.20 }, "Orange" }, { { 0.95, 0.35, 0.35 }, "Red" },
+                { { 0.95, 0.45, 0.75 }, "Pink" }, { { 0.65, 0.50, 1.00 }, "Purple" },
+            }
+            local preset = S.Dropdown(c, 190, PRESETS, function(v)
+                YippRouteDB.rxpSkinAccent = { v[1], v[2], v[3] }
+                YippRouteDB.rxpSkinClass = nil
+                YR.RXPSkinApply()
+                YR:RefreshWindow()
+            end)
+            preset:SetValue("Pick one")
+            Row("Accent presets", preset)
+            Row("Reset colours", S.Button(c, "Reset", function()
+                YippRouteDB.rxpSkinAccent, YippRouteDB.rxpSkinBack, YippRouteDB.rxpSkinClass = nil, nil, nil
+                YR.RXPSkinApply()
+                YR:RefreshWindow()
+            end, nil, 90))
         end
-        Row("Accent colour", Swatch(c, "accent", Accent, YR.DamageSkinApply), "Colours the title and the line under the top bar.")
-        Row("Use class colour", S.Switch(c, function() return YippRouteDB.dmgSkinClass == true end, function(on)
-            YippRouteDB.dmgSkinClass = on
-            YR.DamageSkinApply()
-        end))
-        Row("Background", Swatch(c, "frame", FrameColour, YR.DamageSkinApply), "The window's fill colour and opacity.")
-        Row("Reset colours", S.Button(c, "Reset", function()
-            YippRouteDB.dmgSkinAccent, YippRouteDB.dmgSkinFrame, YippRouteDB.dmgSkinClass = nil, nil, nil
-            YR.DamageSkinApply()
-            YR:RefreshWindow()
-        end, nil, 90))
 end)
 
 -- Chat: Blizzard's buttons beside the chat (BarHide.lua), and the whisper sound (Whisper.lua).
@@ -4117,6 +4370,17 @@ local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
             YR.MoverReset("bag")
             YR.MoverReset("reagentBag")
         end, nil, 90), "Both bags open where Blizzard puts them again.")
+end)
+
+-- General: what is about no one thing you do - the game's cinematics, and Headstart itself (its minimap button,
+-- the colour of its windows). The owner looked for Skip cinematics under Bars & windows and would never have
+-- found it there (2026-10-14); Leatrix Plus keeps such things on pages of their own too ("System" and
+-- "Settings"). First in the menu after All features, under no group: where you look for what fits nowhere.
+local BuildGeneral = QoLPage("general", function(L, c, Section, Row, Opt)
+        Section("Cinematics", "skipped as they start", { find = "skip cinematic intro movie opening", icon = 133885 })
+        Row("Skip cinematics", S.Switch(c, Opt("skipCinematic"), function(on) YippRouteDB.skipCinematic = on end),
+            "Ends a cinematic as it starts: a new character's opening flight over its zone. Hold Shift as it"
+            .. " starts (as you enter the world) to watch that one. On unless you turn it off.")
 
         -- (its only switch was on the routes' settings page, which is not there while the routes are off -
         -- as on every new install)
@@ -4125,10 +4389,28 @@ local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
             "Headstart's own button by the minimap: left click opens this window, right click a menu of its windows. Off: /headstart"
             .. " and /hs still open them.")
 
-        Section("Cinematics", "skipped as they start", { find = "skip cinematic intro movie opening", icon = 133885 })
-        Row("Skip cinematics", S.Switch(c, Opt("skipCinematic"), function(on) YippRouteDB.skipCinematic = on end),
-            "Ends a cinematic as it starts: a new character's opening flight over its zone. Hold Shift as it"
-            .. " starts (as you enter the world) to watch that one. On unless you turn it off.")
+        Section("Headstart's look", "the colour of Headstart's own windows", { find = "accent colour color theme", icon = 134123 })
+        local options = {}
+        for _, a in ipairs(S.ACCENTS) do options[#options + 1] = { a[1], a[2] } end
+        local was = YippRouteDB.accent
+        local accent
+        accent = S.Dropdown(c, 190, options, function(v)
+            YippRouteDB.accent = v ~= "ember" and v or nil
+            YR:RefreshWindow()
+        end)
+        function accent:Refresh()
+            local now = YippRouteDB.accent or "ember"
+            for _, a in ipairs(S.ACCENTS) do if a[1] == now then self:SetValue(a[2]) end end
+        end
+        local note = S.Text(c, 12, S.C.muted)
+        function note:Refresh()
+            local changed = YippRouteDB.accent ~= was
+            self:SetText(changed and "Reload UI to see it." or "")
+            self:SetTextColor(unpack(changed and S.C.gold or S.C.muted))
+        end
+        Row("Accent colour", accent, "The colour of Headstart's windows: their edges, switches and buttons. A new one shows after"
+            .. " Reload UI.")
+        Row("", note)
 end)
 
 local function QoLRefresh(key, extra)
@@ -4160,8 +4442,6 @@ local function HomeFeatures()
     local function State(f, state) f.state = state return f end
     -- a setting on a card that holds other things too: not a switch for the whole card (see QoLPage)
     local function Plain(f) f.plain = true return f end
-    -- a switch at the top of its own page, and no card on All features
-    local function PageOnly(f) f.pageOnly = true return f end
     local function OnOff(on) return on and "On" or "Off" end
     local function HowMany(keys)
         return function()
@@ -4174,17 +4454,48 @@ local function HomeFeatures()
     setup.go = function() YR:ShowSettingsTab("setup") end
     setup.state = function() return OnOff(YR.SetupOn()) end
     local groups = {
+        { "General",
+            F(133885, "Skip cinematics", "A new character's opening flight, ended as it starts.", "general", "Cinematics",
+                Toggle("skipCinematic")),
+            F(134269, "Minimap button", "Headstart's button by the minimap.", "general", "Headstart's minimap button",
+                function() return YR.OptionSet("minimapButton") end, function(on) YR:ShowMinimapButton(on) end),
+        },
+        { "Automation",
+            F(133741, "Auto-train", "Buys your class's spells as the trainer opens.", "trainer", "Class trainer",
+                Toggle("autoTrain", function() YR:SyncRxpTrainer() end)),
+            F(133785, "Restock", "Buys reagents, ammo and your list at vendors.", "vendors", "Restock", Toggle("restock")),
+            F(133639, "Bank deposit", "Moves mats and recipes to the bank for you.", "bags", "Bank deposit", Toggle("bankAuto")),
+            State(F(133471, "Mail to alt", "Sends mats and recipes to another character.", "bags", "Mail to alt"),
+                function() return YR.MailRecipient() or "No recipient" end),
+            State(F(134149, "Accept invites", "Group invites accepted, and who whispers \"inv\" invited.", "quests", "Invites"),
+                function() return OnOff(YR.AcceptInvitesSet() ~= "off" or YR.WhisperInviteSet() ~= "off") end),
+            State(F(134327, "Quest sharing", "Share your quests, accept your party's.", "quests", "Quest sharing"),
+                function() return OnOff(YippRouteDB.shareAll == true or YR.AcceptFromSet() ~= "off") end),
+            State(F(132739, "Quest rewards", "A reward picked and the quest handed in, up to a level.", "quests", "Quest rewards"),
+                function() return OnOff(YR:RewardSettings().on == true) end),
+        },
+        { "Levelling",
+            F(236562, "XP bar", "Rested and quest XP on a bar of your own.", "xpbar", "XP bar",
+                function() return YR.XPBarOn() end, function(on) YR.XPBarDB().on = on YR.XPBarApply() end),
+            State(F(134376, "Reminders", "Trainer, talent points and repairs, said in time.", "reminders", "Reminders"),
+                HowMany({ "remindTrainer", "remindTalents", "durability", "levelUpStats" })),
+            F(133685, "Craftable items", "Says when you can make stones, oils or bandages.", "reminders", "Craftable items",
+                Toggle("craftRemind")),
+            F(134441, "Level-up screenshot", "A screenshot every time you level.", "reminders", "Level-up screenshot",
+                Toggle("levelShot")),
+            F(134237, "Instance tracker", "Dungeon entries counted against the limits.", "instances", "Instance tracker",
+                Toggle("instanceTrack", function() if YR.InstanceHudApply then YR.InstanceHudApply() end end)),
+            F(134939, "Journey", "Your road logged: distance, time, gold, loot.", "journey", "Journey",
+                function() return YippRouteDB.journey ~= false end,
+                function(on) if on then YippRouteDB.journey = nil else YippRouteDB.journey = false end YR.ApplyParts() end),
+            F(132239, "Flight timer", "Time left while you fly.", "journey", "Flight timer",
+                Toggle("flightTimer", function(on) YR:SetFlightTimer(on) end)),
+            F(135805, "Camp icon", "Lit near a camp, or while its buff runs.", "journey", "Camp icon",
+                Toggle("camp", function(on) YR.SetCampIcon(on) end)),
+        },
         { "Combat",
             F(132349, "Swing timer", "Bars for your auto-attacks.", "swing", "Swing timer",
                 function() return YR.SwingDB().on == true end, function(on) YR.SwingDB().on = on YR.SwingApply() end),
-            F(237274, "Death recap", "What killed you, shown when you die.", "recap", "Death recap",
-                Toggle("deathRecap", function() YR.RecapApply() end)),
-            F(133434, "Trinket buttons", "Your trinkets on screen. Click one to swap.", "trinkets", "Trinket buttons",
-                Toggle("trinketBar", function(on) YR.ShowTrinketBar(on) end)),
-            -- (on its page only: beside "Trinket buttons" on the front page the two read as one thing twice)
-            PageOnly(F(133437, "Trinket auto-swap", "Swaps trinkets in by your own rules.", "trinkets", "Trinket auto-swap",
-                function() return YippRouteDB.trinketAuto == true end,
-                function(on) YippRouteDB.trinketAuto = on if YR.TrinketPaint then YR.TrinketPaint() end end)),
             F(136048, "Health bar", "Your health on a bar of Headstart's own.", "swing", "Health and power bars",
                 function() return YR.SwingDB().health == true end,
                 function(on) YR.SwingDB().health = on or nil YR.ApplyParts() YR.SwingApply() end),
@@ -4197,40 +4508,22 @@ local function HomeFeatures()
             F(136048, "Cast bar", "Your casts on a bar of Headstart's own.", "swing", "Cast bar",
                 function() return YR.SwingDB().cast == true end,
                 function(on) YR.SwingDB().cast = on or nil YR.ApplyParts() YR.SwingApply() end),
-            State(F(132349, "Damage meter skin", "A tidy top bar for the game's damage meter.", "dmgskin", "Damage meter skin"),
-                function() return OnOff(YR.DamageSkinMode() ~= "off") end),
+            F(133434, "Trinket buttons", "Your trinkets on screen. Click one to swap.", "trinkets", "Trinket buttons",
+                Toggle("trinketBar", function(on) YR.ShowTrinketBar(on) end)),
+            F(133437, "Trinket auto-swap", "Swaps trinkets in by your own rules.", "trinkets", "Trinket auto-swap",
+                function() return YippRouteDB.trinketAuto == true end,
+                function(on) YippRouteDB.trinketAuto = on if YR.TrinketPaint then YR.TrinketPaint() end end),
+            F(237274, "Death recap", "What killed you, shown when you die.", "recap", "Death recap",
+                Toggle("deathRecap", function() YR.RecapApply() end)),
         },
-        { "Levelling",
-            F(236562, "XP bar", "Rested and quest XP on a bar of your own.", "xpbar", "XP bar",
-                function() return YR.XPBarOn() end, function(on) YR.XPBarDB().on = on YR.XPBarApply() end),
-            F(135805, "Camp icon", "Lit near a camp, or while its buff runs.", "camps", "Camp icon",
-                Toggle("camp", function(on) YR.SetCampIcon(on) end)),
-            F(132239, "Flight timer", "Time left while you fly.", "camps", "Flight timer",
-                Toggle("flightTimer", function(on) YR:SetFlightTimer(on) end)),
-            F(134939, "Journey", "Your road logged: distance, time, gold, loot.", "journey", "Journey",
-                function() return YippRouteDB.journey ~= false end,
-                function(on) if on then YippRouteDB.journey = nil else YippRouteDB.journey = false end YR.ApplyParts() end),
-            F(134237, "Instance tracker", "Dungeon entries counted against the limits.", "instances", "Instance tracker",
-                Toggle("instanceTrack", function() if YR.InstanceHudApply then YR.InstanceHudApply() end end)),
-            State(F(134376, "Reminders", "Trainer, talent points and repairs, said in time.", "reminders", "Reminders"),
-                HowMany({ "remindTrainer", "remindTalents", "durability", "levelUpStats" })),
-            F(133685, "Craftable items", "Says when you can make stones, oils or bandages.", "reminders", "Craftable items",
-                Toggle("craftRemind")),
-            F(134441, "Level-up screenshot", "A screenshot every time you level.", "reminders", "Level-up screenshot",
-                Toggle("levelShot")),
-            F(133741, "Auto-train", "Buys your class's spells as the trainer opens.", "trainer", "Class trainer",
-                Toggle("autoTrain", function() YR:SyncRxpTrainer() end)),
-        },
-        { "Loot & bags",
+        { "Loot & gear",
+            F(136246, "Glimmer", "Herbs, ore, chests and quest objects light up.", "glimmer", "Glimmer",
+                Toggle("glimmer", function() YR.SettingChanged() end)),
             F(133784, "Loot feed", "Recent loot, in lines that fade.", "loot", "Loot feed",
                 Toggle("lootFeed", function() YR.LootFeedApply() end)),
             F(132739, "Upgrade estimate", "DPS and toughness change on item tooltips.", "gear", "Upgrade estimate",
                 Toggle("simTooltip")),
             F(133071, "Upgrade alerts", "Says when loot beats what you wear.", "gear", "Upgrade alerts", Toggle("upgrades")),
-            F(133639, "Bank deposit", "Moves mats and recipes to the bank for you.", "bags", "Bank deposit", Toggle("bankAuto")),
-            State(F(133471, "Mail to alt", "Sends mats and recipes to another character.", "bags", "Mail to alt"),
-                function() return YR.MailRecipient() or "No recipient" end),
-            F(133785, "Restock", "Buys reagents, ammo and your list at vendors.", "vendors", "Restock", Toggle("restock")),
             F("Interface\\Icons\\INV_Misc_Bag_09", "Characters", "Bags, bank and gold of your other characters.", "alts",
                 "Characters", Toggle("alts")),
         },
@@ -4241,12 +4534,10 @@ local function HomeFeatures()
                 function() return OnOff(YippRouteDB.whisperSound ~= nil) end),
             State(F("Interface\\Icons\\INV_Misc_Note_01", "Chat buttons", "Slim or hide the buttons beside chat.", "chat", "Chat buttons"),
                 function() return OnOff(YippRouteDB.chatStrip ~= nil or YippRouteDB.chatTTSHide == true or YippRouteDB.chatSocialHide == true) end),
-            F(134149, "Invite and Leave buttons", "Group up for a kill, and leave again.", "group", "Invites",
+            F(134149, "Invite and Leave buttons", "Group up for a kill, and leave again.", "group", "Invite and Leave buttons",
                 Toggle("groupBar", function(on) YR.SetGroupBar(on) end)),
             F(133884, "Quest group finder", "Ask chat for a group, see who answers.", "group", "Quest group finder",
                 Toggle("questLFG")),
-            State(F(134327, "Quest sharing", "Share your quests, accept your party's.", "group", "Quest sharing"),
-                function() return OnOff(YippRouteDB.shareAll == true or YR.AcceptFromSet() ~= "off") end),
         },
         { "Interface",
             State(F(133633, "Bag bar and micro menu", "Hidden, or shown on mouseover.", "windows", "Bag bar and micro menu"),
@@ -4255,10 +4546,10 @@ local function HomeFeatures()
                 function() return OnOff(YR.TalentFade() > 0 or YR.Option("talentMove")) end),
             State(F(134063, "Window scale", "Blizzard's windows smaller or larger.", "windows", "Window scale"),
                 function() return OnOff(type(YippRouteDB.windowScale) == "table" and next(YippRouteDB.windowScale) ~= nil) end),
-            State(F(134939, "RestedXP skin", "Another look for RestedXP's window.", "rxpskin", "RestedXP skin"),
+            State(F(132349, "Damage meter skin", "A tidy top bar for the game's damage meter.", "skins", "Damage meter skin"),
+                function() return OnOff(YR.DamageSkinMode() ~= "off") end),
+            State(F(134939, "RestedXP skin", "Another look for RestedXP's window.", "skins", "RestedXP skin"),
                 function() return OnOff(YR.RXPSkinMode() ~= "off") end),
-            F(133885, "Skip cinematics", "A new character's opening flight, ended as it starts.", "windows", "Cinematics",
-                Toggle("skipCinematic")),
             setup,
         },
     }
@@ -4331,9 +4622,8 @@ local function HomeCard(parent, f, w)
 end
 
 -- What is new in this version: the same cards, first on the page, until you hide them.
-local NEWS_FOR = "0.10.0-beta6"
-local NEWS = { ["Death recap"] = true, ["Characters"] = true, ["Chat log"] = true,
-    ["Loot feed"] = true, ["Profiles and bar planner"] = true, ["Journey"] = true, ["Cast bar"] = true }
+local NEWS_FOR = "0.10.0-beta7"
+local NEWS = { ["Glimmer"] = true }
 function YR.HomeNews() return NEWS_FOR, NEWS end
 
 local function BuildHome(page)
@@ -4344,9 +4634,6 @@ local function BuildHome(page)
     local gap = 8
     local w = math.floor((CW - 40 - 2 * gap) / 3)
     local groups = HomeFeatures()
-    for _, group in ipairs(groups) do
-        for i = #group, 2, -1 do if group[i].pageOnly then table.remove(group, i) end end
-    end
     local function Grid(parent, list, y)
         for i, f in ipairs(list) do
             local col = (i - 1) % 3
@@ -4443,41 +4730,20 @@ local function BuildHome(page)
 
     local y = -4
     for _, group in ipairs(groups) do
+        local top = y
         y = Head(body, group[1], y)
         local list = {}
         for i = 2, #group do list[#list + 1] = group[i] end
         y = Grid(body, list, y) - 4
+        if group[1] == "Automation" then
+            -- (the group the tour points at: its heading and its cards)
+            local span = CreateFrame("Frame", nil, body)
+            span:SetPoint("TOPLEFT", 0, top)
+            span:SetSize(CW - 40, top - y - 6)
+            tourAt.automation = span
+        end
     end
-    -- The look of Headstart's own windows.
-    y = Head(body, "Headstart", y)
-    local look = CreateFrame("Frame", nil, body)
-    look:SetSize(w, 58)
-    look:SetPoint("TOPLEFT", 0, y)
-    S.Fill(look, S.C.card)
-    S.Border(look, S.C.line)
-    local name = S.Text(look, 13)
-    name:SetPoint("TOPLEFT", 12, -9)
-    name:SetText("Accent colour")
-    local note = S.Text(look, 11, S.C.muted)
-    note:SetPoint("TOPLEFT", 12, -27)
-    local options = {}
-    for _, a in ipairs(S.ACCENTS) do options[#options + 1] = { a[1], a[2] } end
-    local accent
-    accent = S.Dropdown(look, 150, options, function(v)
-        YippRouteDB.accent = v ~= "ember" and v or nil
-        YR:RefreshWindow()
-    end)
-    accent:SetPoint("TOPRIGHT", -12, -8)
-    front.accentWas = YippRouteDB.accent
-    function look:Refresh()
-        local now = YippRouteDB.accent or "ember"
-        for _, a in ipairs(S.ACCENTS) do if a[1] == now then accent:SetValue(a[2]) end end
-        local changed = YippRouteDB.accent ~= front.accentWas
-        note:SetText(changed and "Reload UI to see it." or "For Headstart's windows.")
-        note:SetTextColor(unpack(changed and S.C.gold or S.C.muted))
-    end
-    front.cards[#front.cards + 1] = look
-    bodyH = -y + 58
+    bodyH = -y
     body:SetHeight(bodyH)
     Lay()
 end
@@ -4494,65 +4760,79 @@ function YR.SettingsLayout(key) return qolPages[key] and qolPages[key].L end
 --- How far down QoL's menu reaches, and the room it has (for the tests).
 function YR.SettingsMenuFits() return settings.navBottom, PH end
 
--- QoL's menu: All features first, then the pages in five groups by what you are doing. Every page is
--- named after the thing it is about - the name a player would look for - and one thing has one place:
---   Combat        the swing timer, the death recap, trinkets, the damage meter's skin
---   Levelling     the XP bar, camps and flights, reminders, the trainer, the journey, instances
---   Loot & bags   loot, gear, the bank and the mail, vendors, your other characters
---   Social        chat and groups
---   Interface     Blizzard's bars and windows, RestedXP's window
+-- QoL's menu: All features and General first, then the pages in six groups - and the All features page has the
+-- same groups in the same order, General's two cards first (the owner, 2026-10-15: "All features has another
+-- grouping than the menu - what is best?"; one map to learn, not two). Every page is named after the thing it
+-- is about, the name a player would look for, and one thing has one place:
+--   General         cinematics, Headstart's minimap button, the colour of its windows
+--   Automation      what acts for you: the class trainer, restock, the bank and mail, quests and invites
+--                   (Leatrix Plus opens on its Automation page too; nothing on without the player knowing)
+--   Levelling       the XP bar, reminders, the instance tracker, the journey (with the flight timer and camps)
+--   Combat          combat bars, trinkets, the death recap
+--   Loot & gear     Glimmer, the loot feed and log, upgrades, your other characters
+--   Social          chat, the Invite and Leave buttons and the quest group finder
+--   Interface       Blizzard's bars and windows, skins for the damage meter and RestedXP
+-- (Regrouped 2026-10-14 at the owner's asking; the small pages merged and Quality of life's switch moved to All
+-- features the same day; General, Automation and one grouping for both on 2026-10-15.)
 -- Each page says what is on it under its name (its sections, as links: PageHead).
 local CATEGORIES = {
     { key = "home", label = "All features", build = BuildHome, refresh = RefreshHome, icon = "Interface\\AddOns\\Headstart\\art\\logo",
       scope = "Every character on this account",
       desc = "Everything Headstart does. Switch a feature on here; click its card for the settings." },
-    { group = "Combat" },
-    { key = "swing", label = "Combat bars", build = BuildSwing, refresh = QoLRefresh("swing"), icon = "Interface\\Icons\\INV_Sword_04",
-      status = function() return YR.SwingOn() or YippRouteDB.powerFlashOff == true end, scope = "Every character on this account",
-      desc = "Blizzard's swing bars in a look of your own, and its resource bar without the spend flash." },
-    { key = "recap", label = "Death recap", build = BuildRecap, refresh = QoLRefresh("recap"), icon = 237274,
-      status = function() return YR.Option("deathRecap") end, scope = "Every character on this account",
-      desc = "What killed you and the hits before it, shown when you die." },
-    { key = "trinkets", label = "Trinkets & sets", build = BuildTrinkets, refresh = QoLRefresh("trinkets", RefreshTrinkets),
-      icon = 133434, status = function() return YR.Option("trinketBar") or YippRouteDB.trinketAuto == true end,
-      scope = "Every character; the swap order per character",
-      desc = "Trinket buttons, automatic trinket swaps, and key bindings for equipment sets." },
-    { key = "dmgskin", label = "Damage meter", build = BuildDamageSkin, refresh = QoLRefresh("dmgskin"), icon = 132349,
-      status = function() return YR.DamageSkinMode() ~= "off" end, scope = "Every character on this account",
-      desc = "A tidy top bar for the game's damage meter, in Headstart's look or Blizzard's." },
+    { key = "general", label = "General", build = BuildGeneral, refresh = QoLRefresh("general"), icon = 134064,
+      status = function() return YR.Option("skipCinematic") end, scope = "Every character on this account",
+      desc = "Cinematics skipped, Headstart's minimap button, and the colour of its windows." },
+    { group = "Automation" },
+    { key = "trainer", label = "Class trainer", build = BuildTrainer, refresh = function() trainer.refresh() end, icon = 133741,
+      status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
+      desc = "Buys your class's spells as the trainer opens, as far as your gold goes above what you keep." },
+    { key = "vendors", label = "Vendors & restock", build = BuildVendors, refresh = QoLRefresh("vendors"), icon = 133785,
+      status = function() return YR.Option("restock") end, scope = "Every character on this account",
+      desc = "Reagents, ammo and your own list bought back up to the count you keep." },
+    { key = "bags", label = "Bank & mail", build = BuildBags, refresh = QoLRefresh("bags"), icon = 133633,
+      status = function() return YR.Option("bankAuto") or YR.Option("bankButton") or YR.Option("mailButton") end, scope = "Every character on this account",
+      desc = "Crafting mats and recipes moved to the bank, or mailed to another character." },
+    { key = "quests", label = "Quests & invites", build = BuildQuests, refresh = QoLRefresh("quests", RefreshRewards), icon = 134327,
+      status = function() return YR.AcceptInvitesSet() ~= "off" or YR.WhisperInviteSet() ~= "off" or YR.AcceptFromSet() ~= "off"
+          or YippRouteDB.shareAll == true or YR:RewardSettings().on == true end,
+      scope = "Every character; quest rewards per class",
+      desc = "Invites accepted and sent on a whisper, quests shared and accepted, and quest rewards picked for you." },
     { group = "Levelling" },
     { key = "xpbar", label = "XP bar", build = BuildXPBar, refresh = QoLRefresh("xpbar"), icon = 236562,
       status = function() return YR.XPBarOn() end, scope = "Every character on this account",
       desc = "Your own experience bar: size, position, colours and text." },
-    { key = "camps", label = "Camps & flights", build = BuildCamps, refresh = QoLRefresh("camps"), icon = 135805,
-      status = function() return YR.Option("camp") or YR.Option("flightTimer") end, scope = "Every character on this account",
-      desc = "The camp icon, and a timer bar while you fly." },
     { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134327,
       status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") or YR.Option("levelUpStats") end, scope = "Every character on this account",
       desc = "Said when something needs doing: the trainer, talent points to spend (on screen), repairs, items to craft." },
-    { key = "trainer", label = "Trainer", build = BuildTrainer, refresh = function() trainer.refresh() end, icon = 133741,
-      status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
-      desc = "Buys your class's spells as the trainer opens, as far as your gold goes above what you keep." },
-    { key = "journey", label = "Journey", build = BuildJourney, refresh = QoLRefresh("journey"), icon = 134939,
-      status = function() return YippRouteDB.journey ~= false end, scope = "Every character; each has its own journey",
-      desc = "Your road logged as you play: distance, time, gold, loot, zones. Told as a story you click through." },
-    { key = "instances", label = "Instances", build = BuildInstances, refresh = RefreshInstances, icon = 134237,
+    { key = "instances", label = "Instance tracker", build = BuildInstanceSettings, refresh = RefreshInstances, icon = 134237,
       status = function() return YR.Option("instanceTrack") end, scope = "Every character on this account",
       desc = "The dungeons and raids you entered this hour and today, against the limits." },
-    { group = "Loot & bags" },
-    { key = "loot", label = "Loot", build = BuildLoot, refresh = QoLRefresh("loot"), icon = 133784,
+    { key = "journey", label = "Journey", build = BuildJourney, refresh = QoLRefresh("journey"), icon = 134939,
+      status = function() return YippRouteDB.journey ~= false or YR.Option("flightTimer") or YR.Option("camp") end,
+      scope = "Every character; each has its own journey",
+      desc = "Your road logged and told as a story, a timer while you fly, and the camp icon." },
+    { group = "Combat" },
+    { key = "swing", label = "Combat bars", build = BuildSwing, refresh = QoLRefresh("swing"), icon = "Interface\\Icons\\INV_Sword_04",
+      status = function() return YR.SwingOn() or YippRouteDB.powerFlashOff == true end, scope = "Every character on this account",
+      desc = "Blizzard's swing bars in a look of your own, and its resource bar without the spend flash." },
+    { key = "trinkets", label = "Trinkets & gear sets", build = BuildTrinkets, refresh = QoLRefresh("trinkets", RefreshTrinkets),
+      icon = 133434, status = function() return YR.Option("trinketBar") or YippRouteDB.trinketAuto == true end,
+      scope = "Every character; the swap order per character",
+      desc = "Trinket buttons, automatic trinket swaps, and key bindings for equipment sets." },
+    { key = "recap", label = "Death recap", build = BuildRecap, refresh = QoLRefresh("recap"), icon = 237274,
+      status = function() return YR.Option("deathRecap") end, scope = "Every character on this account",
+      desc = "What killed you and the hits before it, shown when you die." },
+    { group = "Loot & gear" },
+    { key = "glimmer", label = "Glimmer", build = BuildGlimmer, refresh = QoLRefresh("glimmer"), icon = 136246,
+      status = function() return YR.Option("glimmer") end, scope = "Every character on this account",
+      desc = "Herbs, ore, chests, quest objects and your bobber light up as you walk up to them." },
+    { key = "loot", label = "Loot feed & log", build = BuildLoot, refresh = QoLRefresh("loot"), icon = 133784,
       status = function() return YR.Option("lootFeed") end, scope = "Every character; the log per character",
       desc = "Recent loot as lines on screen, and a log with session totals." },
-    { key = "gear", label = "Gear & rewards", build = BuildGear, refresh = QoLRefresh("gear", RefreshRewards), icon = 132739,
-      status = function() return YR.Option("simTooltip") or YR.Option("upgrades") end, scope = "Every character; quest rewards per class",
-      desc = "Upgrades in your bags pointed out, and quest rewards picked for you." },
-    { key = "bags", label = "Bank & mail", build = BuildBags, refresh = QoLRefresh("bags"), icon = 133633,
-      status = function() return YR.Option("bankAuto") or YR.Option("bankButton") or YR.Option("mailButton") end, scope = "Every character on this account",
-      desc = "Crafting mats and recipes moved to the bank, or mailed to another character." },
-    { key = "vendors", label = "Vendors", build = BuildVendors, refresh = QoLRefresh("vendors"), icon = 133785,
-      status = function() return YR.Option("restock") end, scope = "Every character on this account",
-      desc = "Reagents, ammo and your own list bought back up to the count you keep." },
-    { key = "alts", label = "Characters", build = BuildAlts, refresh = QoLRefresh("alts"), icon = "Interface\\Icons\\INV_Misc_Bag_09",
+    { key = "gear", label = "Upgrades", build = BuildGear, refresh = QoLRefresh("gear"), icon = 132739,
+      status = function() return YR.Option("simTooltip") or YR.Option("upgrades") end, scope = "Every character on this account",
+      desc = "Upgrades in your bags pointed out, and what an item would change for you." },
+    { key = "alts", label = "Other characters", build = BuildAlts, refresh = QoLRefresh("alts"), icon = "Interface\\Icons\\INV_Misc_Bag_09",
       status = function() return YR.Option("alts") end, scope = "Every character on this account",
       desc = "The bags, bank and gold of your other characters." },
     { group = "Social" },
@@ -4562,20 +4842,32 @@ local CATEGORIES = {
       desc = "A chat log to search and copy from, a whisper sound, and fewer buttons beside chat." },
     { key = "group", label = "Group", build = BuildGroup, refresh = QoLRefresh("group"), icon = 134149,
       status = function() return YR.Option("groupBar") or YR.QuestLFGOn() end, scope = "Every character on this account",
-      desc = YR.QuestLFGAvailable and "Invites, quest sharing, and a group finder for your quests." or "Invites and quest sharing." },
+      desc = YR.QuestLFGAvailable and "Invite and Leave buttons, and a group finder for your quests." or "Invite and Leave buttons." },
     { group = "Interface" },
     { key = "windows", label = "Bars & windows", build = BuildWindows, refresh = QoLRefresh("windows"), icon = 136243,
       status = function() return YR.TalentFade() > 0 or YR.Option("talentMove") or YippRouteDB.moveBag == true or YippRouteDB.moveReagentBag == true
-          or YippRouteDB.bagBar ~= nil or YippRouteDB.microMenu ~= nil or YR.Option("skipCinematic")
+          or YippRouteDB.bagBar ~= nil or YippRouteDB.microMenu ~= nil
           or (type(YippRouteDB.windowScale) == "table" and next(YippRouteDB.windowScale) ~= nil) end,
       scope = "Every character on this account",
-      desc = "Blizzard's bag bar and micro menu hidden, its windows moved, scaled or see-through, and cinematics skipped." },
-    { key = "rxpskin", label = "RestedXP", build = BuildRXPSkin, refresh = QoLRefresh("rxpskin"), icon = 134939,
-      status = function() return YR.RXPSkinMode() ~= "off" end, scope = "Every character on this account",
-      desc = "Another look for RestedXP's guide window, with your own accent colour." },
+      desc = "Blizzard's bag bar and micro menu hidden, and its windows moved, scaled or see-through." },
+    { key = "skins", label = "Skins", build = BuildSkins, refresh = QoLRefresh("skins"), icon = 132906,
+      status = function() return YR.DamageSkinMode() ~= "off" or YR.RXPSkinMode() ~= "off" end, scope = "Every character on this account",
+      desc = "Another look for the game's damage meter and for RestedXP's guide window." },
 }
--- Older names for a page ("qol" was the one long page; the skins and the talent window had their own).
-local CATEGORY_ALIAS = { qol = "home", main = "home", start = "home", skins = "rxpskin", talentwin = "windows", death = "recap", characters = "alts" }
+--- The menu's group of each page, for the tests: { [page key] = group name }, "General" for the pages above
+--- the first group (All features has a General group of its own).
+function YR.SettingsMenuGroups()
+    local out, group = {}, "General"
+    for _, t in ipairs(CATEGORIES) do
+        if t.group then group = t.group elseif t.key then out[t.key] = group end
+    end
+    return out
+end
+-- Older names for a page ("qol" was the one long page; the talent window had its own, the two skins and
+-- the camps too).
+local CATEGORY_ALIAS = { qol = "home", main = "home", start = "home", rxpskin = "skins", dmgskin = "skins", camps = "journey",
+    rewards = "quests", invites = "quests",
+    talentwin = "windows", death = "recap", characters = "alts" }
 
 -- A main switch at the top of a side menu: its name, the switch at the right, and what it does when you
 -- point at it. QoL's menu has Quality of life, Levelling's has Routes.
@@ -4651,6 +4943,24 @@ local function PageHead(page)
     desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -5)
     desc:SetPoint("RIGHT", page, "RIGHT", -20, 0)
     desc:SetJustifyH("LEFT")
+    -- Quality of life's own switch - every feature on this tab on or off - on All features only, where
+    -- the scope would be. (It was a row at the top of the menu; the menu was too full, 2026-10-14.)
+    local master = CreateFrame("Frame", nil, page)
+    master:SetSize(170, 26)
+    master:SetPoint("TOPRIGHT", page, "TOPRIGHT", -20, -10)
+    master.switch = S.Switch(master, function() return YR.QoLOn() end, function(on) YR.SetQoLOn(on) YR:RefreshWindow() end)
+    master.switch:SetPoint("RIGHT")
+    master.text = S.Text(master, 13)
+    master.text:SetPoint("RIGHT", master.switch, "LEFT", -10, 0)
+    master.text:SetText("Quality of life")
+    master:EnableMouse(true)
+    master:SetScript("OnEnter", function(self) S.Tip(self, "Turns every feature in this menu off at once. Your settings are kept and"
+        .. " return when you turn it back on. Account-wide. Reload to finish. Also /headstart qol on|off.") end)
+    master:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    master:Hide()
+    ui.masters = ui.masters or {}
+    ui.masters[#ui.masters + 1] = master.switch
+    tourAt.qol = master
     local strip = page:CreateTexture(nil, "BORDER")
     strip:SetPoint("TOPLEFT", 16, -TITLE_H + 4)
     strip:SetPoint("TOPRIGHT", -16, -TITLE_H + 4)
@@ -4664,20 +4974,6 @@ local function PageHead(page)
     local function Mark(row, index)
         for i, chip in ipairs(row) do chip:SetOn(i == index) end
     end
-    -- At the right of the links, on a page whose cards fold: every card opened, or folded again.
-    local allOf, all        -- the page it works on now (its RowPage), and the button
-    local function AllPaint()
-        local shut
-        if allOf then shut = allOf.AnyShut() end
-        all:SetShown(shut ~= nil)
-        if shut ~= nil then all.text:SetText(shut and "Open all" or "Fold all") end
-    end
-    all = S.Chip(page, "Open all", function()
-        if not allOf then return end
-        allOf.FoldAll(allOf.AnyShut() and true or false)
-    end)
-    all:SetPoint("TOPRIGHT", -20, -54)
-    all:Hide()
     -- Which section is at the top of the view now.
     local function AtTop(list)
         local area = list[1].area
@@ -4693,9 +4989,6 @@ local function PageHead(page)
     end
     local function Links(t)
         for _, row in pairs(links) do for _, chip in ipairs(row) do chip:Hide() end end
-        allOf = t.key and qolPages[t.key] and qolPages[t.key].L or nil
-        if allOf then allOf.onFold = AllPaint end
-        AllPaint()
         local list = t.key and settings.sections and settings.sections[t.key]
         if not list or #list < 2 then return end
         local row = links[t.key]
@@ -4759,10 +5052,14 @@ local function PageHead(page)
         icon:SetTexture(t.icon)
         title:SetText(t.label)
         desc:SetText((t.key and not YR.QoLOn())
-            and "|cffffb000Quality of life is off, so nothing on this page is running. Turn it on at the top of the menu.|r"
+            and (t.key == "home" and "|cffffb000Quality of life is off, so none of this is running. Turn it on at the top right.|r"
+                or "|cffffb000Quality of life is off, so nothing on this page is running. Turn it on at the top of All features.|r")
             or (t.desc or ""))
         local scope = type(t.scope) == "function" and t.scope() or t.scope
         scopeText:SetText(scope and ("Saved as you change it\n" .. scope) or "Saved as you change it")
+        master:SetShown(t.key == "home")
+        scopeText:SetShown(t.key ~= "home")
+        desc:SetPoint("RIGHT", page, "RIGHT", t.key == "home" and -200 or -20, 0)     -- (clear of the switch)
         Links(t)
     end
 end
@@ -4771,7 +5068,7 @@ end
 local function BuildSettings(page)
     settings.index = {}
     settings.sections = {}          -- [page key] = { { title, y, area }, ... }, filled as a page is built
-    settings.onJump = { instances = function() if inst.View then inst.View("settings") end end }
+    settings.onJump = {}
     local nav = ui.sideQ
 
     -- Find a setting: every row's name and details, on every page.
@@ -4791,7 +5088,6 @@ local function BuildSettings(page)
         search:ClearFocus()             -- or the keys you move with would go on typing into it
         results:Hide()
         ShowTab(e.key)
-        if e.key == "instances" and inst.View then inst.View("settings") end
         if e.of and e.of.open then e.of.open() end        -- a setting in a folded card: the card opened
         -- a page just built for the search has never been laid out: its length is worked out first
         if e.area.UpdateScrollChildRect then e.area:UpdateScrollChildRect() end
@@ -4844,23 +5140,22 @@ local function BuildSettings(page)
     end
     search = S.Input(nav, { width = NAV_W - 24, placeholder = "Search settings", onChange = Search })
     search:SetPoint("TOPLEFT", 12, -12)
+    tourAt.search = search
     YR.SettingsSearch, YR.SettingsGo = Search, Go      -- for tests
 
-    -- everything on this tab on or off
-    local master = MasterRow(nav, NAV_W, "Quality of life", function() return YR.QoLOn() end, YR.SetQoLOn,
-        "Turns every feature in this menu off at once. Your settings are kept and return when you turn it"
-        .. " back on. Account-wide. Reload to finish. Also /headstart qol on|off.")
-    master:SetPoint("TOPLEFT", 12, -44)
-    local y = -82
+    -- (Quality of life's own switch, everything on this tab on or off, was at the top of this menu; it is
+    -- at the top of All features now - PageHead - and the menu is the pages alone.)
+    local y = -48
     for _, t in ipairs(CATEGORIES) do
         if t.group then
             local g = S.Text(nav, 11, S.C.muted)
-            g:SetPoint("TOPLEFT", 18, y - 9)
+            g:SetPoint("TOPLEFT", 18, y - 8)
             g:SetText(t.group:upper())
-            y = y - 21
+            y = y - 22
         else
             local b = CreateFrame("Button", nil, nav)
-            b:SetSize(NAV_W - 16, 22)         -- (22 high: with the Journey page the menu would not end inside the window at 23)
+            -- (21 high, a group's name 22 with room above it: six groups and General, and the menu ends inside the window)
+            b:SetSize(NAV_W - 16, 21)
             b:SetPoint("TOPLEFT", 8, y)
             b.bg = S.Fill(b, { 0, 0, 0, 0 })
             b.bar = b:CreateTexture(nil, "ARTWORK")
@@ -4901,7 +5196,8 @@ local function BuildSettings(page)
             b:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end end)
             b:SetScript("OnClick", function() search:SetValue("") search:ClearFocus() results:Hide() ShowTab(t.key) end)
             t.button = b
-            y = y - 22
+            tourAt["menu:" .. t.key] = b
+            y = y - 21
         end
     end
 
@@ -4921,14 +5217,15 @@ local function BuildSettings(page)
     reload:SetPoint("BOTTOMLEFT", 16, 14)
     local close = S.Button(page, "Close", function() win:Hide() end, nil, 110)
     close:SetPoint("BOTTOMRIGHT", -16, 14)
-    -- (how much of Headstart a new install wants is asked by the welcome window: Welcome.lua)
-    local welcome = S.Button(page, "Welcome", function() YR.WelcomeShow() end, nil, 110)
+    -- (a new install is shown around by the tour, hints over this window: Welcome.lua)
+    local welcome = S.Button(page, "Tour", function() YR.WelcomeShow() end, nil, 110)
     welcome:SetPoint("RIGHT", close, "LEFT", -8, 0)     -- (pages have buttons of their own beside Reload UI)
-    welcome.tip = "Opens the welcome window: choose how much of Headstart you want in four questions"
+    welcome.tip = "A quick look around this window: where everything is, a hint at a time"
     local arrange = S.Button(page, "Arrange", function()
         if YR.ArrangeOpen() then win:Hide() end
     end, nil, 110)
     arrange:SetPoint("RIGHT", welcome, "LEFT", -8, 0)
+    tourAt.arrange = arrange
     arrange.tip = "Move Headstart's bars, buttons and icons on a grid: drag them, or click one and use the arrow keys. Also /hs move"
     local move = S.Button(page, "Move settings", function() YR.TransferShow() end, nil, 130)
     move:SetPoint("RIGHT", arrange, "LEFT", -8, 0)
@@ -5058,7 +5355,11 @@ local function RefreshSetupPage()
     setupTab.inner:SetShown(on)
     setupTab.off:SetShown(not on)
     setupTab.off:Refresh()
-    if on then RefreshSetup() end
+    if on then
+        -- this character's bars and macros kept for good, the first time Character setup is looked at here
+        if YR.Setup and YR.Setup.KeepFirst then YR.Setup.KeepFirst() end
+        RefreshSetup()
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -5301,6 +5602,7 @@ local function Build()
         function() Show(lastLevelling or ((YR.RoutesOn() and #YR.shipped > 0) and "routes" or "route")) end,
         function() Show("settings") end, function() Show("setup") end)
     win.subtitle:SetPoint("RIGHT", track, "LEFT", -16, 0)
+    tourAt.setup, tourAt.levelling = ui.topTabs.setup, ui.topTabs.levelling
     win.subtitle:SetJustifyH("LEFT")
     win.subtitle:SetWordWrap(false)
     -- One menu down the left per tab: Levelling's (SIDE wide), QoL's (NAV_W wide, BuildSettings fills it).

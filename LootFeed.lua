@@ -402,7 +402,7 @@ local function BuildWindow()
     if win then return end
     local S = YR.Style
     win = S.Window("HeadstartLootLogWindow", 620, 500, "Loot log")
-    win:SetFrameStrata("HIGH")
+    -- (the windows' own layer, as Headstart's window: a layer under it, it opened under the settings)
     win.sum = {}
     local labels = { "Money looted", "Vendor value of items", "Money and value an hour", "Experience", "Experience an hour", "Items" }
     for i, label in ipairs(labels) do

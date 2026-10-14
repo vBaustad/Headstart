@@ -152,6 +152,14 @@ def run():
           f"the chat window gets its last lines back, oldest first, and a line where the old text ends ({len(back)})")
     check(lua.eval("rawget(ChatFrame3, 'said')") is None and YR2.ChatLogCount() == 201,
           "a window with nothing kept gets nothing, and what was put back isn't kept a second time")
+    # Leatrix Plus puts chat back after a reload too: ours doesn't, or every line would be there twice
+    lua.execute("""LeaPlusDB = { RestoreChatMessages = 'On' } C_AddOns = C_AddOns or {}
+        KEPT_LOADED = C_AddOns.IsAddOnLoaded C_AddOns.IsAddOnLoaded = function(n) return n == 'Leatrix_Plus' end""")
+    YR2.EllesmereForget()
+    check(YR2.ChatLogRestore() == 0 and YR2.OtherHas("chatRestore") == "Leatrix Plus",
+          "Leatrix Plus's Restore chat messages on: ours puts nothing back (every line would be there twice)")
+    lua.execute("LeaPlusDB = nil C_AddOns.IsAddOnLoaded = KEPT_LOADED")
+    YR2.EllesmereForget()
     lua.execute("""ChatFrame1:AddMessage("hello again")""")
     kinds = [YR2.ChatLogLine(i)[2] for i in (200, 201, 202)]
     check(YR2.ChatLogCount() == 202 and kinds == [1, 0, 1], f"the next session: the old lines, a mark where it began, then the new ({kinds})")

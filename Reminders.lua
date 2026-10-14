@@ -315,6 +315,7 @@ end
 
 local function CheckDurability(cameToTown)
     if not YR.Option("durability") then return end
+    if YR.WelcomeHolds and YR.WelcomeHolds() then return end     -- (said once the welcome is answered: Greet)
     local low = YR.LowestDurability()
     if not low then return end
     local line = YippRouteDB.durWarn or DUR_WARN
@@ -446,5 +447,6 @@ function YR.StartReminders()
     YR.Part(function() return YR.Option("durability") end, { "UPDATE_INVENTORY_DURABILITY", "PLAYER_UPDATE_RESTING" }, OnWear,
         { start = function() resting = IsResting and IsResting() end })
     YR.Part(function() return YR.Option("remindTrainer") end, { "TRAINER_SHOW" }, ReadTrainer)
-    YR.Part(AtLogin, nil, nil, { start = function() C_Timer.After(8, Greet) end })
+    -- (on a new install's first login, after the welcome is answered: YR.AfterWelcome, Core.lua)
+    YR.Part(AtLogin, nil, nil, { start = function() C_Timer.After(8, function() YR.AfterWelcome(Greet) end) end })
 end

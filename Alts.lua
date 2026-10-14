@@ -598,7 +598,7 @@ local function Build()
     if win then return end
     local S = YR.Style
     win = S.Window("HeadstartAltsWindow", W, H, "Characters")
-    win:SetFrameStrata("HIGH")
+    -- (the windows' own layer, as Headstart's window: a layer under it, it opened under the settings)
     win.left = S.ScrollArea(win, LEFT, H - 48 - 28)
     win.left:SetPoint("TOPLEFT", 12, -60)
     local rule = win:CreateTexture(nil, "BORDER")
