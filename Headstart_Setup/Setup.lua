@@ -324,13 +324,19 @@ function YS.UIBehind()
     return true, from, scanned
 end
 
---- This character's screen saved into its interface, quietly, when something on it changed. Returns
---- whether it was. The first look after an interface was put on only notes how the screen reads.
+--- This character's screen saved into its interface, quietly, when something on it changed - on the
+--- character it was saved on, and no other. Returns whether it was. The first look after an interface was
+--- put on only notes how the screen reads.
+---   One writer (the owner, 2026-10-15): with every character on it saving its own changes, each login
+---   on another was asked to take them, and taking them made that one's next change the one to ask
+---   about - round and round. The others take its changes (YS.UICatchUp); Save interface on one of them
+---   makes that one the writer instead (it asks first).
 function YS.FollowUI()
     YS.FollowClassUI()
     local c = Char()
     if not (c and YS.UIOn() and YS.UIFollows()) or InCombatLockdown() then return false end
     if YS.UIBehind() then return false end
+    if select(2, YS.UIRecord(c.iface.name)) ~= YS.PlayerKey() then return false end
     -- just put on, and not looked at since: a reload usually comes first, and the screen as it is in
     -- between is not what the player made (noted at the next login, UISettle)
     if c.iface.fresh then return false end
@@ -484,6 +490,7 @@ function YS:ApplyInterface()
         YippSetupCharDB.uiBackup = kept
     end
     kept.last = time()
+    YS.KeepFirst()                  -- (this character as it was, if nothing of Headstart's was looked at here before)
     YS.UIApplied()
     YS:ApplyUI(ui, YS:Options())
     if YR.RefreshWindow then YR:RefreshWindow() end
@@ -1317,6 +1324,7 @@ local function Backup()
         for i = #c.older, OLDER + 1, -1 do c.older[i] = nil end
     end
     c.backup = b
+    if not c.first then YS.KeepFirst() end
     if not c.first then c.first = Copy(b) end
     return b
 end
@@ -1327,10 +1335,15 @@ end
 --- bars - but nobody knew there was such a copy before trying the planner (the owner, 2026-10-14: "the
 --- first time they go to a character, save, so if they move something and press Apply they lose
 --- nothing"). Returns whether it kept them now.
+---   The interface is kept with them (ui, as Save interface reads it: game settings, graphics and sound, key
+---   bindings, which bars show, the Edit Mode layout, the chat windows, RestedXP's windows): Put back
+---   everything (YS.PutBackEverything) puts this character's own back, not only what an undo step kept.
 function YS.KeepFirst()
     local c = YippSetupCharDB
     if type(c) ~= "table" or c.first or InCombatLockdown() then return false end
-    c.first = { at = time(), slots = (YS.ReadBars(true)), macros = CharacterMacros(),
+    local okUI, ui = false, nil
+    if YS.ScanUI then okUI, ui = pcall(YS.ScanUI, YS) end
+    c.first = { at = time(), slots = (YS.ReadBars(true)), macros = CharacterMacros(), ui = okUI and ui or nil,
         was = { applied = c.applied, layout = c.layout, placed = c.placed and Copy(c.placed) or nil, onLayout = c.layoutName or false } }
     return true
 end
@@ -1564,7 +1577,12 @@ function YS:Apply(force, only, how)
     end
     YippSetupCharDB.hold = nil
     if full then YS.Hold("the macro list was full, so not every button is on") end
-    if only or how.barsOnly then return true, full end
+    -- Headstart's window says where this character stands ("Not on this character yet"): told now, as
+    -- the bars went on - not only when Apply was pressed, which was before its question was answered
+    if only or how.barsOnly then
+        if YR.RefreshWindow then YR:RefreshWindow() end
+        return true, full
+    end
     YS.UIApplied()
     YS:ApplyUI(YS:SharedUI(), o)
     -- the copy kept for good was taken before the interface went on: the game settings and keys that
@@ -1574,6 +1592,7 @@ function YS:Apply(force, only, how)
         if c.first.cvars == nil and c.backup.cvars then c.first.cvars = Copy(c.backup.cvars) end
         if c.first.keys == nil and c.backup.keys then c.first.keys = Copy(c.backup.keys) end
     end
+    if YR.RefreshWindow then YR:RefreshWindow() end
     return true, full
 end
 
@@ -1596,6 +1615,7 @@ local function PutBack(cvars)
     end
     return n
 end
+YS.PutBackCVars = PutBack
 
 function YS:Undo(first, bars)
     if InCombatLockdown() then Print("can't change action bars in combat.") return end
@@ -1704,6 +1724,50 @@ function YS:Undo(first, bars)
         c.backup and " /ysetup undo again goes a step further back." or (not first and c.first)
             and " /ysetup undo first puts the bars back as they were before Headstart changed anything." or ""))
     if YR.RefreshWindow then YR:RefreshWindow() end
+    return true
+end
+
+--- Everything Character setup changed on this character put back as it was before its first change (the
+--- copy kept first, YS.KeepFirst): the bars and macros where Headstart put any on, and the interface where
+--- one was put on here. What it never changed is left alone - bars it never touched are not cleared and
+--- put back (an addon can't place a mount or a toy), nor your own game settings changed since. Returns
+--- false where it couldn't (a fight; the macros to make again don't fit): then nothing was changed.
+function YS.PutBackEverything()
+    if InCombatLockdown() then Print("can't put things back in a fight.") return false end
+    local c = YippSetupCharDB
+    local first = type(c) == "table" and c.first
+    -- (an apply, the planner, a switch of profile: each kept an undo step, or left the character set up)
+    local bars = first and (c.applied ~= nil or c.backup ~= nil)
+    local ui = first and (c.uiTouched or c.uiBackup ~= nil or (type(c.iface) == "table" and c.iface.seen ~= nil))
+    if not (bars or ui) then
+        Print("nothing to put back here: Character setup hasn't changed this character.")
+        return true
+    end
+    if bars and not YS:Undo(true) then return false end
+    if ui then
+        if type(first.ui) == "table" and YS.PutBackUI then
+            YS.PutBackUI(first.ui)
+        else
+            -- kept before the first copy held the interface (Headstart before 0.10.0-beta7): what the undo
+            -- copies hold, the game settings and keys an apply changed
+            local cvars, keys = {}, nil
+            for _, b in ipairs({ c.uiBackup, first }) do
+                if type(b) == "table" then
+                    for name, v in pairs(type(b.cvars) == "table" and b.cvars or {}) do if cvars[name] == nil then cvars[name] = v end end
+                    keys = keys or b.keys
+                end
+            end
+            local n = PutBack(cvars)
+            if keys and YS.ApplyKeys then YS.ApplyKeys(keys) end
+            Print(("put back %d game settings%s. Its chat windows and Edit Mode layout weren't kept before they were changed"
+                .. " (an older Headstart did that): set those as you want them."):format(n, keys and " and your key bindings" or ""))
+        end
+        c.uiBackup, c.uiTouched = nil, nil
+        -- (no longer on the shared interface: nothing of it is put on here again unless asked)
+        if type(c.iface) == "table" then c.iface = { name = c.iface.name } end
+    end
+    if YR.RefreshWindow then YR:RefreshWindow() end
+    return true
 end
 
 -- A spell just learned: its placeholder macro is swapped for the spell itself and then deleted; a
@@ -1989,15 +2053,22 @@ local function FirstTimeHere()
     YS:Toggle()
 end
 
--- A character on an interface that was saved on another character since: the window, asking which.
+-- A character on an interface that was saved again on its own character since: the change put on here
+-- too, at login, and said in chat. It asked, at every login of every other character, which was a
+-- nuisance (the owner, 2026-10-15) - and "Keep it up to date" on is the answer already. Off, nothing
+-- is put on by itself: Apply interface does it.
 local function ChangedElsewhere()
     if not YS.UIFollows() or not YS.UIBehind() or (window and window:IsShown()) then return end
     if InCombatLockdown() or InCinematic() or not UIParent:IsShown() then
         C_Timer.After(5, ChangedElsewhere)
         return
     end
-    YS:Toggle()
+    local _, by, at = YS.UIBehind()
+    Print(("interface %s was changed on %s, %s: put on here too (Keep it up to date, on Character setup's Interface tab)."):format(
+        YS.UIName(), tostring(by or "another character"), Ago(at)))
+    YS:ApplyInterface()
 end
+YS.UICatchUp = ChangedElsewhere
 
 -- The intro cinematic (or movie) a new character logs in to: cancelled at once while level 1, when
 -- Headstart's Skip cinematics is on (Cinematic.lua). It can start before we load, so the first login

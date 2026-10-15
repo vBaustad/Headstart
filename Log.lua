@@ -392,7 +392,7 @@ function YR.DeleteLog(key)
 end
 
 --- How old a run log may get, in days of its character not being played: 30 unless you set another
---- number, 0 for never (Headstart, Levelling, Route settings).
+--- number, 0 for never (Headstart, Levelling, Settings).
 function YR.LogKeepDays()
     local days = tonumber(YippRouteDB.logKeepDays)
     return days and math.max(0, days) or 30
@@ -468,7 +468,7 @@ local function Tidy()
     end
     local pruned = YR.PruneLogs(YR.LogKeepDays())
     if pruned > 0 then
-        YR.Print(("deleted the run logs of %d character%s not played for %d days (kept: the fastest runs and any a route of yours was saved from). Headstart, Levelling, Route settings sets the days; 0 keeps them all."):format(pruned,
+        YR.Print(("deleted the run logs of %d character%s not played for %d days (kept: the fastest runs and any a route of yours was saved from). Headstart, Levelling, Settings sets the days; 0 keeps them all."):format(pruned,
             pruned == 1 and "" or "s", YR.LogKeepDays()))
     end
     if not YippRouteDB.trackSlimmed and next(YippRouteDB.runs) then

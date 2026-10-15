@@ -1901,6 +1901,39 @@ end
 -- ---------------------------------------------------------------------------
 local setup = { controls = {} }
 
+-- A row in a menu down the left, as Quality of life's menu has them: its icon, its name, the one picked lit
+-- in the accent with a bar at its edge.
+local function SideItem(parent, icon, label, onClick)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(NAV_W - 16, 21)
+    b.bg = S.Fill(b, { 0, 0, 0, 0 })
+    b.bar = b:CreateTexture(nil, "ARTWORK")
+    b.bar:SetPoint("TOPLEFT") b.bar:SetPoint("BOTTOMLEFT") b.bar:SetWidth(2)
+    S.Set(b.bar, S.C.accent)
+    b.bar:Hide()
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetSize(20, 20)
+    b.icon:SetPoint("LEFT", 10, 0)
+    b.icon:SetTexture(icon)
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b.text = S.Text(b, 13, S.C.sub)
+    b.text:SetPoint("LEFT", 38, 0)
+    b.text:SetText(label)
+    function b:Select(on)
+        self.selected = on
+        self.bg:SetColorTexture(unpack(on and S.C.accentD or { 0, 0, 0, 0 }))
+        self.bar:SetShown(on)
+        self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
+        self.icon:SetDesaturated(not on)
+        self.icon:SetAlpha(on and 1 or 0.8)
+    end
+    b:SetScript("OnEnter", function(self) if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end end)
+    b:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end end)
+    b:SetScript("OnClick", onClick)
+    b:Select(false)
+    return b
+end
+
 local function BuildSetup(page)
     local YS = YR.Setup
     local o = function() return YS:Options(ViewClass()) end
@@ -1965,7 +1998,8 @@ local function BuildSetup(page)
         elseif YS.UIOn() and YS.UIBehind() then
             text, gold = "Saved again on another character since it was put on here. Apply to take the change.", true
         elseif YS.UIOn() then
-            text = "On this character."
+            text = YS.UIFollows() and ("On this character. Changes saved on %s are put on here when you log in."):format(
+                tostring(YS.UISource() or "the character it was saved on")) or "On this character."
         else
             text, gold = "Not on this character yet. Apply asks first; game settings and keys can be undone.", true
         end
@@ -2003,23 +2037,25 @@ local function BuildSetup(page)
         t:SetWordWrap(false)
     end
 
-    -- Four short pages instead of one long one.
-    local TABS = { { "profiles", "Profiles" }, { "bars", "Bars" }, { "interface", "Interface" }, { "new", "New characters" } }
-    local tabs, chips = {}, {}
+    -- Four short pages instead of one long one, picked in the menu on the left as Quality of life's pages are
+    -- (they were chips above the page, and the menu side held a paragraph of text).
+    local TABS = { { "profiles", "Profiles", 134166 }, { "bars", "Bars", 133742 }, { "interface", "Interface", 134063 },
+        { "new", "New characters", 135955 } }
+    local tabs, rows = {}, {}
     local function ShowTab(key)
         setup.tab = key
         for k, f in pairs(tabs) do f:SetShown(k == key) end
-        for k, c in pairs(chips) do c:SetOn(k == key) end
+        for k, r in pairs(rows) do r:Select(k == key) end
     end
-    local prev
-    for _, t in ipairs(TABS) do
+    setup.nav = CreateFrame("Frame", nil, ui.sideS)
+    setup.nav:SetPoint("TOPLEFT", 0, -56)
+    setup.nav:SetSize(NAV_W, #TABS * 23)
+    for i, t in ipairs(TABS) do
         local key = t[1]
-        local chip = S.Chip(page, t[2], function() ShowTab(key) end)
-        if prev then chip:SetPoint("LEFT", prev, "RIGHT", 6, 0) else chip:SetPoint("TOPLEFT", 16, -152) end
-        prev = chip
-        chips[key] = chip
+        rows[key] = SideItem(setup.nav, t[3], t[2], function() ShowTab(key) end)
+        rows[key]:SetPoint("TOPLEFT", 8, -(i - 1) * 23)
         local f = CreateFrame("Frame", nil, page)
-        f:SetPoint("TOPLEFT", 0, -180)
+        f:SetPoint("TOPLEFT", 0, -152)
         f:SetPoint("BOTTOMRIGHT")
         tabs[key] = f
     end
@@ -2097,9 +2133,9 @@ local function BuildSetup(page)
         if Mine() then YS.SetProfileOwnUI(on) end
         YR:RefreshWindow()
     end)
-    Row("Include interface", ownUI, "Also saves this profile's Edit Mode layout, which extra bars are shown, and RestedXP's window"
-        .. " positions, and restores them when you switch to it. Off: switching profile only changes your"
-        .. " bars. For a separate screen layout, create a layout in Edit Mode first, then turn this on.")
+    Row("Include interface", ownUI, "Remembers which Edit Mode layout is on, which extra bars show and where RestedXP's windows"
+        .. " are, and puts them back when you switch to this profile. It remembers which layout, not what is in it: give each"
+        .. " profile its own layout in Edit Mode first. Off: switching profile only changes your bars.")
     Row("Save bar changes automatically", S.Switch(L.c, function() return YS.Remembers() end, function(on)
         if on then YippSetupDB.remember = nil else YippSetupDB.remember = false end
         YR:RefreshWindow()
@@ -2172,6 +2208,9 @@ local function BuildSetup(page)
         .. " that are empty in the profile leave yours alone.")
     Row("Delete old character macros", Sw("clearMacros"), "Deletes this character's own macros before applying. Account macros and AutoFeed's are never"
         .. " touched.")
+
+    -- (the three ways back sat at the end of "Before applying", where nobody looked for them)
+    Section("Put back", "undo what Headstart changed here", { find = "undo revert reset restore remove before headstart", icon = 134376 })
     local undo = S.Button(L.c, "Undo", function() YS:Undo() end, nil, 90)
     function undo:Refresh()
         local char = _G.YippSetupCharDB          -- this character's saved table (Setup.lua fills it at login)
@@ -2187,10 +2226,14 @@ local function BuildSetup(page)
     end
     Row("Bars before Headstart", before, "Puts this character's bars and macros back as they were the first time you opened"
         .. " Character setup on it, whatever was applied since. That copy is kept for good. Also /ysetup undo first")
+    Row("Everything before Headstart", S.Button(L.c, "Put back...", function() YR.AskPutBack() end, nil, 110),
+        "Puts back everything Headstart changed: this character's bars, macros, key bindings, game settings, Edit Mode layout"
+        .. " and chat windows as they were before its first change, and turns quality of life and Character setup off. Asks"
+        .. " first. Also on the General page, and /headstart putback")
 
     -- ------------------------------------------------------------------ Interface
     Page("interface")
-    Section("Interface", "chat, Edit Mode and game settings, shared by all classes", { icon = 134063 })
+    Section("Interface", "chat, Edit Mode and game settings, shared by every class", { icon = 134063 })
     local function UINames()
         local out = {}
         for _, name in ipairs(YS.UINames()) do out[#out + 1] = { name, name } end
@@ -2239,12 +2282,15 @@ local function BuildSetup(page)
     Row("Delete interface", uiDel, "Deletes the interface this character uses. Asks first. The one new characters get can't be deleted.")
     Row("Keep it up to date", S.Switch(L.c, function() return YS.UIFollows() end, function(on)
         if on then _G.YippSetupDB.uiFollow = nil else _G.YippSetupDB.uiFollow = false end
-    end), "Saves the interface again when you change something on a character that uses it: when you leave Edit Mode"
-        .. " and when you log out. The other characters on it are asked whether to take the change at their next login.")
+    end), "Saves the interface again when you change something on the character it was saved on: when you leave Edit"
+        .. " Mode and when you log out. The other characters on it take the change at their next login and say so in chat."
+        .. " To make another character's screen the saved one, use Save interface there. Off: each keeps what it has until"
+        .. " you Apply interface there.")
 
     Section("What Apply interface brings", "for every character", { icon = 134063 })
     Row("Game settings", Sw("settings"), "What the Options window's own pages set: controls, mouse and camera, combat, names and nameplates,"
-        .. " raid frames, social, map coordinates, accessibility. Not the language, the network or which help tips you have seen.")
+        .. " raid frames, social, map coordinates, accessibility. Not the language, the network or which help tips you have seen."
+        .. " The resource display and the swing timer go on the first time only: after that they are the character's own.")
     Row("Key bindings", Sw("keys"), "Your keys as they were where the interface was saved, action by action - a default you took off"
         .. " stays off. Saved as the game saves them (the account's, unless you use character-specific bindings). /ysetup undo"
         .. " puts back the keys you had. An interface saved before this was added has none: press Save interface once.")
@@ -2474,6 +2520,24 @@ local function RoadSections(L, c, Section, Row, Opt)
             "Shows where you fly from and to, and the time left. A flight is timed the first time you take"
             .. " it. Before that the bar uses RestedXP's time or an estimate. Drag the bar to move it."
             .. " /headstart flight shows a sample.")
+
+        Section("Boat timer", "when the boat at your dock leaves", { find = "boat zeppelin ship ferry dock schedule nauticus",
+            icon = 134440, master = { Opt("boatTimer"), function(on) YippRouteDB.boatTimer = on YR.BoatTimerApply() end } })
+        Row("About the boat timer", S.Text(c, 12, S.C.muted),
+            "At a dock or a zeppelin tower: when the boat there gets in and leaves, and on board when it arrives. The"
+            .. " times are Headstart's own timetable, kept right by what Headstart players see as they ride: each tells"
+            .. " the others in guild and group when a boat left or got in, whether they show this timer or not."
+            .. " Shift-drag the timer to move it.")
+        Row("On the world map", S.Switch(c, function() return YippRouteDB.boatMap ~= false end, function(on)
+            YippRouteDB.boatMap = (not on) and false or nil
+            YR.BoatTimerApply()
+        end), "Your side's boats and zeppelins on the world map, plus the Ratchet boat, each where it is now. Point"
+            .. " at one for where it is bound and when it gets in.")
+        local horde = UnitFactionGroup("player") == "Horde"
+        Row(horde and "Alliance boats too" or "Horde zeppelins too", S.Switch(c, function() return YippRouteDB.boatMapOther == true end, function(on)
+            YippRouteDB.boatMapOther = on or nil
+            YR.BoatTimerApply()
+        end), horde and "Shows the Alliance's boats on the world map as well." or "Shows the Horde's zeppelins on the world map as well.")
 
         Section("Camp icon", "lit near a camp, or while its buff runs", { find = "campfire", icon = 135805, master = { Opt("camp"), YR.SetCampIcon } })
         Row("Show the camp's buffs", S.Switch(c, Opt("campList"), YR.SetCampList),
@@ -3042,7 +3106,7 @@ local BuildQuests = QoLPage("quests", function(L, c, Section, Row, Opt)
         Row("Share quests I accept", S.Switch(c, function() return YippRouteDB.shareAll == true end,
             function(on) YippRouteDB.shareAll = on end),
             "Shares every quest you accept from an NPC with your party. Off: only quests from a route are"
-            .. " shared (Route settings, Group play).")
+            .. " shared (Levelling, Settings, Group play).")
         local FROM = { { "friends", "Guildies and friends" }, { "party", "Anyone in my party" }, { "off", "Nobody" } }
         local from
         from = S.Dropdown(c, 190, FROM, function(v) YippRouteDB.acceptFrom = v from:Refresh() end)
@@ -4411,6 +4475,13 @@ local BuildGeneral = QoLPage("general", function(L, c, Section, Row, Opt)
         Row("Accent colour", accent, "The colour of Headstart's windows: their edges, switches and buttons. A new one shows after"
             .. " Reload UI.")
         Row("", note)
+
+        Section("Put back everything", "your screen as it was before Headstart", { find = "undo revert reset restore uninstall remove put back",
+            icon = 134520 })
+        Row("Put back everything Headstart changed", S.Button(c, "Put back...", function() YR.AskPutBack() end, nil, 110),
+            "Turns quality of life and Character setup off, and puts this character's bars, macros, key bindings, game settings,"
+            .. " Edit Mode layout and chat windows back as they were before Headstart first changed them. Asks first. Also"
+            .. " /headstart putback")
 end)
 
 local function QoLRefresh(key, extra)
@@ -4490,6 +4561,8 @@ local function HomeFeatures()
                 function(on) if on then YippRouteDB.journey = nil else YippRouteDB.journey = false end YR.ApplyParts() end),
             F(132239, "Flight timer", "Time left while you fly.", "journey", "Flight timer",
                 Toggle("flightTimer", function(on) YR:SetFlightTimer(on) end)),
+            F(134440, "Boat timer", "When the boat at your dock leaves.", "journey", "Boat timer",
+                Toggle("boatTimer", function() YR.BoatTimerApply() end)),
             F(135805, "Camp icon", "Lit near a camp, or while its buff runs.", "journey", "Camp icon",
                 Toggle("camp", function(on) YR.SetCampIcon(on) end)),
         },
@@ -4781,7 +4854,7 @@ local CATEGORIES = {
       desc = "Everything Headstart does. Switch a feature on here; click its card for the settings." },
     { key = "general", label = "General", build = BuildGeneral, refresh = QoLRefresh("general"), icon = 134064,
       status = function() return YR.Option("skipCinematic") end, scope = "Every character on this account",
-      desc = "Cinematics skipped, Headstart's minimap button, and the colour of its windows." },
+      desc = "Cinematics skipped, Headstart's minimap button, the colour of its windows, and putting everything back." },
     { group = "Automation" },
     { key = "trainer", label = "Class trainer", build = BuildTrainer, refresh = function() trainer.refresh() end, icon = 133741,
       status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
@@ -4808,12 +4881,12 @@ local CATEGORIES = {
       status = function() return YR.Option("instanceTrack") end, scope = "Every character on this account",
       desc = "The dungeons and raids you entered this hour and today, against the limits." },
     { key = "journey", label = "Journey", build = BuildJourney, refresh = QoLRefresh("journey"), icon = 134939,
-      status = function() return YippRouteDB.journey ~= false or YR.Option("flightTimer") or YR.Option("camp") end,
+      status = function() return YippRouteDB.journey ~= false or YR.Option("flightTimer") or YR.Option("camp") or YR.Option("boatTimer") end,
       scope = "Every character; each has its own journey",
       desc = "Your road logged and told as a story, a timer while you fly, and the camp icon." },
     { group = "Combat" },
     { key = "swing", label = "Combat bars", build = BuildSwing, refresh = QoLRefresh("swing"), icon = "Interface\\Icons\\INV_Sword_04",
-      status = function() return YR.SwingOn() or YippRouteDB.powerFlashOff == true end, scope = "Every character on this account",
+      status = function() return YR.SwingOn() or YippRouteDB.powerFlashOff == true end, scope = "Which bars show per character; the look for all",
       desc = "Blizzard's swing bars in a look of your own, and its resource bar without the spend flash." },
     { key = "trinkets", label = "Trinkets & gear sets", build = BuildTrinkets, refresh = QoLRefresh("trinkets", RefreshTrinkets),
       icon = 133434, status = function() return YR.Option("trinketBar") or YippRouteDB.trinketAuto == true end,
@@ -5353,6 +5426,7 @@ local function RefreshSetupPage()
     end
     setupTab.head(SETUP_PAGE)
     setupTab.inner:SetShown(on)
+    if setup.nav then setup.nav:SetShown(on) end
     setupTab.off:SetShown(not on)
     setupTab.off:Refresh()
     if on then
@@ -5375,7 +5449,9 @@ local PAGES = {
       build = BuildRun, refresh = RefreshRun },
     { key = "share", tab = "levelling", nav = true, label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,
       refresh = function() win.subtitle:SetText("") end },
-    { key = "route", tab = "levelling", nav = true, label = "Route settings", icon = 134269, build = BuildRoutePage,
+    -- (the menu says Settings: under the Levelling tab it can be no other's - the owner, 2026-10-15; the page's
+    -- heading still says Route settings)
+    { key = "route", tab = "levelling", nav = true, label = "Settings", icon = 134269, build = BuildRoutePage,
       refresh = RefreshRoutePage },
     { key = "routesoff", tab = "levelling", build = BuildRoutesOff, refresh = function() win.subtitle:SetText("") routesOff:Refresh() end },
     { key = "settings", tab = "qol", build = BuildSettings, refresh = RefreshSettings },
@@ -5626,15 +5702,38 @@ local function Build()
         "On: the bar planner, and a main's bars, macros and interface on a new character. Off: none of it is"
         .. " loaded, and nothing is ever placed on your bars for you. For the whole account")
     setupRow:SetPoint("TOPLEFT", 12, -12)
-    local setupSays = S.Text(ui.sideS, 12, S.C.muted)
-    setupSays:SetPoint("TOPLEFT", 16, -58)
-    setupSays:SetWidth(NAV_W - 32)
-    setupSays:SetWordWrap(true)
-    setupSays:SetJustifyV("TOP")
-    setupSays:SetSpacing(3)
-    setupSays:SetText("Each class has its own bar profiles."
-        .. "\n\nThe interface (chat windows, Edit Mode, game settings) is shared by all classes."
-        .. "\n\n/headstart plan opens the bar planner.")
+    -- whose each thing is (the owner, 2026-10-15: say it where Character setup is), under its menu (Editor's
+    -- BuildSetup puts the menu between this and the switch)
+    local whose = S.Text(ui.sideS, 11, S.C.muted)
+    whose:SetPoint("TOPLEFT", 18, -170)
+    whose:SetText("WHOSE IS WHAT")
+    -- (each at its own place, with room for the lines it has: not hung under the one above, whose height
+    -- is its lines' only once the game has drawn it)
+    local y = -194
+    for _, w in ipairs({
+        { 133742, "Bars", "Each class has its own profiles.", 1 },
+        { 134063, "Interface", "Shared. Kept up to date by the character it was saved on; the others take its changes at login.", 3 },
+        { 132288, "Each character's own", "Resource display, swing timer (a new one starts with its class's) and which combat bars show.", 3 },
+    }) do
+        local icon = ui.sideS:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(16, 16)
+        icon:SetPoint("TOPLEFT", 18, y)
+        icon:SetTexture(w[1])
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        local title = S.Text(ui.sideS, 12, S.C.sub)
+        title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 6, -1)
+        title:SetText(w[2])
+        local line = S.Text(ui.sideS, 11, S.C.muted)
+        line:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
+        line:SetWidth(NAV_W - 18 - 22 - 12)
+        line:SetWordWrap(true)
+        line:SetJustifyH("LEFT")
+        line:SetSpacing(2)
+        line:SetHeight(w[4] * 15)
+        line:SetJustifyV("TOP")
+        line:SetText(w[3])
+        y = y - 18 - w[4] * 15 - 10
+    end
     pages = {}
     ui.routeTabs = {}
     -- The routes switch, Levelling's pages, then every route in a list that scrolls (more routes than room)

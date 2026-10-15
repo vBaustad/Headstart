@@ -253,6 +253,7 @@ function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true,
     groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true,
     deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true, glimmer = true, instanceTrack = true,
+    boatTimer = true,
     bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
 YR.STARTS_OFF = STARTS_OFF
 
@@ -435,6 +436,44 @@ function YR.SetSetupOn(on)
         YR.Print("Character setup off: /reload to take it out of memory. Nothing more is placed on your bars.")
     end
 end
+-- Put back everything Headstart changed (General page, Character setup, /headstart putback), for whoever
+-- fears for the screen they had (the owner, 2026-10-15): Character setup puts this character's bars, macros
+-- and interface back as they were before its first change (Headstart_Setup, YS.PutBackEverything), then
+-- quality of life and Character setup go off - each feature puts back what it changed as it goes off.
+-- The levelling routes stay: they change nothing on the screen. Asked first.
+function YR.PutBackEverything()
+    if InCombatLockdown() then YR.Print("not in a fight: put it back when the fight is over.") return false end
+    local c = YippSetupCharDB
+    if type(c) == "table" and c.first then
+        -- (Character setup may be off, and its addon not loaded: what it changed is still its to put back)
+        if not (YR.LoadSetup(true) and YR.Setup.PutBackEverything) then return false end
+        if YR.Setup.PutBackEverything() == false then return false end      -- (it said why; nothing is changed)
+    end
+    YR.SetSetupOn(false)
+    YR.SetQoLOn(false)
+    YR.Print("put back: quality of life and Character setup are off. The levelling routes stay (Levelling tab).")
+    if YR.RefreshWindow then YR:RefreshWindow() end
+    return true
+end
+
+-- (the question made the first time it is asked)
+local PUTBACK = {
+    text = "Headstart: put back everything it changed?\n\nQuality of life and Character setup go off, and each feature puts"
+        .. " back what it changed. On this character, the bars, macros, key bindings, game settings, Edit Mode layout and"
+        .. " chat windows go back to how they were before Headstart first changed them (an addon can't place mounts or"
+        .. " toys on bars).\n\nOther characters: log in on each and put back there too. The levelling routes stay.",
+    button1 = "Put back",
+    button2 = "Cancel",
+    OnAccept = function() YR.PutBackEverything() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+}
+function YR.AskPutBack()
+    StaticPopupDialogs["HEADSTART_PUTBACK"] = StaticPopupDialogs["HEADSTART_PUTBACK"] or PUTBACK
+    StaticPopup_Show("HEADSTART_PUTBACK")
+end
+
 function YR:ToggleWindow(page) if YR.LoadWindow() then YR:ToggleWindow(page) end end
 function YR:ToggleSettings() if YR.LoadWindow() then YR:ToggleSettings() end end
 function YR:ShowSettingsTab(key) if YR.LoadWindow() then YR:ShowSettingsTab(key) end end
@@ -600,6 +639,10 @@ SlashCmdList.HEADSTART = function(msg)
         YR.GlimmerDebug()
     elseif cmd == "repair" then
         YR.RepairDebug()
+    elseif cmd == "boats" then
+        YR.BoatsCommand(arg)
+    elseif cmd == "putback" then
+        YR.AskPutBack()
     elseif cmd == "perf" then
         -- what Headstart costs, by the game's own count (the code for it is in the window's addon)
         if YR.LoadWindow() then YR.Perf() end
@@ -679,7 +722,7 @@ SlashCmdList.HEADSTART = function(msg)
             .. " /headstart camp (unlock|lock|always|debug) - the campfire icon; /headstart bank - bank mats now; /headstart mail - mail them to your alt;"
             .. " /headstart routes on|off - Headstart routes in RestedXP; /headstart inv - invite your target; /headstart leave - leave the group; /headstart plan - plan your bars;"
             .. " /headstart restock - buy what you keep at this vendor; /headstart trainer - what's new at the trainer;"
-            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart profile [name] - switch this character to another of the class's profiles; /headstart macro - the macro helper: your class's usual macros made by ticking boxes; /headstart start - the welcome window: pick how much of Headstart you want; /headstart transfer - your settings as a text, to move them to another install")
+            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart profile [name] - switch this character to another of the class's profiles; /headstart macro - the macro helper: your class's usual macros made by ticking boxes; /headstart start - the welcome window: pick how much of Headstart you want; /headstart transfer - your settings as a text, to move them to another install; /headstart putback - put back everything Headstart changed (asks first)")
     else
         YR:ToggleWindow()
     end

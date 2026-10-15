@@ -681,11 +681,18 @@ function YS:ApplyUI(ui, o)
     -- each game setting as it was, kept beside the bars' copy for /ysetup undo
     local char = _G.YippSetupCharDB          -- this character's saved table (Setup.lua fills it at login)
     local backup = type(char) == "table" and (char.uiBackup or char.backup) or nil
-    -- the account's settings, and over them the class's own (the Personal Resource Display's switch)
+    if type(char) == "table" then char.uiTouched = true end     -- (Put back everything: its own goes back on)
+    -- the account's settings, and over them the class's own (the Personal Resource Display's switch, the
+    -- swing timer) - those only the first time an interface goes on here: a new character starts from its
+    -- class, and after that they are its own. The game keeps them per character, and the class's put on
+    -- again at every change taken from elsewhere undid a choice made here (the owner, 2026-10-15).
     local cvars = {}
     if o.settings then
         for name, v in pairs(ui.cvars or {}) do if not IS_CLASS_CVAR[name] then cvars[name] = v end end
-        for name, v in pairs(YS.ClassUI and YS.ClassUI() or {}) do cvars[name] = v end
+        if not (type(char) == "table" and char.classUI) then
+            for name, v in pairs(YS.ClassUI and YS.ClassUI() or {}) do cvars[name] = v end
+            if type(char) == "table" then char.classUI = true end
+        end
     end
     for name, v in pairs(cvars) do
         local was = C_CVar.GetCVar(name)
@@ -746,7 +753,13 @@ function YS:ApplyUI(ui, o)
         if layout then clean = true else layout, layoutChanged = ApplyLayout(ui.layout) end
         if layoutChanged and not clean then taint = true end
     end
-    local chat = o.chat and YS.ApplyChat(ui.chat) or "off"
+    -- the windows as they are saved already (a change made elsewhere that wasn't to chat): left alone - put
+    -- on again, they would ask for a reload for nothing
+    local chat = "off"
+    if o.chat then
+        local same = type(ui.chat) == "table" and YS.UISig and YS.UISig(YS.ScanChat()) == YS.UISig(ui.chat)
+        chat = same and "as saved" or YS.ApplyChat(ui.chat)
+    end
     -- chat windows are set through Blizzard's own functions, called from here: what they write on the
     -- chat frames is ours until a reload, so it ends with the same Reload question
     if o.chat and type(chat) == "string" and chat:find("windows$") then taint = true end
@@ -779,6 +792,71 @@ function YS:ApplyUI(ui, o)
         -- the bars are checked even when nothing changed now: set at login (EarlyBars), they may not show yet
         CheckLater(clean and layoutChanged and ui.layout or nil, cleanBars and ui.bars or nil)
     end
+end
+
+-- Put back everything (Setup.lua): this character's own interface, as it was before Headstart first changed it
+-- (the copy YS.KeepFirst kept): its game settings, graphics and sound, key bindings, which bars show, its Edit
+-- Mode layout, its chat windows and RestedXP's windows. Not the camera. The layout is picked by its own name
+-- and kind (a character layout too: it is this character's own), imported again only if it is gone.
+local function PickLayout(layout)
+    local layouts, em = EditModeLayouts()
+    if not (layout and layouts) then return "not kept", false end
+    for index, info in ipairs(layouts) do
+        if info.layoutName == layout.name and (layout.type == nil or info.layoutType == layout.type) then
+            local active = em.layoutInfo and em.layoutInfo.activeLayout
+            if active == index or (em.IsLayoutSelected and em:IsLayoutSelected(index)) then return "'" .. layout.name .. "' (already on)", false, true end
+            if C_EditMode and C_EditMode.SetActiveLayout then
+                C_EditMode.SetActiveLayout(index)
+                return "'" .. layout.name .. "'", true, true
+            end
+            em:SelectLayout(index)
+            return "'" .. layout.name .. "'", true, false
+        end
+    end
+    local text, changed = ApplyLayoutClean(layout)
+    if text then return text, changed, true end
+    text, changed = ApplyLayout(layout)
+    return text, changed, false
+end
+
+function YS.PutBackUI(ui)
+    if type(ui) ~= "table" or InCombatLockdown() then return nil end
+    local cvars, differ = {}, 0
+    for _, list in ipairs({ ui.cvars, ui.machine }) do
+        for name, v in pairs(type(list) == "table" and list or {}) do cvars[name] = v end
+    end
+    for name, v in pairs(cvars) do if C_CVar.GetCVar(name) ~= v then differ = differ + 1 end end
+    if YS.PutBackCVars then YS.PutBackCVars(cvars) end
+    local keys = ui.keys and YS.ApplyKeys(ui.keys)
+    local suite = FirstLoaded(UI_SUITES)
+    local barAddon = suite or FirstLoaded(BAR_ADDONS)
+    local taint, bars = false, 0
+    if type(ui.bars) == "table" and not barAddon then
+        local n = ApplyBarsClean(ui.bars)
+        if n then
+            bars = n
+        else
+            for bar, shown in pairs(ui.bars) do
+                local key = "PROXY_SHOW_ACTIONBAR_" .. bar
+                local ok, cur = pcall(Settings.GetValue, key)
+                if ok and cur ~= shown and pcall(Settings.SetValue, key, shown) then bars, taint = bars + 1, true end
+            end
+        end
+    end
+    local layout, changed, clean = "left to " .. tostring(suite), false, true
+    if not suite then layout, changed, clean = PickLayout(ui.layout) end
+    if changed and not clean then taint = true end
+    local chat = ui.chat and YS.ApplyChat(ui.chat) or "not kept"
+    if type(chat) == "string" and chat:find("windows$") then taint = true end
+    local rxp = ui.rxp and YS.ApplyRXP(ui.rxp) or "nothing kept"
+    YS.Print(("put back as it was before Headstart: game settings %d changed, key bindings %s, bars shown or hidden %d, Edit Mode %s,"
+        .. " chat %s, RestedXP windows %s."):format(differ, keys and (keys .. " changed") or "not kept", bars, tostring(layout),
+        tostring(chat), tostring(rxp)))
+    if taint then
+        YS.Print("reload to finish: until then the action bars can be blocked in combat.")
+        StaticPopup_Show("YIPPSETUP_RELOAD")
+    end
+    return true
 end
 
 -- SetActionBarToggles only saves which bars show; Blizzard shows them when its own setting changes (a

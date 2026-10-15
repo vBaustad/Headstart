@@ -29,6 +29,9 @@ MailStep.lua
 StepKeeper.lua
 MyRoutes.lua
 Flight.lua
+Boats.lua
+Data\Boats.lua
+BoatTimer.lua
 Rewards.lua
 Camp.lua
 Data\Crafting.lua

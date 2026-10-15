@@ -1000,6 +1000,136 @@ missing = lua.eval("""(function()
     end
     return table.concat(out, ", ") end)()""")
 check(missing == "", f"every card on All features opens a section that exists, and its switch works ({missing})")
+# the boat timer: off as Headstart comes; on, at Ratchet's dock, it shows the boat there and when it leaves
+check(not YR.Option("boatTimer"), "the boat timer starts off")
+lua.execute("""KEPT_POS = UnitPosition
+    local d = HeadstartNS.BoatData.ratchetBB.docks[2]
+    function UnitPosition() return d[4], d[3], 0, d[2] end
+    YippRouteDB.boatTimer = true
+    HeadstartNS.BoatTimerApply()""")
+_hud = g.HeadstartBoatTimer
+check(_hud is not None and _hud.hidden is not True, "on, at Ratchet's dock: the timer shows the boat there")
+lua.execute("YippRouteDB.boatTimer = nil HeadstartNS.BoatTimerApply() UnitPosition = KEPT_POS")
+check(_hud.hidden is True, "and off again: gone")
+# and the boats on the world map: each where it is, while the map is open
+lua.execute("""
+    WorldMapFrame = CreateFrame("Frame", "WorldMapFrame")
+    WorldMapFrame.hidden = false
+    BOAT_CANVAS = CreateFrame("Frame")
+    function WorldMapFrame:GetMapID() return 1414 end
+    function WorldMapFrame:GetCanvas() return BOAT_CANVAS end
+    function WorldMapFrame:GetCanvasScale() return 1 end
+    -- the map canvas's data providers, as the game keeps them
+    MapCanvasDataProviderMixin = MapCanvasDataProviderMixin or {}
+    CreateFromMixins = CreateFromMixins or function(...)
+        local t = {}
+        for _, m in ipairs({ ... }) do for k, v in pairs(m) do t[k] = v end end
+        return t
+    end
+    BOAT_PROVIDERS, BOAT_UPDATES = {}, {}
+    function WorldMapFrame:AddDataProvider(p) BOAT_PROVIDERS[p] = true end
+    function WorldMapFrame:RemoveDataProvider(p) p:RemoveAllData() BOAT_PROVIDERS[p] = nil end
+    function WorldMapFrame:RegisterDataProviderOnUpdate(p) BOAT_UPDATES[p] = true end
+    function WorldMapFrame:UnregisterDataProviderOnUpdate(p) BOAT_UPDATES[p] = nil end
+    function BOAT_CALL(method) for p in pairs(BOAT_PROVIDERS) do p[method](p) end end
+    function BOAT_COUNT(t) local n = 0 for _ in pairs(t) do n = n + 1 end return n end
+    C_Map = C_Map or {}
+    KEPT_MAPPOS = C_Map.GetMapPosFromWorldPos
+    BOAT_AT = 0.5
+    C_Map.GetMapPosFromWorldPos = function(c, v, id)
+        if id ~= 1414 then return id, { GetXY = function() return 1.5, 1.5 end } end
+        return id, { GetXY = function() return BOAT_AT, 0.5 end }
+    end
+    CreateVector2D = CreateVector2D or function(x, y) return { x = x, y = y } end
+    YippRouteDB.boatTimer = true
+    HeadstartNS.BoatTimerApply()
+    BOAT_CALL("OnShow")""")
+check(YR.BoatMapPins() == 5,
+      f"the boats on the world map: an Alliance player's four and Ratchet's, no zeppelins ({YR.BoatMapPins()})")
+lua.execute("YippRouteDB.boatMapOther = true BOAT_CALL('OnUpdate')")
+check(YR.BoatMapPins() == 8, f"Horde zeppelins too: every route with a course ({YR.BoatMapPins()})")
+lua.execute("YippRouteDB.boatMapOther = nil BOAT_CALL('OnUpdate')")
+check(YR.BoatMapPins() == 5, "and off again: back to your own side's")
+lua.execute("UnitFactionGroup = function() return 'Horde' end BOAT_CALL('OnUpdate')")
+check(YR.BoatMapPins() == 4, f"a Horde player's: the three zeppelins and Ratchet's, no Alliance boats ({YR.BoatMapPins()})")
+lua.execute("UnitFactionGroup = function() return 'Alliance' end BOAT_CALL('OnUpdate')")
+check(lua.eval("BOAT_COUNT(BOAT_PROVIDERS) == 1 and BOAT_COUNT(BOAT_UPDATES) == 1"),
+      "kept on the map as the game keeps its own icons: a data provider, run every frame the map is open")
+# the map turned to a zone with no boat on it: gone at once, not on a timer
+lua.execute("function WorldMapFrame:GetMapID() return 1411 end BOAT_CALL('OnMapChanged')")
+check(YR.BoatMapPins() == 0, "the map turned to a map without them: gone at once")
+lua.execute("function WorldMapFrame:GetMapID() return 1414 end BOAT_CALL('OnMapChanged')")
+check(YR.BoatMapPins() == 5, "and back: there at once")
+# a frame later the boats have moved on, and the pins with them
+lua.execute("""local p = HeadstartNS.BoatMapPinFor("ratchetBB")
+    function p:SetPoint(_, _, _, x) self.px = x end
+    BOAT_CALL("OnUpdate") BOAT_X0 = p.px
+    BOAT_AT = 0.6 BOAT_CALL("OnUpdate") BOAT_X1 = p.px""")
+_x0, _x1 = lua.eval("BOAT_X0"), lua.eval("BOAT_X1")
+check(_x0 is not None and _x1 is not None and _x1 > _x0, f"the next frame: moved along with the boat ({_x0} -> {_x1})")
+# how big: grows as the map comes closer (zoomed in, or a zone rather than its continent), within bounds
+lua.execute("""C_Map.GetMapWorldSize = function(id) return id == 1414 and 36800 or 5300, 1 end
+    BOAT_SCALE = 1
+    function WorldMapFrame:GetCanvasScale() return BOAT_SCALE end
+    function BOAT_CANVAS:GetWidth() return 1002 end
+    local p = HeadstartNS.BoatMapPinFor("ratchetBB")
+    local function OnScreen() BOAT_CALL("OnCanvasScaleChanged") return p.size * BOAT_SCALE end
+    BOAT_S1 = OnScreen()
+    BOAT_SCALE = 3 BOAT_S2 = OnScreen()
+    BOAT_SCALE = 1000 BOAT_S3 = OnScreen()
+    BOAT_SCALE = 0.001 BOAT_S4 = OnScreen()
+    BOAT_SCALE = 1""")
+_s = [lua.eval(f"BOAT_S{i}") for i in range(1, 5)]
+check(_s[1] > _s[0], f"zoomed in: bigger on screen, not smaller ({_s[0]:.1f} -> {_s[1]:.1f})")
+check(abs(_s[2] - 80) < 0.01 and abs(_s[3] - 32) < 0.01, f"and never past a hand nor too small to see ({_s[2]:.1f}, {_s[3]:.1f})")
+lua.execute("BOAT_CANVAS.GetWidth = nil BOAT_CALL('OnUpdate') C_Map.GetMapWorldSize = nil")
+lua.execute("YippRouteDB.boatMap = false HeadstartNS.BoatTimerApply()")
+check(YR.BoatMapPins() == 0, "On the world map switched off: none")
+check(lua.eval("BOAT_COUNT(BOAT_PROVIDERS) == 0 and BOAT_COUNT(BOAT_UPDATES) == 0"),
+      "and taken off the map: nothing run while it is off")
+lua.execute("YippRouteDB.boatMap = nil YippRouteDB.boatTimer = nil HeadstartNS.BoatTimerApply() C_Map.GetMapPosFromWorldPos = KEPT_MAPPOS")
+check(YR.BoatMapPins() == 0, "the boat timer off: none")
+# Which combat bars show is each character's own; one that hasn't chosen starts from its class's last choice
+lua.execute("""KEPT_CHARDB, KEPT_CLASS = YippSetupCharDB, UnitClass
+    YippRouteDB.swingClass = nil
+    UnitClass = function() return "Warrior", "WARRIOR" end
+    YippSetupCharDB = {}
+    local s = HeadstartNS.SwingDB() s.on, s.power, s.cast = true, true, false
+    WARRIOR_CHAR = YippSetupCharDB
+    YippSetupCharDB = {}                                         -- another warrior, never chosen
+    W2_ON, W2_POWER = HeadstartNS.SwingOwn("on"), HeadstartNS.SwingOwn("power")
+    UnitClass = function() return "Mage", "MAGE" end
+    YippSetupCharDB = {}                                         -- a mage, never chosen
+    MAGE_ON = HeadstartNS.SwingOwn("on")
+    local m = HeadstartNS.SwingDB() m.on, m.power = false, false
+    YippSetupCharDB = WARRIOR_CHAR UnitClass = function() return "Warrior", "WARRIOR" end
+    BACK_ON, BACK_POWER = HeadstartNS.SwingDB().on, HeadstartNS.SwingOwn("power")
+    RAW_ON = rawget(YippRouteDB.swing, "on")""")
+check(g.WARRIOR_CHAR.combatBars is not None and g.WARRIOR_CHAR.combatBars.on is True and g.RAW_ON is None,
+      "the combat bars a character turns on are its own, not the account's")
+check(g.W2_ON is True and g.W2_POWER is True, "another warrior that hasn't chosen: starts with the last warrior's choice")
+check(g.MAGE_ON == lua.eval("YippRouteDB.swingShared and YippRouteDB.swingShared.on"),
+      "a mage, no mage having chosen: starts from what the account had before")
+check(g.BACK_ON is True and g.BACK_POWER is True, "and the mage turning them off leaves the warrior's as they were")
+lua.execute("YippSetupCharDB, UnitClass = KEPT_CHARDB, KEPT_CLASS")
+
+# Put back everything Headstart changed (General page, Character setup, /headstart putback): asked first, and
+# answered, quality of life and Character setup go off (each feature puts back its own as it goes)
+lua.execute("""PUTBACK_ASKED = nil KEPT_SHOW = StaticPopup_Show
+    StaticPopup_Show = function(w, ...) if w == "HEADSTART_PUTBACK" then PUTBACK_ASKED = w end if KEPT_SHOW then return KEPT_SHOW(w, ...) end end
+    YippSetupCharDB = YippSetupCharDB or {} KEPT_FIRST = YippSetupCharDB.first YippSetupCharDB.first = nil
+    KEPT_SETUPON = YippRouteDB.setupOn YippRouteDB.setupOn = true""")
+g.SlashCmdList.HEADSTART("putback")
+check(g.PUTBACK_ASKED == "HEADSTART_PUTBACK" and YR.QoLOn(), "/headstart putback: asked first, nothing changed yet")
+lua.execute("StaticPopupDialogs.HEADSTART_PUTBACK.OnAccept()")
+check(not YR.QoLOn() and not YR.SetupOn(), "answered: quality of life and Character setup off")
+lua.execute("""HeadstartNS.SetQoLOn(true) YippRouteDB.setupOn = KEPT_SETUPON YippSetupCharDB.first = KEPT_FIRST
+    StaticPopup_Show = KEPT_SHOW""")
+# /headstart boats: the list of every boat and zeppelin, a button each (a tool to measure them for a timetable)
+g.SlashCmdList.HEADSTART("boats")
+check(g.HeadstartBoats is not None and g.HeadstartBoats.hidden is not True, "/headstart boats: the list of boats and zeppelins opens")
+g.SlashCmdList.HEADSTART("boats")
+check(g.HeadstartBoats.hidden is True, "and shuts again")
 # one grouping for All features and the menu: every card stands in the group its page is in
 wrong = lua.eval("""(function()
     local YR, out = HeadstartNS, {}
@@ -1499,6 +1629,8 @@ import smoke_trinkets
 bad += smoke_trinkets.run()
 import smoke_instances
 bad += smoke_instances.run()
+import smoke_boats
+bad += smoke_boats.run()
 import smoke_xpbar
 bad += smoke_xpbar.run()
 import smoke_talentfade

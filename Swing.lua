@@ -109,11 +109,72 @@ local HANDS = {
 }
 local BLIZZARD = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTimerRangedFrame" }
 
+-- Which bars show is each character's own (the owner, 2026-10-15: "each character has its own wish for its
+-- resource, health and swing timer"): a warrior wants its swing and its rage, a mage neither. Kept per
+-- character in YippSetupCharDB.combatBars. A character that hasn't chosen starts with what the last
+-- character of its class chose (YippRouteDB.swingClass[class]) - or, no character of the class having
+-- chosen yet, with what the account had while these were the account's (YippRouteDB.swingShared, kept
+-- once). The look (colours, sizes, texture, where the bars stand) stays the account's.
+--   Read and written as YR.SwingDB()'s own fields, as before: the account's table hands these few to the
+--   character's (a metatable; they are no longer saved in it).
+local OWN = { on = true, health = true, power = true, cast = true, combo = true, ["rangeBar"] = true }   -- (the range bar's own field)
+local mine                      -- this character's choices, once looked up
+local function Mine()
+    local char = YippSetupCharDB
+    if mine and type(char) == "table" and char.combatBars == mine then return mine end
+    if type(char) ~= "table" then char = {} YippSetupCharDB = char end
+    local db = YippRouteDB.swing
+    if type(db) == "table" and YippRouteDB.swingShared == nil then
+        local shared = {}
+        for k in pairs(OWN) do shared[k] = rawget(db, k) end
+        YippRouteDB.swingShared = shared
+    end
+    if type(char.combatBars) ~= "table" then
+        local _, class = UnitClass("player")
+        local from = (class and type(YippRouteDB.swingClass) == "table" and YippRouteDB.swingClass[class])
+            or YippRouteDB.swingShared or {}
+        local t = {}
+        for k in pairs(OWN) do t[k] = from[k] end
+        char.combatBars = t
+    end
+    mine = char.combatBars
+    return mine
+end
+--- One of this character's choices (on, health, power, cast, combo, rangeBar), read without filling the
+--- settings of bars that are off.
+function YR.SwingOwn(key) return Mine()[key] end
+
+-- a choice made here: this character's, and where the next character of its class starts
+local function Keep(k, v)
+    local m = Mine()
+    m[k] = v
+    local _, class = UnitClass("player")
+    if class then
+        YippRouteDB.swingClass = type(YippRouteDB.swingClass) == "table" and YippRouteDB.swingClass or {}
+        local c = YippRouteDB.swingClass[class] or {}
+        YippRouteDB.swingClass[class] = c
+        for key in pairs(OWN) do c[key] = m[key] end
+    end
+end
+local OwnFields = {
+    __index = function(_, k) if OWN[k] then return Mine()[k] end end,
+    __newindex = function(t, k, v) if OWN[k] then Keep(k, v) else rawset(t, k, v) end end,
+}
+
 local filled
 function YR.SwingDB()
     local db = YippRouteDB.swing
     if db and filled == db then return db end
     if not db then db = {} YippRouteDB.swing = db end
+    if getmetatable(db) ~= OwnFields then
+        local m = Mine()        -- (what the account had is kept as the start before it is taken out)
+        -- a table that still has them (settings moved in from another install): this character takes them
+        for k in pairs(OWN) do
+            local v = rawget(db, k)
+            if v ~= nil then m[k] = v rawset(db, k, nil) end
+        end
+        setmetatable(db, OwnFields)
+    end
     -- bars you had dragged somewhere stay there: only settings from before "place" that never moved them follow Edit Mode
     if db.place == nil and db.pos then db.place = "own" end
     for k, v in pairs(DEFAULT) do
@@ -145,8 +206,7 @@ end
 --- On or off, read as it is saved: asking must not fill the settings of a swing timer that is off
 --- with its defaults (YR.SwingDB does that, for the bars themselves).
 function YR.SwingOn()
-    local db = YippRouteDB.swing
-    return YR.QoLOn() and type(db) == "table" and db.on == true
+    return YR.QoLOn() and Mine().on == true
 end
 -- Our own bars are the ones showing / Blizzard's are, dressed.
 local function Own() return YR.SwingOn() and YR.SwingDB().style == "own" end
@@ -919,12 +979,11 @@ local function RangePaint()
 end
 
 local function RangeBarApply()
-    local db = YippRouteDB.swing
-    if not (YR.SwingOn() and type(db) == "table" and db.rangeBar == true) then
+    if not (YR.SwingOn() and Mine().rangeBar == true) then
         if rangeBar then rangeBar:Hide() end
         return
     end
-    db = YR.SwingDB()
+    local db = YR.SwingDB()
     if not rangeBar then
         rangeBar = NewBar(UIParent, "range")
         rangeBar:SetFrameStrata("LOW")
@@ -961,9 +1020,8 @@ end
 -- flipping asks for. (All of RangeBarApply - placed, dressed, its fonts set - is for a setting changing;
 -- at the edge of melee range it ran several times a second.)
 local function RangeBarNow()
-    local db = YippRouteDB.swing
-    if not (rangeBar and YR.SwingOn() and type(db) == "table" and db.rangeBar == true) then return RangeBarApply() end
-    db = YR.SwingDB()
+    if not (rangeBar and YR.SwingOn() and Mine().rangeBar == true) then return RangeBarApply() end
+    local db = YR.SwingDB()
     local target = Truly(UnitExists("target")) and Truly(UnitCanAttack("player", "target")) and not Truly(UnitIsDead("target"))
     RangePaint()
     rangeBar:SetShown(not db.lock or (target and rangeBar.known) and true or false)
@@ -1325,12 +1383,11 @@ local resCombat = false
 local EASE = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut or nil
 
 local function ResWant(key)
-    local db = YippRouteDB.swing
-    if type(db) ~= "table" then return false end
+    local m = Mine()
     -- combo points come with the power bar unless turned off (or on, by themselves): a rogue who turns
     -- the power bar on means the points too
-    if key == "combo" and db.combo == nil then return db.power == true end
-    return db[key] == true
+    if key == "combo" and m.combo == nil then return m.power == true end
+    return m[key] == true
 end
 YR.ResourceBarWanted = ResWant
 function YR.ResourceBarsOn() return YR.QoLOn() and (ResWant("health") or ResWant("power") or ResWant("combo")) end
@@ -1697,8 +1754,7 @@ local cast                      -- the bar
 local castState                 -- nil, "cast", "channel", or "hold" (stopped short, said for a moment)
 local CAST_COLOUR, CHANNEL_COLOUR, STOPPED_COLOUR = { 0.80, 0.62, 0.24 }, { 0.30, 0.62, 0.36 }, { 0.70, 0.22, 0.22 }
 local function CastWanted()
-    local db = YippRouteDB.swing
-    return YR.QoLOn() and type(db) == "table" and db.cast == true
+    return YR.QoLOn() and Mine().cast == true
 end
 YR.CastBarOn = CastWanted
 

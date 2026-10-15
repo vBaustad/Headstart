@@ -1445,6 +1445,27 @@ YS.Toggle(YS)
 w.keep._OnClick(w.keep)
 report(YS.UIBehind() is False and lua.eval("YippSetupDB.ui ~= ELSE_UI") and lua.eval("YippSetupDB.uiFrom") == me and not w.IsShown(w),
        "Keep this character's: saved over the change, from here")
+# One character keeps it up to date, the one it was saved on; the others take its changes at login, unasked
+# (each saving its own made every login on another ask, and each answer the next question - a loop)
+lua.execute("""KEEP_UI = YippSetupDB.ui
+    YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned = ELSE_UI, "Moray-Realm", time()
+    SAID_UP = {} KEPT_PRINT = YR_SETUP.Print YR_SETUP.Print = function(t) SAID_UP[#SAID_UP + 1] = t end
+    KEPT_OUT = print print = function(...) SAID_UP[#SAID_UP + 1] = table.concat({ ... }, " ") end""")
+YS.UICatchUp()
+said = " / ".join(str(v) for v in g.SAID_UP.values())
+report(YS.UIBehind() is False and not w.IsShown(w) and lua.eval("YippSetupDB.ui == ELSE_UI") and lua.eval("YippSetupCharDB.iface.fresh") is True
+       and "Moray-Realm" in said, f"changed on the one it was saved on: put on here at login, no window, and said in chat ({said[:90]})")
+YS.UISettle()
+lua.execute("KEPT_GET = C_CVar.GetCVar local get = C_CVar.GetCVar C_CVar.GetCVar = function(n) if n == 'lootUnderMouse' then return 'mine' end return get(n) end")
+report(YS.FollowUI() is False and lua.eval("YippSetupDB.ui == ELSE_UI") and lua.eval("YippSetupDB.uiFrom") == "Moray-Realm",
+       "a setting changed here, on a character it wasn't saved on: not saved into it (nobody is asked about it)")
+lua.execute("YippSetupDB.uiFollow = false YippSetupDB.uiFrom, YippSetupDB.uiScanned = 'Moray-Realm', time() SAID_UP = {}")
+YS.UICatchUp()
+report(lua.eval("YR_SETUP.UIBehind() == true") and len(g.SAID_UP) == 0,
+       f"Keep it up to date off: nothing is put on by itself ({list(g.SAID_UP.values())})")
+lua.execute("""YippSetupDB.uiFollow = nil YR_SETUP.Print = KEPT_PRINT print = KEPT_OUT C_CVar.GetCVar = KEPT_GET
+    YippSetupDB.ui, YippSetupDB.uiFrom, YippSetupDB.uiScanned = KEEP_UI, ME_KEY, time()
+    YippSetupCharDB.iface = { name = YR_SETUP.UIName(), seen = YippSetupDB.uiScanned }""".replace("ME_KEY", repr(me)))
 # a second interface, by name
 YS.SaveInterface(YS, " Healer ")
 report(list(YS.UINames().values()) == ["Main", "Healer"] and YS.UIName() == "Healer" and lua.eval("YippSetupDB.uis.Healer.from") == me
@@ -1481,9 +1502,14 @@ lua.execute('ME.class = "PALADIN"; CVARS.nameplateShowSelf = "0"')
 YS.ClassUINoted()
 YS.ApplyUI(YS, lua.eval('{ cvars = { nameplateShowSelf = "1" }, bars = {} }'), YS.Options(YS))
 report(g.CVARS.nameplateShowSelf == "0", "a paladin doesn't get the rogues' switch (nor one from an account save)")
-lua.execute('ME.class = "ROGUE"')
+lua.execute('ME.class = "ROGUE" YippSetupCharDB.classUI = nil')         # (a new character: its own table)
 YS.ApplyUI(YS, lua.eval('{ cvars = {}, bars = {} }'), YS.Options(YS))
 report(g.CVARS.nameplateShowSelf == "1", "a new rogue gets it on with Apply interface")
+# after that it is the character's own: the game keeps it per character, and an interface put on again (a
+# change taken from the character it was saved on) leaves it as this character has it
+lua.execute('CVARS.nameplateShowSelf = "0"')
+YS.ApplyUI(YS, lua.eval('{ cvars = {}, bars = {} }'), YS.Options(YS))
+report(g.CVARS.nameplateShowSelf == "0", "and turned off on that rogue: an interface put on again leaves it off")
 report(YS.FollowClassUI() is False, "being put on is not a change by the player")
 lua.execute("YippSetupDB.classes, ME.class, CVARS.nameplateShowSelf = KEPT_CLASSES, KEPT_CLASS, nil")
 
@@ -1517,6 +1543,14 @@ report(g.ASKED is not None and g.ASKED.which == "YIPPSETUP_BARS" and g.BAR[30] i
 report(lua.eval("StaticPopupDialogs.YIPPSETUP_BARS.enterClicksFirstButton == true and StaticPopupDialogs.YIPPSETUP_AGAIN.enterClicksFirstButton == true"
                 " and StaticPopupDialogs.YIPPSETUP_AGAIN.button1 == 'Bars only'"),
        "and Enter is the answer that changes least: the bars alone")
+# answered: the bars go on, and Headstart's window is told then - not only when Apply was pressed, before the
+# answer (its "Not on this character yet" stayed until the window was opened again)
+lua.execute("""KEPT_REFRESH = HeadstartNS.RefreshWindow REFRESHED = 0
+    HeadstartNS.RefreshWindow = function() REFRESHED = REFRESHED + 1 end
+    StaticPopupDialogs.YIPPSETUP_BARS.OnAccept(nil, ASKED.data)
+    HeadstartNS.RefreshWindow = KEPT_REFRESH""")
+report(g.REFRESHED >= 1 and lua.eval("YippSetupCharDB.applied ~= nil"),
+       f"and answered: the bars on, and Headstart's window told so at once ({g.REFRESHED})")
 lua.execute("UnitLevel = OLD_LEVEL")
 # "Apply bars" on a new character (nothing asked there): the bars, and no interface - no chat, Edit Mode,
 # keys or game settings (the settings window's button put the interface on too, until 0.10.0-beta7)
@@ -1735,4 +1769,37 @@ report(g.YippSetupCharDB.hold is None and not same(YS.Profile(YS), before), "sav
 lua.execute('CVARS.AutoPushSpellToActionBar = "1"')
 YS.Apply(YS, None, None, lua.eval("{ sure = true, barsOnly = true }"))
 report(g.CVARS.AutoPushSpellToActionBar == "0", f"Bars only: Blizzard's own placing of new spells is stopped at once, not at the next login ({g.CVARS.AutoPushSpellToActionBar})")
+
+# Put back everything (General page, Character setup, /headstart putback): this character as it was before
+# Headstart first changed it - the bars only where Headstart changed them, the interface only where one went on
+lua.execute("""Fresh() local c = YippSetupCharDB
+    c.first, c.backup, c.older, c.applied, c.uiBackup, c.uiTouched, c.iface = nil, nil, nil, nil, nil, nil, nil
+    BAR = { [1] = { kind = 'mount', id = 77 }, [3] = { kind = 'spell', id = 635 } }""")
+YS.KeepFirst()
+first_ui = g.YippSetupCharDB.first.ui
+report(first_ui is not None and first_ui.cvars is not None and first_ui["keys"] is not None,
+       "the first copy holds this character's interface too: its game settings and keys")
+ok = YS.PutBackEverything()
+report(ok is True and g.BAR[1] is not None and g.BAR[1].kind == "mount",
+       "nothing changed here by Headstart: nothing put back, and a mount on the bars left where it is")
+# changed: the bars applied, an interface put on (a game setting, a key)
+lua.execute("""Fresh() local c = YippSetupCharDB
+    c.first, c.backup, c.older, c.applied, c.uiBackup, c.uiTouched, c.iface = nil, nil, nil, nil, nil, nil, nil
+    BAR = { [3] = { kind = 'spell', id = 635 }, [60] = { kind = 'spell', id = 20594 } }
+    CVARS.lootUnderMouse = "0"
+    SetBinding("E") SetBinding("W", "MOVEFORWARD") SetBinding("UP", "MOVEFORWARD")""")
+YS.KeepFirst()
+YS.Apply(YS, None, None, SURE)
+YS.ApplyUI(YS, lua.eval('{ cvars = { lootUnderMouse = "1" }, bars = {}, keys = { MOVEFORWARD = { "E", false } } }'), YS.Options(YS))
+changed = g.CVARS.lootUnderMouse == "1" and g.KEYS().MOVEFORWARD == "E,-" and g.YippSetupCharDB.uiTouched is True
+bars_after = dict((k, v.id) for k, v in g.BAR.items())
+ok = YS.PutBackEverything()
+report(changed and ok is True and g.CVARS.lootUnderMouse == "0" and g.KEYS().MOVEFORWARD == "W,UP",
+       f"bars applied and an interface put on, then Put back everything: the game setting and the key as they were ({g.CVARS.lootUnderMouse}, {g.KEYS().MOVEFORWARD})")
+now = dict((k, v.id) for k, v in g.BAR.items())
+report(now == {3: 635, 60: 20594} and now != bars_after and g.YippSetupCharDB.applied is None and g.YippSetupCharDB.uiTouched is None,
+       f"and the bars as they were, the character no longer set up ({now})")
+lua.execute("COMBAT = true")
+report(YS.PutBackEverything() is False, "in a fight: not done")
+lua.execute("COMBAT = false")
 sys.exit(1 if bad else 0)

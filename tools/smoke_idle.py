@@ -63,7 +63,15 @@ BUDGET = {
     # 41, frames 13.
     # Lowered 2026-10-14: the instance tracker starts off on a new install (the owner's choice): three events,
     # a frame and a hot path fewer.
-    "new": {"hot": 8, "events": 39, "tickers": 1, "onupdate": 0, "frames": 13, "hooks": 4, "kb": 1},
+    # Raised 2026-10-15 for the boat timetable's sharing, which the owner asked to have on for every Headstart
+    # player whether they show the boat timer or not ("sending to the others is straight up needed for it to work
+    # for those who want to see the boats leave"): a ride seen is told to the guild and group, and a login asks
+    # for the latest - the only way the timetable survives a server restart that moves the boats. What it costs
+    # is what the raise is: one frame and three events - the zone changing, the world entered, and the addon
+    # channel (hot: every addon's messages, one prefix compared and dropped). It looks at where you are only in
+    # a zone with a dock (every two seconds; ten times a second within a few hundred yards of one), so a new
+    # install away from the docks ticks for none of it. Before: hot 8, events 39, frames 13.
+    "new": {"hot": 9, "events": 42, "tickers": 1, "onupdate": 0, "frames": 14, "hooks": 4, "kb": 1},
 }
 # Everything switched on, as the settings would do it (each feature's own switch, then what the settings
 # call to make it show), and everything switched off again (the main switches, as the settings do it).

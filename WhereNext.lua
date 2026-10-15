@@ -118,7 +118,7 @@ local function Plain(s) return (s:gsub("%f[%d]0+(%d)", "%1")) end
 --- Load a route in RestedXP at a step. Returns true, or nil and why not.
 function YR.LoadRouteAt(key, step)
     if not YR.RoutesOn() then
-        return nil, "Headstart's routes are off: switch them on under Route settings, then /reload."
+        return nil, "Headstart's routes are off: switch Routes on at the top of the Levelling tab, then /reload."
     end
     if type(RXP) ~= "table" or type(RXP.LoadGuide) ~= "function" or type(RXP.guides) ~= "table" then
         return nil, "RestedXP isn't loaded."
@@ -246,7 +246,7 @@ function YR.RefreshWherePage()
         ui.detail:SetText(("Start at step %d of %d  ·  %s  ·  %s"):format(best.first or 1, best.steps, Counts(best), best.note))
     elseif not YR.RoutesOn() then
         ui.name:SetText("Headstart's routes are off")
-        ui.detail:SetText("Switch them on under Route settings, then /reload.")
+        ui.detail:SetText("Switch Routes on at the top of the menu, then /reload.")
     elseif #list == 0 then
         ui.name:SetText("No routes yet")
         ui.detail:SetText("Save a run as a route under This run, or paste one in under Share: then this page says where to pick it up.")

@@ -28,7 +28,8 @@ local STEPS = {
       text = "What spends gold, moves your items or answers for you: the trainer, restock, the bank, invites."
           .. " Each is off until you turn it on here." },
     { page = "home", at = "menu:general", side = "right", title = "General",
-      text = "Cinematics skipped, Headstart's minimap button, and the colour of its windows." },
+      text = "Cinematics skipped, Headstart's minimap button, the colour of its windows - and Put back everything:"
+          .. " your screen as it was before Headstart, any time you want it." },
     { at = "setup", side = "below", title = "Character setup",
       text = "Save your bars and interface on the character you play, plan bars from the ones you have, and put"
           .. " them on your other characters. A character's own bars are kept the first time you open it there." },
