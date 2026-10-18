@@ -37,6 +37,7 @@ Hold Shift as you open a trainer, vendor, bank or mailbox to do it yourself that
 
 - **Combat bars.** A swing timer (Blizzard's bars restyled, or Headstart's own), a range bar that says how many yards your target is away, health, power and combo point bars, and a cast bar, all in one look.
 - **Trinket buttons** with your other trinkets a click away, and keys for the game's equipment sets.
+- **NPC markers:** the NPC your RestedXP step says to talk to, marked on its nameplate (! to take a quest, ? to hand one in), and a sword on the enemies your quests still need.
 - **Death recap.** What killed you and the hits before it.
 - **XP bar** with rested and quest experience, XP an hour and time to level.
 - **Camp icon** lit near a camp or while its buff runs, and a **flight timer** while you fly.

@@ -1671,6 +1671,8 @@ import smoke_cinematic
 bad += smoke_cinematic.run()
 import smoke_glimmer
 bad += smoke_glimmer.run()
+import smoke_npcmarkers
+bad += smoke_npcmarkers.run()
 import smoke_questlfg
 bad += smoke_questlfg.run()
 import smoke_alts

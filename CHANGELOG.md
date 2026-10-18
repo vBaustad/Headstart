@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0-beta8
+
+- **NPC markers (new; Journey page, a card on All features; off until you turn it on).** The NPC your RestedXP step says to talk to gets an icon on its nameplate: ! where you take a quest, ? where you hand one in, a speech bubble for anything else - only while that step is the one you're on. It reads the step's `.target` lines, which Headstart's routes and RestedXP's own guides put on their "talk to" steps; RestedXP's own marking needs a click or a macro on Forever. **Quest mobs** (a switch in the card, on with it): a sword on enemies you still need for a quest in your log. The icon stands beside the plate's health bar, or over the name where none shows. Friendly NPCs have no nameplates unless you turned them on, so while this is on the game's friendly NPC nameplates are on; what the setting was is written down first and put back when you turn it off (or as you log out, and after a fight if you turn it off in one). Turn them off yourself and yours stands.
+
 ## 0.10.0-beta7
 
 - **Combat bars: which bars show is each character's own.** The swing timer, health, power, cast bar, combo points and range bar were the account's: turned on for a warrior, they showed on your mage too. Now each character keeps its own, and one that hasn't chosen starts with what the last character of its class chose (or, for a class none has chosen for yet, with what the account had). The look - colours, sizes, texture, where the bars stand - is still one for all. Blizzard's own Personal Resource Display and swing timer, which the game keeps per character: the class's are put on only the first time an interface goes on a character, and never over a choice made there afterwards.

@@ -2507,6 +2507,27 @@ local function QoLPage(key, build)   -- (TOP_CARD: the card of switches every pa
     end
 end
 
+-- NPC markers (NpcMarkers.lua): an icon on the nameplate of the NPC RestedXP's step says to talk to, and on quest
+-- mobs. On the Journey page.
+local function NpcMarkerSections(L, c, Section, Row, Opt)
+        Section("NPC markers", "who to talk to, on their nameplate", { find = "npc marker nameplate talk target quest giver mob objective icon restedxp",
+            icon = 132053, master = { Opt("npcMarkers"), function(on) YippRouteDB.npcMarkers = on YR.ApplyParts() end } })
+        Row("About NPC markers", S.Text(c, 12, S.C.muted),
+            "Marks the NPC your RestedXP step says to talk to: ! when you take a quest there, ? when you hand one in,"
+            .. " a speech bubble for anything else. Only while that step is the one you're on.")
+        local function Flag(label, key, help)
+            Row(label, S.Switch(c, function() return YippRouteDB[key] ~= false end, function(on)
+                YippRouteDB[key] = (not on) and false or nil
+                YR.SettingChanged()
+            end), help)
+        end
+        Flag("Quest mobs", "npcMarkersMobs", "A sword on enemies you still need for a quest in your log.")
+        Flag("Show friendly NPC nameplates", "npcMarkersPlates",
+            "Turns the game's friendly NPC nameplates on while this is on, and back as they were when it goes off.")
+        Row("Size", RowSlider(c, 14, 40, 2, function() return YR.NpcMarkerSize() end,
+            function(v) YippRouteDB.npcMarkersSize = v ~= 22 and v or nil YR.SettingChanged() end))
+end
+
 -- The camp icon (Camp.lua) and the flight timer (Flight.lua): on the Journey page, the things of the
 -- road. (They had a page of their own, two small cards - merged at the owner's asking, 2026-10-14.)
 local function RoadSections(L, c, Section, Row, Opt)
@@ -2549,6 +2570,7 @@ local function RoadSections(L, c, Section, Row, Opt)
         Row("Lock position", S.Switch(c, Opt("campLocked"), YR.SetCampLocked),
             "Turn off to drag the icon. A preview with a coloured edge shows while it is unlocked. Also"
             .. " /headstart camp unlock.")
+        NpcMarkerSections(L, c, Section, Row, Opt)
 end
 
 local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
@@ -4565,6 +4587,8 @@ local function HomeFeatures()
                 Toggle("boatTimer", function() YR.BoatTimerApply() end)),
             F(135805, "Camp icon", "Lit near a camp, or while its buff runs.", "journey", "Camp icon",
                 Toggle("camp", function(on) YR.SetCampIcon(on) end)),
+            F(132053, "NPC markers", "Who your RestedXP step says to talk to, marked.", "journey", "NPC markers",
+                Toggle("npcMarkers", function() YR.ApplyParts() end)),
         },
         { "Combat",
             F(132349, "Swing timer", "Bars for your auto-attacks.", "swing", "Swing timer",
@@ -4881,7 +4905,7 @@ local CATEGORIES = {
       status = function() return YR.Option("instanceTrack") end, scope = "Every character on this account",
       desc = "The dungeons and raids you entered this hour and today, against the limits." },
     { key = "journey", label = "Journey", build = BuildJourney, refresh = QoLRefresh("journey"), icon = 134939,
-      status = function() return YippRouteDB.journey ~= false or YR.Option("flightTimer") or YR.Option("camp") or YR.Option("boatTimer") end,
+      status = function() return YippRouteDB.journey ~= false or YR.Option("flightTimer") or YR.Option("camp") or YR.Option("boatTimer") or YR.Option("npcMarkers") end,
       scope = "Every character; each has its own journey",
       desc = "Your road logged and told as a story, a timer while you fly, and the camp icon." },
     { group = "Combat" },

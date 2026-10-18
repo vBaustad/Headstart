@@ -47,6 +47,7 @@ Sim.lua
 Upgrades.lua
 Trinkets.lua
 Instances.lua
+NpcMarkers.lua
 XPBar.lua
 RXPSkin.lua
 DamageSkin.lua

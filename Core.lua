@@ -254,6 +254,7 @@ local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelSho
     groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true,
     deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true, glimmer = true, instanceTrack = true,
     boatTimer = true,
+    npcMarkers = true,                      -- (the nameplate markers, NpcMarkers.lua)
     bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
 YR.STARTS_OFF = STARTS_OFF
 
