@@ -33,7 +33,7 @@ end
 -- With quality of life off every QoL option answers "off" whatever it's set to (your settings are
 -- kept for when it's back on); what belongs to the routes and the window itself still answers.
 local LEVELLING = { minimapButton = true, logging = true, showSplits = true, deathSkipRelease = true, campReminder = true,
-    buyLater = true, sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true, skipQuests = true }
+    buyLater = true, sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true, skipQuests = true, paceWatch = true }
 
 function YR.QoLOn()
     return YippRouteDB.qolOff ~= true
@@ -255,6 +255,7 @@ local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelSho
     deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true, glimmer = true, instanceTrack = true,
     boatTimer = true,
     npcMarkers = true,                      -- (the nameplate markers, NpcMarkers.lua)
+    paceWatch = true,                       -- (the level pace box under the guide, Pace.lua)
     bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
 YR.STARTS_OFF = STARTS_OFF
 
@@ -278,7 +279,7 @@ end
 -- the splits box ran on with the routes off on every account that had them written down as on - the
 -- routes' page then says "none of it runs", and had no switch left to stop them.)
 local ROUTES_OWN = { logging = true, showSplits = true, deathSkipRelease = true, campReminder = true, buyLater = true,
-    sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true, skipQuests = true }
+    sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true, skipQuests = true, paceWatch = true }
 function YR.Option(key)
     if YippRouteDB.qolOff == true and not LEVELLING[key] then return false end
     if ROUTES_OWN[key] and YR.RoutesOn and not YR.RoutesOn() then return false end
@@ -860,6 +861,7 @@ f:SetScript("OnEvent", function(_, event, name)
     Start(YR.StartRunStore)
     Start(YR.HookTooltips, YR)
     Start(YR.StartSplits, YR)
+    Start(YR.StartPace)
     Start(YR.StartGroup, YR)
     Start(YR.StartCamp)
     Start(YR.StartBank)

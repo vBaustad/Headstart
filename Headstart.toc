@@ -70,6 +70,7 @@ Data\Consumables.lua
 CraftRemind.lua
 Trainer.lua
 Splits.lua
+Pace.lua
 Options.lua
 Guides.lua
 Group.lua

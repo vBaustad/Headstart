@@ -1680,6 +1680,11 @@ local function BuildRouteSettings(page)
         "Shows a small list under the splits: each party member with Headstart, their role and their"
         .. " current step.")
 
+    Section("Level pace", "off by default", { icon = 134376 })
+    Row("Level pace", S.Switch(c, Opt("paceWatch"), SetOpt("paceWatch")),
+        "Shows the XP you still need and the time to level at your pace, under the RestedXP guide. Says once"
+        .. " when a quest step pays clearly less than grinding where you are, or has cost you two deaths.")
+
     Section("Level splits", nil, { icon = 236562 })
     Row("Show level splits", S.Switch(c, Opt("showSplits"), SetOpt("showSplits", function(on) YR:ShowSplits(on) end)))
     Row("Lock position", S.Switch(c, function() return st().lock end, Style("lock")),
