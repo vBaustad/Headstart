@@ -627,6 +627,21 @@ g.YippRouteDB.splitsCompare = "class"
 check(YR.SplitsFastest().levels[10] == 3000, "same class: the rogue is out, the old paladin run counts")
 g.YippRouteDB.splitsCompare = "race"
 check(YR.SplitsFastest().levels[10] == 5900, "class and race: a Gnome paladin counts for a Dwarf, a Human and an unplaced run don't")
+# Class and start route: a Lean opener against Lean runs only, the route from the run (RestedXP's
+# "01-06" or "1-6") or, for a run from before, from a routes addon's HeadstartRunRoutes
+lua.execute('''YippRouteDB.splits.runs = {
+  lean = { name = "Lean-Realm", class = "PALADIN", route = "01-06 Shadowglen (Lean)", levels = { [1] = 0, [5] = 1600 } },
+  oldlean = { name = "OldLean-Realm", class = "PALADIN", levels = { [1] = 0, [5] = 1500 } },
+  full = { name = "Full-Realm", class = "PALADIN", route = "1-6 Shadowglen (Launch)", levels = { [1] = 0, [5] = 1200 } },
+  other = { name = "Rogue-Realm", class = "ROGUE", route = "1-6 Shadowglen (Lean)", levels = { [1] = 0, [5] = 1000 } } }
+  HeadstartRunRoutes = { ["OldLean-Realm"] = "1-6 Shadowglen (Lean)" }
+  KEPT_RXP, KEPT_LEVEL = RXP, UnitLevel
+  RXP = { currentGuide = { name = "1-6 Shadowglen (Lean)" } }
+  UnitLevel = function() return 3 end''')
+g.YippRouteDB.splitsCompare = "route"
+check(YR.SplitsFastest().levels[5] == 1500,
+      "class and start route: a Lean run and an older one the routes addon names; not the Launch run, not another class")
+lua.execute("RXP, UnitLevel, HeadstartRunRoutes = KEPT_RXP, KEPT_LEVEL, nil")
 g.YippRouteDB.splitsCompare = None
 lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 

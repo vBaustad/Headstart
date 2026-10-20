@@ -155,6 +155,31 @@ local function RunRace(k, r)
     end
 end
 
+-- The route a run started on: the RestedXP guide it was on at level 6 or below (rec.route, kept from
+-- the moment it is first seen), so practice on one opener is compared with practice on the same
+-- opener: "class and start route" (the user, 2026-10-20: lean runs against lean runs, "ellers er jeg
+-- alltid bak når jeg praccer"). Runs from before this have none; a routes addon may name theirs in
+-- HeadstartRunRoutes ["Name-Realm"] = guide name. RestedXP writes "01-06" where a guide says "1-6".
+local function Plain(name)
+    return type(name) == "string" and (name:gsub("^0(%d)", "%1"):gsub("%-0(%d)", "-%1")) or nil
+end
+local function RouteOf(r)
+    if r.route then return Plain(r.route) end
+    local known = _G.HeadstartRunRoutes
+    return type(known) == "table" and r.name and Plain(known[r.name]) or nil
+end
+YR.SplitsRouteOf = RouteOf   -- for the tests
+-- The guide RestedXP has loaded, while you are still on an opener (level 6 or below), else nil.
+local function StartNow()
+    if (UnitLevel("player") or 99) > 6 then return nil end
+    local guide = type(RXP) == "table" and RXP.currentGuide
+    local name = type(guide) == "table" and (guide.name or guide.displayname)
+    return type(name) == "string" and name ~= "" and name or nil
+end
+local function NoteRoute()
+    if rec and not rec.route then rec.route = StartNow() end
+end
+
 local function Counts(k, r)
     local by = YippRouteDB.splitsCompare
     if not by or by == "any" then return true end
@@ -164,6 +189,10 @@ local function Counts(k, r)
     if by == "race" then
         local race = RunRace(k, r)
         return race ~= nil and RaceGroup(race) == RaceGroup(myRace)
+    end
+    if by == "route" then
+        local mine = rec and RouteOf(rec) or Plain(StartNow())
+        return mine ~= nil and RouteOf(r) == mine
     end
     return true
 end
@@ -412,6 +441,7 @@ local spare
 local function Tick()
     local now = GetTime()
     if rec and last and not rec.stopped then
+        if not rec.route then NoteRoute() end
         rec.elapsed = rec.elapsed + (now - last)
         local newest = rate[#rate]
         if not newest or rec.elapsed - newest[1] >= 5 then
