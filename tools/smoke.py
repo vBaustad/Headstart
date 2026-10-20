@@ -1639,6 +1639,8 @@ check(YR.DropIdleTracks() == 0 and g.YippRouteDB.routesEver is True, "routes on:
 lua.execute('YippRouteDB.runs["Other-Realm"] = nil; YippRouteDB.routes, YippRouteDB.routesEver = KEEP_ROUTES, KEEP_EVER')
 import smoke_stepkeeper
 bad += smoke_stepkeeper.run()
+import smoke_questskip
+bad += smoke_questskip.run()
 import smoke_myroutes
 bad += smoke_myroutes.run()
 import smoke_trinkets

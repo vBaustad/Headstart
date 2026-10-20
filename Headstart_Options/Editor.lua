@@ -1662,6 +1662,10 @@ local function BuildRouteSettings(page)
         "Abandons a quest the route skips when it is accepted within a second of its window opening, which is"
         .. " how another addon accepts it (a very quick click of yours looks the same). Only with a routes addon"
         .. " that lists such quests. Once a session: accept the quest again and it stays. Off until you turn it on.")
+    Row("Skip quest", S.Switch(c, Opt("questSkip"), SetOpt("questSkip")),
+        "Adds Skip quest to the right-click menu of RestedXP's steps: every step of that quest is skipped, and"
+        .. " the quest stays in your log. Right-click a skipped step to undo, or /headstart unskip. Off until you"
+        .. " turn it on.")
 
     Section("Group play", "for a duo or trio on the same route", { icon = 134149 })
     local role = S.Dropdown(c, 190, YR.ROLES, function(v) YR:SetRole(v) YR:RefreshWindow() end)

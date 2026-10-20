@@ -27,6 +27,7 @@ SkipQuests.lua
 CampingReminder.lua
 MailStep.lua
 StepKeeper.lua
+QuestSkip.lua
 MyRoutes.lua
 Flight.lua
 Boats.lua

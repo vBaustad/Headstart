@@ -256,6 +256,7 @@ local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelSho
     boatTimer = true,
     npcMarkers = true,                      -- (the nameplate markers, NpcMarkers.lua)
     paceWatch = true,                       -- (the level pace box under the guide, Pace.lua)
+    questSkip = true,                       -- (Skip quest in RestedXP's step menu, QuestSkip.lua)
     bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
 YR.STARTS_OFF = STARTS_OFF
 
@@ -279,7 +280,8 @@ end
 -- the splits box ran on with the routes off on every account that had them written down as on - the
 -- routes' page then says "none of it runs", and had no switch left to stop them.)
 local ROUTES_OWN = { logging = true, showSplits = true, deathSkipRelease = true, campReminder = true, buyLater = true,
-    sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true, skipQuests = true, paceWatch = true }
+    sellGuard = true, groupPanel = true, groupAccept = true, groupShare = true, skipQuests = true, paceWatch = true,
+    questSkip = true }
 function YR.Option(key)
     if YippRouteDB.qolOff == true and not LEVELLING[key] then return false end
     if ROUTES_OWN[key] and YR.RoutesOn and not YR.RoutesOn() then return false end
@@ -697,6 +699,15 @@ SlashCmdList.HEADSTART = function(msg)
         YR.ShowTrinketBar(YR.Option("trinketBar"))
     elseif cmd == "leave" then
         YR.LeaveGroup()
+    elseif cmd == "skip" or cmd == "unskip" then
+        -- the quest of the step you're on skipped, or the last skip put back (QuestSkip.lua)
+        if not YR.Option("questSkip") then
+            YR.Print("turn on Skip quest first: Settings, Levelling, Route settings.")
+        elseif cmd == "skip" then
+            YR.QuestSkip()
+        else
+            YR.QuestUnskip()
+        end
     elseif cmd == "mail" then
         if YR.MailIsOpen() then YR.MailToAlt(true) else YR.Print("open a mailbox first.") end
     elseif cmd == "bank" then
