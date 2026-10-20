@@ -413,15 +413,23 @@ function YR.StepSummary(step)
     return classes and (line .. "  [" .. classes .. "]") or line
 end
 
-function YR:SaveCustom(key, header, steps)
+-- What other files read from a route's text and keep (the needs, Group play's quests, the shopping
+-- list): rebuilt from the new text after an edit, a revert or a merge.
+local function ForgetDerived()
     if YR.ForgetNeeds then YR:ForgetNeeds() end
+    if YR.ForgetRouteQuests then YR:ForgetRouteQuests() end
+    if YR.ForgetShopping then YR:ForgetShopping() end
+end
+
+function YR:SaveCustom(key, header, steps)
+    ForgetDerived()
     local old = Custom()[key]
     Custom()[key] = { text = YR.JoinSteps(header, steps), saved = time(),
         base = old and old.base or (byKey[key] and byKey[key].text) }
 end
 
 function YR:RevertGuide(key)
-    if YR.ForgetNeeds then YR:ForgetNeeds() end
+    ForgetDerived()
     Custom()[key] = nil
 end
 
@@ -534,7 +542,7 @@ end
 
 -- Take the new shipped route into the player's edited one. Returns the number of clashes.
 function YR:MergeUpdate(key)
-    if YR.ForgetNeeds then YR:ForgetNeeds() end
+    ForgetDerived()
     local c, g = Custom()[key], byKey[key]
     if not (c and g and c.base) then return end
     local bHead, bSteps = YR.SplitSteps(c.base)
@@ -554,7 +562,7 @@ function YR:CanUndoMerge(key)
 end
 
 function YR:UndoMerge(key)
-    if YR.ForgetNeeds then YR:ForgetNeeds() end
+    ForgetDerived()
     local c = Custom()[key]
     if not (c and c.before) then return end
     Custom()[key] = { text = c.before.text, base = c.before.base, saved = time(), told = c.told }
