@@ -176,8 +176,29 @@ local function StartNow()
     local name = type(guide) == "table" and (guide.name or guide.displayname)
     return type(name) == "string" and name ~= "" and name or nil
 end
+-- Past 6 with no route kept (a run begun before this was added): this character's own run log says
+-- which opener it played most up to level 6 (its "step" rows, Log.lua). Asked once a login.
+local fromLog
+local function StartInLog()
+    if fromLog ~= nil then return fromLog or nil end
+    fromLog = false
+    local key = YR.CharKey and YR.CharKey()
+    local run = key and type(YippRouteDB.runs) == "table" and YippRouteDB.runs[key]
+    if type(run) ~= "table" or type(run.ev) ~= "table" then return nil end
+    local count, best, most = {}, nil, 0
+    for _, e in ipairs(run.ev) do
+        local g = e[2] == "step" and (e[4] or 99) <= 6 and e.guide
+        if type(g) == "string" and (g:find("^01%-0") or g:find("^1%-")) then
+            count[g] = (count[g] or 0) + 1
+            if count[g] > most then best, most = g, count[g] end
+        end
+    end
+    fromLog = best or false
+    return best
+end
+YR.SplitsStartInLog = StartInLog   -- for the tests
 local function NoteRoute()
-    if rec and not rec.route then rec.route = StartNow() end
+    if rec and not rec.route then rec.route = StartNow() or StartInLog() end
 end
 
 local function Counts(k, r)

@@ -643,6 +643,7 @@ check(YR.SplitsFastest().levels[5] == 1500,
       "class and start route: a Lean run and an older one the routes addon names; not the Launch run, not another class")
 lua.execute("RXP, UnitLevel, HeadstartRunRoutes = KEPT_RXP, KEPT_LEVEL, nil")
 g.YippRouteDB.splitsCompare = None
+check(YR.SplitsStartInLog is not None, "the start route can be read from this character's own log (a run past 6)")
 lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
 
 # Shipped guides: both handed to RestedXP at login; a guide splits into steps and joins back unchanged;
