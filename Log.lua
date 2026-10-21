@@ -462,23 +462,17 @@ local function Tidy()
     end
     tidied = true
     -- this character's log from its own file, and what the account's file still holds packed small
-    local packed = YR.RunsAttach()
-    if packed > 0 then
-        YR.Print(("packed the run logs of %d other character%s: they take a third of the memory now, and each moves to its own character's file the next time that character logs in."):format(packed, packed == 1 and "" or "s"))
-    end
+    YR.RunsAttach()             -- (it said how many it packed: housekeeping nobody needs told of)
     local pruned = YR.PruneLogs(YR.LogKeepDays())
     if pruned > 0 then
-        YR.Print(("deleted the run logs of %d character%s not played for %d days (kept: the fastest runs and any a route of yours was saved from). Headstart, Levelling, Settings sets the days; 0 keeps them all."):format(pruned,
+        YR.Print(("deleted the run logs of %d character%s not played for %d days (kept: the fastest runs and any a route of yours was saved from). Routes, Settings, Record runs sets the days; 0 keeps them all."):format(pruned,
             pruned == 1 and "" or "s", YR.LogKeepDays()))
     end
     if not YippRouteDB.trackSlimmed and next(YippRouteDB.runs) then
         for _, r in pairs(YippRouteDB.runs) do if type(r.track) == "table" then YR.SlimTrack(r.track) end end
         YippRouteDB.trackSlimmed = 1
     end
-    local dropped = YR.DropIdleTracks()
-    if dropped > 0 then
-        YR.Print(("routes are off: dropped %d old position samples of your other characters' run logs (their events stay; nothing of this character's)."):format(dropped))
-    end
+    YR.DropIdleTracks()         -- (nor how many old position samples went: their events stay)
 end
 
 -- Recording is a part (Core.lua): its frame, its events and the sample every two seconds exist only

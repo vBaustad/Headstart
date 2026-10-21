@@ -1,44 +1,38 @@
--- NPC markers: an icon on the nameplate of the NPC the RestedXP step you're on says to talk to (the owner,
--- 2026-10-16: "kan vi marke npc som vi skal snakke med kanskje?"). RestedXP's own marking puts a raid target on
--- the NPC, and SetRaidTarget is restricted on Forever: it needs a click or a macro there.
---   Who: the names on the active steps' .target lines (RestedXP's own: element.targets; a name may come as
---   "Name::id", or as the id alone until RestedXP has the name). Matched by the NPC's id where the guide gave one,
---   else by its name; another player is never marked. Only while that step is active.
---   Which icon: "?" while the step has a quest to hand in, "!" while it has one to take, else a speech bubble.
---   Quest mobs (npcMarkersMobs, on unless turned off): a sword on the plates of enemies that count for a quest in
---   your log - the game's own quest objective lines on the unit, and the step's .mob lines.
+-- Quest mob markers (NpcMarkers.lua): a sword on the nameplate of an enemy you still need for a quest - one to
+-- kill, or one that drops what a quest wants: the game's own quest objective lines on the unit (in its tooltip
+-- data) not yet done, and the .mob lines of the RestedXP steps you're on. Only enemies, alive.
+--   It marked the NPC a step says to talk to as well ("!", "?", a speech bubble), and could turn the game's
+--   friendly NPC plates on for it; the game shows a quest giver's "!" and "?" itself (the owner, 2026-10-20:
+--   "nameplate quest objectives only need to be for enemies to kill or loot, not quest givers"). Friendly plates
+--   it turned on are put back as they were (written down then: npcMarkersWas), in a fight as it ends.
 --   The icon stands beside the plate's health bar where it shows one, else over its name (Blizzard's plates and
 --   other addons' differ: Plater and ElvUI keep theirs in plate.unitFrame, Kui in plate.kui).
---   Friendly NPC plates (npcMarkersPlates, on unless turned off): the game has them off unless you turned them
---   on, and a talk-to NPC with no plate has nowhere to show the icon. While this is on the game's setting is on;
---   what it was is written down first and put back when this goes off, as you log out (so with Headstart removed
---   the game has your own), and in a fight as it ends. Changed by you while this holds it: yours stands.
+--   Questie draws its own quest icons on enemies' plates (Questie.db.profile.nameplateEnabled, on unless turned
+--   off): while it does, none of ours, so nobody with both sees two.
 --   Secret values (Forever can hand out a unit's GUID, name or tooltip as secret in combat): no marker, never an
 --   error.
---   Account options: npcMarkers (off until turned on), npcMarkersMobs, npcMarkersPlates, npcMarkersSize (22).
+--   Account options: npcMarkers (off until turned on).
 --   Free while off (YR.Part): nothing listens, nothing is made; RestedXP's step functions are hooked the first
 --   time this is on, and do nothing while it is off.
 local _, YR = ...
 
-local TALK, OFFER, HANDIN, MOB = 132053, 132049, 132048, 131013    -- GossipGossipIcon, AvailableQuestIcon, ActiveQuestIcon, Cursor\Attack
-local RANK = { [TALK] = 1, [OFFER] = 2, [HANDIN] = 3 }
-local CVAR = "nameplateShowFriendlyNpcs"
+local MOB = 131013                          -- Cursor\Attack
+local CVAR = "nameplateShowFriendlyNpcs"    -- (the game's friendly NPC plates: put back where this turned them on)
 local OBJECTIVE = 8                         -- Enum.TooltipDataLineType.QuestObjective
 
 local function On() return YR.QoLOn() and YR.Option("npcMarkers") end
-local function Flag(key) return YippRouteDB[key] ~= false end
 local function Plain(v)
     if v == nil or (issecretvalue and issecretvalue(v)) then return nil end
     return v
 end
 
 --- The icons' size, as set.
-function YR.NpcMarkerSize() return math.max(14, math.min(40, tonumber(YippRouteDB.npcMarkersSize) or 22)) end
+function YR.NpcMarkerSize() return 22 end
 
 -- ---------------------------------------------------------------------------
--- Who: the active steps' .target and .mob lines
+-- Who: the active steps' .mob lines
 -- ---------------------------------------------------------------------------
-local talkName, talkId, mobName, mobId = {}, {}, {}, {}
+local mobName, mobId = {}, {}
 
 -- A guide's name for a unit: "Name", "Name::123", "123", maybe with RestedXP's "*" or "+" in front.
 local function Entry(raw)
@@ -50,49 +44,27 @@ local function Entry(raw)
     return raw ~= "" and raw or nil, nil
 end
 
-local function Add(names, ids, raw, value, rxp)
+local function Add(raw, rxp)
     local name, id = Entry(raw)
     if name and type(rxp.GetCreatureName) == "function" then
         local ok, local_ = pcall(rxp.GetCreatureName, name)          -- (its name in the client's language)
         if ok and type(local_) == "string" then name = local_ end
     end
-    local function Put(t, k)
-        if k ~= nil and (t[k] == nil or (RANK[value] or 0) > (RANK[t[k]] or 0)) then t[k] = value end
-    end
-    Put(names, name)
-    Put(ids, id)
-end
-
--- "?" while the step has a quest to hand in, "!" while it has one to take, else the speech bubble.
-local function StepIcon(step)
-    local take = false
-    for _, e in ipairs(step.elements) do
-        if type(e) == "table" and not e.completed and not e.skip then
-            if e.tag == "turnin" then return HANDIN end
-            if e.tag == "accept" then take = true end
-        end
-    end
-    return take and OFFER or TALK
+    if name ~= nil then mobName[name] = true end
+    if id ~= nil then mobId[id] = true end
 end
 
 local function ReadSteps()
-    wipe(talkName) wipe(talkId) wipe(mobName) wipe(mobId)
+    wipe(mobName) wipe(mobId)
     local rxp = _G.RXP
     local frame = type(rxp) == "table" and rxp.RXPFrame
     local steps = type(frame) == "table" and frame.activeSteps
     if type(steps) ~= "table" then return end
     for _, step in pairs(steps) do
         if type(step) == "table" and type(step.elements) == "table" then
-            local icon
             for _, e in ipairs(step.elements) do
-                if type(e) == "table" then
-                    if type(e.targets) == "table" then
-                        icon = icon or StepIcon(step)
-                        for _, raw in ipairs(e.targets) do Add(talkName, talkId, raw, icon, rxp) end
-                    end
-                    if type(e.mobs) == "table" then
-                        for _, raw in ipairs(e.mobs) do Add(mobName, mobId, raw, MOB, rxp) end
-                    end
+                if type(e) == "table" and type(e.mobs) == "table" then
+                    for _, raw in ipairs(e.mobs) do Add(raw, rxp) end
                 end
             end
         end
@@ -119,31 +91,46 @@ local function NpcId(unit)
     return tonumber(id)
 end
 
--- Whether the game's own tooltip for the unit has a quest objective of yours not yet done.
-local function Objective(unit)
+-- Whether the game's own tooltip for the unit has a quest objective of yours not yet done. Read once per kind of mob
+-- (its NPC id) until your quest log changes: every plate of a pack, and every look again, had the tooltip built anew.
+local objective = {}                            -- [npc id] = true / false
+local function Objective(unit, id)
+    if id and objective[id] ~= nil then return objective[id] end
+    local found = false
     local tip = C_TooltipInfo
     local data = tip and Ask(tip.GetUnit, unit)
     local lines = type(data) == "table" and Plain(data.lines)
-    if type(lines) ~= "table" then return false end
+    if type(lines) ~= "table" then return false end         -- (no answer: asked again next time)
     for _, line in ipairs(lines) do
-        if type(line) == "table" and Plain(line.type) == OBJECTIVE then
-            local done = line.completed
-            if issecretvalue and issecretvalue(done) then return false end
-            if done ~= true then return true end
+        if type(line) == "table" then
+            -- a line the game keeps secret (in a fight): not known - no sword now, and not kept, so it is asked again
+            -- (the review, 2026-10-21: kept as "no", a mob first seen in a fight stayed bare until the quest log changed)
+            local kind, done = line.type, line.completed
+            if issecretvalue and issecretvalue(kind) then return false end
+            if kind == OBJECTIVE then
+                if issecretvalue and issecretvalue(done) then return false end
+                if done ~= true then found = true break end
+            end
         end
     end
-    return false
+    if id then objective[id] = found end
+    return found
+end
+
+-- Whether Questie is drawing its own quest icons on nameplates now (its settings: Questie.db.profile, AceDB's).
+local function QuestieDraws()
+    local questie = _G.Questie
+    local db = type(questie) == "table" and questie.db
+    local p = type(db) == "table" and db.profile
+    return type(p) == "table" and p.nameplateEnabled ~= false
 end
 
 local function Want(unit)
     if Ask(UnitIsPlayer, unit) ~= false then return nil end         -- (a player, or not known: none)
+    if Ask(UnitCanAttack, "player", unit) ~= true or Ask(UnitIsDead, unit) == true then return nil end
+    if QuestieDraws() then return nil end
     local name, id = Ask(UnitName, unit), NpcId(unit)
-    local icon = (id and talkId[id]) or (name and talkName[name])
-    if icon then return icon end
-    if not Flag("npcMarkersMobs") or Ask(UnitCanAttack, "player", unit) ~= true or Ask(UnitIsDead, unit) == true then
-        return nil
-    end
-    if (id and mobId[id]) or (name and mobName[name]) or Objective(unit) then return MOB end
+    if (id and mobId[id]) or (name and mobName[name]) or Objective(unit, id) then return MOB end
     return nil
 end
 YR.NpcMarkerWant = Want
@@ -176,6 +163,20 @@ local function Hide(plate)
     if f then f:Hide() end
 end
 
+-- The icon by the plate's health bar (or over its name, or the plate): placed again only where that has changed - the
+-- plate's parts, the size - and not at every look.
+local function Place(f, plate)
+    local frame, bar = Parts(plate)
+    local size = YR.NpcMarkerSize()
+    local at = bar or (Shown(frame.name) and frame.name) or frame
+    if f.at == at and f.size == size then return end
+    f.at, f.size = at, size
+    f:SetSize(size, size)
+    f:ClearAllPoints()
+    if at == bar then f:SetPoint("RIGHT", bar, "LEFT", -3, 0) else f:SetPoint("BOTTOM", at, "TOP", 0, 2) end
+    local level = Plain(frame:GetFrameLevel())
+    f:SetFrameLevel((level or 1) + 10)
+end
 local function Put(plate, icon)
     local f = icons[plate]
     if not f then
@@ -185,24 +186,15 @@ local function Put(plate, icon)
         f.tex:SetAllPoints()
         icons[plate] = f
     end
-    local ok = pcall(function()
-        local frame, bar = Parts(plate)
-        local size = YR.NpcMarkerSize()
-        f:SetSize(size, size)
-        f:ClearAllPoints()
-        if bar then
-            f:SetPoint("RIGHT", bar, "LEFT", -3, 0)
-        elseif Shown(frame.name) then
-            f:SetPoint("BOTTOM", frame.name, "TOP", 0, 2)
-        else
-            f:SetPoint("BOTTOM", frame, "TOP", 0, 2)
-        end
-        local level = Plain(frame:GetFrameLevel())
-        f:SetFrameLevel((level or 1) + 10)
-    end)
-    if not ok then f:Hide() return end
-    f.icon = icon
-    f.tex:SetTexture(icon)
+    if not pcall(Place, f, plate) then
+        f.at = nil
+        f:Hide()
+        return
+    end
+    if f.icon ~= icon then
+        f.icon = icon
+        f.tex:SetTexture(icon)
+    end
     f:Show()
 end
 
@@ -276,7 +268,7 @@ local function Hook()
 end
 
 -- ---------------------------------------------------------------------------
--- The game's setting for friendly NPC plates: written down, then put back
+-- The game's setting for friendly NPC plates, where this turned them on (it no longer does): put back
 -- ---------------------------------------------------------------------------
 local writing = false            -- our own writes, which CVAR_UPDATE reports too
 local function Get()
@@ -300,18 +292,8 @@ local function Wait()
     waiter:RegisterEvent("PLAYER_REGEN_ENABLED")
     waiter:SetScript("OnEvent", function(self)
         self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-        if live and Flag("npcMarkersPlates") then YR.NpcMarkersPlates() else PlatesBack() end
+        PlatesBack()
     end)
-end
-
---- Friendly NPC plates on, while this is (what the game had is written down first).
-function YR.NpcMarkersPlates()
-    if not (C_CVar and live and Flag("npcMarkersPlates")) then return end
-    local now = Get()
-    if now == nil or now == "1" then return end
-    if InCombatLockdown() then Wait() return end
-    if YippRouteDB.npcMarkersWas == nil then YippRouteDB.npcMarkersWas = now end
-    Write("1")
 end
 
 --- The game's setting put back as it was before this changed it.
@@ -336,16 +318,18 @@ YR.Part(On, { "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "QUEST_LOG_UPD
         Hide(marked[arg])
         marked[arg] = nil
     elseif event == "QUEST_LOG_UPDATE" then
-        Soon(true)
+        -- (what each kind of mob's tooltip says is read again; the route's steps are RestedXP's to change, and
+        -- its own update - hooked above - says so)
+        wipe(objective)
+        Soon(false)
     elseif event == "PLAYER_ENTERING_WORLD" then
-        YR.NpcMarkersPlates()
+        wipe(objective)
         Gather()
         Soon(true)
     elseif event == "CVAR_UPDATE" then
-        -- changed by you while this holds it: yours stands (turned off, the switch for it goes off too)
+        -- changed by you before it was put back: yours stands
         if writing or type(arg) ~= "string" or arg:lower() ~= CVAR:lower() or YippRouteDB.npcMarkersWas == nil then return end
         YippRouteDB.npcMarkersWas = nil
-        if value ~= nil and tostring(value) == "0" then YippRouteDB.npcMarkersPlates = false end
     elseif event == "PLAYER_LOGOUT" then
         -- (put back before the game saves it, made again at the next login: removed, Headstart leaves yours)
         PlatesBack()
@@ -353,8 +337,10 @@ YR.Part(On, { "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "QUEST_LOG_UPD
 end, {
     start = function()
         live = true
+        -- (what was read before it was turned off: the quest log changed unheard since)
+        wipe(objective)
         Hook()
-        YR.NpcMarkersPlates()
+        PlatesBack()
         ReadSteps()
         Gather()
         MarkAll()
@@ -365,8 +351,7 @@ end, {
         wipe(units)
         PlatesBack()
     end,
-    again = function()                  -- still on, and a setting changed (the plates' switch, the size, mobs)
-        if Flag("npcMarkersPlates") then YR.NpcMarkersPlates() else PlatesBack() end
+    again = function()                  -- still on, and a setting changed (the size)
         MarkAll()
     end,
 })

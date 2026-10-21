@@ -169,6 +169,14 @@ end
     check(YR.TalentScale() == 84, "a tap on +5: 84")
     YR.SetTalentScale(400)
     check(YR.TalentScale() == 150, "held at 150 at most")
+    # never larger than fits the screen: a window taller than the screen was pushed to its top and couldn't be
+    # moved up or down (the owner, 2026-10-19). The fake window is 1000 by 800; the screen 1500 by 1000 here
+    lua.execute("UIParent.GetHeight = function() return 1000 end UIParent.GetWidth = function() return 1500 end")
+    YR.SetTalentScale(150)
+    check(near(scale(), 1000 / 800 * 0.95), f"150 asked, the window taller than the screen at that: as large as fits ({scale()})")
+    YR.SetTalentScale(110)
+    check(near(scale(), 1.1), f"110: it fits, as asked ({scale()})")
+    lua.execute("UIParent.GetHeight = nil UIParent.GetWidth = nil")
     YR.SetTalentScale(100)
     check(near(scale(), 1), "100: Blizzard's own again")
     # a new size keeps the window under the mouse: the spot the mouse is on stays put. The fake window
@@ -252,6 +260,38 @@ end
     YR.MoverReset("bag")
     lua.execute("ContainerFrameCombinedBags:SetPoint('BOTTOMRIGHT', UIParent, 'BOTTOMRIGHT', -10, 90)")
     check(g.YippRouteDB.moved.bag is None and bagpoint()[0] == "BOTTOMRIGHT", "Reset: forgotten, Blizzard's place the next time it's laid out")
+    # Talents before level 10: below 10 the talent key (N) opens Headstart's own Talents page, after Blizzard's own
+    # function has run and opened nothing; Blizzard's window is not changed. (Its IsTabAvailable was wrapped until
+    # 2026-10-21, and the key pressed in a fight was blocked: the owner's BugGrabber, PlayerSpellsFrame:SetAttributeNoHandler().)
+    lua.execute("""
+        local IS_TAB = function(self, id) return id ~= 2 end            -- Blizzard's: no talents before 10
+        rawset(PlayerSpellsFrame, "IsTabAvailable", IS_TAB)
+        KEEP_IS_TAB = IS_TAB
+        rawset(PlayerSpellsFrame, "shown", false)                      -- (Blizzard's window shut)
+        CAN_TALENTS, OPENED, BLIZZARD_RAN = false, {}, 0
+        C_SpecializationInfo = { CanPlayerUseTalentUI = function() return CAN_TALENTS end }
+        PlayerSpellsUtil = { ToggleClassTalentOrSpecFrame = function() BLIZZARD_RAN = BLIZZARD_RAN + 1 end }
+        function hooksecurefunc(o, name, fn)                            -- (a table's own function too, not only a frame's)
+            local old = rawget(o, name) or Obj[name]
+            rawset(o, name, function(...) old(...) fn(...) end)
+        end
+        KEEP_TOGGLE = HeadstartNS.ToggleWindow
+        HeadstartNS.ToggleWindow = function(_, page) OPENED[#OPENED + 1] = page end""")
+    check("talentEarly" not in YR.STARTS_OFF and YR.Option("talentEarly"), "on unless turned off (the owner, 2026-10-20)")
+    YR.ApplyParts()
+    YR.TalentEarlyApply()
+    lua.execute("PlayerSpellsUtil.ToggleClassTalentOrSpecFrame()")
+    opened = [g.OPENED[i] for i in range(1, len(g.OPENED) + 1)]
+    check(g.BLIZZARD_RAN == 1 and opened == ["builds"],
+          f"below 10, the talent key: Blizzard's own first, then Headstart's Talents page ({g.BLIZZARD_RAN}, {opened})")
+    check(lua.eval("rawget(PlayerSpellsFrame, 'IsTabAvailable') == KEEP_IS_TAB"), "Blizzard's window is not changed")
+    lua.execute("CAN_TALENTS = true PlayerSpellsUtil.ToggleClassTalentOrSpecFrame()")
+    check(len(g.OPENED) == 1, "from level 10 on: Blizzard's alone")
+    lua.execute("CAN_TALENTS = false")
+    g.YippRouteDB.talentEarly = False
+    lua.execute("PlayerSpellsUtil.ToggleClassTalentOrSpecFrame()")
+    check(len(g.OPENED) == 1 and g.BLIZZARD_RAN == 3, "turned off: Blizzard's alone")
+    lua.execute("HeadstartNS.ToggleWindow = KEEP_TOGGLE")
     return bad
 
 

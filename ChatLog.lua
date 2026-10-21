@@ -35,7 +35,7 @@ local SHOWN_MAX = 600              -- lines put in the window at once (the newes
 local floor, issecret = math.floor, issecretvalue
 
 function YR.ChatLogOn() return YR.Option("chatLog") end
-function YR.ChatLogMax() return math.max(200, math.min(5000, tonumber(YippRouteDB.chatLogMax) or 1000)) end
+function YR.ChatLogMax() return 1000 end
 
 local function DB()
     local db = _G.HeadstartChatLog
@@ -84,7 +84,6 @@ local function Keep(frame, msg, r, g, b)
     end
     if n > cut then Trim() end
 end
-YR.ChatLogKeep = Keep           -- for the tests
 
 local function Hook()
     for i = 1, tonumber(_G.NUM_CHAT_WINDOWS) or 10 do
@@ -119,12 +118,6 @@ function YR.ChatLogLine(i)
     local l = { floor(m / 16), m % 16, text[i] }
     if c >= 0 then l[4], l[5], l[6] = floor(c / 65536) / 255, floor(c / 256) % 256 / 255, c % 256 / 255 end
     return l
-end
-
--- A window's name as its tab says it.
-local function WindowName(i)
-    local name = GetChatWindowInfo and GetChatWindowInfo(i)
-    return (type(name) == "string" and name ~= "") and name or ("Window " .. i)
 end
 
 --- The chat windows to pick from: { { number, name } }, "All windows" (0) first, then every chat
@@ -396,7 +389,7 @@ local function PlaceButton()
     end
 end
 
-function YR.ChatLogRestoreLines() return math.max(10, math.min(500, tonumber(YippRouteDB.chatLogRestoreLines) or 100)) end
+function YR.ChatLogRestoreLines() return 100 end
 
 --- The old text back in the chat windows: the last lines each window showed, oldest first, as chat
 --- showed them. Once, at a login or a reload, before anything new is said. Returns how many went in.

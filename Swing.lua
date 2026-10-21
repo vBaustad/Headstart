@@ -13,7 +13,12 @@
 --   hand) and its range check (C_SwingTimer, PLAYER_SWING_RANGE_UPDATE). Should the game keep a
 --   swing's length secret, your weapon's attack speed is used instead.
 --   Which bars: main hand; off hand while you hold a weapon there; ranged for a hunter, and for
---   anyone while a ranged swing runs. Shown always, in combat, or only while a swing runs.
+--   anyone while a ranged swing runs. Shown always, in combat, only while a swing runs, or always but
+--   faded between swings (show = "fade"). The ranged bar stands in the main hand's place: one place for
+--   the two - you don't swing and shoot at once - the one swinging shows, else the one you used last. (The
+--   owner, 2026-10-20: "they needn't show all the time; the ranged bar could share the main hand's place -
+--   you don't do both at once"; then "so many settings - some needn't be a setting at all": it was one.)
+--   Where they stand and how large: Arrange (/hs move) - the settings page no longer moves or sizes them.
 --   Blizzard's own swing bars can be made invisible while ours show (only see-through: they are Edit
 --   Mode frames, and hiding or moving them from an addon would taint Edit Mode). In Edit Mode they show.
 --   Nothing runs between swings: the bars are only drawn while one is on its way (or while unlocked).
@@ -24,7 +29,7 @@
 --   Health and power bars (health = true, power = true; Headstart's own, whichever swing bars you
 --   use): the same look, fed with your health and power as the game gives them - in a fight those are
 --   kept from addons, and go to the bar unread. combo = true: your combo points as a row of squares
---   that fill, in the same look. comboColor ("swing": the main hand's colour; "class": your class's). resText (all, pct, value, none): the words on the two bars.
+--   that fill, in the same look, in the main hand's colour. resText (all, pct, value, none): the words on the two bars.
 --   resTone ("muted": the game's colours taken down to sit beside the swing bars'; "bright": Blizzard's own, as they are). resShow ("combat": only in a fight), healthClass (the
 --   bar in your class's colour), healthColor.
 --   Account options (YippRouteDB.swing): on, hideBlizz, w, h, gap, pos, lock, texture, font, show
@@ -79,9 +84,6 @@ YR.SWING_PALETTES = { { "muted", "Muted" }, { "deep", "Deep" }, { "blue", "Blue 
 -- round it in bronze (the frames of Blizzard's action buttons), silver, or your class's colour.
 YR.SWING_FRAMES = { { "light", "Thin light line" }, { "bronze", "Bronze" }, { "silver", "Silver" }, { "class", "Class colour" }, { "thin", "Thin dark line" },
     { "none", "None" } }
--- What a bar says, as one choice.
-YR.SWING_TEXTS = { { "name", "Name" }, { "time", "Name and time left" }, { "all", "Name, time left and swing length" },
-    { "none", "Nothing" } }
 
 local function ClassColour()
     local _, class = UnitClass("player")
@@ -94,7 +96,7 @@ end
 -- "own": where you drag them, at the size set here (what it was before; kept for whoever had moved them).
 local DEFAULT = { on = false, hideBlizz = true, lock = true, show = "combat", range = true, style = "blizzard",
     border = false, colors = true, place = "edit", resShow = "always", healthColor = { 0.30, 0.78, 0.36, 1 },
-    rimColor = { 0.54, 0.45, 0.35, 1 }, fontFace = "blizzard", resText = "all", resTone = "bright", comboColor = "swing" }
+    rimColor = { 0.54, 0.45, 0.35, 1 }, fontFace = "blizzard", resText = "all", resTone = "bright" }
 for k, v in pairs(PRESETS.slim) do DEFAULT[k] = v end
 YR.SWING_DEFAULT = DEFAULT
 local TEXTURES = {
@@ -117,7 +119,8 @@ local BLIZZARD = { "SwingTimerMainHandFrame", "SwingTimerOffHandFrame", "SwingTi
 -- once). The look (colours, sizes, texture, where the bars stand) stays the account's.
 --   Read and written as YR.SwingDB()'s own fields, as before: the account's table hands these few to the
 --   character's (a metatable; they are no longer saved in it).
-local OWN = { on = true, health = true, power = true, cast = true, combo = true, ["rangeBar"] = true }   -- (the range bar's own field)
+local OWN = { on = true, health = true, power = true, cast = true, combo = true, ["rangeBar"] = true,   -- (the range bar's own field)
+    ["rangeText"] = true }
 local mine                      -- this character's choices, once looked up
 local function Mine()
     local char = YippSetupCharDB
@@ -184,8 +187,8 @@ function YR.SwingDB()
     if (db.look or 1) < 2 then db.icon, db.look = false, 2 end
     -- One kind of bar (2026-10-09): Blizzard's own, restyled. Edit Mode already gives them a size, a
     -- place, a title, the time and when they show, and they are timed by the game itself - bars of
-    -- ours beside them were a second set of every setting. The settings page no longer offers ours;
-    -- whoever had them is moved over once. (The code for them is still below, unused by the page.)
+    -- ours beside them were a second set of every setting. Whoever had them was moved over once. (The settings
+    -- page offers Headstart's own again, as "Bars": its code below is in use.)
     if db.look < 3 then db.style, db.look = "blizzard", 3 end
     -- One thin light line and a flat fill (2026-10-12): the double bronze frame read as thick and hard
     -- beside other addons' bars. Everyone starts from it once; the other frames are still to pick.
@@ -199,6 +202,9 @@ function YR.SwingDB()
     -- Blizzard's own colours for health and power, now that the fill is shaded as Blizzard's is: the
     -- muted ones under that shade came out grey and dirty. Once; Muted is still to pick.
     if db.look < 6 then db.resTone, db.look = "bright", 6 end
+    -- Fewer settings (2026-10-20): "Move bars" is gone from the page (Arrange places and sizes them), and "Show
+    -- out of range" is no longer a choice - bars left unlocked or with it off are put right, once.
+    if db.look < 7 then db.lock, db.resLock, db.castLock, db.range, db.look = true, nil, nil, true, 7 end
     filled = db
     return db
 end
@@ -266,7 +272,7 @@ end
 -- Headstart's own bars: each stands where you put it, at its own size. Until moved they stand in a
 -- stack at the bottom middle of the screen (rows up from the base: off hand, main hand, ranged, then
 -- power and health).
-local ROW = { off = 0, main = 1, ranged = 2, combo = 3, power = 4, health = 5, range = 6, cast = 7 }
+local ROW = { off = 0, main = 1, ranged = 2, combo = 3, power = 4, health = 5, range = 6, cast = 7, rangetext = 8 }
 local function BarSize(db, key)
     local size = db.size and db.size[key]
     local w, h = size and size[1] or db.w, size and size[2] or db.h
@@ -276,7 +282,7 @@ end
 function YR.SwingBarSize(key) return BarSize(YR.SwingDB(), key) end
 local function PlaceBar(bar, db, key)
     local w, h = BarSize(db, key)
-    bar:SetSize(w, h)
+    if bar.ownSize ~= true then bar:SetSize(w, h) end           -- (the range text has a size of its own)
     bar:ClearAllPoints()
     local at = db.at and db.at[key]
     if at and at[1] and at[2] then
@@ -344,11 +350,21 @@ end
 
 -- Is there a bar for this hand now?
 local preview = false           -- sample swings on every bar, kept going while you change the look (YR.SwingPreview)
+-- Arrange open (YR.SwingArranging): every bar of ours shows as it does unlocked - a sample where there is nothing
+-- to show (no cast, no swing) - so each is seen as it is while it is placed; but without the unlocked glow round
+-- it, and not taking the mouse: Arrange's outline is what is dragged (the owner, 2026-10-20: "why are the bars
+-- different in Arrange? some have an extra border" - the ones not showing were an empty outline).
+local arranging = false
 local function Wanted(hand, db, now)
     local s = swings[hand.type]
     local running = s and now - s.start < s.length
     if db.use and db.use[hand.key] == false then return false end
     if preview then return true end
+    if arranging then
+        -- (as Arrange has them: an off hand with a weapon in it; the ranged bar in the main hand's place)
+        if hand.type == OFF then return Speed(OFF) ~= nil end
+        return hand.type == MAIN
+    end
     if not db.lock then return true end
     if db.show == "swing" then return running or false end
     if db.show == "combat" and not inCombat then return false end
@@ -362,6 +378,24 @@ end
 -- Out of reach is also said in words, where the time is: a bar between swings is empty, and an empty
 -- bar has no colour to change.
 local FAR_WORDS, FAR_COLOUR = "Out of range", { 1, 0.36, 0.30 }
+local FADED = 0.35                  -- a bar between swings, with "Faded between swings"
+
+-- The ranged bar in the main hand's place: the place a bar stands in, and which of the two has it now - the one
+-- swinging (where both are, the later begun), else the one you used last.
+local lastKind = MAIN
+local function PlaceKey(hand) return hand.type == RANGED and "main" or hand.key end
+local function SharedTurn(now)
+    local m, r = swings[MAIN], swings[RANGED]
+    local mRun = m and now - m.start < m.length
+    local rRun = r and now - r.start < r.length
+    if mRun and rRun then
+        if r.start == m.start then return lastKind end          -- (begun the same moment: the later told)
+        return r.start > m.start and RANGED or MAIN
+    end
+    if rRun then return RANGED end
+    if mRun then return MAIN end
+    return lastKind
+end
 local function Colour(bar, db)
     local out = (db.range and far[bar.hand.type]) and true or false
     local c = out and db.farColor or db[bar.hand.color]
@@ -405,6 +439,12 @@ local function Paint(bar, db, now)
         end
         bar.time:SetText(text)
     end
+    -- faded between swings (show = "fade"): there, in its place, but quiet until it swings
+    local a = (bar.fade == true and not running) and FADED or 1
+    if bar.alphaNow ~= a then
+        bar.alphaNow = a
+        bar:SetAlpha(a)
+    end
     return running
 end
 
@@ -431,10 +471,17 @@ function YR.SwingLayout()
     local db, now = YR.SwingDB(), GetTime()
     local on = Own() and not editing
     local set = 0
+    for _, hand in ipairs(HANDS) do
+        local bar = bars[hand.type]
+        bar.want = on and Wanted(hand, db, now) or false
+        bar.fade = db.show == "fade" and db.lock ~= false and not arranging and not preview
+    end
+    -- the ranged bar in the main hand's place: one of the two there (the main hand's while being placed)
+    if bars[MAIN].want and bars[RANGED].want then
+        if not db.lock or arranging or SharedTurn(now) ~= RANGED then bars[RANGED].want = false else bars[MAIN].want = false end
+    end
     for i, hand in ipairs(HANDS) do
-        local want = on and Wanted(hand, db, now) or false
-        bars[hand.type].want = want
-        if want then set = set + SET[i] end
+        if bars[hand.type].want then set = set + SET[i] end
     end
     if set ~= laid then
         laid = set
@@ -481,32 +528,10 @@ local function StyleBar(bar, look)
     bar.edge:SetShown(unlocked)
 end
 
--- The health, power and combo bars' look: the frame, the texture, the dark back and the font. It is
--- the swing bars' look, so every bar of ours reads as one set, until you pick one for these alone
--- (resOwn = true): then it is YippRouteDB.swing.res, which starts as the swing bars' look was then.
-local LOOK_KEYS = { "texture", "outline", "rim", "rimColor", "rimKind", "lineColor", "bgAlpha", "font", "fontFace" }
-function YR.ResourceLook()
-    local db = YR.SwingDB()
-    if db.resOwn ~= true then return db end
-    local look = db.res
-    if type(look) ~= "table" then look = {} db.res = look end
-    for _, k in ipairs(LOOK_KEYS) do
-        if look[k] == nil then
-            local v = db[k]
-            look[k] = type(v) == "table" and { unpack(v) } or v
-        end
-    end
-    return look
-end
---- Whether the health, power and combo bars wear a look of their own (true), or the swing bars' (false).
---- Turned on, it starts from the swing bars' look as it is now.
-function YR.ResourceLookOwn(own)
-    local db = YR.SwingDB()
-    if own == nil then return db.resOwn == true end
-    if own and db.resOwn ~= true then db.res = nil end
-    db.resOwn = own and true or nil
-    return db.resOwn == true
-end
+-- The health, power and combo bars' look: the frame, the texture, the dark back and the font - the swing bars',
+-- so every bar of ours reads as one set. (They could wear one of their own until 2026-10-21: a frame and a texture
+-- more to set that hardly anyone would.)
+function YR.ResourceLook() return YR.SwingDB() end
 local function NewBar(parent, key)
     local bar = CreateFrame("StatusBar", nil, parent)
     bar.key = key
@@ -524,9 +549,9 @@ local function Look()
     laid = nil                      -- which bars show, and their colours: gone over again
     for _, hand in ipairs(HANDS) do
         local bar = bars[hand.type]
-        PlaceBar(bar, db, hand.key)
+        PlaceBar(bar, db, PlaceKey(hand))
         StyleBar(bar, db)
-        local _, h = BarSize(db, hand.key)
+        local _, h = BarSize(db, PlaceKey(hand))
         bar.icon:SetSize(h, h)
         bar.icon:SetShown(db.icon)
         bar.spark:SetSize(2, h)
@@ -568,6 +593,7 @@ local function Build()
         bar.far:SetText(FAR_WORDS)
         bar.far:SetTextColor(FAR_COLOUR[1], FAR_COLOUR[2], FAR_COLOUR[3])
         bar.far:Hide()
+        bar.fade = false
         bars[hand.type] = bar
     end
     Look()
@@ -634,7 +660,7 @@ function YR.SwingFrameNow(look)
     return db.rimKind == "silver" and "silver" or db.rimKind == "class" and "class" or "bronze"
 end
 
---- What a bar says (one of YR.SWING_TEXTS).
+--- What a bar says: "name", "time" (name and time left), "all" (and the swing's length) or "none".
 function YR.SwingText(key)
     local db = YR.SwingDB()
     db.name = key ~= "none"
@@ -891,8 +917,16 @@ end
 -- when it is not: then there is nothing true to show, and the bar is away). A hunter's says which reach:
 -- melee, ranged, or neither. At its right end, how far the target is, as a span of yards. Placed, sized
 -- and dressed as the other bars of ours are (its key: "range").
+--   What it says, nearest first (the owner, 2026-10-20: "more detail if we can - a dead zone and so on; fully out
+--   of range must be red; within casting range it can say In range"): Melee range; a band spell's range (Charge,
+--   8 to 25: "Charge range"); the Dead zone, too near for that band and too far for melee (a hunter's 5 to 8, a
+--   warrior's before Charge); In range within your spells' reach; Out of range, in red. A hunter's: Melee range,
+--   In range (the shots), Dead zone, Out of range.
 local rangeBar
-local RANGE_IN, RANGE_MELEE, RANGE_OUT = { 0.28, 0.60, 0.34 }, { 0.80, 0.56, 0.24 }, { 0.62, 0.20, 0.20 }
+local RANGE_IN, RANGE_MELEE, RANGE_OUT = { 0.28, 0.60, 0.34 }, { 0.80, 0.56, 0.24 }, { 0.82, 0.16, 0.14 }
+local RANGE_CAST = { 0.30, 0.50, 0.82 }     -- (within your spells' reach, past melee)
+local RANGE_BAND = { 0.56, 0.38, 0.80 }     -- (within a band spell's reach: Charge)
+local RANGE_DEAD = { 0.90, 0.76, 0.18 }     -- (the dead zone: too near for the band, too far for melee)
 local function Truly(v) return not (issecretvalue and issecretvalue(v)) and v and true or false end
 -- How far the target is, as near as an addon can tell. The game gives no distance, but it does say
 -- whether an item's use would reach a target, and that for an item you do not have: so one item of each
@@ -926,47 +960,216 @@ local function Reaches(ids)
     end
     return nil
 end
--- more than `least` yards, at most `most` (either nil where it could not be told)
+-- And your own spells. An item may answer nothing - one you don't carry, or in a fight (the owner, 2026-10-20:
+-- "still only Out of range, no yards") - while your spells' reach is what the action bars ask all the time. Your
+-- class's spells that you know (Data/TrainerSpells.lua) and that reach from you on (no least distance: Charge's 8
+-- to 25 says "out of reach" when you're too near too), one or two for each reach (the game's own, C_Spell's
+-- maxRange), asked the same way; the two spans are put together. Read again a minute on (a spell learned).
+--   A spell only for friends (a blessing, a heal, a seal on yourself) answers nothing for an enemy: left out, so it
+--   can't take the place of one that does (the review, 2026-10-21: a paladin's 30 yards were Blessing of Might and
+--   Purify, and Exorcism was never asked). Each reach says whether an attack is among its spells (hurts): only an
+--   attack's reach is your cast reach - Mind Vision reaches 100 yards and answers for an enemy too.
+local spellReach, spellReachAt
+local function Says(fn, id)          -- the game's yes or no about a spell, or nil where it gives none
+    if type(fn) ~= "function" then return nil end
+    local ok, v = pcall(fn, id)
+    if not ok or (issecretvalue and issecretvalue(v)) or type(v) ~= "boolean" then return nil end
+    return v
+end
+local function SpellReaches()
+    local now = GetTime() or 0
+    if spellReach and now - spellReachAt < 60 then return spellReach end
+    spellReach, spellReachAt = {}, now
+    local _, class = UnitClass("player")
+    local list = class and type(YR.TrainerSpells) == "table" and YR.TrainerSpells[class]
+    local info = type(C_Spell) == "table" and C_Spell.GetSpellInfo
+    if type(list) ~= "table" or not (info and IsPlayerSpell) then return spellReach end
+    local by = {}
+    for _, e in ipairs(list) do
+        local id = e[1]
+        local hurts = id and Says(C_Spell.IsSpellHarmful, id)
+        if id and IsPlayerSpell(id) and not (hurts == false and Says(C_Spell.IsSpellHelpful, id) == true) then
+            local ok, s = pcall(info, id)
+            local hi, lo = ok and type(s) == "table" and s.maxRange, ok and type(s) == "table" and s.minRange
+            local known = type(hi) == "number" and type(lo) == "number" and not (issecretvalue and (issecretvalue(hi) or issecretvalue(lo)))
+            if known and lo == 0 and hi >= 5 and hi <= 100 then
+                local yd = math.floor(hi + 0.5)
+                by[yd] = by[yd] or { ids = {} }
+                if #by[yd].ids < 2 then
+                    by[yd].ids[#by[yd].ids + 1] = id
+                    -- (where the game can't say, an attack: as it was before it was asked)
+                    by[yd].hurts = by[yd].hurts or hurts ~= false
+                end
+            elseif known and lo == 0 and hi == 0 then
+                -- melee range: no yards in the game's data (it is your reach and the target's) - asked all the same, as
+                -- the action bars ask Heroic Strike; a spell on yourself (an aura, a seal) answers nothing for a target
+                spellReach.melee = spellReach.melee or {}
+                if #spellReach.melee < 4 then spellReach.melee[#spellReach.melee + 1] = id end
+            end
+        end
+    end
+    for yd, r in pairs(by) do spellReach[#spellReach + 1] = { yd, r.ids, r.hurts } end
+    table.sort(spellReach, function(a, b) return a[1] < b[1] end)
+    return spellReach
+end
+-- Your band spells: those with a least distance as well (Charge and Intercept, 8 to 25; a hunter's shots, 8 to 35),
+-- the longest band's - { lo, hi, ids, name } or false. Read again a minute on, as the others.
+local band, bandAt
+local function Band()
+    local now = GetTime() or 0
+    if band ~= nil and now - bandAt < 60 then return band end
+    band, bandAt = false, now
+    local _, class = UnitClass("player")
+    local list = class and type(YR.TrainerSpells) == "table" and YR.TrainerSpells[class]
+    local info = type(C_Spell) == "table" and C_Spell.GetSpellInfo
+    if type(list) ~= "table" or not (info and IsPlayerSpell) then return band end
+    for _, e in ipairs(list) do
+        local id = e[1]
+        if id and IsPlayerSpell(id) then
+            local ok, s = pcall(info, id)
+            local hi, lo = ok and type(s) == "table" and s.maxRange, ok and type(s) == "table" and s.minRange
+            if type(hi) == "number" and type(lo) == "number" and not (issecretvalue and (issecretvalue(hi) or issecretvalue(lo)))
+                and lo >= 5 and hi <= 45 and hi > lo then
+                if not band or hi > band.hi then
+                    band = { lo = lo, hi = hi, ids = { id } }
+                elseif hi == band.hi and lo == band.lo and #band.ids < 2 then
+                    band.ids[#band.ids + 1] = id
+                end
+            end
+        end
+    end
+    if band then
+        local name = type(C_Spell) == "table" and C_Spell.GetSpellName and C_Spell.GetSpellName(band.ids[1])
+        band.name = type(name) == "string" and not (issecretvalue and issecretvalue(name)) and name or nil
+    end
+    return band
+end
+local castOf, castReach         -- the target whose reach (Yards, below) was asked, and that reach
+--- (For the tests: your spells read again at the next look.)
+function YR.SwingRangeSpellsForget() spellReach, band, castOf = nil, nil, nil end
+local function SpellAnswer(ids)
+    local ask = type(C_Spell) == "table" and C_Spell.IsSpellInRange
+    if not ask then return nil end
+    for _, id in ipairs(ids) do
+        local ok, r = pcall(ask, id, "target")
+        if ok and not (issecretvalue and issecretvalue(r)) and r ~= nil then return r and true or false end
+    end
+    return nil
+end
+
+local function Attackable() return Truly(UnitExists("target")) and Truly(UnitCanAttack("player", "target")) end
+
+-- more than `least` yards, at most `most` (either nil where it could not be told); and whether your band spell
+-- (Band, above: Charge) reaches - its answer narrows the yards too: within it, between its two ends; saying no while
+-- the target is nearer than its far end, nearer than its near end (the dead zone)
+local CAST_MOST = 45            -- (no attack of a class reaches farther; a hunter's shots are told apart)
 local function Yards()
     -- Only of something you can attack. Asked about a friend in a fight, the game takes the question
     -- for an action an addon may not take (it is allowed of an enemy, or out of a fight) - and with a
     -- party member clicked on in a fight that was thirteen of them, five times a second.
-    if not (Truly(UnitExists("target")) and Truly(UnitCanAttack("player", "target"))) then return nil, nil end
+    if not Attackable() then return nil, nil end
+    local okG, guid = pcall(UnitGUID, "target")
+    if not okG or type(guid) ~= "string" or (issecretvalue and issecretvalue(guid)) then guid = nil end
     local least, most
     for _, step in ipairs(YARDS) do
         local r = Reaches(step[2])
         if r == true then most = step[1] break end
         if r == false then least = step[1] end
     end
-    return least, most
+    -- How far your spells reach it, `cast`: the longest reach that answers for this target (a heal or Distract answers
+    -- nothing for an enemy) - every reach asked once for a target; after that only those between what is known.
+    local reaches = SpellReaches()
+    local fresh = guid == nil or guid ~= castOf
+    local cast = fresh and 0 or castReach
+    for _, step in ipairs(reaches) do
+        local yd = step[1]
+        local between = not (most and yd >= most) and not (least and yd <= least)
+        if between or fresh then
+            local r = SpellAnswer(step[2])
+            if fresh and r ~= nil and step[3] and yd <= CAST_MOST and yd > cast then cast = yd end
+            if between then
+                if r == true then most = yd elseif r == false then least = yd end
+            end
+        end
+    end
+    if fresh then castOf, castReach = guid, cast end
+    -- your melee abilities: within reach is within 5 yards (the owner, 2026-10-20: standing at a mob out of a fight
+    -- said In range - the nearest reach asked was 10 yards); out of reach, more than 5
+    local melee = reaches.melee and SpellAnswer(reaches.melee)
+    if melee == true then
+        most = math.min(most or 5, 5)
+        if least and least >= 5 then least = nil end
+    elseif melee == false and not (most and most <= 5) then
+        least = math.max(least or 5, 5)
+    end
+    local b, inBand = Band(), nil
+    if b then
+        inBand = SpellAnswer(b.ids)
+        if inBand == true then
+            least, most = math.max(least or 0, b.lo), math.min(most or b.hi, b.hi)
+        -- (not at its far end itself: an item that reaches 25 and Charge's 25 measure the yards each its own way)
+        elseif inBand == false and most and most < b.hi and not (least and least >= b.lo) then
+            most = math.min(most, b.lo)
+        end
+    end
+    if least and most and least >= most then least = nil end      -- (the two disagreeing: the nearer reach holds)
+    return least, most, inBand, cast
+end
+
+-- The yards as words: "10 - 15 yd", "< 5 yd", "> 40 yd", or "" where nothing could be told.
+local function YardsWords(least, most)
+    if least and most then return least .. " - " .. most .. " yd" end
+    if most then return "< " .. most .. " yd" end
+    if least then return "> " .. least .. " yd" end
+    return ""
 end
 
 -- What the range bar says now: its words, its colour, the yards. The swing's own check where the
--- game is making it (it is the truth of whether a swing lands); else what the yards say.
+-- game is making it (it is the truth of whether a swing lands); else what the yards say. Past melee but within
+-- the longest reach of your spells (those that reach from you on): In range, in a colour of its own (the owner,
+-- 2026-10-20: "another colour when within cast range"; then "within casting range it can say In range"). A band
+-- spell (Charge) says its own range; short of it but past melee is the dead zone - known when the band says no
+-- while the target is nearer than the band's far end (a band spell says no too near as much as too far).
 local function RangePaint()
     local bar = rangeBar
-    local least, most = Yards()
+    -- (inBand: true / false, or nil where it isn't known - no band spell, no answer; reach: your spells' longest at it)
+    local least, most, inBand, reach = Yards()
+    local b = Band()
     local melee, ranged                 -- true / false, or nil where it isn't known
     if checks[MAIN] then melee = not far[MAIN]
     elseif most then melee = most <= 5
     elseif least then melee = false end
     if checks[RANGED] then ranged = not far[RANGED]
+    elseif inBand ~= nil and hunter then ranged = inBand
     elseif most then ranged = most <= 35
-    elseif least then ranged = least < 35 and nil or false end
+    elseif least and least >= 35 then ranged = false end      -- (more than some yards short of 35: not known)
+    -- too near for the band, too far for melee
+    local short
+    if hunter then short = ranged == false else short = inBand == false end
+    local dead = melee == false and short and b and most ~= nil and most <= b.lo
+    local cast
+    if not hunter then
+        reach = reach or 0
+        if reach > 5 then
+            if most then cast = most <= reach elseif least and least >= reach then cast = false end
+        end
+    end
     local words, c
     if hunter and (melee ~= nil or ranged ~= nil) then
         if melee then words, c = "Melee range", RANGE_MELEE
         elseif ranged then words, c = "In range", RANGE_IN
+        elseif dead then words, c = "Dead zone", RANGE_DEAD
         else words, c = "Out of range", RANGE_OUT end
-    elseif melee ~= nil then
-        if melee then words, c = "In range", RANGE_IN else words, c = "Out of range", RANGE_OUT end
+    elseif melee ~= nil or cast ~= nil or inBand ~= nil then
+        if melee then words, c = "Melee range", RANGE_IN
+        elseif inBand then words, c = (b.name or "Band") .. " range", RANGE_BAND
+        elseif dead then words, c = "Dead zone", RANGE_DEAD
+        elseif cast then words, c = "In range", RANGE_CAST
+        else words, c = "Out of range", RANGE_OUT end
     end
     bar.known = words ~= nil
     if not words then words, c = "Range", RANGE_IN end        -- (only seen while the bars are being placed)
-    local yards = ""
-    if least and most then yards = least .. " - " .. most .. " yd"
-    elseif most then yards = "< " .. most .. " yd"
-    elseif least then yards = "> " .. least .. " yd" end
+    local yards = YardsWords(least, most)
     if bar.said ~= words then
         bar.said = words
         bar.name:SetText(words)
@@ -976,8 +1179,22 @@ local function RangePaint()
         bar.told = yards
         bar.yards:SetText(yards)
     end
+    bar.yardsNow = yards            -- (the range text's too, while the bar is looking: RangeTextNow)
+    -- narrow - the words and the yards don't both fit: the yards alone, in the middle; the colour says the rest
+    -- (the owner, 2026-10-20: "Out of range" and the yards written over each other on a short bar)
+    local width = tonumber(bar:GetWidth()) or 0
+    local need = (tonumber(bar.name:GetStringWidth()) or 0) + (tonumber(bar.yards:GetStringWidth()) or 0) + 18
+    local narrow = yards ~= "" and width < need
+    if bar.narrow ~= narrow then
+        bar.narrow = narrow
+        bar.name:SetShown(not narrow)
+        bar.yards:ClearAllPoints()
+        if narrow then bar.yards:SetPoint("CENTER") else bar.yards:SetPoint("RIGHT", -6, 0) end
+    end
 end
 
+local rangeText, RangeTextNow         -- (the range text, below: the bar's look serves it too)
+local RangeBarNow
 local function RangeBarApply()
     if not (YR.SwingOn() and Mine().rangeBar == true) then
         if rangeBar then rangeBar:Hide() end
@@ -1003,7 +1220,11 @@ local function RangeBarApply()
             since = since + (elapsed or 0)
             if since < 0.2 then return end
             since = 0
-            RangePaint()
+            -- (and whether it shows: the game says nothing when your target dies - the bar stood over the corpse
+            -- saying Melee range until you changed target; the review, 2026-10-21)
+            RangeBarNow()
+            -- (the range text from the same look: the two asked every item and spell each, five times a second)
+            if rangeText and rangeText.on then RangeTextNow(rangeBar.yardsNow) end
         end)
     end
     PlaceBar(rangeBar, db, "range")
@@ -1013,18 +1234,94 @@ local function RangeBarApply()
     local target = Truly(UnitExists("target")) and Truly(UnitCanAttack("player", "target")) and not Truly(UnitIsDead("target"))
     rangeBar.said, rangeBar.told = nil, nil
     RangePaint()
-    rangeBar:SetShown(not db.lock or (target and rangeBar.known) and true or false)
+    rangeBar:SetShown(not db.lock or arranging or (target and rangeBar.known) and true or false)
 end
 
 -- The range bar's words and whether it shows, as things are now: what a target changing or the range
 -- flipping asks for. (All of RangeBarApply - placed, dressed, its fonts set - is for a setting changing;
 -- at the edge of melee range it ran several times a second.)
-local function RangeBarNow()
+function RangeBarNow()
     if not (rangeBar and YR.SwingOn() and Mine().rangeBar == true) then return RangeBarApply() end
     local db = YR.SwingDB()
     local target = Truly(UnitExists("target")) and Truly(UnitCanAttack("player", "target")) and not Truly(UnitIsDead("target"))
     RangePaint()
-    rangeBar:SetShown(not db.lock or (target and rangeBar.known) and true or false)
+    rangeBar:SetShown(not db.lock or arranging or (target and rangeBar.known) and true or false)
+end
+
+-- The range text (rangeText = true): how far your target is, in yards, on its own - a line you can put where
+-- you like (the owner, 2026-10-20: "it should be its own bar or text, movable if you want"). The range bar's
+-- yards, in the bars' font, four sizes larger than their text. Shows while you have a living target you can
+-- attack and the yards can be told; unlocked (the swing bars' lock), always - with sample yards - to be placed.
+-- Its key: "rangetext" (Arrange moves it; it has no size to set there).
+local function RangeTextApply()
+    if not (YR.SwingOn() and Mine().rangeText == true) then
+        if rangeText then rangeText:Hide() end
+        return
+    end
+    local db = YR.SwingDB()
+    if not rangeText then
+        rangeText = CreateFrame("Frame", "HeadstartRangeText", UIParent)
+        rangeText.key, rangeText.ownSize = "rangetext", true
+        rangeText:SetFrameStrata("LOW")
+        rangeText.text = rangeText:CreateFontString(nil, "OVERLAY")
+        rangeText.text:SetPoint("CENTER")
+        Draggable(rangeText, "rangetext")
+        -- looked at five times a second while it shows, as the range bar is - by the bar, while it shows and looks
+        local since = 0
+        rangeText:SetScript("OnUpdate", function(_, elapsed)
+            if rangeBar and rangeBar:IsVisible() then since = 0 return end
+            since = since + (elapsed or 0)
+            if since < 0.2 then return end
+            since = 0
+            RangeTextNow()
+        end)
+    end
+    local size = math.max(8, math.min(40, (tonumber(db.font) or 12) + 4))
+    rangeText.text:SetFont(Face(), size, "OUTLINE")
+    rangeText:SetSize(math.max(70, size * 6), size + 8)
+    PlaceBar(rangeText, db, "rangetext")
+    rangeText.told = nil
+    RangeTextNow()
+end
+--- yards: what the range bar's look found just now (nil: looked at here).
+function RangeTextNow(yards)
+    if not (rangeText and YR.SwingOn() and Mine().rangeText == true) then
+        if rangeText then rangeText.on = false end
+        return RangeTextApply()
+    end
+    rangeText.on = true
+    local db = YR.SwingDB()
+    local unlocked = not db.lock
+    local words = ""
+    if Attackable() and not Truly(UnitIsDead("target")) then words = yards or YardsWords(Yards()) end
+    if words == "" and (unlocked or arranging) then words = "10 - 15 yd" end           -- (to be placed)
+    if rangeText.told ~= words then
+        rangeText.told = words
+        rangeText.text:SetText(words)
+    end
+    rangeText:EnableMouse(unlocked)          -- (locked, a click goes through it to the world)
+    rangeText.edge:SetShown(unlocked)
+    rangeText:SetShown(words ~= "")
+end
+
+--- What each way of telling the target's distance answers now (/headstart range): the items, your spells, and
+--- what the range bar and text make of it.
+function YR.RangeReport()
+    if not Attackable() then YR.Print("target something you can attack, then /headstart range again.") return end
+    local parts = {}
+    for _, step in ipairs(YARDS) do
+        local r = Reaches(step[2])
+        parts[#parts + 1] = step[1] .. ":" .. (r == nil and "-" or r and "in" or "out")
+    end
+    YR.Print("items (yards: in reach?): " .. table.concat(parts, " "))
+    parts = {}
+    for _, step in ipairs(SpellReaches()) do
+        local r = SpellAnswer(step[2])
+        parts[#parts + 1] = step[1] .. ":" .. (r == nil and "-" or r and "in" or "out")
+    end
+    YR.Print("your spells: " .. (#parts > 0 and table.concat(parts, " ") or "none of yours reaches from you on"))
+    local words = YardsWords(Yards())
+    YR.Print("so: " .. (words ~= "" and words or "nothing could be told") .. ". (- : no answer from the game)")
 end
 
 -- Built, sized, placed and shown as it is now - or, with the timer off, everything put back.
@@ -1035,6 +1332,7 @@ local function Apply()
     RangeChecks()
     YR.SwingLayout()
     RangeBarApply()
+    RangeTextApply()
 end
 
 -- Free while off (YR.Part, Core.lua, declared in YR.StartSwing): `part.on` is whether it's on now.
@@ -1120,6 +1418,7 @@ function YR.SwingStart(kind, length)
     if not length then return end
     swings[kind] = swings[kind] or {}
     swings[kind].start, swings[kind].length = GetTime(), length
+    lastKind = kind == RANGED and RANGED or MAIN
     YR.SwingLayout()
 end
 
@@ -1303,7 +1602,7 @@ local function OnEvent(_, event, a, b, c)
                 Colour(bars[a], YR.SwingDB())
             end
         end
-        if changed then RangeBarNow() end
+        if changed then RangeBarNow() RangeTextNow() end
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         inCombat = event == "PLAYER_REGEN_DISABLED"
         if inCombat then RangeChecks() end
@@ -1312,6 +1611,7 @@ local function OnEvent(_, event, a, b, c)
     elseif event == "PLAYER_TARGET_CHANGED" then
         RangeChecks()
         RangeBarNow()
+        RangeTextNow()
     elseif event == "PLAYER_EQUIPMENT_CHANGED" then
         -- a weapon slot (main hand, off hand, ranged): nothing else you put on changes a swing bar
         if type(a) == "number" and (a < 16 or a > 18) then return end
@@ -1573,11 +1873,10 @@ local function ComboApply(on, db)
     -- bar of the swing bars' kind, divided into its points
     local gap = (look.outline and (look.rim ~= false or look.lineColor ~= nil)) and 3 or 1
     local each = (w - (most - 1) * gap) / most
-    -- their colour (comboColor): the swing timer's main-hand colour, so they sit with those bars, or your class's
+    -- their colour: the swing timer's main-hand colour, so they sit with those bars
     local c = db.mainColor
     local cr, cg, cb = 0.72, 0.24, 0.24
     if type(c) == "table" and c[1] then cr, cg, cb = c[1], c[2], c[3] end
-    if db.comboColor == "class" then cr, cg, cb = ClassColour() end
     for i = 1, most do
         local part = combo.parts[i]
         if not part then
@@ -1623,7 +1922,7 @@ local function ComboApply(on, db)
     local unlocked = db.resLock == false
     combo:EnableMouse(unlocked)
     combo.edge:SetShown(unlocked)
-    combo:SetShown(unlocked or db.resShow ~= "combat" or resCombat)
+    combo:SetShown(unlocked or arranging or db.resShow ~= "combat" or resCombat)
     ComboFeed(true)
 end
 
@@ -1690,7 +1989,7 @@ function YR.ResourceBarsApply()
                 bar.pct:SetShown(not unlocked and (says == "all" or says == "pct" or says == "name"))
                 bar.amount:SetShown(says == "all" or says == "value")
                 Shade(bar)
-                bar:SetShown(unlocked or db.resShow ~= "combat" or resCombat)
+                bar:SetShown(unlocked or arranging or db.resShow ~= "combat" or resCombat)
             else
                 bar:Hide()
             end
@@ -1705,11 +2004,13 @@ function YR.ResourceBarsApply()
     end
 end
 
-local function OnResEvent(_, event, unit)
+local function OnResEvent(_, event, unit, kind)
     if event == "UNIT_HEALTH" or event == "UNIT_MAXHEALTH" then
         ResHealth()
     elseif event == "UNIT_POWER_FREQUENT" then
-        ResPower()
+        -- (a combo point needn't feed the energy bar; the combo points are fed at every change - which kind this
+        -- client names them by is not leaned on)
+        if kind ~= "COMBO_POINTS" then ResPower() end
         ComboFeed()
     elseif event == "UNIT_MAXPOWER" then
         ResPower()
@@ -1759,6 +2060,38 @@ end
 YR.CastBarOn = CastWanted
 
 local theirCastHooked, theirCastHidden
+-- Blizzard's bar also fades by animation - a cast cut short holds the bar up and fades it (HoldFadeOutAnim), a
+-- finished one fades it (FadeOutAnim) - and while an animation plays, the alpha it gives the frame is the
+-- frame's, over what SetAlpha said: so the bar showed for a moment on every cancelled cast (the owner,
+-- 2026-10-16). While ours stands in for it, the alpha animations on the frame itself go from nothing to
+-- nothing (put back as they were when ours goes). They still play to their end, and Blizzard hides its bar
+-- there as always - only unseen. (Stopped instead, the bar was left shown, unseen, holding its place among
+-- the frames along the bottom of the screen.) Not the ones on its parts (the glow): those are inside it.
+local zeroed = {}               -- [animation] = { from, to } as they were
+local function TheirFades(f, hide)
+    if type(f.GetAnimationGroups) ~= "function" then return end
+    for _, group in ipairs({ f:GetAnimationGroups() }) do
+        for _, anim in ipairs(type(group) == "table" and type(group.GetAnimations) == "function" and { group:GetAnimations() } or {}) do
+            local ok, kind = pcall(anim.GetObjectType, anim)
+            local onFrame = ok and kind == "Alpha" and (function()
+                local got, target = pcall(anim.GetTarget, anim)
+                return got and (target == nil or target == f)
+            end)()
+            if onFrame then
+                if hide and not zeroed[anim] then
+                    zeroed[anim] = { anim:GetFromAlpha(), anim:GetToAlpha() }
+                    anim:SetFromAlpha(0)
+                    anim:SetToAlpha(0)
+                elseif not hide and zeroed[anim] then
+                    anim:SetFromAlpha(zeroed[anim][1])
+                    anim:SetToAlpha(zeroed[anim][2])
+                    zeroed[anim] = nil
+                end
+            end
+        end
+    end
+end
+
 local function TheirCast()
     local f = _G.PlayerCastingBarFrame
     if type(f) ~= "table" or not f.SetAlpha then return end
@@ -1768,11 +2101,20 @@ local function TheirCast()
             theirCastHooked = true
             hooksecurefunc(f, "ApplyAlpha", function() YR.CastBarHideTheirs() end)
         end
+        if not theirCastHidden then TheirFades(f, true) end
         theirCastHidden = true
         if f:GetAlpha() ~= 0 then f:SetAlpha(0) end
+        -- (and the parts Blizzard fades with it that aren't inside it: its ApplyAlpha sets theirs too)
+        for widget in pairs(type(f.additionalFadeWidgets) == "table" and f.additionalFadeWidgets or {}) do
+            if type(widget) == "table" and widget.SetAlpha and widget:GetAlpha() ~= 0 then widget:SetAlpha(0) end
+        end
     elseif theirCastHidden then
         theirCastHidden = nil
+        TheirFades(f, false)
         f:SetAlpha(1)
+        for widget in pairs(type(f.additionalFadeWidgets) == "table" and f.additionalFadeWidgets or {}) do
+            if type(widget) == "table" and widget.SetAlpha then widget:SetAlpha(1) end
+        end
     end
 end
 YR.CastBarHideTheirs = TheirCast
@@ -1809,6 +2151,25 @@ local function CastBegin(channel)
     bar:Show()
     return true
 end
+-- Nothing being cast any more: the next cast if one has begun, else the sample while the bar is being placed, else
+-- nothing. The bar stays as it is dressed (YR.CastBarApply does that, for a setting changing).
+local function CastIdle()
+    if not cast or castState == "hold" then return end
+    if CastBegin(false) or CastBegin(true) then return end
+    castState = nil
+    if YR.SwingDB().castLock == false or arranging then
+        -- being placed: a sample, so there is something to see and drag
+        cast:SetStatusBarColor(CAST_COLOUR[1], CAST_COLOUR[2], CAST_COLOUR[3], 1)
+        cast:SetMinMaxValues(0, 1)
+        cast:SetValue(0.6)
+        cast.name:SetText("Cast bar")
+        cast.time:SetText("1.2")
+        cast.icon:SetTexture(136243)
+        cast:Show()
+    else
+        cast:Hide()
+    end
+end
 -- Stopped short: said on the bar in red, and the bar gone half a second later.
 local function CastHold(words)
     if not cast or not castState or castState == "hold" then return end
@@ -1825,7 +2186,7 @@ local function CastTick(bar)
     if castState == "hold" then
         if now >= (bar.gone or 0) then
             CastStop()
-            YR.CastBarApply()           -- (being placed: its sample back)
+            CastIdle()                  -- (being placed: its sample back)
         end
         return
     end
@@ -1884,21 +2245,7 @@ function YR.CastBarApply()
     else
         cast.spark:Hide()
     end
-    if castState == "hold" then return end
-    if CastBegin(false) or CastBegin(true) then return end
-    castState = nil
-    if db.castLock == false then
-        -- being placed: a sample, so there is something to see and drag
-        cast:SetStatusBarColor(CAST_COLOUR[1], CAST_COLOUR[2], CAST_COLOUR[3], 1)
-        cast:SetMinMaxValues(0, 1)
-        cast:SetValue(0.6)
-        cast.name:SetText("Cast bar")
-        cast.time:SetText("1.2")
-        cast.icon:SetTexture(136243)
-        cast:Show()
-    else
-        cast:Hide()
-    end
+    CastIdle()
 end
 
 local function OnCastEvent(_, event)
@@ -1915,7 +2262,7 @@ local function OnCastEvent(_, event)
     elseif event == "UNIT_SPELLCAST_STOP" or event == "UNIT_SPELLCAST_CHANNEL_STOP" then
         if castState ~= "hold" and not UnitCastingInfo("player") and not UnitChannelInfo("player") then
             CastStop()
-            YR.CastBarApply()
+            CastIdle()
         end
     else
         YR.CastBarApply()
@@ -1943,19 +2290,31 @@ function YR.StartSwing()
     })
 end
 
+--- Arrange opened (true) or closed (false): every bar of ours shown as it is unlocked, and back.
+function YR.SwingArranging(on)
+    on = on and true or false
+    if arranging == on then return end
+    arranging = on
+    laid = nil
+    YR.SwingApply()
+end
+
 --- A bar of Headstart's own by its key (main, off, ranged, health, power, combo), while it is in use:
 --- nil for one that is turned off or was never made. For Arrange.lua, which moves them.
 function YR.OwnBarFrame(key)
     if key == "cast" then return CastWanted() and cast or nil end
     if key == "range" then return YR.SwingOn() and YR.SwingDB().rangeBar == true and rangeBar or nil end
+    if key == "rangetext" then return YR.SwingOn() and YR.SwingDB().rangeText == true and rangeText or nil end
     if key == "combo" then return ResWant("combo") and YR.ResourceBarsOn() and combo or nil end
     if key == "health" or key == "power" then return ResWant(key) and YR.ResourceBarsOn() and res[key] or nil end
     if not Own() then return nil end
     local db = YR.SwingDB()
     if db.use and db.use[key] == false then return nil end
-    -- (a hand you have nothing in has no bar to place: no off-hand weapon, or no ranged swing to time)
+    -- (a hand you have nothing in has no bar to place: no off-hand weapon, or no ranged weapon - a bow, gun or
+    -- wand of anyone's is placed too, not only a hunter's: the owner, 2026-10-20, "the ranged swing timer isn't in
+    -- Arrange")
     if key == "off" and Speed(OFF) == nil then return nil end
-    if key == "ranged" and not hunter then return nil end
+    if key == "ranged" then return nil end          -- (it stands in the main hand's place: placed with that one)
     for _, hand in ipairs(HANDS) do
         if hand.key == key then return bars[hand.type] end
     end

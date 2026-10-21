@@ -3,7 +3,8 @@
 -- A button on the mail window does it ("Send to <alt>"), and if you like it happens as the mailbox
 -- opens. Hold Shift as it opens to send nothing.
 --
---   What goes is the bank's rule (Bank.lua, YR.StashReason) with its own settings, plus your list.
+--   What goes is the bank's rule (Bank.lua, YR.StashReason) with its own settings, plus your list. At an open
+--   mailbox, before Send is pressed, a small mailbox marks those items in your bags (see Marks, below).
 --   What never goes: quest items, soulbound items (the game won't), anything a quest you'd still do needs (YR.QuestLive),
 --   and what AutoFeed keeps - and nothing at all to yourself, so the same settings work on the alt.
 --
@@ -156,11 +157,14 @@ end
 -- ---------------------------------------------------------------------------
 local function Coins(c) return YR.Money(c) end
 
+local Marks                     -- (the marks on what Send would mail: below)
+
 local function Finish(note)
     local r = run
     run = nil
     if not r then return end
     Errors(false)
+    Marks()                     -- (what is left, if anything, marked again)
     if r.sent > 0 then
         YR.Print(("mailed %d stack%s to %s (%d letter%s, %s postage)%s"):format(r.sent, r.sent == 1 and "" or "s",
             r.to, r.letters, r.letters == 1 and "" or "s", Coins(r.postage), note and (" - " .. note) or "."))
@@ -252,7 +256,72 @@ function YR.MailToAlt(loud)
         return
     end
     run = { list = list, i = 1, to = to, sent = 0, letters = 0, postage = 0 }
+    Marks()                     -- (sending: the marks go)
     NextLetter()
+end
+
+-- ---------------------------------------------------------------------------
+-- Marks: at an open mailbox, before anything is sent, a small mailbox on the items in your bags that Send would
+-- mail (the owner, 2026-10-20: "a mail icon on the items that get sent when you open the mailbox - before you've
+-- pressed Send, as long as it isn't all automatic"). On Blizzard's own bag windows: drawn after each of them fills
+-- its slots (a hook on the window's UpdateItems, put on the first time a mailbox opens with this on); a bag addon
+-- that draws bags of its own gets none. Only with the Send button on and sending as the mailbox opens off; gone
+-- as Send is pressed and as the mailbox closes, and looked at again as your bags change while it is open.
+-- ---------------------------------------------------------------------------
+local MARK = 136459                                     -- Interface\Minimap\Tracking\Mailbox
+local marks = setmetatable({}, { __mode = "k" })        -- an item button -> our mark on it
+local going = {}                                        -- [bag * 1000 + slot] = true: what Send would mail now
+local hookedBags = {}
+
+local function Marking()
+    return mailOpen and not run and YR.Option("mailButton") and YippRouteDB.mailAuto ~= true
+        and ToOther(YR.MailRecipient()) and true or false
+end
+
+local function PaintBag(frame)
+    if type(frame) ~= "table" or type(frame.EnumerateValidItems) ~= "function" then return end
+    local on = Marking()
+    pcall(function()
+        for _, button in frame:EnumerateValidItems() do
+            local m = marks[button]
+            if on and going[button:GetBagID() * 1000 + button:GetID()] then
+                if not m then
+                    m = button:CreateTexture(nil, "OVERLAY", nil, 7)
+                    m:SetTexture(MARK)
+                    m:SetSize(16, 16)
+                    m:SetPoint("TOPLEFT", -2, 2)
+                    marks[button] = m
+                end
+                m:Show()
+            elseif m then
+                m:Hide()
+            end
+        end
+    end)
+end
+
+local function BagFrames()
+    local list = { _G.ContainerFrameCombinedBags }
+    for i = 1, (tonumber(_G.NUM_CONTAINER_FRAMES) or 13) do list[#list + 1] = _G["ContainerFrame" .. i] end
+    return list
+end
+
+function Marks()
+    wipe(going)
+    if Marking() then
+        for _, s in ipairs(YR.MailPick()) do going[s.bag * 1000 + s.slot] = true end
+    elseif next(marks) == nil then
+        return                  -- (none ever drawn: nothing to take away, and no hook needed)
+    end
+    for _, frame in ipairs(BagFrames()) do
+        if type(frame) == "table" then
+            if not hookedBags[frame] and type(frame.UpdateItems) == "function" then
+                hookedBags[frame] = true
+                hooksecurefunc(frame, "UpdateItems", PaintBag)
+            end
+            if frame.IsShown and frame:IsShown() then PaintBag(frame) end
+        end
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -306,7 +375,9 @@ local function Auto() YR.MailToAlt(false) end
 
 local function Closed()
     mailOpen = false
+    if part and part.frame then part.frame:UnregisterEvent("BAG_UPDATE_DELAYED") end
     if run then Finish("the mailbox closed before the rest went") end
+    Marks()
     if button then button:Hide() end
     if asked then
         asked = nil
@@ -315,10 +386,16 @@ local function Closed()
 end
 
 local function OnEvent(_, event, ...)
+    if event == "BAG_UPDATE_DELAYED" then
+        if mailOpen and not run then Marks() end
+        return
+    end
     if event == "MAIL_SHOW" then
         if mailOpen then return end
         mailOpen = true
         Refresh()
+        if part and part.frame then part.frame:RegisterEvent("BAG_UPDATE_DELAYED") end      -- (only while it is open)
+        Marks()
         if YippRouteDB.mailAuto == true and YR.QoLOn() and not IsShiftKeyDown() then
             C_Timer.After(0.5, Auto)
         end
@@ -351,7 +428,7 @@ function YR.StartMail()
                 Refresh()
             end
         end,
-        again = function() if mailOpen then Refresh() end end,
+        again = function() if mailOpen then Refresh() Marks() end end,
         stop = Closed,
     })
 end

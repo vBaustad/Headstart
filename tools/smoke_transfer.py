@@ -141,7 +141,8 @@ def run():
 
     # A text from a stranger: it would have your mailbox send your mats to its writer's character
     lua.execute("""THEFT = { db = { mailAuto = true, mailTo = { ["Realm-Alliance"] = "Their Alt" }, mailMats = "all", mailCustom = { [2589] = true },
-        restock = true, restockReserve = 0, acceptInvites = "anyone", lootFeed = true, rewardClasses = { PALADIN = { on = true } } }, setup = {} }
+        restock = true, restockReserve = 0, acceptInvites = "anyone", lootFeed = true, rewardClasses = { PALADIN = { on = true } },
+        kept = { invites = { "anyone", "anyone" } }, cardOn = { invites = true } }, setup = {} }
         BEFORE_DB = Copy(YippRouteDB)""")
     lua.execute("local d = YR.TransferRead(YR.TransferExport()) SUMMED = d")
     theirs_text = lua.eval("""(function()
@@ -158,7 +159,7 @@ def run():
     n, left, stayed = YR.TransferImport(d)
     db = g.YippRouteDB
     check(db.mailAuto is None and db.mailTo is None and db.mailCustom is None and db.restock is False and db.acceptInvites is None
-          and db.rewardClasses is None and db.lootFeed is True and stayed >= 7,
+          and db.rewardClasses is None and db.lootFeed is True and stayed >= 7 and db.kept is None and db.cardOn is None,
           f"imported the plain way: none of it is switched on, nobody is named for your mail, and the rest comes in ({stayed} left as they were)")
     YR.TransferUndo()
 

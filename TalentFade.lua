@@ -14,7 +14,9 @@
 --   0 is Blizzard's own), talentFadeSlider (the slider on the window, on unless turned off), talentMove
 --   (drag by the title bar, on unless turned off; where you left it is YippRouteDB.moved.talents),
 --   talentScale (50-150 percent, 100 is Blizzard's own). The size is the talent page's only: the
---   spellbook is the same window and gets its own size back. Set out of combat.
+--   spellbook is the same window and gets its own size back. Set out of combat. talentEarly (on unless turned
+--   off - the owner, 2026-10-20: "it can be on by default"): the talent key opens a talent tree before level 10 too -
+--   Headstart's own Talents page (see Early).
 local ADDON, YR = ...
 
 local slider
@@ -44,8 +46,15 @@ end
 
 -- Wanted while any of it is set: moving the window, the sliders on it, a fade or a size of ours.
 -- Until then nothing of Blizzard's is hooked and nothing is listened for.
+-- (Talents before level 10 has something to do only on a character below 10: on one past it, nothing is wanted
+-- for it, and a new install pays for it only there.)
+local function Below10()
+    local api = C_SpecializationInfo
+    if api and api.CanPlayerUseTalentUI then return not api.CanPlayerUseTalentUI() end
+    return ((UnitLevel and UnitLevel("player")) or 1) < 10
+end
 local function Wanted()
-    return YR.Option("talentMove") or YR.Option("talentFadeSlider")
+    return YR.Option("talentMove") or YR.Option("talentFadeSlider") or (YR.Option("talentEarly") and Below10())
         or (YR.QoLOn() and (YR.TalentFade() > 0 or YR.TalentScale() ~= 100)) or false
 end
 
@@ -58,6 +67,20 @@ end
 local scaled
 local late          -- the size was to be set in a fight: done when it ends
 local part          -- what listens for us (YR.StartTalentFade)
+
+-- Never larger than fits your screen. The window is held on the screen: one taller than it was pushed to its
+-- top and couldn't be moved up or down any more (the owner, 2026-10-19: "I changed the talent window's scale and
+-- it snapped to the top of the screen, and won't move on the y axis"). Larger than Blizzard's own is made only as
+-- large as leaves a little room; smaller always is as asked.
+local function Fit(frame, want)
+    if want <= 1 then return want end
+    local w, h = frame:GetWidth(), frame:GetHeight()
+    local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
+    if not (w and h and sw and sh) or w <= 0 or h <= 0 then return want end
+    return math.min(want, math.max(1, math.min(sw / w, sh / h) * 0.95))
+end
+YR.TalentScaleFit = Fit
+
 local function Scale()
     local frame = _G.PlayerSpellsFrame
     local talents = frame and frame.TalentsFrame
@@ -69,7 +92,7 @@ local function Scale()
         return
     end
     late = nil
-    local want = talents:IsShown() and YR.QoLOn() and YR.TalentScale() / 100 or 1
+    local want = talents:IsShown() and YR.QoLOn() and Fit(frame, YR.TalentScale() / 100) or 1
     if want == 1 and not scaled then return end
     scaled = want ~= 1
     frame:SetScale(want)
@@ -241,6 +264,33 @@ function YR.SetTalentFade(v)
     YR.SettingChanged()
 end
 
+-- Talents before level 10 (talentEarly): Blizzard opens the talent page from level 10 on. Before that its tab
+-- isn't there, and the talent key (N) opens nothing at all (the owner, 2026-10-20: "make it possible to see the
+-- talent tree before level 10 - the normal key binding opening talents"). Below 10, with this on, the key opens
+-- Headstart's own Talents page instead (QoL, Talents): your class's trees and what to take at each level.
+-- (Until 2026-10-21 Blizzard's window was made to show its own talent page early: its IsTabAvailable answered by
+-- a wrap of ours. Blizzard's window asks that on its own way to its panel layout, so the key pressed in a fight was
+-- blocked - "AddOn 'Headstart' tried to call the protected function PlayerSpellsFrame:SetAttributeNoHandler()", the
+-- owner's BugGrabber. Nothing of Blizzard's is changed now: the key's own function is hooked to run after it -
+-- hooksecurefunc, whose code taints nothing of the caller's - and does something only when the key opened nothing.)
+local early
+local function OwnTalents()
+    if not YR.Option("talentEarly") or not Below10() then return end
+    local frame = _G.PlayerSpellsFrame
+    if frame and frame.IsShown and frame:IsShown() then return end        -- Blizzard's window is up (the spellbook)
+    if YR.WindowShowing and YR.WindowShowing("builds") then _G.HeadstartWindow:Hide() return end
+    YR:ToggleWindow("builds")           -- (QoL, Talents)
+end
+local function Early()
+    local util = _G.PlayerSpellsUtil
+    if early or type(util) ~= "table" or type(util.ToggleClassTalentOrSpecFrame) ~= "function" then return end
+    if not YR.Option("talentEarly") or not Below10() then return end
+    early = true
+    hooksecurefunc(util, "ToggleClassTalentOrSpecFrame", OwnTalents)
+end
+--- (Turned on: the window wrapped now, where it is there already.)
+function YR.TalentEarlyApply() Early() end
+
 -- Moved by its title bar (Movers.lua does the moving)
 function YR.TalentPlace() YR.MoverPlace("talents") end
 function YR.TalentResetPosition() YR.MoverReset("talents") end
@@ -262,6 +312,7 @@ local function Hook()
         -- sheet the talents sit on
         function(frame) return { frame, frame.TalentsFrame, frame.TalentsFrame and frame.TalentsFrame.ButtonsParent } end)
     YR.MoverPlace("talents")
+    Early()
     talents:HookScript("OnShow", YR.TalentFadeApply)
     talents:HookScript("OnHide", YR.TalentFadeApply)
 end
@@ -285,6 +336,7 @@ local function OnEvent(self, event, name)
 end
 
 local function Start(p)
+    Early()             -- (the key's own function is there from the start; Blizzard's window loads on the first press)
     Hook()
     if not hooked then
         p.frame:RegisterEvent("ADDON_LOADED")

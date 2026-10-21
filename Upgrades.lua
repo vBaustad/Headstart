@@ -8,12 +8,16 @@
 --   kind of armor or weapon you can't use) is never offered.
 --   Two of a kind (rings, a second one-hander): it is measured against the weaker one you wear. A
 --   two-hander against your main hand and off hand together.
+--   A profession's tool you can wield (Mining Pick, Blacksmith Hammer, Skinning Knife) and a fishing pole
+--   are never offered; one you wear is measured like any weapon.
 --   Shown once per item: a chat line with both links, and a small window with an Equip button.
 --
 -- Account options (YippRouteDB, Settings, QoL): upgrades (on unless turned off), upgradeQuality
 -- (highest quality to look at: 1 white, 2 green - the default, 3 blue, 5 everything),
--- upgradeMin (percent better before it's mentioned, default 2), upgradeButton (on unless turned off).
+-- upgradeButton (on unless turned off).
 local ADDON, YR = ...
+
+local MIN_GAIN = 2              -- (percent better, where an item trades one thing for another, before it is told)
 
 -- Weights per point. Armor is per point of armor, dps per point of damage per second.
 local W = {
@@ -43,7 +47,19 @@ local SLOTS = {
     INVTYPE_RANGED = { 18 }, INVTYPE_RANGEDRIGHT = { 18 }, INVTYPE_THROWN = { 18 }, INVTYPE_RELIC = { 18 },
 }
 
+-- A profession's tool you can wield, and fishing poles: never offered, however they score (the owner,
+-- 2026-10-16: "don't suggest the mining pick and the blacksmith hammer as an upgrade to equip"). One you wear is
+-- measured like any weapon, so nothing worse than it is offered either ("people can choose to wear them"). The
+-- tools: Forever's items that count as a profession's tool and go in a hand or the ranged slot (ItemSparse's
+-- TotemCategoryID, build 1.60.1.70425): Mining Pick, Blacksmith Hammer, Rock Chipper, Arclight Spanner,
+-- Skinning Knife, and Forever's own Keen Skinning Knife and Mithril and Arcanite Blacksmith Hammers. Fishing
+-- poles by their kind (a weapon, subclass 20).
+local TOOLS = { [2901] = true, [5956] = true, [6206] = true, [6219] = true, [7005] = true,
+    [269716] = true, [285280] = true, [285281] = true }
+local FISHING_POLE = 20
+
 local told = {}        -- [link] = true: said once, this session
+function YR.UpgradesTold() return told end      -- (for the tests: what was told, in its window or in chat)
 local queue = {}       -- upgrades waiting for the window
 local win
 
@@ -122,8 +138,8 @@ function YR.CheckUpgrade(bag, slot)
     local info = C_Container.GetContainerItemInfo(bag, slot)
     local link = type(info) == "table" and info.hyperlink
     if not link then return nil end
-    local _, _, _, equipLoc = C_Item.GetItemInfoInstant(link)
-    if not SLOTS[equipLoc] then return nil end
+    local id, _, _, equipLoc, _, classID, subClassID = C_Item.GetItemInfoInstant(link)
+    if not SLOTS[equipLoc] or TOOLS[id] or (classID == 2 and subClassID == FISHING_POLE) then return nil end
     local q = Quality(link)
     if not q or q > (YippRouteDB.upgradeQuality or 2) then return nil end
     -- You wield a two-hander: that's your choice of weapon, so nothing that takes it off is offered - no
@@ -149,14 +165,14 @@ function YR.CheckUpgrade(bag, slot)
         local fills = not c.old and (c.pct > 0 or c.tough > 0)
         -- better and nothing worse (more armor, the same DPS): free to wear, however small the gain
         local free = c.pct >= -0.05 and c.tough >= -0.05 and (c.pct > 0.05 or c.tough > 0.05)
-        if gain < (YippRouteDB.upgradeMin or 2) and not fills and not free then return nil end
+        if gain < MIN_GAIN and not fills and not free then return nil end
         return c.old, gain, c.slot, link, YR.SimLine(c)
     end
     -- Without it (your numbers can't be read yet): the class weights.
     local old, new, was, s = YR.UpgradeOver(link, equipLoc)
     if not new or new <= 0 then return nil end
     local better = was > 0 and (new - was) / was * 100 or 100
-    if better < (YippRouteDB.upgradeMin or 2) then return nil end
+    if better < MIN_GAIN then return nil end
     return old, better, s, link, ("about %d%% better"):format(math.floor(better + 0.5))
 end
 
@@ -272,8 +288,9 @@ local function Window()
     local head = S.Text(win, 11, S.C.accent)
     head:SetPoint("TOPLEFT", 14, -10)
     head:SetText("BETTER GEAR")
-    local close = S.IconButton and S.IconButton(win, "close", function() win:Hide() end, nil, S.C.muted, 18)
-    if close then close:SetPoint("TOPRIGHT", -8, -6) end
+    -- (the same clear x as New at your trainer's: the two small windows alike)
+    local close = S.CloseX and S.CloseX(win, function() win:Hide() end)
+    if close then close:SetPoint("TOPRIGHT", -5, -5) end
     local frame = CreateFrame("Frame", nil, win)
     frame:SetSize(40, 40)
     frame:SetPoint("TOPLEFT", 14, -30)
@@ -342,7 +359,10 @@ function YR.ScanUpgrades()
     end
     for _, u in pairs(found) do
         told[u.link] = true
-        YR.Print(("%s for you, over %s: %s."):format(u.link, u.old or "the empty slot", u.how or ""))
+        -- in chat only where its window is off: the window says it (and the line beside it was one nobody read)
+        if not YR.Option("upgradeButton") then
+            YR.Print(("%s for you, over %s: %s."):format(u.link, u.old or "the empty slot", u.how or ""))
+        end
         if YR.Option("upgradeButton") then
             Window()
             -- one waiting for the same slot already: the better of the two stays

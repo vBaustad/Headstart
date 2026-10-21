@@ -55,11 +55,10 @@ def run():
           "a cinematic starts: not ended inside the event (the game's own frame must have it first), but a moment later")
     g.Later()
     check(g.STOPS == 1, "then it is ended")
-    check(len(g.SAID) == 1 and "skipped the cinematic" in g.SAID[1] and "Shift" in g.SAID[1] and "/hs" in g.SAID[1],
-          f"and chat says so, with how to watch one and where the switch is ({list(g.SAID.values())})")
+    check(len(g.SAID) == 0, f"and nothing said in chat (it said so until 2026-10-21: nobody read it) ({list(g.SAID.values())})")
     g.Fire("CINEMATIC_START", True)
     g.Later()
-    check(g.STOPS == 2 and len(g.SAID) == 1, "the next one is ended too, without saying it again")
+    check(g.STOPS == 2 and len(g.SAID) == 0, "the next one is ended too")
 
     lua.execute("SHIFT = true")
     g.Fire("CINEMATIC_START", True)
@@ -94,6 +93,41 @@ def run():
     YR.ApplyParts()
     check(g.Listening() == 1, "and on with it")
     check("skipCinematic" not in YR.STARTS_OFF, "it is not among what starts off")
+
+    # Under the login's loading screen (a new character's opening flight starts while it is up): not ended until
+    # it has gone - ended under it, the world was loaded again behind a second loading screen
+    lua.execute("""STOPS, LATER = 0, {}
+        function ScheduledNow() for _, w in ipairs(LATER) do if w[1] == 0 then return true end end return false end
+        function ListeningLoad() local n = 0 for _, f in ipairs(FRAMES) do if f.ev.LOADING_SCREEN_DISABLED then n = n + 1 end end return n end""")
+    YR.CinematicLoadingAgain()
+    g.Fire("CINEMATIC_START", True)
+    check(g.STOPS == 0 and not g.ScheduledNow(), "a cinematic under the login's loading screen: not ended yet")
+    g.Fire("LOADING_SCREEN_DISABLED")
+    g.Later()
+    check(g.STOPS == 1 and g.ListeningLoad() == 0, "the loading screen gone: ended then, and the loading screen no longer listened for")
+    # one that started before Headstart was loaded (no start of its own here): ended once the loading screen has gone
+    lua.execute("STOPS, LATER = 0, {} KEPT_IN = InCinematic function InCinematic() return true end")
+    YR.CinematicLoadingAgain()
+    g.Fire("LOADING_SCREEN_DISABLED")
+    g.Later()
+    check(g.STOPS == 1, "one already running when Headstart loaded: ended once the loading screen has gone")
+    lua.execute("function InCinematic() return false end STOPS, LATER = 0, {}")
+    g.Fire("CINEMATIC_START", True)
+    check(g.ScheduledNow(), "after the login, one that starts is ended a moment later as before")
+    g.Later()
+    check(g.STOPS == 0, "but not when it has already ended by then (nothing is stopped that isn't running)")
+    lua.execute("InCinematic = KEPT_IN")
+
+    # only the intro: past level 1 nothing listens, and a cinematic plays (the owner, 2026-10-16)
+    lua.execute("KEPT_LEVEL = UnitLevel function UnitLevel() return 12 end STOPS, LATER = 0, {}")
+    YR.ApplyParts()
+    g.Fire("CINEMATIC_START", True)
+    g.Later()
+    check(g.Listening() == 0 and g.STOPS == 0 and YR.SkipsCinematics(),
+          "a character past level 1: nothing listens, and a cinematic plays (the setting still on)")
+    lua.execute("UnitLevel = KEPT_LEVEL")
+    YR.ApplyParts()
+    check(g.Listening() == 1, "back on a level 1 character: listening again")
     return bad
 
 

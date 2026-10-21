@@ -27,7 +27,8 @@ local YR = _G.HeadstartNS
 
 local HEAD = "HEADSTART-SETTINGS 1"
 local DROP_DB = { runs = true, place = true, instanceRuns = true, scan = true, welcome = true, welcomeSeen = true, quiet = true,
-    rxpTrainerWasOn = true, transferKept = true, splits = true }
+    rxpTrainerWasOn = true, transferKept = true, splits = true,
+    markerLog = true, taintLog = true }   -- (logs of what the world marker and Character setup did: this install's)
 -- What acts for you: spends gold, sends or moves your things, answers for you, or says who gets your
 -- mail. A text from someone else must not be able to switch any of it on (with the mail ones it could
 -- send your mats to its writer's character at the next mailbox): Import leaves each of these as it is
@@ -37,17 +38,20 @@ local ACTING = { mailAuto = true, mailTo = true, mailCustom = true, mailMats = t
     autoTrain = true, trainer = true, bankAuto = true, bankMats = true, bankButton = true,
     deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true, shareAll = true,
     acceptInvites = true, whisperInvite = true, acceptFrom = true, levelShot = true, trinketAuto = true,
-    pickRewards = true, rewardClasses = true, setupOn = true, routes = true }
+    pickRewards = true, rewardClasses = true, setupOn = true, routes = true,
+    -- (what a card's main switch puts back when it is switched on, and which cards read as on: in a text from
+    -- someone else, Invites would accept from anyone at your next switch-on; the review, 2026-10-21)
+    kept = true, cardOn = true }
 -- The words for the ones that are switches, for the line that says what a text would turn on.
 local ACTS = { { "mailAuto", "mail to another character" }, { "restock", "restock" }, { "autoTrain", "the class trainer" },
-    { "bankAuto", "bank deposit" }, { "deathSkipRelease", "release at death skips" }, { "skipQuests", "abandoning skipped quests" },
+    { "bankButton", "the bank's Deposit button" }, { "deathSkipRelease", "release at death skips" }, { "skipQuests", "abandoning skipped quests" },
     { "groupAccept", "accepting shared quests" }, { "groupShare", "sharing quests" }, { "shareAll", "sharing every quest" },
     { "acceptInvites", "accepting invites" }, { "whisperInvite", "inviting on a whisper" }, { "levelShot", "screenshots" },
     { "trinketAuto", "trinket swaps" } }
 -- What the addon reads as a table: anything else under these names, and the login stopped at it.
 local TABLES = { custom = true, myRoutes = true, extra = true, swing = true, xpbar = true, trainer = true, rewardClasses = true,
     mailTo = true, mailCustom = true, restockCustom = true, restockCounts = true, minimap = true, anchor = true,
-    windowScale = true, trainerCosts = true }
+    windowScale = true, trainerCosts = true, kept = true, cardOn = true }
 local DROP_SETUP = { uiPrev = true }
 local MAX_LINES, MAX_DEPTH = 400000, 40
 

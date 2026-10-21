@@ -24,10 +24,10 @@ def canvas():
     return img, ImageDraw.Draw(img)
 
 
-def line(d, pts):
-    d.line(pts, fill=(255, 255, 255, 255), width=W, joint="curve")
+def line(d, pts, w=W):
+    d.line(pts, fill=(255, 255, 255, 255), width=w, joint="curve")
     for x, y in (pts[0], pts[-1]):
-        r = W / 2
+        r = w / 2
         d.ellipse((x - r, y - r, x + r, y + r), fill=(255, 255, 255, 255))
 
 
@@ -41,6 +41,13 @@ img, d = canvas()
 line(d, [(84, 84), (172, 172)])
 line(d, [(172, 84), (84, 172)])
 save(img, "close")
+
+# a small window's cross (S.CloseX): larger and bolder in its square than the title bar's - "close" filled a third of
+# it, and at a small window's size it was a speck (the owner, 2026-10-21: "make the X better")
+img, d = canvas()
+line(d, [(62, 62), (194, 194)], 30)
+line(d, [(194, 62), (62, 194)], 30)
+save(img, "x")
 
 # plus
 img, d = canvas()

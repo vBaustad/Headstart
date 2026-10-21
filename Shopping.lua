@@ -3,7 +3,11 @@
 -- as you reach it, so Headstart keeps the list instead:
 --   * read from the routes this character follows: a step with ".money <price" and ".collect item,1"
 --     (what to buy, for how much, from whom and where; ".itemStat 16,...DAMAGE_PER_SECOND..., <N":
---     only while your weapon is worse than that)
+--     only while your weapon is worse than that). Or "#hsprice price" in place of ".money": RestedXP
+--     only stores that line on the step, where ".money <" hides the step the moment you can't pay (the
+--     route chat, 2026-10-16: the Rogue's Stiletto in Dolanaar vanished as Gouge was trained)
+--   * the next one ahead of you on the route you're on is what the trainer keeps money back for
+--     (YR.NextRouteBuy, Trainer.lua)
 --   * once you have the money, don't have the item and it still beats your weapon, one line in chat
 --     says what, how much and where
 --   * at any vendor who sells it, a popup offers to buy it (hold Shift as you open the vendor to skip)
@@ -11,6 +15,29 @@
 local _, YR = ...
 
 local list          -- { { item, price, npc, where, dps, name } }
+
+-- A buy step's purchase: ".collect item,1" and its price (".money <" or "#hsprice", in gold); nil for any
+-- other step.
+local function BuyOf(step)
+    local price = step:match("\n%s*%.money%s+<([%d%.]+)") or step:match("\n%s*#hsprice%s+([%d%.]+)")
+    local item = step:match("\n%s*%.collect%s+(%d+),1%s*[%-\n]") or step:match("\n%s*%.collect%s+(%d+),1$")
+    if not (price and item) then return nil end
+    -- (its name: [Stiletto] in the text, else the collect line's own words: "--Collect Stiletto (1)",
+    -- "-- Mining Pick (1)", "--Stiletto (1)")
+    local name = step:match("%[(.-)%]")
+    if not name then
+        name = step:match("%.collect%s+%d+,1[^\n]-%-%-%s*([^%(\n]+)")
+        name = name and (name:gsub("^Collect%s+", ""))
+    end
+    return {
+        item = tonumber(item),
+        price = math.floor(tonumber(price) * 10000 + 0.5),
+        npc = (step:match("\n%s*%.target%s+([^\n:]+)") or ""):gsub("%s+$", ""),
+        where = step:match("\n%s*%.goto%s+([^\n]+)"),
+        dps = tonumber(step:match("ITEM_MOD_DAMAGE_PER_SECOND_SHORT,%s*<%s*([%d%.]+)")),
+        name = name and name:gsub("%s+$", "") or ("item " .. item),
+    }
+end
 
 local function Build()
     list = {}
@@ -21,19 +48,10 @@ local function Build()
         local text = mine[g.key] and YR:GuideText(g.key) or ""
         local _, steps = YR.SplitSteps(text)
         for _, step in ipairs(steps) do
-            local price = step:match("\n%s*%.money%s+<([%d%.]+)")
-            local item = step:match("\n%s*%.collect%s+(%d+),1%s*[%-\n]") or step:match("\n%s*%.collect%s+(%d+),1$")
-            if price and item and YR.Shows(step:match("^step%s*<<%s*([^\n%-]+)")) and not seen[item] then
-                seen[item] = true
-                local name = step:match("%[(.-)%]") or step:match("%-%-Collect ([^%(\n]+)")
-                list[#list + 1] = {
-                    item = tonumber(item),
-                    price = math.floor(tonumber(price) * 10000 + 0.5),
-                    npc = (step:match("\n%s*%.target%s+([^\n:]+)") or ""):gsub("%s+$", ""),
-                    where = step:match("\n%s*%.goto%s+([^\n]+)"),
-                    dps = tonumber(step:match("ITEM_MOD_DAMAGE_PER_SECOND_SHORT,%s*<%s*([%d%.]+)")),
-                    name = name and name:gsub("%s+$", "") or ("item " .. item),
-                }
+            local e = YR.Shows(step:match("^step%s*<<%s*([^\n%-]+)")) and BuyOf(step)
+            if e and not seen[e.item] then
+                seen[e.item] = true
+                list[#list + 1] = e
             end
         end
     end
@@ -65,6 +83,22 @@ function YR.ShoppingWanted(e)
     if Have(e.item) then return false end
     if e.dps and WeaponDPS() >= e.dps then return false end
     return true
+end
+
+--- The route's next buy ahead of you: on the route you're on (one of Headstart's, as RestedXP has it for
+--- this character), from your step on, the first whose item you still want. Nil for none. The trainer keeps
+--- its price back (Trainer.lua) - asked as a trainer opens, so the steps are read then and not kept.
+function YR.NextRouteBuy()
+    if not (YR.RoutesOn and YR.RoutesOn() and YR.RouteKeyOf and YR.CharSteps) then return nil end
+    local key = YR.RouteKeyOf(type(RXP) == "table" and RXP.currentGuide)
+    local n = type(RXPCData) == "table" and tonumber(RXPCData.currentStep)
+    if not (key and n) then return nil end
+    local steps = YR.CharSteps(key)
+    for i = math.max(1, n), #steps do
+        local e = BuyOf(steps[i])
+        if e and YR.ShoppingWanted(e) then return e end
+    end
+    return nil
 end
 
 local function Coins(c) return YR.Money(c) end

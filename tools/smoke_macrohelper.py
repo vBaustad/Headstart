@@ -51,7 +51,10 @@ def run():
     def build(spell, opts, cls=None):
         return YS.MacroBuild(spell, T(opts), cls)
 
-    check(build("Stealth", "{ keep = true }") == "#showtooltip Stealth\n/cast !Stealth", "pressing again doesn't turn it off: !Stealth")
+    check(build("Stealth", "{ keep = true }") == "#showtooltip Stealth\n/cast [nostealth] Stealth",
+          "Stealth that stays on: [nostealth], not ! (which took it off again in Forever)")
+    check(build("Prowl", "{ keep = true }") == "#showtooltip Prowl\n/cast [nostealth] Prowl", "Prowl the same")
+    check(build("Cat Form", "{ keep = true }") == "#showtooltip Cat Form\n/cast !Cat Form", "a form still stays on by !")
     check(build("Flash Heal", "{ mouse = 'help' }") == "#showtooltip Flash Heal\n/cast [@mouseover,help,nodead][] Flash Heal",
           "a friend under the mouse first, else your target")
     check(build("Flash Heal", "{ mouse = 'help', self = true }").endswith("/cast [mod:alt,@player][@mouseover,help,nodead][] Flash Heal"),
@@ -73,8 +76,9 @@ def run():
     def line(spell, opts="{}"):
         return YS.MacroLine(spell, T(opts))
     check(line("Sap") == "/cast Sap" and line("Sap", "{ when = 'stealth' }") == "/cast [stealth] Sap"
-          and line("Stealth", "{ when = 'nostealth', keep = true }") == "/cast [nostealth] !Stealth",
-          "a line: the spell, a condition in front of it, ! to keep it on")
+          and line("Stealth", "{ when = 'nostealth', keep = true }") == "/cast [nostealth] Stealth"
+          and line("Stealth", "{ keep = true }") == "/cast [nostealth] Stealth" and line("Cat Form", "{ keep = true }") == "/cast !Cat Form",
+          "a line: the spell, a condition in front of it; kept on by ! - Stealth by [nostealth]")
     check(line("Charge", "{ when = 'stance:1' }") == "/cast [stance:1] Charge", "a warrior's stance as the condition")
     check(line("Renew", "{ target = 'help' }") == "/cast [@mouseover,help,nodead][] Renew"
           and line("Renew", "{ target = 'help', when = 'mod:shift' }") == "/cast [mod:shift,@mouseover,help,nodead][mod:shift] Renew",
@@ -89,7 +93,7 @@ def run():
     one = YS.MacroAddElse(YS.MacroAddLine("#showtooltip", line("Sap", "{ when = 'stealth' }")), line("Stealth"))
     check(one == "#showtooltip\n/cast [stealth] Sap; Stealth", "or else: on the last /cast line, after a semicolon")
     check(YS.MacroAddElse("", line("Stealth")) == "/cast Stealth" and YS.MacroAddElse("#showtooltip", line("Stealth")) == "#showtooltip\n/cast Stealth"
-          and YS.MacroAddElse("/cast [combat] Vanish", line("Stealth", "{ when = 'nostealth', keep = true }")) == "/cast [combat] Vanish; [nostealth] !Stealth",
+          and YS.MacroAddElse("/cast [combat] Vanish", line("Stealth", "{ when = 'nostealth', keep = true }")) == "/cast [combat] Vanish; [nostealth] Stealth",
           "with no /cast line to hang on it is a line of its own; its own condition comes along")
     tip = YS.MacroSetLine(two, "tip", True)
     check(tip == "#showtooltip\n" + two and YS.MacroHasLine(tip, "tip") and not YS.MacroHasLine(two, "tip"),
@@ -108,7 +112,7 @@ def run():
           and "Taunt, from any stance, mouseover first" in w and "Pummel, from any stance" not in w
           and "Your stance's long cooldown" not in w, f"a warrior's: the ones whose spells it has ({len(w)})")
     r = {x.label: x for x in YS.MacroRecipes("ROGUE").values()}
-    check(r["Stealth that stays on"].body == "#showtooltip Stealth\n/cast !Stealth"
+    check(r["Stealth that stays on"].body == "#showtooltip Stealth\n/cast [nostealth] Stealth"
           and r["Pick Pocket, then Sap"].body == "#showtooltip Sap\n/cast Pick Pocket\n/cast Sap" and "Pick Pocket, then Ambush" not in r
           and r["Pick Pocket, then Sap"].name == "PP Sap",
           "a rogue's: Stealth that stays, Pick Pocket with the opener it has, under a name of its own")

@@ -86,7 +86,7 @@ local function OnInvite(name, guid)
         dialog.inviteAccepted = 1
         StaticPopup_Hide("PARTY_INVITE")
     end
-    YR.Print(("joined %s's group."):format(Ambiguate(name or "?", "short")))
+    -- (the game says you joined: ours said it twice - 2026-10-21)
 end
 
 -- ---------------------------------------------------------------------------
@@ -169,7 +169,6 @@ end
 -- The bar's settings: every part is looked at, so the bar comes on with its events (or goes with them)
 -- at once, and one that stays on is drawn again.
 function YR.SetGroupBar(on) YippRouteDB.groupBar = on and true or false YR.ApplyParts() end
-function YR.SetGroupBarLocked(on) YippRouteDB.groupBarLocked = on and true or false YR.ApplyParts() end
 
 -- Free while off (YR.Part, Core.lua). Three parts, each listening only while it has something to do:
 -- your target and the group changing only repaint the bar; whispers are read only while a whispered

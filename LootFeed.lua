@@ -10,9 +10,8 @@
 --   built until it is turned on; a log left over from when it was on is dropped at the next login.
 --   Nothing runs per frame while a line shows: a line's fading is the game's own animation, and one
 --   timer wakes us when the oldest line has run out.
---   Account options (YippRouteDB; Headstart, QoL, Loot): lootFeed (off until turned on), lootItems,
---   lootMoney, lootXP, lootRep (each on unless turned off), lootQuality (lowest item quality shown, 0),
---   lootSeconds (4), lootLock (on unless turned off), lootFeedPos, lootStyle ("cards": each line a
+--   Account options (YippRouteDB; Headstart, QoL, Loot): lootFeed (off until turned on), lootMoney, lootXP,
+--   lootRep (each on unless turned off), lootQuality (lowest item quality shown, 0), lootFeedPos (set in Arrange), lootStyle ("cards": each line a
 --   dark card with a bigger icon; anything else: plain lines), lootPrice (what an item sells for, at
 --   the right of its line: on in cards and off in lines unless set). Per character: HeadstartLootLog =
 --   { entries = { { time, "i", link, count, value } | { time, "r", faction, amount } }, session = {
@@ -32,7 +31,7 @@ local issecret = issecretvalue
 
 function YR.LootFeedOn() return YR.Option("lootFeed") end
 local function Shows(key) return YippRouteDB[key] ~= false end
-local function Seconds() return math.max(2, math.min(15, tonumber(YippRouteDB.lootSeconds) or 4)) end
+local function Seconds() return 4 end
 local function Cards() return YippRouteDB.lootStyle == "cards" end
 local function Prices()
     if YippRouteDB.lootPrice == nil then return Cards() end
@@ -179,10 +178,9 @@ local function Layout()
             line:Hide()
         end
     end
-    local unlocked = YippRouteDB.lootLock == false
-    holder.edge:SetShown(unlocked)
-    holder:EnableMouse(unlocked)
-    holder:SetShown(n > 0 or unlocked)
+    holder.edge:Hide()
+    holder:EnableMouse(false)
+    holder:SetShown(n > 0)
     if soonest and not waking then
         waking = true
         C_Timer.After(soonest - now + 0.02, Wake)
@@ -232,8 +230,7 @@ local function Build()
     holder:SetFrameStrata("MEDIUM")
     holder:SetClampedToScreen(true)
     holder:SetMovable(true)
-    holder:RegisterForDrag("LeftButton")
-    holder:SetScript("OnDragStart", function(self) if YippRouteDB.lootLock == false then self:StartMoving() end end)
+    -- (moved in Arrange, which ends a move by this: where it stands is kept)
     holder:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         local l, b = self:GetLeft(), self:GetBottom()
@@ -329,7 +326,7 @@ local function GotItem(link, count)
     local s = DB().session
     s.items, s.value, s.last = s.items + count, s.value + value, time()
     Log({ time(), "i", link, count, value })
-    if Shows("lootItems") and (tonumber(quality) or 1) >= (tonumber(YippRouteDB.lootQuality) or 0) then
+    if (tonumber(quality) or 1) >= (tonumber(YippRouteDB.lootQuality) or 0) then
         Feed(id or link, "i", link, count, id and C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id) or nil, value)
     end
 end
@@ -483,7 +480,6 @@ function YR.LootFeedApply()
         if holder then holder:Hide() end
         return
     end
-    if YippRouteDB.lootLock == false then Build() end
     if holder then
         Dress()
         for i = 1, ROWS do holder.lines[i].words = false end
@@ -495,16 +491,6 @@ end
 function YR.LootFeedResetPosition()
     YippRouteDB.lootFeedPos = nil
     if holder then Place() end
-end
-
---- A few made-up lines, to see the feed and place it (Settings).
-function YR.LootFeedSample()
-    if not on then return false end
-    Feed("sample0", nil, "|cff9d9d9d[Chipped Claw]|r", 0, "Interface\\Icons\\INV_Misc_MonsterClaw_04", 4)
-    Feed("sample1", nil, "|cff1eff00[Sample Green Blade]|r x2", 0, "Interface\\Icons\\INV_Sword_04", 1240)
-    Feed("sample2", nil, "+ " .. YR.Coins(1274), 0, "Interface\\Icons\\INV_Misc_Coin_01")
-    Feed("sample3", nil, "|cffb48cff+320 XP|r", 0, "Interface\\Icons\\INV_Misc_Book_09")
-    return true
 end
 
 function YR.StartLootFeed()

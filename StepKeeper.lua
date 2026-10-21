@@ -26,6 +26,7 @@ local function OurKey(guide)
     end
     return keyOf[raw] or nil
 end
+YR.RouteKeyOf = OurKey          -- (Shopping.lua: the route you're on, for its next buy)
 
 -- The steps RestedXP has for this character, in its order: the route's steps whose "step << ..." filter
 -- is this character's (RestedXP leaves the others out when it loads the route).

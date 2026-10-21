@@ -523,10 +523,8 @@ end
 local function MapOn() return YR.QoLOn() and YR.Option("boatTimer") and YippRouteDB.boatMap ~= false end
 
 -- Only your own side's boats and the ones both take: an Alliance player has no use for the zeppelins, nor a
--- Horde player for the Alliance's boats (the owner, 2026-10-15) - unless the other side's are asked for too
--- (YippRouteDB.boatMapOther, off).
+-- Horde player for the Alliance's boats (the owner, 2026-10-15).
 local function Mine(key, side)
-    if YippRouteDB.boatMapOther then return true end
     if ALLIANCE[key] then return side ~= "Horde" end
     if HORDE[key] then return side ~= "Alliance" end
     return true
@@ -587,8 +585,10 @@ local function OnMap(key, id, now)
     return mx, my, heading, what, dock, left
 end
 
---- The boats put where they are on the map shown now: every frame while the map is open, and at once when
---- it turns to another map, zooms or changes size (the map tells its data providers, Headstart's among them).
+--- The boats put where they are on the map shown now: ten times a second while the map is open (a boat moves a
+--- few pixels in that: every frame made new map positions by the hundred - the performance audit, 2026-10-20), and
+--- at once when it turns to another map, zooms or changes size (the map tells its data providers, Headstart's among
+--- them).
 function YR.BoatMapRefresh()
     local map = WorldMapFrame
     local on = MapOn() and map and map:IsShown() and map.GetMapID and map.GetCanvas and C_Map and C_Map.GetMapPosFromWorldPos
@@ -607,13 +607,21 @@ function YR.BoatMapRefresh()
                 pin = NewPin(canvas, key)
                 pins[key] = pin
             end
-            pin:SetFrameLevel(Level(map, canvas))
+            local level = Level(map, canvas)
+            if pin.level ~= level then
+                pin:SetFrameLevel(level)
+                pin.level = level
+            end
             if pin.size ~= size then
                 pin:SetSize(size * pin.grow, size * pin.grow)
                 pin.size = size
             end
-            pin:ClearAllPoints()
-            pin:SetPoint("CENTER", canvas, "TOPLEFT", mx * w, -my * h)
+            local px, py = mx * w, -my * h
+            if pin.px ~= px or pin.py ~= py then           -- (where it was a moment ago: not placed again)
+                pin.px, pin.py = px, py
+                pin:ClearAllPoints()
+                pin:SetPoint("CENTER", canvas, "TOPLEFT", px, py)
+            end
             if pin.icon.SetRotation then pin.icon:SetRotation(heading or 0) end
             local i, whole = pin.info, math.floor(left or 0)
             i.key, i.what, i.dock, i.left = key, what, dock, left
@@ -647,7 +655,14 @@ local function Provider()
     provider.OnMapChanged = Refresh
     provider.OnCanvasScaleChanged = Refresh
     provider.OnCanvasSizeChanged = Refresh
-    provider.OnUpdate = Refresh
+    -- (the map calls this every frame it is open, and says nothing of the time: ten times a second is plenty)
+    local at = -1
+    provider.OnUpdate = function()
+        local now = GetTime()
+        if now and now - at < 0.09 and now >= at then return end     -- (0.09: a tenth, give or take a frame)
+        at = now or 0
+        Refresh()
+    end
     provider.RemoveAllData = function() for _, pin in pairs(pins) do pin:Hide() end end
     return provider
 end

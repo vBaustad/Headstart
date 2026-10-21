@@ -1,8 +1,8 @@
--- Reminders: one quiet chat line when there is something to do about it.
---   * Trainer: at a ding (and once at login) - what your class trainer has for you now and about what
---     it costs. The ranks come from the game's data (Data/TrainerSpells.lua); the prices are only
---     shown at the trainer, so every visit remembers them (YippRouteDB.trainerCosts[CLASS]) and a
---     rank never seen there is counted as "price not known yet".
+-- Reminders: said when there is something to do about it.
+--   * Trainer: at a ding - a small window with what your class trainer has new for you at that level and about
+--     what it costs (it was a chat line, once at login too: see "New at your trainer" below). The ranks come from
+--     the game's data (Data/TrainerSpells.lua); the prices are only shown at the trainer, so every visit
+--     remembers them (YippRouteDB.trainerCosts[CLASS]) and a rank never seen there is "price not known yet".
 --   * Talents: at a ding (and once at login) - points you haven't spent.
 --   * Durability: when your most worn piece drops under the warning line, once until you repair;
 --     and when you come into a town or an inn while it's under the town line, "repair here".
@@ -107,6 +107,183 @@ local function ReadTrainer()
     end
 end
 
+--- The next level at which your class trainer has something new for you (nil: nothing more to 60).
+function YR.TrainerNextLevel(level)
+    level = level or UnitLevel("player")
+    local race, best = RaceBit(), nil
+    for _, e in ipairs((YR.TrainerSpells or {})[Class()] or {}) do
+        if e[2] > level and (e[5] == 0 or bit.band(e[5], race) ~= 0) and e[6] ~= 1 and (not best or e[2] < best) then best = e[2] end
+    end
+    return best
+end
+
+-- ---------------------------------------------------------------------------
+-- New at your trainer: a small window as you level, when your class trainer has something new for you at that
+-- level - each spell's icon and rank, the spell itself under the mouse - instead of a line in chat
+-- (the owner, 2026-10-21: "nobody looks at our chat lines"; "a popup that comes every second level and says what is
+-- available this level"; the line named every spell not trained yet, so one you skip - Pick Pocket - came back at
+-- every ding). Only what came at the levels just gained, and only what you haven't trained: a spell trained while
+-- it is up goes from it, and it goes when nothing is left. Its x puts it away. After a fight, not in one. Placed in
+-- Arrange (trainerPos). Nothing of it is made until there is something to show; it listens only while it is up.
+--   Thin: the heading and the icons, as wide as they are (the owner, 2026-10-21: "make it thinner. no need for price
+--   etc and make the X better" - a line under them said the level and what it would cost, "prices not known yet").
+-- ---------------------------------------------------------------------------
+local POP_ICON, POP_GAP, POP_ROW, POP_PAD, POP_MIN = 34, 6, 7, 12, 220
+local pop, popList, popSample, popWaiting = nil, {}, false, false
+
+local function PopPlace()
+    pop:ClearAllPoints()
+    local p = YippRouteDB.trainerPos
+    if type(p) == "table" and p[1] and p[2] then
+        pop:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p[1], p[2])
+    else
+        pop:SetPoint("TOP", UIParent, "TOP", 0, -300)          -- (under where the better-gear window comes)
+    end
+end
+
+local PopRefresh
+local function PopBuild()
+    local S = YR.Style
+    pop = CreateFrame("Frame", "HeadstartTrainerPopup", UIParent)
+    pop:SetFrameStrata("MEDIUM")
+    pop:SetClampedToScreen(true)
+    pop:SetMovable(true)
+    pop:EnableMouse(true)
+    S.Fill(pop, S.C.window)
+    S.Border(pop, S.C.lineHi)
+    S.Shadow(pop, 14, 4, 0.6)
+    pop.head = S.Text(pop, 11, S.C.muted)
+    pop.head:SetPoint("TOPLEFT", POP_PAD, -10)
+    pop.head:SetText("NEW AT YOUR TRAINER")
+    local close = S.CloseX(pop, function()
+        if popSample then return end
+        pop:Hide()
+    end, "Put away until your next level")
+    close:SetPoint("TOPRIGHT", -5, -5)
+    pop.icons = {}
+    -- while it is up: a spell trained goes from it, and it waits out a fight
+    pop:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_REGEN_ENABLED" then
+            pop:UnregisterEvent("PLAYER_REGEN_ENABLED")
+            if popWaiting then popWaiting = false PopRefresh(true) end
+        else
+            PopRefresh()
+        end
+    end)
+    pop:SetScript("OnHide", function(self)
+        if not popWaiting then self:UnregisterAllEvents() end
+    end)
+    pop:Hide()
+    PopPlace()
+end
+
+local function PopIcon(i)
+    local b = pop.icons[i]
+    if b then return b end
+    local S = YR.Style
+    b = CreateFrame("Button", nil, pop)
+    b:SetSize(POP_ICON, POP_ICON)
+    b.tex = b:CreateTexture(nil, "ARTWORK")
+    b.tex:SetPoint("TOPLEFT", 1, -1)
+    b.tex:SetPoint("BOTTOMRIGHT", -1, 1)
+    b.tex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    S.Border(b, S.C.lineHi)
+    b.rank = b:CreateFontString(nil, "OVERLAY")
+    b.rank:SetFont(S.FONT, 12, "OUTLINE")
+    b.rank:SetPoint("BOTTOMRIGHT", 2, -2)
+    b:SetScript("OnEnter", function(self)
+        if not self.m then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if GameTooltip.SetSpellByID then GameTooltip:SetSpellByID(self.m.id) else GameTooltip:SetText(self.m.name) end
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    pop.icons[i] = b
+    return b
+end
+
+-- What is still to learn of the list, drawn; gone when nothing is. show: up it comes (else as it is).
+function PopRefresh(show)
+    if not pop then return end
+    local list = {}
+    for _, m in ipairs(popList) do
+        if popSample or not (IsPlayerSpell and IsPlayerSpell(m.id)) then list[#list + 1] = m end
+    end
+    if #list == 0 then
+        pop:Hide()
+        return
+    end
+    for i, m in ipairs(list) do
+        local b = PopIcon(i)
+        b.m = m
+        local tex = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(m.id)
+        b.tex:SetTexture(tex or 134400)
+        b.rank:SetText(m.rank > 0 and m.rank or "")
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", POP_PAD + ((i - 1) % POP_ROW) * (POP_ICON + POP_GAP), -30 - math.floor((i - 1) / POP_ROW) * (POP_ICON + POP_GAP))
+        b:Show()
+    end
+    for i = #list + 1, #pop.icons do pop.icons[i]:Hide() end
+    local rows, cols = math.ceil(#list / POP_ROW), math.min(#list, POP_ROW)
+    pop:SetSize(math.max(POP_MIN, POP_PAD * 2 + cols * (POP_ICON + POP_GAP) - POP_GAP),
+        30 + rows * (POP_ICON + POP_GAP) - POP_GAP + POP_PAD)
+    if show and not pop:IsShown() then pop:Show() end
+    if pop:IsShown() and not popSample then pop:RegisterEvent("SPELLS_CHANGED") end
+end
+
+--- At a ding: what came at the levels from `from` up to `to` that you haven't trained, in the window.
+function YR.TrainerPopup(from, to)
+    if not YR.Option("remindTrainer") then return end
+    to = to or UnitLevel("player")
+    from = from or to
+    local list = {}
+    for _, m in ipairs(YR.TrainerMissing(to)) do
+        if m.level >= from and m.level <= to then list[#list + 1] = m end
+    end
+    if #list == 0 then return end
+    if not pop then PopBuild() end
+    popList, popSample = list, false
+    if InCombatLockdown() then
+        popWaiting = true
+        pop:RegisterEvent("PLAYER_REGEN_ENABLED")
+        return
+    end
+    PopRefresh(true)
+end
+
+--- For Arrange: the window, with spells of yours on it while it is being placed (sample).
+function YR.TrainerPopupFrame(sample)
+    if not YR.Option("remindTrainer") then return nil end
+    if sample ~= nil then
+        if sample then
+            if not pop then PopBuild() end
+            if not pop:IsShown() then
+                local list, level = {}, UnitLevel("player")
+                for _, e in ipairs((YR.TrainerSpells or {})[Class()] or {}) do
+                    if #list < 3 and e[2] <= math.max(level, 2) then
+                        list[#list + 1] = { id = e[1], name = e[3], rank = e[4], level = e[2] }
+                    end
+                end
+                popList, popSample = list, true
+                PopRefresh(true)
+            end
+        elseif popSample then
+            popSample = false
+            pop:Hide()
+        end
+    end
+    return pop
+end
+function YR.TrainerPopupSave()
+    if not pop then return end
+    local l, t = pop:GetLeft(), pop:GetTop()
+    if l and t then YippRouteDB.trainerPos = { l, t } end
+end
+function YR.TrainerPopupReset()
+    YippRouteDB.trainerPos = nil
+    if pop then PopPlace() end
+end
+
 -- ---------------------------------------------------------------------------
 -- Talents
 -- ---------------------------------------------------------------------------
@@ -134,6 +311,8 @@ end
 -- that takes a click away from the game. It is there while you have a point to spend and are out of
 -- a fight, and goes the moment the last point is spent. A click on it puts it away until the number
 -- changes (a new level).
+--   With a talent build followed (Talents.lua), the words say which talent is next - "next: Deflection 2/5" - and
+--   its tooltip the next as many as there are points.
 --   YippRouteDB.talentNotice: "both" (the icon and the words; as it comes), "text", "icon", or "chat"
 --   - the one line in chat this used to be. talentPos = { left, top } once you have moved it (Arrange).
 --   Nothing of it is made until there is a point to tell of: its frame, and the three events it
@@ -163,7 +342,9 @@ local function NoticePaint()
     notice.count:SetShown(not words)
     notice.count:SetText(n)
     notice.text:SetShown(words)
-    notice.text:SetText(("%d talent point%s to spend"):format(n, n == 1 and "" or "s"))
+    local nextOne = YR.TalentNextLines and YR.TalentNextLines(1)[1]
+    notice.text:SetText(("%d talent point%s to spend"):format(n, n == 1 and "" or "s")
+        .. (nextOne and ("  -  next: |cffffffff" .. nextOne .. "|r") or ""))
     notice.text:ClearAllPoints()
     notice.text:SetPoint("LEFT", mode == "text" and 2 or 30, 0)
     local wide = notice.text:GetStringWidth()
@@ -196,6 +377,11 @@ local function NoticeBuild()
     notice:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:SetText(("%d talent point%s to spend"):format(noticeN, noticeN == 1 and "" or "s"), 1, 0.82, 0.25)
+        local build = YR.TalentFollowed and YR.TalentFollowed()
+        if build then
+            GameTooltip:AddLine(build.name, 0.8, 0.8, 0.8)
+            for _, line in ipairs(YR.TalentNextLines(math.max(1, noticeN))) do GameTooltip:AddLine(line, 1, 1, 1) end
+        end
         GameTooltip:AddLine("Click to put this away until your next level. It moves in Arrange (/hs move).", 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
@@ -276,11 +462,9 @@ function YR.TalentNoticeReset()
     if notice then NoticePlace() end
 end
 
-local function Remind(level)
-    if YR.Option("remindTrainer") then
-        local line = YR.TrainerLine(level)
-        if line then YR.Print(line) end
-    end
+-- At a ding (from, to: the levels just gained) the trainer's window; at the login only the talents.
+local function Remind(from, to)
+    if to and YR.Option("remindTrainer") then YR.TrainerPopup(from, to) end
     if YR.Option("remindTalents") then
         if YR.TalentNoticeMode() == "chat" then
             local n = YR.UnspentTalents()
@@ -308,8 +492,8 @@ function YR.LowestDurability()
 end
 
 local warned = false      -- told about the warning line; again only after it's back above it
+-- Mid-screen, on the game's own line for messages (it was in chat as well: the line nobody read - 2026-10-21).
 local function Warn(text)
-    YR.Print(text)
     if UIErrorsFrame then UIErrorsFrame:AddMessage("Headstart: " .. text, 1, 0.6, 0.2) end
 end
 
@@ -327,7 +511,7 @@ local function CheckDurability(cameToTown)
         return
     end
     if cameToTown and low < (YippRouteDB.durTown or DUR_TOWN) then
-        YR.Print(("your gear is at %d%% - repair while you're here."):format(math.floor(low)))
+        Warn(("your gear is at %d%% - repair while you're here."):format(math.floor(low)))
     end
 end
 
@@ -335,81 +519,30 @@ end
 -- Each reminder listens only while it is on: the ding for the screenshot and the two lines, your
 -- gear's wear and coming into a town for the durability lines, the trainer's window for the prices.
 local function Leveling()
-    return YR.Option("levelShot") or YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("levelUpStats")
+    return YR.Option("levelShot") or YR.Option("remindTrainer") or YR.Option("remindTalents")
 end
 
-local DingLines              -- (the lines a ding used to write in chat: further down)
-local dinged
+local dinged, dingedFrom          -- the level reached, and the first of the levels gained since the last Ding
 local function Shot() Screenshot() end
-local function Ding() Remind(dinged) end
-local function OnLevel(_, _, level, ...)
-    if DingLines and YR.Option("levelUpStats") then DingLines(...) end
+local function Ding()
+    if not dingedFrom then return end           -- (two dings close together: the first Ding told both)
+    local from = dingedFrom
+    dingedFrom = nil
+    Remind(from, dinged)
+end
+local function OnLevel(_, _, level)
     -- The new spells and talent point are in place a moment after the event, and the ding
     -- animation is worth waiting for in the screenshot.
     dinged = level
+    dingedFrom = dingedFrom or level
     if YR.Option("levelShot") then C_Timer.After(1.5, Shot) end
     C_Timer.After(2, Ding)
 end
 
--- ---------------------------------------------------------------------------
--- A ding as chat used to tell it: "You have gained 19 hit points. Your Strength increases by 1." Forever
--- only says "Congratulations, you have reached Level 2!".
---   The ding's event carries what you gained (health, power, strength, agility, stamina, intellect).
---   Spirit isn't in it, and should a number come as nothing, what you had is remembered from the
---   login and from the ding before, and the difference said instead. The lines are written a moment
---   after the ding, in the yellow of the game's own, in the game's own words where it still has them.
---   Account option levelUpStats (on unless turned off): lines in chat, nothing else.
--- ---------------------------------------------------------------------------
-local STAT_NAMES = { "Strength", "Agility", "Stamina", "Intellect", "Spirit" }
-local had = {}                  -- what you had: [1..5] the five stats, hp, mp
-local gain = {}                 -- what the ding's event said: [1..4], hp, mp
-
-local function Readable(v) return type(v) == "number" and not (issecretvalue and issecretvalue(v)) and v or nil end
-
-local function Have(into)
-    for i = 1, 5 do
-        local ok, base = pcall(UnitStat, "player", i)
-        into[i] = ok and Readable(base) or nil
-    end
-    local ok, health = pcall(UnitHealthMax, "player")
-    into.hp = ok and Readable(health) or nil
-    local got, mana = pcall(UnitPowerMax, "player", 0)
-    into.mp = got and Readable(mana) or nil
-end
-
-local now = {}
-local function SayDing()
-    Have(now)
-    local chat = DEFAULT_CHAT_FRAME
-    if not (chat and chat.AddMessage) then return end
-    -- what the event said, else the difference from what you had
-    local function Up(key)
-        local said = gain[key]
-        if said and said > 0 then return said end
-        if now[key] and had[key] and now[key] > had[key] then return now[key] - had[key] end
-        return 0
-    end
-    local hp, mp = Up("hp"), Up("mp")
-    if hp > 0 and mp > 0 then
-        chat:AddMessage((_G.LEVEL_UP_HEALTH_MANA or "You have gained %d hit points and %d mana."):format(hp, mp), 1, 1, 0)
-    elseif hp > 0 then
-        chat:AddMessage((_G.LEVEL_UP_HEALTH or "You have gained %d hit points."):format(hp), 1, 1, 0)
-    end
-    for i = 1, 5 do
-        local up = Up(i)
-        if up > 0 then
-            chat:AddMessage((_G.LEVEL_UP_STAT or "Your %s increases by %d."):format(_G["SPELL_STAT" .. i .. "_NAME"] or STAT_NAMES[i], up), 1, 1, 0)
-        end
-    end
-    for k, v in pairs(now) do had[k] = v end
-end
-
-local function OnDingStats(hp, mp, _, _, str, agi, sta, int)
-    gain.hp, gain.mp, gain[1], gain[2], gain[3], gain[4] = Readable(hp), Readable(mp), Readable(str), Readable(agi), Readable(sta), Readable(int)
-    C_Timer.After(0.4, SayDing)         -- your new numbers are in place a moment after the event
-end
-DingLines = OnDingStats
-YR.LevelUpLines = SayDing               -- for the tests
+-- (Headstart's own level-up lines - "You have gained 19 hit points. Your Strength increases by 1." - are
+-- gone: Forever said only "Congratulations, you have reached Level 2!", and from build 1.60.1.70425 its chat
+-- writes them all itself again, Spirit and talent points too - Blizzard_ChatFrameBase's Camelot
+-- ChatFrameUtilOverrides.lua, ChatFrameUtil.DisplayLevelUp. Ours would have said each twice. 2026-10-16.)
 
 local resting
 -- wear comes a piece at a time (a death is eight of these at once): one look for the lot
@@ -441,9 +574,7 @@ local declared
 function YR.StartReminders()
     if declared then return end
     declared = true
-    -- (what you have is noted as this comes on and whenever a setting changes: the lines need a "before")
-    local function Note() if YR.Option("levelUpStats") then Have(had) end end
-    YR.Part(Leveling, { "PLAYER_LEVEL_UP" }, OnLevel, { start = Note, again = Note })
+    YR.Part(Leveling, { "PLAYER_LEVEL_UP" }, OnLevel)
     YR.Part(function() return YR.Option("durability") end, { "UPDATE_INVENTORY_DURABILITY", "PLAYER_UPDATE_RESTING" }, OnWear,
         { start = function() resting = IsResting and IsResting() end })
     YR.Part(function() return YR.Option("remindTrainer") end, { "TRAINER_SHOW" }, ReadTrainer)

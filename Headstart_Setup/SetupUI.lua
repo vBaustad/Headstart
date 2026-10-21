@@ -128,14 +128,141 @@ YS.CLASS_CVARS = CLASS_CVARS
 local IS_CLASS_CVAR = {}
 for _, name in ipairs(CLASS_CVARS) do IS_CLASS_CVAR[name] = true end
 
--- The RestedXP guide a new character starts on: Headstart's launch opener for its starting zone.
+-- The RestedXP guide a new character starts on, by its race (YS.StartGuide): the one picked for that race
+-- (YippSetupDB.raceGuide[race] = { group, name }, for the account: Character setup, Interface tab), or else
+-- Headstart's opener for its starting zone where the routes are installed - the first of the race's list that
+-- is for the character (the Lean ones first: the owner, 2026-10-16, "can we make Lean the default guide"; the
+-- Shadowglen one is a Rogue's, so a Night Elf Druid gets the Launch one) - or else RestedXP's own free starter
+-- for the race. Without one of them a new character's RestedXP was blank: RestedXP marks a default in its menu
+-- (#defaultfor) but loads none by itself (the owner, 2026-10-16).
 local GUIDE_GROUP = "Headstart Launch (A)"
 local GUIDE_FOR_RACE = {
-    Human = "1-6 Northshire (Launch)",
-    NightElf = "1-6 Shadowglen (Launch)",
-    Dwarf = "1-5 Coldridge Valley (Launch)",
-    Gnome = "1-5 Coldridge Valley (Launch)",
+    Human = { "1-6 Northshire (Lean)", "1-6 Northshire (Launch)" },
+    NightElf = { "1-6 Shadowglen (Lean)", "1-6 Shadowglen (Launch)" },
+    Dwarf = { "1-5 Coldridge Valley (Launch)" },
+    Gnome = { "1-5 Coldridge Valley (Launch)" },
 }
+local RXP_STARTER = {
+    Human = { "RestedXP Forever Guide (A)", "1-6 Northshire" },
+    NightElf = { "RestedXP Forever Guide (A)", "1-6 Shadowglen" },
+    Dwarf = { "RestedXP Forever Guide (A)", "1-5 Coldridge Valley" },
+    Gnome = { "RestedXP Forever Guide (A)", "1-5 Coldridge Valley" },
+    Orc = { "RestedXP Forever Guide (H)", "1-6 Durotar" },
+    Troll = { "RestedXP Forever Guide (H)", "1-6 Durotar" },
+    Scourge = { "RestedXP Forever Guide (H)", "1-6 Tirisfal Glades" },
+    Tauren = { "RestedXP Forever Guide (H)", "1-6 Mulgore" },
+}
+-- the races, as the game names them (UnitRace's second answer) and as the choice shows them
+YS.GUIDE_RACES = { { "Human", "Human" }, { "Dwarf", "Dwarf" }, { "Gnome", "Gnome" }, { "NightElf", "Night Elf" },
+    { "Orc", "Orc" }, { "Troll", "Troll" }, { "Tauren", "Tauren" }, { "Scourge", "Undead" } }
+local HORDE_RACE = { Orc = true, Troll = true, Tauren = true, Scourge = true }
+
+-- a guide RestedXP has, by its group and its name as written: the name it has there (RestedXP writes the
+-- levels with its own affix, "01-06"), or nil
+local function HaveGuide(group, name)
+    local rxp = RXP
+    if not (type(rxp) == "table" and rxp.GetGuideTable and type(group) == "string" and type(name) == "string") then return nil end
+    local affixed = rxp.affix and (name:gsub("^(%d)-(%d%d?)", rxp.affix)) or name
+    for _, n in ipairs({ affixed, name }) do
+        local ok, guide = pcall(rxp.GetGuideTable, group, n)
+        if ok and guide then return n end
+    end
+end
+
+-- whether a guide RestedXP has is for the character you are on: its header's filter ("<< Alliance Rogue"),
+-- read by RestedXP's own check. A guide for another class loads with every step filtered out - an empty
+-- guide (the route chat, 2026-10-16: a Rogue's opener picked for Night Elves, on a Night Elf Druid).
+local function ForThisCharacter(group, name)
+    local rxp = RXP
+    local ok, guide = pcall(rxp.GetGuideTable, group, name)
+    local tag = ok and type(guide) == "table" and guide.enabledFor
+    if type(tag) ~= "string" or type(rxp.applies) ~= "function" then return true end
+    local fine, yes = pcall(rxp.applies, tag)
+    return not fine or yes and true or false
+end
+
+--- The guide a new character of `race` starts on: its group, its name as RestedXP has it, and whose it is
+--- ("picked", "headstart" or "restedxp"); nil when RestedXP has none of them. here: for the character you
+--- are on - a guide that isn't for it (another class's) is passed over for the next, and the fourth answer
+--- says so.
+function YS.StartGuide(race, here)
+    local skipped
+    local function Take(group, name)
+        local n = HaveGuide(group, name)
+        if n and here and not ForThisCharacter(group, n) then skipped = skipped or n return nil end
+        return n
+    end
+    local picked = YippSetupDB and type(YippSetupDB.raceGuide) == "table" and YippSetupDB.raceGuide[race]
+    if type(picked) == "table" then
+        local n = Take(picked[1], picked[2])
+        if n then return picked[1], n, "picked" end
+    end
+    for _, name in ipairs(GUIDE_FOR_RACE[race] or {}) do
+        local n = Take(GUIDE_GROUP, name)
+        if n then return GUIDE_GROUP, n, "headstart", skipped end
+    end
+    local s = RXP_STARTER[race]
+    local n = s and Take(s[1], s[2])
+    if n then return s[1], n, "restedxp", skipped end
+    return nil, nil, nil, skipped
+end
+
+-- The default for a race as the character you are on would get it: nothing picked, and a guide for other
+-- classes passed over (a Rogue sees the Rogue's opener, anyone else the next).
+local function DefaultGuide(race)
+    local picks = YippSetupDB and type(YippSetupDB.raceGuide) == "table" and YippSetupDB.raceGuide or nil
+    local was = picks and picks[race]
+    if picks then picks[race] = nil end
+    local g, n = YS.StartGuide(race, true)
+    if picks then picks[race] = was end
+    return g, n
+end
+
+--- The guides to pick from for a race: every guide RestedXP has loaded that starts at level 1, not the other
+--- side's (its group says (A) or (H)), with "the default" first. { { value, label }, ... }; value
+--- "group||name", or "" for the default.
+function YS.StartGuideChoices(race)
+    local out, seen = {}, {}
+    local _, dn = DefaultGuide(race)
+    out[1] = { "", dn and ("Default: " .. dn) or "Default (none loaded)" }
+    local list = {}
+    local rxp = RXP
+    local other = HORDE_RACE[race] and "%(A%)$" or "%(H%)$"
+    for _, guide in pairs(type(rxp) == "table" and type(rxp.guides) == "table" and rxp.guides or {}) do
+        local group = type(guide) == "table" and type(guide.group) == "string" and guide.group:gsub("^%*", "")
+        local name = type(guide) == "table" and guide.name
+        if group and type(name) == "string" and name:match("^0?1%-") and not group:match(other) then
+            local key = group .. "||" .. name
+            if not seen[key] then
+                seen[key] = true
+                -- a guide for some characters only says for whom (its header's filter): it is passed over
+                -- for any other, so a Rogue's opener picked for the race starts only the race's Rogues on it
+                local only = type(guide.enabledFor) == "string" and guide.enabledFor:match("%S") and ("  (" .. guide.enabledFor .. " only)") or ""
+                list[#list + 1] = { key, name .. only .. "  -  " .. group, group, name }
+            end
+        end
+    end
+    table.sort(list, function(a, b) if a[3] ~= b[3] then return a[3] < b[3] end return a[4] < b[4] end)
+    for _, x in ipairs(list) do out[#out + 1] = { x[1], x[2] } end
+    return out
+end
+
+--- One picked for a race ("" or nil: none, the default again).
+function YS.PickStartGuide(race, value)
+    if not (YippSetupDB and race) then return end
+    YippSetupDB.raceGuide = type(YippSetupDB.raceGuide) == "table" and YippSetupDB.raceGuide or {}
+    local group, name
+    if type(value) == "string" then group, name = value:match("^(.-)||(.+)$") end
+    YippSetupDB.raceGuide[race] = group and { group, name } or nil
+end
+
+--- What the choice shows for a race.
+function YS.StartGuideLabel(race)
+    local _, name, whose = YS.StartGuide(race)
+    if whose == "picked" then return name end
+    local _, dn = DefaultGuide(race)
+    return dn and ("Default: " .. dn) or "None loaded"
+end
 
 -- Other UI addons. Action slots are the game's own and every bar addon (Bartender, Dominos, ElvUI,
 -- EllesmereUI ...) draws from them, so spells and macros placed in slots show on their bars too.
@@ -280,34 +407,70 @@ function YS.ScanKeys()
     return n > 0 and keys or nil
 end
 
---- The saved keys put on. backup: where the keys as they were are kept for /ysetup undo (the first
---- time only). Returns how many actions changed, or nil where it can't be done (a fight, no keys saved).
-function YS.ApplyKeys(keys, backup)
+--- The saved keys put on, a few at a time (each key set has the game tell every action button): YS.KeysJob
+--- makes the job, YS.KeysStep sets at most `most` keys of it (an action at a time, so a little over) and is true
+--- once it is all on and saved.
+---   One action at a time: the keys it has let go and the ones it should have set together. A key set takes it from
+---   whatever had it, so the order doesn't matter - and a fight between two frames leaves every action with keys,
+---   old or new (the two passes - every key let go, then every key set - left them with none until it ended).
+--- backup: where the keys as they were are kept for /ysetup undo (the first time only). KeysJob is nil where it
+--- can't be done (a fight, no keys saved).
+function YS.KeysJob(keys, backup)
     if type(keys) ~= "table" or not (SetBinding and GetBindingKey and SaveBindings) then return nil end
     if InCombatLockdown() then return nil end
-    local was = backup and backup.keys == nil and YS.ScanKeys() or nil
-    local differs = {}
+    local k = { keys = keys, backup = backup, was = backup and backup.keys == nil and YS.ScanKeys() or nil,
+        list = {}, i = 1, changed = 0, done = {} }
     for action, want in pairs(keys) do
-        if type(action) == "string" and type(want) == "table" then
-            local k1, k2 = GetBindingKey(action)
-            if (k1 or false) ~= (want[1] or false) or (k2 or false) ~= (want[2] or false) then
-                differs[action] = want
-                if k1 then SetBinding(k1) end
-                if k2 then SetBinding(k2) end
-            end
+        if type(action) == "string" and type(want) == "table" then k.list[#k.list + 1] = action end
+    end
+    return k
+end
+-- One action's keys put on: the ones it has let go, the ones it should have set. An action of the job a key is taken
+-- from is put on at once too (two keys swapped: neither is left without one between two frames). Returns the keys set.
+local function PutKeys(k, action)
+    k.done[action] = true
+    local want = k.keys[action]
+    local k1, k2 = GetBindingKey(action)        -- (as it is now: a key taken by an action before is not its)
+    if (k1 or false) == (want[1] or false) and (k2 or false) == (want[2] or false) then return 0 end
+    local n, robbed = 0, {}
+    if k1 then SetBinding(k1) n = n + 1 end
+    if k2 then SetBinding(k2) n = n + 1 end
+    for i = 1, 2 do
+        local key = want[i]
+        if type(key) == "string" then
+            local had = GetBindingAction and GetBindingAction(key)
+            if type(had) == "string" and had ~= action and k.keys[had] and not k.done[had] then robbed[#robbed + 1] = had end
+            SetBinding(key, action)
+            n = n + 1
         end
     end
-    local changed = 0
-    for action, want in pairs(differs) do
-        if type(want[1]) == "string" then SetBinding(want[1], action) end
-        if type(want[2]) == "string" then SetBinding(want[2], action) end
-        changed = changed + 1
+    k.changed = k.changed + 1
+    for _, other in ipairs(robbed) do
+        if not k.done[other] then n = n + PutKeys(k, other) end
     end
-    if changed > 0 then
+    return n
+end
+function YS.KeysStep(k, most)
+    local n = 0
+    while k.i <= #k.list and n < most do
+        local action = k.list[k.i]
+        k.i = k.i + 1
+        if not k.done[action] then n = n + PutKeys(k, action) end
+    end
+    if k.i <= #k.list then return false end
+    if k.changed > 0 and not k.saved then
+        k.saved = true
         pcall(SaveBindings, GetCurrentBindingSet and GetCurrentBindingSet() or 1)
-        if backup and was then backup.keys = was end
+        if k.backup and k.was then k.backup.keys = k.was end
     end
-    return changed
+    return true
+end
+--- All of it at once. Returns how many actions changed, or nil where it can't be done.
+function YS.ApplyKeys(keys, backup)
+    local k = YS.KeysJob(keys, backup)
+    if not k then return nil end
+    while not YS.KeysStep(k, math.huge) do end
+    return k.changed
 end
 
 function YS:ScanUI()
@@ -576,6 +739,7 @@ local function CheckLater(layout, want)
         end
         if reload then
             YS.Print("reload to finish: until then the action bars can be blocked in combat.")
+            if YR.TaintNoted then YR.TaintNoted("Character setup changed which bars show (a reload clears it)") end
             StaticPopup_Show("YIPPSETUP_RELOAD")
         end
     end
@@ -588,12 +752,13 @@ local function ApplyGuide()
     -- the opener is a level 1 route: a character past it keeps the guide it is on
     if (UnitLevel("player") or 1) > 5 then return "left as it is (not a new character)" end
     local _, race = UnitRace("player")
-    local guide = GUIDE_FOR_RACE[race]
-    if not guide then return "no Headstart opener for this race" end
-    local name = rxp.affix and guide:gsub("^(%d)-(%d%d?)", rxp.affix) or guide
-    if not rxp.GetGuideTable(GUIDE_GROUP, name) then return "guide '" .. guide .. "' not found" end
-    local ok = pcall(rxp.LoadGuideTable, rxp, GUIDE_GROUP, name)
-    return ok and ("'" .. guide .. "'") or "RestedXP refused the guide"
+    local group, name, _, skipped = YS.StartGuide(race, true)
+    if not group then
+        return skipped and ("'" .. skipped .. "' isn't for this class, and there is no other starting guide") or "no starting guide for this race in RestedXP"
+    end
+    local ok = pcall(rxp.LoadGuideTable, rxp, group, name)
+    if not ok then return "RestedXP refused the guide" end
+    return "'" .. name .. "'" .. (skipped and (" (the one picked for the race, '" .. skipped .. "', isn't for this class)") or "")
 end
 
 --- A character's screen about to be saved into its interface: the parts Apply never put on this
@@ -668,14 +833,22 @@ function YS.ApplyProfileUI(ui)
     return table.concat(said, "; ")
 end
 
-function YS:ApplyUI(ui, o)
+--- The interface put on, as steps (Setup.lua's job runner runs them a frame each): the game settings
+--- CVAR_BATCH a frame, then graphics and sound, the bars that show, Edit Mode, chat and the camera, your keys
+--- KEY_BATCH a frame, RestedXP, and what was done said in chat. YS:ApplyUI: all of them at once.
+local CVAR_BATCH, KEY_BATCH = 25, 30
+--- The interface's steps for a job (Setup.lua). login: a new character set up as it logs in - a part the game puts
+--- its own on a moment in (chat windows, key bindings, Edit Mode's layouts) waits for that, or it would be written over.
+function YS.UISteps(ui, o, login)
     o = o or YS:Options()
     if not ui then
-        YS.Print(("RestedXP guide: %s. No Edit Mode layout, bars or settings saved yet: log in on your main once.")
-            :format(o.guide and ApplyGuide() or "off"))
-        return
+        return { function()
+            YS.Print(("RestedXP guide: %s. No Edit Mode layout, bars or settings saved yet: log in on your main once.")
+                :format(o.guide and ApplyGuide() or "off"))
+            return true
+        end }
     end
-    local set, bars = 0, 0
+    local u = { set = 0, bars = 0, c = 1, layout = "off", chat = "off", keys = "off", taint = false }
     local suite = FirstLoaded(UI_SUITES)
     local barAddon = suite or FirstLoaded(BAR_ADDONS)
     -- each game setting as it was, kept beside the bars' copy for /ysetup undo
@@ -694,23 +867,34 @@ function YS:ApplyUI(ui, o)
             if type(char) == "table" then char.classUI = true end
         end
     end
-    for name, v in pairs(cvars) do
-        local was = C_CVar.GetCVar(name)
-        if was ~= nil and was ~= v and pcall(C_CVar.SetCVar, name, v) then
-            set = set + 1
-            if backup then
-                backup.cvars = backup.cvars or {}
-                -- the first value seen is the one to go back to (a second apply mustn't overwrite it)
-                if backup.cvars[name] == nil then backup.cvars[name] = was end
+    local names = {}
+    for name in pairs(cvars) do names[#names + 1] = name end
+    local steps = {}
+    steps[#steps + 1] = function()
+        local n = 0
+        while u.c <= #names and n < CVAR_BATCH do
+            local name = names[u.c]
+            local v = cvars[name]
+            u.c = u.c + 1
+            local was = C_CVar.GetCVar(name)
+            if was ~= nil and was ~= v and pcall(C_CVar.SetCVar, name, v) then
+                u.set, n = u.set + 1, n + 1
+                if backup then
+                    backup.cvars = backup.cvars or {}
+                    -- the first value seen is the one to go back to (a second apply mustn't overwrite it)
+                    if backup.cvars[name] == nil then backup.cvars[name] = was end
+                end
             end
         end
+        if u.c <= #names then return false end
+        if YS.ClassUINoted then YS.ClassUINoted() end        -- put on, not changed by the player
+        return true
     end
-    if YS.ClassUINoted then YS.ClassUINoted() end        -- put on, not changed by the player
     -- Graphics and sound. What each is now is read before anything is set: a quality preset sets what
     -- is under it, and what undo goes back to is what you had, not what the preset made of it.
-    local machine = nil
-    if o.graphics ~= false and type(ui.machine) == "table" then
-        machine = 0
+    steps[#steps + 1] = function()
+        if not (o.graphics ~= false and type(ui.machine) == "table") then return true end
+        u.machine = 0
         local had, touched = {}, false
         for _, name in ipairs(MACHINE_CVARS) do had[name] = C_CVar.GetCVar(name) end
         for _, name in ipairs(MACHINE_CVARS) do
@@ -722,7 +906,7 @@ function YS:ApplyUI(ui, o)
                     ok = pcall(C_CVar.SetCVar, name, v)
                     touched = touched or ok
                 end
-                if ok and was ~= v then machine = machine + 1 end
+                if ok and was ~= v then u.machine = u.machine + 1 end
             end
         end
         -- kept for /ysetup undo: all of them as they were, not only those that differ - a preset put
@@ -733,64 +917,103 @@ function YS:ApplyUI(ui, o)
                 if had[name] ~= nil and backup.cvars[name] == nil then backup.cvars[name] = had[name] end
             end
         end
+        return true
     end
     local barsDone = not barAddon and o.barVisibility
-    local taint = false            -- the old way ran: only a reload clears it
-    local cleanBars = barsDone and ApplyBarsClean(ui.bars or {})
-    if cleanBars then
-        bars = cleanBars
-    elseif barsDone then
-        for bar, shown in pairs(ui.bars or {}) do
-            local key = "PROXY_SHOW_ACTIONBAR_" .. bar
-            local ok, cur = pcall(Settings.GetValue, key)
-            if ok and cur ~= shown and pcall(Settings.SetValue, key, shown) then bars, taint = bars + 1, true end
+    steps[#steps + 1] = function()
+        u.cleanBars = barsDone and ApplyBarsClean(ui.bars or {})
+        if u.cleanBars then
+            u.bars = u.cleanBars
+        elseif barsDone then
+            for bar, shown in pairs(ui.bars or {}) do
+                local key = "PROXY_SHOW_ACTIONBAR_" .. bar
+                local ok, cur = pcall(Settings.GetValue, key)
+                if ok and cur ~= shown and pcall(Settings.SetValue, key, shown) then u.bars, u.taint = u.bars + 1, true end
+            end
         end
+        return true
     end
-    local layout, layoutChanged, clean = "off", false, false
-    if suite then layout = "left to " .. suite
-    elseif o.editMode then
-        layout, layoutChanged = ApplyLayoutClean(ui.layout)
-        if layout then clean = true else layout, layoutChanged = ApplyLayout(ui.layout) end
-        if layoutChanged and not clean then taint = true end
+    steps[#steps + 1] = function()
+        if login and not suite and o.editMode and not EditModeLayouts() and not YS.Ready() then return "wait" end
+        if suite then u.layout = "left to " .. suite
+        elseif o.editMode then
+            u.layout, u.layoutChanged = ApplyLayoutClean(ui.layout)
+            if u.layout then u.clean = true else u.layout, u.layoutChanged = ApplyLayout(ui.layout) end
+            if u.layoutChanged and not u.clean then u.taint = true end
+        end
+        return true
     end
     -- the windows as they are saved already (a change made elsewhere that wasn't to chat): left alone - put
     -- on again, they would ask for a reload for nothing
-    local chat = "off"
-    if o.chat then
-        local same = type(ui.chat) == "table" and YS.UISig and YS.UISig(YS.ScanChat()) == YS.UISig(ui.chat)
-        chat = same and "as saved" or YS.ApplyChat(ui.chat)
+    steps[#steps + 1] = function()
+        if login and o.chat and not YS.Ready("chat") then return "wait" end
+        if o.chat then
+            local same = type(ui.chat) == "table" and YS.UISig and YS.UISig(YS.ScanChat()) == YS.UISig(ui.chat)
+            u.chat = same and "as saved" or YS.ApplyChat(ui.chat)
+        end
+        -- chat windows are set through Blizzard's own functions, called from here: what they write on the
+        -- chat frames is ours until a reload, so it ends with the same Reload question
+        if o.chat and type(u.chat) == "string" and u.chat:find("windows$") then u.taint = true end
+        if o.camera then YS.ApplyCamera(ui.camera) end
+        return true
     end
-    -- chat windows are set through Blizzard's own functions, called from here: what they write on the
-    -- chat frames is ours until a reload, so it ends with the same Reload question
-    if o.chat and type(chat) == "string" and chat:find("windows$") then taint = true end
-    if o.camera then YS.ApplyCamera(ui.camera) end
     -- your keys, as they were where the interface was saved (kept for /ysetup undo like the game settings)
-    local keys = "off"
     if o.keys ~= false then
-        local n = YS.ApplyKeys(ui.keys, backup)
-        keys = n and (n .. " changed") or (ui.keys and "not now" or "none saved")
+        steps[#steps + 1] = function()
+            if login and u.k == nil and not YS.Ready("keys") then return "wait" end
+            if u.k == nil then u.k = YS.KeysJob(ui.keys, backup) or false end
+            if not u.k then
+                u.keys = ui.keys and "not now" or "none saved"
+                return true
+            end
+            if not YS.KeysStep(u.k, KEY_BATCH) then return false end
+            u.keys = u.k.changed .. " changed"
+            return true
+        end
     end
-    local barText = barAddon and ("left to " .. barAddon) or (o.barVisibility and (tostring(bars) .. " changed") or "off")
-    local machineText = o.graphics == false and "off" or (machine and (machine .. " changed") or "none saved")
-    YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. Key bindings: %s. Graphics and sound: %s. RestedXP guide: %s. RestedXP windows: %s.")
-        :format(layout, barText, chat, set, keys, machineText, o.guide and ApplyGuide() or "off", o.rxpFrames ~= false and YS.ApplyRXP(ui.rxp) or "off"))
-    if YS.UIStale(ui) then
-        -- what an older save lacks, by the version it was saved with (the list above UI_VERSION)
-        local v, lacks = ui.v or 1, {}
-        if v < 2 then lacks[#lacks + 1] = "whether the damage meter is on and RestedXP's look" end
-        if v < 4 then lacks[#lacks + 1] = "your key bindings" end
-        if v < 5 then lacks[#lacks + 1] = "graphics and sound" end
-        YS.Print(("this interface was saved by an older Headstart: %s are not in it."
-            .. " Save it again on %s (Character setup, Save interface), then Apply interface here.")
-            :format(table.concat(lacks, ", "), tostring(YS.UISource() or "the character it came from")))
+    steps[#steps + 1] = function()
+        u.guide = o.guide and ApplyGuide() or "off"
+        return true
     end
-    -- the old way taints until a reload; the game's own functions don't, but get checked a moment later
-    if taint then
-        YS.Print("reload to finish: until then the action bars can be blocked in combat.")
-        StaticPopup_Show("YIPPSETUP_RELOAD")
-    elseif (clean and layoutChanged) or cleanBars then
-        -- the bars are checked even when nothing changed now: set at login (EarlyBars), they may not show yet
-        CheckLater(clean and layoutChanged and ui.layout or nil, cleanBars and ui.bars or nil)
+    steps[#steps + 1] = function()
+        local barText = barAddon and ("left to " .. barAddon) or (o.barVisibility and (tostring(u.bars) .. " changed") or "off")
+        local machineText = o.graphics == false and "off" or (u.machine and (u.machine .. " changed") or "none saved")
+        -- A new character's own setup asks for no reload: everything works without one, and the player reloads when it
+        -- suits them (the owner, 2026-10-21, a new character set up in the stress test: "you don't need to do the
+        -- reload, everything works, and I take a reload when it suits me"). Said at the end of this line, not a line more.
+        local later = u.taint and login and " A /reload when it suits you finishes it (until then a bar can be blocked in a fight)." or ""
+        YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. Key bindings: %s. Graphics and sound: %s. RestedXP guide: %s. RestedXP windows: %s.%s")
+            :format(u.layout, barText, u.chat, u.set, u.keys, machineText, u.guide, o.rxpFrames ~= false and YS.ApplyRXP(ui.rxp) or "off", later))
+        if YS.UIStale(ui) then
+            -- what an older save lacks, by the version it was saved with (the list above UI_VERSION)
+            local v, lacks = ui.v or 1, {}
+            if v < 2 then lacks[#lacks + 1] = "whether the damage meter is on and RestedXP's look" end
+            if v < 4 then lacks[#lacks + 1] = "your key bindings" end
+            if v < 5 then lacks[#lacks + 1] = "graphics and sound" end
+            YS.Print(("this interface was saved by an older Headstart: %s are not in it."
+                .. " Save it again on %s (Character setup, Save interface), then Apply interface here.")
+                :format(table.concat(lacks, ", "), tostring(YS.UISource() or "the character it came from")))
+        end
+        -- the old way taints until a reload; the game's own functions don't, but get checked a moment later
+        if u.taint and login then
+            if YR.TaintNoted then YR.TaintNoted("Character setup changed the bars or Edit Mode the old way (a reload clears it)") end
+            YS.reloadDue = true         -- (for /ysetup debug: left for the player to make)
+        elseif u.taint then
+            YS.Print("reload to finish: until then the action bars can be blocked in combat.")
+            if YR.TaintNoted then YR.TaintNoted("Character setup changed the bars or Edit Mode the old way (a reload clears it)") end
+            StaticPopup_Show("YIPPSETUP_RELOAD")
+        elseif (u.clean and u.layoutChanged) or u.cleanBars then
+            -- the bars are checked even when nothing changed now: set at login (EarlyBars), they may not show yet
+            CheckLater(u.clean and u.layoutChanged and ui.layout or nil, u.cleanBars and ui.bars or nil)
+        end
+        return true
+    end
+    return steps
+end
+
+function YS:ApplyUI(ui, o)
+    for _, step in ipairs(YS.UISteps(ui, o)) do
+        while not step() do end
     end
 end
 
@@ -854,6 +1077,7 @@ function YS.PutBackUI(ui)
         tostring(chat), tostring(rxp)))
     if taint then
         YS.Print("reload to finish: until then the action bars can be blocked in combat.")
+        if YR.TaintNoted then YR.TaintNoted("Character setup changed the bars or Edit Mode the old way (a reload clears it)") end
         StaticPopup_Show("YIPPSETUP_RELOAD")
     end
     return true

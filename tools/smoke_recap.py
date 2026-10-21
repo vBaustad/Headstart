@@ -171,8 +171,8 @@ def run():
     src = list(view.sources.values())
     check(len(src) == 2 and src[0].frac == 1 and src[0].amount == "412  81%" and src[1].deadly is False and src[0].deadly is True,
           "what you took by spell: its share, and the deadly one marked")
-    check(YR.RecapSample() is True and shown() is True and g.YippSetupCharDB.lastDeath.zone == "Duskwood",
-          "Preview shows a made-up death and leaves the real last one alone")
+    check(YR.RecapShow() is True and shown() is True and g.YippSetupCharDB.lastDeath.zone == "Duskwood",
+          "Your last death (the settings' button, /headstart death): the recap of the real last one")
     lua.execute("""Fire("UNIT_COMBAT", "target", "WOUND", "CRITICAL", 999, 1)""")
     check(g.YippRouteDB.records is None and g.YippSetupCharDB.records is None, "hits on anything but you are not kept at all")
 

@@ -5,6 +5,8 @@
 A first flight is timed and learned (with the pace per length), the next flight on the same route
 counts down from the learned time, a new route is estimated from its length, RestedXP's time is used
 when it has one, a reload in the air carries the bar on without learning, and the setting hides it.
+The card: its ring set once a flight (the game draws it), Land quiet on a direct flight, and Blizzard's
+own Land button see-through while it shows.
 """
 import os
 import sys
@@ -38,9 +40,17 @@ function Obj.GetText(self) return rawget(self, "_text") or "" end
 function Obj.SetValue(self, v) rawset(self, "_value", v) end
 function Obj.SetWidth(self, w) rawset(self, "_w", w) rawset(self, "_wn", (rawget(self, "_wn") or 0) + 1) end
 function Obj.GetLeft() return 100 end
+function Obj.GetFrameLevel() return 1 end
+function Obj.SetCooldown(self, start, length) rawset(self, "_cd", { start, length }) rawset(self, "_cdn", (rawget(self, "_cdn") or 0) + 1) end
+-- Blizzard's own Land button, shown on a taxi
+THEIRS = { alpha = 1, mouse = true }
+MainMenuBarVehicleLeaveButton = { SetAlpha = function(self, a) THEIRS.alpha = a end, GetAlpha = function() return THEIRS.alpha end,
+    EnableMouse = function(self, on) THEIRS.mouse = on end, IsMouseEnabled = function() return THEIRS.mouse end,
+    IsProtected = function() return false end, HookScript = function(self, what, fn) THEIRS.onShow = fn end }
 function Obj.GetTop() return 600 end
 function CreateFrame(_, name) local f = setmetatable({}, Obj) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 UIParent = CreateFrame()
+GameTooltip = CreateFrame()
 function Fire(event) for _, f in ipairs(FRAMES) do if rawget(f, "_ev") and f._ev[event] and rawget(f, "_OnEvent") then f._OnEvent(f, event) end end end
 -- A frame of dt seconds: the OnUpdates, then each ticker whose time has come (once a frame at most,
 -- as in the game).
@@ -124,7 +134,7 @@ strtrim = function(s) return s end
         g.HOOKS.TakeTaxiNode(i)
         lua.execute("Tick(0.5); ONTAXI = true; Tick(0.5)")
         bar = g.HeadstartFlightFrame
-        texts = (bar.time.GetText(bar.time), bar["from"].GetText(bar["from"]), bar.to.GetText(bar.to), bar.note.GetText(bar.note)) if bar else None
+        texts = (bar.time.GetText(bar.time), bar["from"].GetText(bar["from"]), bar.to.GetText(bar.to), bar.eta.GetText(bar.eta)) if bar else None
         lua.execute(f"Tick({seconds - 1})")
         mid = bar.time.GetText(bar.time) if bar else None
         lua.execute("Tick(1); ONTAXI = false; Fire('PLAYER_CONTROL_GAINED')")
@@ -135,7 +145,7 @@ strtrim = function(s) return s end
     check(g.Running() == 0,
           "on the ground again: nothing ticks, nothing is counted each frame, losing control isn't listened for")
     check(texts and texts[0] == "0:00" and "timing it" in texts[3], f"first flight counts up while it learns: {texts}")
-    check(texts and texts[1] == "Ironforge" and texts[2] == "Thelsamar", f"from and to, without the zone: {texts}")
+    check(texts and texts[1] == "from Ironforge" and texts[2] == "Thelsamar", f"where to, and where from under it, without the zone: {texts}")
     check(not g.HeadstartFlightFrame.IsShown(g.HeadstartFlightFrame), "the bar goes on landing")
     learned = g.YippRouteDB.flights["Ironforge, Dun Morogh>Thelsamar, Loch Modan"]
     check(learned == 60, f"60-second flight learned: {learned}")
@@ -144,16 +154,19 @@ strtrim = function(s) return s end
     check(texts[0] == "1:00" or texts[0] == "0:59", f"second time: counts down from the learned time: {texts[0]}")
     check(mid == "0:01", f"a second before landing: {mid}")
 
-    # the fill is drawn when it moves a whole pixel, not on every frame between
+    # the ring: the game's cooldown sweep, set once for the flight - nothing moved each frame
     g.HOOKS.TakeTaxiNode(2)
     lua.execute("Tick(0.5); ONTAXI = true; Tick(0.5); Tick(10)")
-    fill = g.HeadstartFlightFrame.fill
-    n0, w0 = fill._wn, fill._w
-    lua.execute("for i = 1, 20 do Tick(0.0005) end")
-    check(fill._wn == n0, f"twenty frames inside one pixel: the fill isn't touched ({fill._wn - n0} redraws)")
-    lua.execute("Tick(5)")
-    check(fill._wn == n0 + 1 and fill._w > w0, f"five seconds on: drawn again, further along ({w0} -> {fill._w})")
+    sweep = g.HeadstartFlightFrame.sweep
+    n0 = sweep._cdn
+    check(sweep._cd[2] == 60, f"the ring set for the learned minute ({sweep._cd[2]})")
+    lua.execute("for i = 1, 20 do Tick(0.05) end Tick(5)")
+    check(sweep._cdn == n0, f"twenty frames and five seconds on: the ring isn't set again ({sweep._cdn - n0})")
+    check(g.THEIRS.alpha == 0 and g.THEIRS.mouse is False, "in the air: Blizzard's own Land button see-through, and let through to the world")
+    g.THEIRS.onShow(g.MainMenuBarVehicleLeaveButton)
+    check(g.THEIRS.alpha == 0, "shown again by Blizzard's code meanwhile: still see-through")
     lua.execute("Tick(60); ONTAXI = false; Fire('PLAYER_CONTROL_GAINED')")
+    check(g.THEIRS.alpha == 1 and g.THEIRS.mouse is True, "landed: Blizzard's Land button as it was")
 
     # Menethil: never flown, two hops of 0.2 against Thelsamar's one of 0.1: four times the minute,
     # by way of Thandol Span, halfway
@@ -169,7 +182,8 @@ strtrim = function(s) return s end
     g.HOOKS.TakeTaxiNode(2)
     lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(20)")
     YR2 = lua.table()
-    lua.execute("for i = #FRAMES, 1, -1 do FRAMES[i] = nil end; TICKERS = {}; HeadstartFlightFrame = nil; NOW = 5000")
+    # (a reload: the UI, Blizzard's button with it, as new)
+    lua.execute("for i = #FRAMES, 1, -1 do FRAMES[i] = nil end; TICKERS = {}; HeadstartFlightFrame = nil; NOW = 5000; THEIRS.alpha, THEIRS.mouse = 1, true")
     for f in ("Core.lua", "Style.lua", "Flight.lua"):
         chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
             open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
@@ -200,7 +214,8 @@ strtrim = function(s) return s end
     lua.execute("ONTAXI = false; Tick(0.3)")
     g.HOOKS.TakeTaxiNode(2)
     lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(1)")
-    check(not bar.stop.IsShown(bar.stop), "no stop button on a flight with no stops")
+    check(bar.stop.IsShown(bar.stop) and bar.stopCan is False,
+          "a direct flight: Land is there, but quiet - nothing to land at before the end")
     lua.execute("ONTAXI = false; Tick(0.3)")
     lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Thelsamar, Loch Modan"] = 60')
     lua.execute('YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] = 240')
@@ -208,12 +223,24 @@ strtrim = function(s) return s end
     lua.execute("Tick(0.5); ONTAXI = true; Tick(0.1); Tick(30); Tick(0.2)")
     bar.stop._OnClick(bar.stop)
     lua.execute("Tick(0.2)")
-    check(g.EARLY == 1 and bar.note.GetText(bar.note) == "landing at the next stop",
-          f"stop pressed: the game asked, the bar says {bar.note.GetText(bar.note)!r}")
-    check(not bar.stop.IsShown(bar.stop), "the button goes once pressed")
+    check(g.EARLY == 1 and bar.eta.GetText(bar.eta) == "next stop",
+          f"stop pressed: the game asked, the card says {bar.eta.GetText(bar.eta)!r}")
+    check(bar.stopCan is False and bar.stop.text.GetText(bar.stop.text) == "Landing", "pressed: it says Landing, and can't be pressed again")
+    # under the mouse it lights, whether or not it can land you (it only had a tooltip)
+    lua.execute("""COLOURS = {} local bg = HeadstartFlightFrame.stop.bg
+        function bg.SetVertexColor(self, r, g, b, a) COLOURS[#COLOURS + 1] = a end""")
+    bar.stop._OnLeave(bar.stop)
+    quiet = g.COLOURS[len(g.COLOURS)]
+    bar.stop._OnEnter(bar.stop)
+    lit = g.COLOURS[len(g.COLOURS)]
+    bar.stop._OnLeave(bar.stop)
+    check(lit > quiet, f"Land under the mouse, landing asked already: lit all the same ({quiet} -> {lit})")
     lua.execute("Tick(90); ONTAXI = false; Tick(0.3)")
     check(g.YippRouteDB.flights["Ironforge, Dun Morogh>Menethil Harbor, Wetlands"] == 240, "a flight landed early isn't learned")
 
+    # the sample bar (/headstart flight) leaves Blizzard's Land button be
+    YR.PreviewFlight(YR)
+    check(g.THEIRS.alpha == 1, "the sample card: Blizzard's Land button left as it is")
     # the setting off: no bar
     lua.execute("YippRouteDB.flightTimer = false")
     g.HOOKS.TakeTaxiNode(2)

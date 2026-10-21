@@ -28,6 +28,7 @@ function Obj.UnregisterEvent(self, e) local ev = rawget(self, "_ev") if ev then 
 function Obj.UnregisterAllEvents(self) rawset(self, "_ev", nil) end
 function Obj.SetText(self, t) rawset(self, "_text", t) end
 function Obj.SetShown(self, on) if on then self:Show() else self:Hide() end end
+function Obj.SetSize(self, w, h) rawset(self, "_w", w) rawset(self, "_h", h) end
 function CreateFrame(_, name) local f = setmetatable({}, Obj) table.insert(FRAMES, f) if name then _G[name] = f end return f end
 UIParent = CreateFrame()
 GameTooltip = CreateFrame()
@@ -230,9 +231,15 @@ def run():
     lua.execute("VENDOR = { { 17031, 1000, 1 }, { 17056, 30, 1 }, { 4540, 25, 1 } }")
     g.KNOWN[teleport] = True
     g.COUNT[17031] = 2
+    # nothing set: nothing bought (the data's number was bought until 2026-10-21: "default should be 0 on everything")
     g.Fire("MERCHANT_SHOW")
     lua.execute("RunAfter()")
-    check(bought() == [(17031, 3)], f"a mage with a teleport tops the runes up to 5, no feathers without Slow Fall: {bought()}")
+    check(bought() == [] and YR.RestockCount(17031, 5) == 0, f"a mage with a teleport, no number set: no runes bought ({bought()})")
+    YR.SetRestockCount(17031, 5)
+    lua.execute("BOUGHT = {}")
+    g.Fire("MERCHANT_SHOW")
+    lua.execute("RunAfter()")
+    check(bought() == [(17031, 3)], f"5 set: the runes topped up to 5 (2 held, 3 bought), no feathers without Slow Fall: {bought()}")
     check(any("restocked 3 Item17031" in p for p in prints()), f"chat says what was bought: {prints()}")
 
     lua.execute("BOUGHT = {} COUNT = {} SHIFT = true")
@@ -268,6 +275,8 @@ def run():
     lua.execute("CLASS = 'DRUID' KNOWN = {} BOUGHT = {} COUNT = {} VENDOR = { { 17034, 200, 1 }, { 17035, 400, 1 }, { 17036, 800, 1 } }")
     g.KNOWN[seeds[17034]] = True
     g.KNOWN[seeds[17035]] = True
+    for _seed in seeds:
+        YR.SetRestockCount(_seed, 3)
     YR.Restock(False)
     check(bought() == [(17035, 3)], f"a druid with Rebirth 2 buys Stranglethorn Seeds, not Maple: {bought()}")
 
@@ -279,6 +288,9 @@ def run():
         WORN = { [18] = "|Hitem:2504|h" }
         VENDOR = { { 2512, 10, 200 }, { 2515, 50, 200 }, { 3030, 100, 200, false }, { 2516, 10, 200 } }
         COUNT[2512] = 300''')
+    YR.Restock(False)
+    check(bought() == [] and YR.RestockAmmo("HUNTER") == 0, f"a hunter, no number set: no ammo (it was 1000 until 2026-10-21) ({bought()})")
+    YR.SetRestockAmmo(1000)
     YR.Restock(False)
     check(bought() == [(2515, 700)], f"bow: Sharp Arrows (usable, best) up to 1000 counting the rough ones: {bought()}")
     # a warrior shoots too, but buys no ammo until a number is set for it: its own number
@@ -395,7 +407,7 @@ def run():
     check(any("2 talent points to spend" in p for p in prints()) and not up() and YR.TalentNoticeFrame(True) is None,
           f"set to a line in chat: said there, nothing on the screen: {prints()}")
     lua.execute("YippRouteDB.talentNotice = nil YippRouteDB.levelShot = nil UNSPENT = 2")
-    check(any("new at your class trainer" in p for p in prints()), "and the trainer")
+    check(not any("new at your class trainer" in p for p in prints()), "and no trainer line in chat (a window now: below)")
     g.YippRouteDB.levelShot = False
     g.YippRouteDB.remindTalents = False
     lua.execute("PRINTS = {}")
@@ -403,29 +415,49 @@ def run():
     lua.execute("RunAfter()")
     check(g.SHOTS == 1 and not any("talent" in p for p in prints()), "settings off: no screenshot, no talent line")
 
-    # a ding as chat used to tell it: what the event says, and for what it doesn't say (spirit) the
-    # difference from what you had
-    lua.execute("""SAID = {} DEFAULT_CHAT_FRAME = { AddMessage = function(_, text, r, g, b) SAID[#SAID + 1] = text .. (r == 1 and g == 1 and b == 0 and "" or " NOT YELLOW") end }
-        MANA = 100 function UnitPowerMax() return MANA end""")
+    # New at your trainer: a window at the ding with what came at that level and isn't trained - not a line in chat
+    # (the owner, 2026-10-21: "a popup that comes every second level and says what is available this level")
+    lua.execute("PRINTS = {} KNOWN[25780] = nil KNOWN[7294] = nil")
+    g.Fire("PLAYER_LEVEL_UP", 16)
+    lua.execute("RunAfter()")
+    pop = g.HeadstartTrainerPopup
+    is_up = lua.eval("function(f) return rawget(f, '_shown') == true end")
+    shown = lambda: sorted(b.m.name for b in pop.icons.values() if is_up(b))
+    check(pop is not None and is_up(pop) and shown() == ["Retribution Aura", "Righteous Fury"] and not any("trainer" in p for p in prints()),
+          f"a ding at 16: a window with what came at 16 and nothing else ({shown()}), nothing in chat")
+    # thin: the heading and the icons, as wide as they are, no line of level and price (the owner, 2026-10-21: "make it
+    # thinner. no need for price etc and make the X better")
+    _w, _h = lua.eval("function(f) return rawget(f, '_w'), rawget(f, '_h') end")(pop)
+    check(_w == 220 and _h <= 76 and lua.eval("function(f) return rawget(f, 'line') end")(pop) is None,
+          f"thin: {_w} x {_h}, no line under the icons")
+    lua.execute("KNOWN[7294] = true")
+    g.Fire("SPELLS_CHANGED")
+    check(shown() == ["Righteous Fury"], f"a spell trained: it goes from the window ({shown()})")
+    lua.execute("KNOWN[25780] = true")
+    g.Fire("SPELLS_CHANGED")
+    check(not is_up(pop), "the last one trained: the window goes")
+    lua.execute("KNOWN[25780] = nil COMBAT = true")
+    YR.TrainerPopup(16, 16)
+    _during = is_up(pop)
+    lua.execute("COMBAT = false")
+    g.Fire("PLAYER_REGEN_ENABLED")
+    check(not _during and is_up(pop), "levelled in a fight: the window comes when it ends")
+    lua.execute("HeadstartTrainerPopup:Hide() KNOWN[25780] = true")
+    f = YR.TrainerPopupFrame(True)
+    check(f is not None and is_up(pop) and len(shown()) > 0, "Arrange has it to place, with spells of yours on it")
+    YR.TrainerPopupFrame(False)
+    check(not is_up(pop), "and the sample goes with the grid")
+
+    # (Headstart's own level-up lines are gone: Forever's chat writes them itself from build 1.60.1.70425)
+    lua.execute("SAID = {} DEFAULT_CHAT_FRAME = { AddMessage = function(_, text) SAID[#SAID + 1] = text end }")
     YR.ApplyParts()
-    lua.execute("STATS.hp, STATS.spi, MANA = 519, 41, 115")
     g.Fire("PLAYER_LEVEL_UP", 14, 19, 15, 0, 0, 1, 0, 2, 0)
     lua.execute("RunAfter()")
-    said = list(g.SAID.values())
-    check(said == ["You have gained 19 hit points and 15 mana.", "Your Strength increases by 1.", "Your Stamina increases by 2.",
-                   "Your Spirit increases by 1."], f"a ding: health and mana, then each stat that went up, in yellow ({said})")
-    lua.execute("SAID = {} STATS.hp = 540")
-    g.Fire("PLAYER_LEVEL_UP", 15, 0, 0, 0, 0, 0, 0, 0, 0)
-    lua.execute("RunAfter()")
-    check(list(g.SAID.values()) == ["You have gained 21 hit points."], f"the event saying nothing: what you gained is worked out ({list(g.SAID.values())})")
-    g.YippRouteDB.levelUpStats = False
-    YR.ApplyParts()
-    lua.execute("SAID = {} STATS.hp = 600")
-    g.Fire("PLAYER_LEVEL_UP", 16, 60, 0, 0, 0, 0, 0, 0, 0)
-    lua.execute("RunAfter()")
-    check(len(g.SAID) == 0, "turned off: not a line")
+    check(len(g.SAID) == 0, f"a ding: no level-up lines of Headstart's, the game writes them ({list(g.SAID.values())})")
 
-    # durability: once under the line, again only after a repair; "repair here" coming into town
+    # durability: once under the line, again only after a repair; "repair here" coming into town - mid-screen, on the
+    # game's line for messages (in chat too until 2026-10-21): what goes there is counted with the prints here
+    lua.execute("UIErrorsFrame = { AddMessage = function(_, m) table.insert(PRINTS, m) end }")
     lua.execute("PRINTS = {} DUR = { [1] = { 50, 100 }, [5] = { 20, 100 } }")
     lua.execute("READS = 0 local get = GetInventoryItemDurability"
                 " GetInventoryItemDurability = function(slot) READS = READS + 1 return get(slot) end")
@@ -462,23 +494,26 @@ def run():
     YR.partsReady = True             # the login: what is wanted comes on
     YR.ApplyParts()
     YR.ScanUpgrades()
-    told = prints()
-    check(any("Green Vest" in p for p in told), f"the better green vest is mentioned: {told}")
+    # (told in its window, not in chat as well: the chat line is only where the window is off - 2026-10-21)
+    told_set = lambda: {str(k) for k in YR.UpgradesTold().keys()}
+    told = sorted(told_set())
+    check(any("Green Vest" in p for p in told) and not any("Green Vest" in p for p in prints()),
+          f"the better green vest is told, in its window and not in chat: {told}")
     check(len(told) == 1, f"only it: cloth scores lower, plate is red, the blue is over the limit: {told}")
     check(g.HeadstartUpgradeFrame is not None and g.HeadstartUpgradeFrame.IsShown(g.HeadstartUpgradeFrame),
           "the Equip window shows")
     YR.ScanUpgrades()
-    check(len(prints()) == 1, "once per item")
+    check(len(told_set()) == 1, "once per item")
     # an item found no upgrade isn't looked at again on the next loot
     lua.eval("function(YR) CHECKS = 0 local real = YR.CheckUpgrade YR.CheckUpgrade = function(...) CHECKS = CHECKS + 1 return real(...) end end")(YR)
     YR.ScanUpgrades()
     check(lua.eval("CHECKS") == 0, f"the next loot: items already looked at are skipped ({lua.eval('CHECKS')} looked at again)")
     g.YippRouteDB.upgradeQuality = 3
     YR.ScanUpgrades()
-    check(not any("Hitem:104" in p for p in prints()), "a setting changed behind the window's back: still the kept answer")
+    check(not any("Hitem:104" in p for p in told_set()), "a setting changed behind the window's back: still the kept answer")
     YR.UpgradesForget()          # what the Settings dropdown does
     YR.ScanUpgrades()
-    check(any("Hitem:104" in p for p in prints()), "Up to blue: the blue helm (empty head slot) is mentioned")
+    check(any("Hitem:104" in p for p in told_set()), "Up to blue: the blue helm (empty head slot) is mentioned")
     # a belt with 6 more armor and nothing less: a tiny gain, but free, so it's offered (not held to the 2%)
     sim = lua.eval("""function(YR, pct, tough)
         local real = YR.SimCompare
@@ -500,6 +535,19 @@ def run():
     check(sim(YR, 0, 3) is not None, "a shield beside a one-hander still is")
     lua.execute('''WORN = { [16] = "|Hitem:105|h" } BAGS = { [1] = { "|Hitem:106|h[Sword]|h" } }''')
     check(sim(YR, 5, 10) is None, "a one-hander over the two-hander you wield: not offered, however the sim scores it")
+    # a profession's tool and a fishing pole: never offered, however they score; one you wear is measured like any
+    # weapon, so a weaker one isn't offered over it
+    lua.execute('''ITEMS[2901] = { 2, 0, "INVTYPE_WEAPON", 1, { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 9 } }
+        ITEMS[6256] = { 2, 20, "INVTYPE_2HWEAPON", 1, { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 9 } }
+        ITEMS[130] = { 2, 7, "INVTYPE_WEAPON", 1, { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 12 } }
+        WORN = { [16] = "|Hitem:106|h" } BAGS = { [1] = { "|Hitem:2901|h[Mining Pick]|h" } }''')
+    check(sim(YR, 20, 0) is None and YR.CheckUpgrade(0, 1) is None, "a Mining Pick, 20% more DPS: not offered (a profession's tool)")
+    lua.execute('''BAGS = { [1] = { "|Hitem:6256|h[Fishing Pole]|h" } }''')
+    check(sim(YR, 20, 0) is None and YR.CheckUpgrade(0, 1) is None, "nor a fishing pole")
+    lua.execute('''WORN = { [16] = "|Hitem:2901|h" } BAGS = { [1] = { "|Hitem:106|h[Sword]|h" } }''')
+    check(YR.CheckUpgrade(0, 1) is None, "wearing the Mining Pick: a weaker sword is not offered over it")
+    lua.execute('''BAGS = { [1] = { "|Hitem:130|h[Better Sword]|h" } }''')
+    check(YR.CheckUpgrade(0, 1) is not None, "a better one is")
     lua.execute('''WORN = { [16] = "|Hitem:106|h" } BAGS = { [1] = { "|Hitem:107|h[Buckler]|h" } }''')
     lua.execute('''WORN = { [5] = "|Hitem:100|h", [16] = "|Hitem:106|h", [17] = "|Hitem:107|h" }
         BAGS = { [1] = { "|Hitem:101|h[Green Vest]|h" } }''')
@@ -513,15 +561,14 @@ def run():
         BAGS = { [1] = { "|Hitem:122|h[Frayed Shoes]|h" }, [2] = { "|Hitem:121|h[Flimsy Chain Boots]|h" } }''')
     win.Hide(win)
     lua.execute("AFTER = {}")
-    n0 = len(prints())
+    n0 = told_set()
     YR.ScanUpgrades()
-    said = prints()[n0:]
+    said = sorted(told_set() - n0)
     check(len(said) == 1 and "Flimsy Chain Boots" in said[0], f"two boots for one slot: only the better pair is told ({said})")
     check(win.IsShown(win) and "121" in win.link, "and the window offers it")
     # a pair waiting behind the window, then better boots go on: the waiting pair is never shown
     lua.execute('''BAGS = { [1] = { "|Hitem:123|h[Old Boots]|h" } }''')
     YR.ScanUpgrades()
-    prints()
     lua.execute('''WORN[8] = "|Hitem:121|h"''')    # you equip the chain boots
     YR.SimForget()               # what PLAYER_EQUIPMENT_CHANGED does: the kept answers are for the old gear
     win.Hide(win)
@@ -554,15 +601,17 @@ def run():
     lua.execute("WORN[8] = nil BAGS = {}")
     # a two-hander against main hand and shield together
     lua.execute('PRINTS = {} BAGS = { [1] = { "|Hitem:105|h" } }')
+    n0 = told_set()
     YR.ScanUpgrades()
     c2 = YR.SimCompare("|Hitem:105|h")
-    check(c2 is not None and c2.slot == 16 and (c2.pct + c2.tough / 4 >= 2) == any("Hitem:105" in p for p in prints()),
+    check(c2 is not None and c2.slot == 16 and (c2.pct + c2.tough / 4 >= 2) == any("Hitem:105" in p for p in told_set() - n0),
           f"2H weighed against main hand and shield together: {c2 and c2.pct}% DPS, {c2 and c2.tough}% toughness")
     g.YippRouteDB.upgrades = False
     lua.execute('PRINTS = {} BAGS = { [1] = { "|Hitem:101|h" } }')
+    n0 = told_set()
     g.Fire("PLAYER_LEVEL_UP", 11)
     lua.execute("RunAfter()")
-    check(not any("Hitem" in p for p in prints()), "upgrades off: nothing")
+    check(not any("Hitem" in p for p in prints()) and not (told_set() - n0), "upgrades off: nothing")
     g.YippRouteDB.upgrades = None
 
     # ---- Make it yourself ---------------------------------------------------------------------

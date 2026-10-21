@@ -793,6 +793,7 @@ local function Same(a, b)
 end
 
 local function Save(thenApply)
+    if YS.Busy and YS.Busy() then YR.Print(YS.WAIT) return end        -- (an apply still putting bars on)
     -- what a layout can hold: a mount, a toy or a pet's button stays on this character's bar only
     local keep, n = {}, 0
     for slot, e in pairs(plan) do

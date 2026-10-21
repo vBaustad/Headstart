@@ -79,6 +79,7 @@ end
 --- true, or false and why not.
 function YS.LayoutNew(name)
     if InCombatLockdown() then return false, "not in a fight." end
+    if YS.Busy() then return false, YS.WAIT end        -- (the bars half put on are no profile's)
     name = Clean(name)
     if name == "" then return false, "it needs a name." end
     if Exists(name) then return false, ("there is a profile called %s already."):format(Exists(name)) end
@@ -160,6 +161,8 @@ StaticPopupDialogs["YIPPSETUP_SWITCH"] = {
 --- (false and nothing: asked first, see above). sure: asked and answered.
 function YS.LayoutSwitch(name, sure)
     if InCombatLockdown() then return false, "not in a fight: bars can't be changed there." end
+    -- an apply putting bars on: the one you leave would be saved half put on, and this one's buttons refused
+    if YS.Busy() then return false, YS.WAIT end
     local to = Exists(tostring(name or ""))
     if not to then return false, "no such profile." end
     if to == YS.LayoutName() then return false, ("you are on %s already."):format(to) end
@@ -274,6 +277,7 @@ StaticPopupDialogs["YIPPSETUP_SPEC"] = {
 --- Your spec changed (the game's event: the spec you're in now, and the one you were in).
 function YS.OnSpecChanged(curr, prev)
     if not (YippSetupCharDB and YippSetupCharDB.applied) then return end
+    if YS.Busy("spec", function() YS.OnSpecChanged(curr, prev) end) then return end      -- (once the apply is done)
     local names = YS.LayoutNames()
     if #names < 2 then return end
     YippSetupCharDB.specLayouts = YippSetupCharDB.specLayouts or {}

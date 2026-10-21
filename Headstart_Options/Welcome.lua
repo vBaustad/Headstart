@@ -25,16 +25,20 @@ local STEPS = {
     { page = "home", at = "menu:home", side = "right", title = "All features",
       text = "Every feature is a card on this page. Its switch turns it on; a click on the card opens its settings." },
     { page = "home", at = "automation", side = "below", title = "Automation",
-      text = "What spends gold, moves your items or answers for you: the trainer, restock, the bank, invites."
+      text = "What spends gold, moves your items or answers for you: the trainer, restock, the bank and mail."
           .. " Each is off until you turn it on here." },
     { page = "home", at = "menu:general", side = "right", title = "General",
-      text = "Cinematics skipped, Headstart's minimap button, the colour of its windows - and Put back everything:"
+      text = "The intro cinematic skipped, Headstart's minimap button, the colour of its windows - and Put back everything:"
           .. " your screen as it was before Headstart, any time you want it." },
+    { at = "interface", side = "below", title = "Interface",
+      text = "What Headstart puts on your screen - the XP bar, combat bars, trinkets - and what it does to Blizzard's"
+          .. " bars, windows and talent window. Its own menu, and its cards are on All features too." },
     { at = "setup", side = "below", title = "Character setup",
       text = "Save your bars and interface on the character you play, plan bars from the ones you have, and put"
           .. " them on your other characters. A character's own bars are kept the first time you open it there." },
-    { at = "levelling", side = "below", title = "Levelling",
-      text = "Your runs recorded as routes of your own, played back in RestedXP. Off until you turn it on there." },
+    { at = "levelling", side = "below", title = "Routes",
+      text = "Which route to take now, every route by level, and your runs recorded as routes of your own, played back in"
+          .. " RestedXP. Off until you turn it on there." },
     { at = "arrange", side = "above", title = "Arrange",
       text = "Move Headstart's bars and windows on your screen. Also /hs move." },
     { page = "home", at = "qol", side = "belowright", title = "Quality of life", next = "Done",

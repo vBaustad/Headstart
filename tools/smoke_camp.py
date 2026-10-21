@@ -207,9 +207,9 @@ strtrim = function(s) return s end
     lua.execute("CampfireCampFrame = nil ADDONS = {} CampfireDB = nil")
     YR.RefreshCamp()
 
-    # Unlocked shows the preview anywhere; the setting off hides it.
+    # Unlocked was a setting until 2026-10-21 (placing is Arrange's): one still saved is locked all the same.
     YR.SetCampLocked(False)
-    check(hud.IsShown(hud) and hud.handle.IsShown(hud.handle), "unlocked: a preview with its drag edge")
+    check(not hud.handle.IsShown(hud.handle), "an old 'unlocked' saved: locked all the same, no drag edge (Arrange places it)")
     YR.SetCampLocked(True)
     YR.SetCampIcon(False)
     check(not hud.IsShown(hud), "the campfire icon off: hidden")

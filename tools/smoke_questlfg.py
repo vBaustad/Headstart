@@ -111,7 +111,8 @@ def run():
     chan.handler(None, "CHAT_MSG_CHANNEL", "still up for Hogger?", "Bo-Realm")
     r = list(YR.QuestLFGReplies().values())
     check(len(r) == 2 and r[1].text == "still up for Hogger?", "the same player about the same quest again: their latest words, not another line")
-    check(YR.QuestLFGUnseen() == 2 and any("Bo answered about Hogger" in s for s in g.SAID.values()), "counted as not looked at, and said in one line of chat")
+    check(YR.QuestLFGUnseen() == 2 and not any("answered about" in s for s in g.SAID.values()),
+          "counted as not looked at (the eye's number), and not said in chat")
     YR.QuestLFGInvite("Bo-Realm")
     check(list(g.INVITED.values()) == ["Bo-Realm"], "Invite invites them")
 

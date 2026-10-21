@@ -71,7 +71,12 @@ BUDGET = {
     # channel (hot: every addon's messages, one prefix compared and dropped). It looks at where you are only in
     # a zone with a dock (every two seconds; ten times a second within a few hundred yards of one), so a new
     # install away from the docks ticks for none of it. Before: hot 8, events 39, frames 13.
-    "new": {"hot": 9, "events": 42, "tickers": 1, "onupdate": 0, "frames": 14, "hooks": 4, "kb": 1},
+    # Raised 2026-10-20 for Talents before level 10, which the owner asked to have on by default ("it can be on
+    # by default"): the talent key opens the talent tree below level 10, and for that the talent window is
+    # waited for until it first loads - one frame and two events (an addon loading, the world entered), neither
+    # hot, both let go of once the window is there. Only on a character below level 10: past it, nothing. Before:
+    # events 42, frames 14.
+    "new": {"hot": 9, "events": 44, "tickers": 1, "onupdate": 0, "frames": 15, "hooks": 4, "kb": 1},
 }
 # Everything switched on, as the settings would do it (each feature's own switch, then what the settings
 # call to make it show), and everything switched off again (the main switches, as the settings do it).
@@ -79,7 +84,7 @@ SWITCH_ON = """
     local db, T = YippRouteDB, HEADSTART
     for key in pairs(T.STARTS_OFF) do if key ~= "xpbar" then db[key] = true end end       -- (xpbar: a table of its own)
     for _, key in ipairs({ "camp", "flightTimer", "remindTrainer", "remindTalents", "durability",
-        "craftRemind", "levelUpStats", "simTooltip", "skipCinematic", "minimapButton", "logging", "showSplits",
+        "craftRemind", "simTooltip", "skipCinematic", "minimapButton", "logging", "showSplits",
         "campReminder", "buyLater", "sellGuard", "groupPanel", "trinketAuto", "mailAuto", "shareAll", "moveBag",
         "moveReagentBag" }) do db[key] = true end
     db.routes, db.bagBar, db.microMenu, db.chatStrip, db.whisperSound, db.talentFade = true, "hover", "hide", "slim", "ring", 40
@@ -130,7 +135,7 @@ EACH = """
     for _, k in ipairs({ "trinketAuto", "mailAuto", "shareAll", "moveBag", "moveReagentBag", "logging", "showSplits",
         "campReminder", "buyLater", "sellGuard", "groupPanel" }) do Key(k) end
     for _, k in ipairs({ "camp", "flightTimer", "remindTrainer", "remindTalents", "durability",
-        "craftRemind", "levelUpStats", "simTooltip", "skipCinematic", "minimapButton", "journey" }) do
+        "craftRemind", "simTooltip", "skipCinematic", "minimapButton", "journey" }) do
         list[#list + 1] = { k, function() db[k] = false end, function() db[k] = nil end }
     end
     for _, v in ipairs({ { "routes", true, false }, { "bagBar", "hover" }, { "microMenu", "hide" }, { "chatStrip", "slim" },

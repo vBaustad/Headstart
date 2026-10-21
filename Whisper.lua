@@ -4,15 +4,12 @@
 --   like, each by its SOUNDKIT name - one this client doesn't have is left out of the list), and, when
 --   another addon has LibSharedMedia loaded, every sound registered there too (sound packs, Details,
 --   WeakAuras, boss mods). We ship no sound files and embed no library.
---   A sound file of your own: put it anywhere under the game's Interface folder and write where
---   (whisperFile; "AddOns\\whisper.ogg" is Interface\\AddOns\\whisper.ogg). The game finds a new file only
---   after it has been started again - a reload isn't enough.
---   Which channel it plays on is a setting: Master is heard with the game's sound effects turned down.
+--   It plays on the Master channel: heard with the game's sound effects turned down. (A file of your own and
+--   the channel were settings until 2026-10-21: "a lot of settings I'll never touch".)
 --   The whisper itself isn't read (in an instance the game keeps it secret): the event alone is the cue.
 --   The game still plays its own quiet "tell" sound; ours is on top of it.
---   Account options (YippRouteDB): whisperSound ("kit:NAME", "lsm:Name" or "file"; nil is off), whisperFile, whisperChannel
---   ("Master", "SFX", "Dialog"; Master to begin with), whisperBNet (Battle.net whispers too, on unless
---   turned off), whisperGap (seconds between two sounds, 2).
+--   Account options (YippRouteDB): whisperSound ("kit:NAME" or "lsm:Name"; nil is off), whisperBNet (Battle.net
+--   whispers too, on unless turned off), whisperGap (seconds between two sounds, 2).
 local ADDON, YR = ...
 
 -- The game's own, by SOUNDKIT name, with what we call each. In the order they're listed. Only the
@@ -45,12 +42,7 @@ local function Kit()
     return KIT
 end
 
-local CHANNELS = { Master = true, SFX = true, Dialog = true }
-
-function YR.WhisperChannel()
-    local c = YippRouteDB.whisperChannel
-    return CHANNELS[c] and c or "Master"
-end
+local CHANNEL = "Master"
 
 local function SharedMedia()
     local stub = _G.LibStub
@@ -59,21 +51,10 @@ local function SharedMedia()
     return ok and type(lib) == "table" and type(lib.HashTable) == "function" and lib or nil
 end
 
---- Your own sound file as the game wants it: under Interface, with backslashes. nil when none is written.
-function YR.WhisperFile()
-    local path = YippRouteDB.whisperFile
-    if type(path) ~= "string" then return nil end
-    path = path:gsub("/", "\\"):gsub("^%s+", ""):gsub("%s+$", ""):gsub("^\\+", "")
-    if path == "" then return nil end
-    if not path:lower():find("^interface\\") then path = "Interface\\" .. path end
-    return path
-end
-
 --- Every sound there is to pick: { { key, label }, ... }, "off" first. The game's own that this client
 --- has, then (with LibSharedMedia loaded and files playable) what other addons registered, by name.
 function YR.WhisperSounds()
     local list = { { "off", "None" } }
-    if YR.WhisperFile() then list[#list + 1] = { "file", "Your own file" } end
     local kit = _G.SOUNDKIT
     if type(kit) == "table" then
         for _, e in ipairs(Kit()) do
@@ -97,7 +78,6 @@ end
 function YR.WhisperSoundName(key)
     key = key or YippRouteDB.whisperSound
     if type(key) ~= "string" then return "None" end
-    if key == "file" then return YR.WhisperFile() and "Your own file" or "None" end
     local kind, name = key:match("^(%a+):(.+)$")
     if kind == "kit" then
         for _, e in ipairs(Kit()) do if e[1] == name then return e[2] end end
@@ -113,13 +93,7 @@ function YR.PlayWhisperSound(key)
     key = key or YippRouteDB.whisperSound
     if type(key) ~= "string" then return false end
     local kind, name = key:match("^(%a+):(.+)$")
-    local channel = YR.WhisperChannel()
-    if key == "file" then
-        local file, play = YR.WhisperFile(), _G.PlaySoundFile
-        if not (file and play) then return false end
-        local ok, played = pcall(play, file, channel)
-        return ok and played and true or false
-    end
+    local channel = CHANNEL
     if kind == "kit" then
         local id = type(_G.SOUNDKIT) == "table" and _G.SOUNDKIT[name]
         if not id then return false end

@@ -1,6 +1,9 @@
 """Smoke test: /yroute scan and the run log against a fake WoW API, in Lua 5.1 (lupa).
 
     python tools/smoke.py      (exit code 1 on any failure)
+
+Without the routes addon beside Headstart (Headstart_Routes, private) the tests in this file are skipped and the
+suites with a fake game of their own run alone; SMOKE_NO_ROUTES=1 runs it that way with the routes there.
 """
 import re
 import os
@@ -27,7 +30,8 @@ end
 function Frame:IsMouseOver() return false end
 function Frame:HasFocus() return false end
 function Frame:SetShown(on) self.hidden = not on end
-function Frame:SetScript(_, fn) self.fn = fn end
+-- (fn: the last script set, for Fire; scripts: each by its name, for a test to call one)
+function Frame:SetScript(name, fn) self.fn = fn local s = rawget(self, "scripts") or {} rawset(self, "scripts", s) s[name] = fn end
 function Frame:RegisterEvent(e) self.ev[e] = true end
 function Frame:UnregisterEvent(e) self.ev[e] = nil end
 function Frame:UnregisterAllEvents() self.ev = {} end
@@ -75,7 +79,7 @@ PRINTS = {}
 function print(m) table.insert(PRINTS, m) end
 function UnitFullName() return "Tester", "Realm" end
 function GetRealmName() return "Realm" end
-function UnitClass() return "Paladin", "PALADIN" end
+function UnitClass() return "Paladin", "PALADIN", 2 end       -- (and the class ID, as the game gives it)
 function UnitHealth() return 80 end
 function UnitHealthMax() return 100 end
 function UnitPower() return 40 end
@@ -188,9 +192,49 @@ YR = lua.table()
 # The routes are not part of Headstart: they are the routes addon beside it (Headstart_Routes, private),
 # which loads first and queues its guides for Guides.lua. The route tests below need it.
 ROUTES = os.path.join(os.path.dirname(ROOT), "Headstart_Routes")
-if not os.path.isdir(ROUTES):
-    print("SKIPPED: these tests need the routes addon in " + ROUTES)
-    sys.exit(0)
+
+
+def _apart():
+    """What runs whether the routes are there or not: no frame named as a saved variable is, and the tests that are
+    scripts of their own (Character setup's, the live move's). Returns how many failed."""
+    import glob as _glob
+    import subprocess as _sp
+    n_bad = 0
+    # A frame's name is a global, and so is a saved variable's: one name for both and the frame replaces
+    # the saved table (or the game's Esc handling finds the table where it looks for the frame).
+    saved, frames = set(), set()
+    for toc in _glob.glob(os.path.join(ROOT, "**", "*.toc"), recursive=True):
+        for line in open(toc, encoding="utf-8"):
+            if line.startswith("## SavedVariables"):
+                saved.update(n.strip() for n in line.split(":", 1)[1].split(","))
+    for path in _glob.glob(os.path.join(ROOT, "**", "*.lua"), recursive=True):
+        src = open(path, encoding="utf-8", errors="replace").read()
+        frames.update(re.findall(r'S\.Window\("([^"]+)"', src))
+        frames.update(re.findall(r'CreateFrame\("\w+",\s*"([^"]+)"', src))
+    clash = sorted(saved & frames)
+    print(("ok  " if not clash else "FAIL"), f"no frame is named as a saved variable is ({', '.join(clash) or 'none'})")
+    n_bad += bool(clash)
+    for script in ("smoke_setup.py", "smoke_live_move.py"):
+        r = _sp.run([sys.executable, os.path.join(ROOT, "tools", script)], capture_output=True, text=True,
+                    encoding="utf-8", errors="replace")
+        fails = [l.strip() for l in r.stdout.splitlines() if l.strip().startswith("FAIL")]
+        n = sum(1 for l in r.stdout.splitlines() if l.strip().startswith("ok"))
+        print(("ok  " if r.returncode == 0 else "FAIL"), f"{script}: " + (f"{n} checks passed" if r.returncode == 0
+              else ("; ".join(fails[:5]) or r.stderr.strip()[-300:])))
+        n_bad += r.returncode != 0
+    return n_bad
+
+
+if not os.path.isdir(ROUTES) or os.environ.get("SMOKE_NO_ROUTES"):
+    # Without it (a copy of the public repo) the tests in this file can't run - but every suite with a fake game of its
+    # own (each "import smoke_..." below) and the scripts apart still do. (The test audit, 2026-10-21: everything was
+    # skipped, and the run said it passed.) SMOKE_NO_ROUTES=1 takes this way with the routes there, to try it.
+    print("SKIPPED: the tests in smoke.py itself need the routes addon in " + ROUTES + "; the suites of their own run")
+    _bad = 0
+    for _name in re.findall(r"^import (smoke_\w+)$", open(os.path.abspath(__file__), encoding="utf-8").read(), flags=re.M):
+        _bad += __import__(_name).run()
+    _bad += _apart()
+    sys.exit(1 if _bad else 0)
 sys.path.insert(0, os.path.join(ROUTES, "tools"))      # check_deathskips, check_levels
 RNS = lua.table()
 for l in open(os.path.join(ROUTES, "Headstart_Routes.toc"), encoding="utf-8"):
@@ -513,7 +557,7 @@ b = splits.runs["Player-B"]
 check(abs(b.levels[2] - 50) < 1, f"B: level 2 at {b.levels[2]:.0f} s of play")
 # the last few lines: the ding also brings the QoL reminders (trainer, talents) after this one
 said = " / ".join(g.PRINTS[i] for i in range(max(1, len(g.PRINTS) - 3), len(g.PRINTS) + 1))
-check("|cff40ff40-0:50" in said, f"B is told it is 50 s ahead of A: {said}")
+check("level 2 at" not in said, f"the time at a level isn't said in chat: the splits have it (below) ({said})")
 # the table: the live row for level 3 on top, then level 2 - its own time 0:50 and total 0:50, green against A's 1:40
 YR.ShowSplits(YR, True)
 g.NOW += 1; g.RunTickers()
@@ -784,28 +828,108 @@ check(g.HeadstartInstanceLog is not None and g.HeadstartInstanceLog.hidden is Fa
 YR.InstanceLogToggle()
 check(g.HeadstartInstanceLog.hidden is True, "and shuts again (/headstart instances, the on-screen icon)")
 check(len(g.SEEN_ICONS) == 0, "Settings builds a page the first time it's opened: the trainer's isn't yet")
+# a page built unseen (a search builds every page) starts nothing of its own: the swing timer's sample swings ran on
+# your bars after a search, until the next fight (the review, 2026-10-21)
+lua.execute("""local YR = HeadstartNS
+    SWING_WAS, QOL_WAS = YR.SwingDB().on, YippRouteDB.qolOff
+    YR.SwingDB().on, YippRouteDB.qolOff = true, nil
+    local F = getmetatable(CreateFrame())
+    rawset(F, "IsVisible", function() return false end)
+    SAMPLES_BEFORE = YR.SwingPreviewing()
+    YR.SettingsSearch("zzz")
+    SAMPLES_UNSEEN = YR.SwingPreviewing()
+    YR.SettingsSearch("")
+    rawset(F, "IsVisible", nil)
+    YR.SwingPreview(false)
+    YR.SwingDB().on, YippRouteDB.qolOff = SWING_WAS, QOL_WAS""")
+check(g.SAMPLES_BEFORE is False and g.SAMPLES_UNSEEN is False,
+      f"a search builds the Combat bars page unseen: no sample swings on your bars ({g.SAMPLES_BEFORE}, {g.SAMPLES_UNSEEN})")
 for key in ("camps", "bags", "vendors", "group", "quests", "reminders", "gear", "trinkets", "xpbar", "character", "trainer", "route"):
     YR.ShowSettingsTab(YR, key)        # every page builds, and fills, without an error
 icons = [g.SEEN_ICONS[i] for i in range(1, len(g.SEEN_ICONS) + 1)]
 check(any("Seal of" in t or "Holy Light" in t for t in icons), f"trainer rows carry the spell's icon: {icons[:2]}")
+YR.ShowSettingsTab(YR, "talents")         # (the talent window's page; talent builds are the Levelling tab's)
+check(YR.WindowTab() == "interface", f"the Talent window page is on the Interface tab ({YR.WindowTab()})")
+found = YR.SettingsSearch("talent build")
+check(found is not None and len(found) >= 1 and found[1].key == "builds", "Talent builds is found by the settings search")
+YR.SettingsGo(found[1])
+check(YR.WindowTab() == "qol" and YR.WindowShowing("builds") and YR.SettingsSearching() is False,
+      f"and picking it opens QoL's Talents page ({YR.WindowTab()})")
 # Find a setting: by a word in its name or details, on any page; picking one opens its page
 found = YR.SettingsSearch("durability")
 labels = [found[i].label for i in range(1, len(found) + 1)] if found else []
 check(any("Durability" in l for l in labels) and all(found[i].key for i in range(1, len(found) + 1)),
       f"the search finds Durability warning, and knows its page: {labels}")
+_searching = YR.SettingsSearching()
 YR.SettingsGo(found[1])
-check(g.YippRouteDB is not None and lua.eval("true"), "picking a result opens its page without an error")
+check(_searching is True and YR.SettingsSearching() is False and YR.SettingsLayout(found[1].key) is not None,
+      "picking a result: the results go, and its page is there")
 check(YR.SettingsSearch("") is None, "an empty search shows the page again")
+# a tab at the top clears a search, as a page in the menu does (the review, 2026-10-21: QoL and Interface are one page,
+# and the results stood over the other tab's)
+YR.SettingsSearch("durability")
+_searching = YR.SettingsSearching()
+_tab = YR.TourTarget("interface")
+_tab.scripts.OnClick(_tab)
+check(_searching is True and YR.SettingsSearching() is False and YR.WindowTab() == "interface",
+      f"searching on QoL, the Interface tab picked: its page, not the results ({YR.WindowTab()})")
 check(len(YR.SettingsSearch("zzqqxx") or []) == 0, "nothing matches: an empty list, no error")
-# A card's master switch: the rows under it dim while it's off
+# A feature that is off is its head alone: its options are of no use while it is (the quiet ledger, 2026-10-21)
 lua.execute("""local F = getmetatable(CreateFrame()) F.SetAlpha = function(self, a) self.alpha = a end""")
-g.YippRouteDB.restock = False
+def _rows_shown(page, card):
+    return [e.row.hidden is not True for e in YR.SettingsIndex().values() if e.key == page and not e.card and e.of and e.of.title == card]
+g.YippRouteDB.restock, g.YippRouteDB.cardsOpen = False, None
 YR.ShowSettingsTab(YR, "vendors")
-dimmed = lua.eval("""(function()
-    local n = 0
-    for _, f in ipairs(FRAMES) do if f.alpha == 0.40 then n = n + 1 end end
-    return n end)()""")
-check(dimmed > 0, f"Vendor restock off: its rows are dimmed ({dimmed})")
+YR.RefreshWindow(YR)
+_shut = _rows_shown("vendors", "Restock")
+_V = YR.SettingsLayout("vendors")
+_restock = [cd for cd in _V.cards.values() if cd.title == "Restock"][0]
+_restock.head.scripts.OnMouseUp(_restock.head)          # a click on its row
+_open = _rows_shown("vendors", "Restock")
+_quiet = all(e.row.alpha == 0.45 for e in YR.SettingsIndex().values() if e.key == "vendors" and not e.card and e.of and e.of.title == "Restock")
+g.YippRouteDB.restock = True
+YR.RefreshWindow(YR)
+_awake = all(e.row.alpha == 1 for e in YR.SettingsIndex().values() if e.key == "vendors" and not e.card and e.of and e.of.title == "Restock")
+check(len(_shut) > 0 and not any(_shut) and all(_open) and _quiet and _awake and g.YippRouteDB.cardsOpen["vendors:Restock"] is True,
+      f"Restock: its settings shut to begin with; a click on its row opens them - quiet while it is off, awake on - and that is kept ({len(_shut)})")
+_restock.head.scripts.OnMouseUp(_restock.head)
+check(not any(_rows_shown("vendors", "Restock")) and g.YippRouteDB.cardsOpen["vendors:Restock"] is None, "clicked again: shut")
+g.YippRouteDB.restock = None
+YR.RefreshWindow(YR)
+# A card whose feature is several settings has one main switch: off puts them to off and keeps them, on puts them
+# back as they were - the first time, a start of its own (the owner, 2026-10-20: "everything can be switched on
+# and off, each with its own main switch")
+_kept = lua.eval("""(function()
+    local M, out = HeadstartNS.CardMasters(), {}
+    local inv = M.invites
+    YippRouteDB.acceptInvites, YippRouteDB.whisperInvite, YippRouteDB.kept, YippRouteDB.cardOn = "anyone", "off", nil, nil
+    if not inv[1]() then out[#out + 1] = "invites read as off with one of them on" end
+    inv[2](false)
+    if inv[1]() or YippRouteDB.acceptInvites ~= "off" then out[#out + 1] = "off: not off" end
+    inv[2](true)
+    if not inv[1]() or YippRouteDB.acceptInvites ~= "anyone" or YippRouteDB.whisperInvite ~= "off" then
+        out[#out + 1] = "on again: not as it was (" .. tostring(YippRouteDB.acceptInvites) .. ")"
+    end
+    YippRouteDB.acceptInvites, YippRouteDB.whisperInvite, YippRouteDB.kept, YippRouteDB.cardOn = nil, nil, nil, nil
+    inv[2](true)
+    if YippRouteDB.acceptInvites ~= "friends" or YippRouteDB.whisperInvite ~= "friends" then out[#out + 1] = "first time on: no start" end
+    inv[2](false)
+    local ws = M.windowScale
+    YippRouteDB.windowScale, YippRouteDB.kept, YippRouteDB.cardOn = nil, nil, nil
+    ws[2](true)
+    if not ws[1]() then out[#out + 1] = "window scale on, with nothing to change yet: reads off" end
+    ws[2](false)
+    if ws[1]() then out[#out + 1] = "window scale off: reads on" end
+    YippRouteDB.acceptInvites, YippRouteDB.whisperInvite, YippRouteDB.kept, YippRouteDB.cardOn = nil, nil, nil, nil
+    -- one that works on another addon, that addon not loaded: it says so and stays off (the review, 2026-10-21)
+    local rs, KEPT_RXP = M.rxpSkin, RXP
+    RXP, PRINTS = nil, {}
+    rs[2](true)
+    if rs[1]() or (YippRouteDB.cardOn and YippRouteDB.cardOn.rxpSkin) then out[#out + 1] = "RestedXP skin on without RestedXP: reads on" end
+    if not (PRINTS[1] and PRINTS[1]:find("RestedXP isn't loaded")) then out[#out + 1] = "RestedXP skin on without RestedXP: nothing said" end
+    RXP, YippRouteDB.kept, YippRouteDB.cardOn = KEPT_RXP, nil, nil
+    return table.concat(out, "; ") end)()""")
+check(_kept == "", f"a card of several settings: off keeps them, on puts them back, the first time a start of its own ({_kept})")
 # the features stand on All features in the order of their cards on the page - within a group (Automation
 # stands first, whatever pages its features are on)
 _order = {}
@@ -828,76 +952,118 @@ for (_group, page), sections in _feats.items():
         _wrong.append((page, seen, cards))
 check(not _wrong, f"on every page the top switches are in the order of their cards: {_wrong}")
 # the card of a feature that is off stands under the cards of the ones that are on
-def _card_y(page, label):
-    return [e.y for e in YR.SettingsIndex().values() if e.key == page and e.card and e.label == label][0]
+# One column, the cards in their place whether on or off (the quiet ledger: they moved under the ones that were on,
+# and stood side by side)
+def _heads_at(page):
+    """{ card: (top, x) } of a page's cards as they stand."""
+    return {e.of.title: (e.of.top + (e.of.shift or 0), e.of.x or 0) for e in YR.SettingsIndex().values()
+            if e.key == page and e.card and e.of and e.label == e.of.title}
 _sw = YR.SwingDB()
-_was = (_sw.on, _sw.health, _sw.power)
-_sw.on, _sw.health, _sw.power = True, None, None
+_was = (_sw.on, _sw.health, _sw.power, _sw.cast)
+_sw.on, _sw.health, _sw.power, _sw.cast = True, None, None, None
 YR.ShowSettingsTab(YR, "swing")
 YR.RefreshWindow(YR)
-_first = _card_y("swing", "Swing timer") > _card_y("swing", "Health and power bars")
+_h1 = _heads_at("swing")
 _sw.on, _sw.health = False, True
 YR.RefreshWindow(YR)
-check(_first and _card_y("swing", "Health and power bars") > _card_y("swing", "Swing timer")
-,
-      "Combat bars: the swing timer's card first while it is on; turned off with the health bar on, the health and power card goes above it")
-# off is off: a frame over the card's rows takes the mouse, so nothing in it can be changed
-def _blocked(label):
-    row = [e.row for e in YR.SettingsIndex().values() if e.key == "swing" and e.card and e.label == label][0]
-    return row.block is not None and row.block.hidden is not True
-check(_blocked("Swing timer") and not _blocked("Health and power bars"),
-      "a card whose feature is off answers no click (the swing timer's, off here); one that is on does")
-_sw.on, _sw.health, _sw.power = _was
+_h2 = _heads_at("swing")
+_order = lambda h: sorted(h, key=lambda k: -h[k][0])
+check(_order(_h1) == _order(_h2) == ["Swing timer", "Health and power bars", "Cast bar"] and all(x == 0 for _, x in _h2.values()),
+      f"Combat bars: one column, the cards in their own order whether on or off ({_order(_h2)})")
+_L = YR.SettingsLayout("swing")
+def _packed(L):
+    """Every card right under the one before it: its top on that one's bottom edge (a card that is off: its head)."""
+    cards = sorted(L.cards.values(), key=lambda cd: -(cd.top + (cd.shift or 0)))
+    for a, b in zip(cards, cards[1:]):
+        if b.top + (b.shift or 0) != a.top + (a.shift or 0) - (54 if a.shut else a.height):
+            return False
+    return True
+check(_packed(_L), "one list: each card right under the one before it")
+_health = [cd for cd in _L.cards.values() if cd.title == "Health and power bars"][0]
+_health.head.scripts.OnMouseUp(_health.head)
+_shut = {cd.title: cd.shut for cd in _L.cards.values()}
+check(_shut == {"Swing timer": True, "Health and power bars": False, "Cast bar": True} and not any(_rows_shown("swing", "Swing timer"))
+      and all(_rows_shown("swing", "Health and power bars")) and _packed(_L),
+      f"one card opened: its settings under it, the cards under it moved down to make room ({_shut})")
+_health.head.scripts.OnMouseUp(_health.head)
+_sw.on, _sw.health, _sw.power, _sw.cast = _was
 YR.RefreshWindow(YR)
 # a feature's switch is in the head of its own card (a block of switches at the top of the page sent you looking)
 _idx = [e for e in YR.SettingsIndex().values() if e.key == "trinkets"]
 check(not any(e.label == "On this page" for e in _idx) and any(e.card and e.label == "Trinket auto-swap" for e in _idx),
       "no block of switches at the top of a page: each card has its own")
-# Cards fold. A page of several cards opens with every card open (it opened as a list of heads, with an
-# "Open all" at the right - the owner, 2026-10-14); a click on a head folds that card and it is
-# remembered; the cards under it move, and so does what a page keeps under its cards.
+# Nothing folds by hand, and a page whose features are on has every setting in sight
+_sw.on, _sw.cast = True, None
 g.YippRouteDB.cardsOpen = None
 YR.ShowSettingsTab(YR, "swing")
 YR.RefreshWindow(YR)
 _L = YR.SettingsLayout("swing")
-def _hidden(page, card):
-    return [e.row.hidden is True for e in YR.SettingsIndex().values() if e.key == page and not e.card and e.of and e.of.title == card]
-def _heads(page):
-    return sorted([e.y for e in YR.SettingsIndex().values() if e.key == page and e.card and e.of and e.label == e.of.title], reverse=True)
-check(_L.AnyShut() is False and len(_hidden("swing", "Cast bar")) > 3 and not any(_hidden("swing", "Cast bar")),
-      f"a page of several cards starts open: every setting in sight, nothing to press first ({len(_hidden('swing', 'Cast bar'))})")
-_L.FoldAll(False)
-_ys = _heads("swing")
-check(len(_ys) == 3 and all(a - b == 54 for a, b in zip(_ys, _ys[1:])), f"folded, each head stands right under the one before ({_ys})")
 _cast = [cd for cd in _L.cards.values() if cd.title == "Cast bar"][0]
-_cast.head.fn()                     # a click on the folded card's head
-check(g.YippRouteDB.cardsOpen["swing:Cast bar"] is None and not any(_hidden("swing", "Cast bar")) and _cast.shut is False,
-      "a click on a folded card's head opens it: its rows are back")
-_cast.head.fn()
-_first = max(_L.cards.values(), key=lambda cd: cd.top + (cd.shift or 0))       # the card at the top of the page
-_first.head.fn()
-_ys2 = _heads("swing")
-check(_first.span > 54 and _ys2[0] == _ys[0] and _ys[1] - _ys2[1] == _first.span - 54 and _ys[2] - _ys2[2] == _first.span - 54,
-      f"an open card takes its room: the heads under it move down by what it grew ({_ys} to {_ys2}, {_first.span})")
-_first.head.fn()
-check(_heads("swing") == _ys, "and back up when it is folded again")
-check(g.YippRouteDB.cardsOpen["swing:Cast bar"] is False and all(_hidden("swing", "Cast bar")), "clicked again: folded, and that is remembered")
-found = YR.SettingsSearch("show out of range")
+_shut_before = not any(_rows_shown("swing", "Cast bar"))
+_cast.frame.switch.scripts.OnClick(_cast.frame.switch)          # the cast bar switched on: its settings open
+check(_shut_before and YR.SwingDB().cast is True and all(_rows_shown("swing", "Cast bar")) and len(_rows_shown("swing", "Cast bar")) >= 3
+      and _packed(_L), f"a feature switched on: its settings open, to be seen as it starts ({len(_rows_shown('swing', 'Cast bar'))})")
+found = YR.SettingsSearch("range text")
 YR.SettingsGo(found[1])
-check(g.YippRouteDB.cardsOpen["swing:Swing timer"] is None and found[1].row.hidden is not True,
-      "the search opens the card of the setting it leads to")
-_L.FoldAll(True)
-check(_L.AnyShut() is False and not any(_hidden("swing", "Health and power bars")) and g.YippRouteDB.cardsOpen["swing:Cast bar"] is None,
-      "every card open again, and none kept as folded")
+check(found[1].row.hidden is not True and YR.SettingsSearching() is False, "the search leads to a setting of a feature that is on")
+_sw.on, _sw.cast = _was[0], _was[3]
 YR.SettingsSearch("")
+YR.RefreshWindow(YR)
 YR.ShowSettingsTab(YR, "recap")
-_J = YR.SettingsLayout("recap")
-check(_J.AnyShut() is None and not any(_hidden("recap", "Death recap")) and len(_hidden("recap", "Death recap")) > 2,
-      "a page with one card: it is all there is on it, and it does not fold")
+check(all(_rows_shown("recap", "Death recap")) == bool(g.YippRouteDB.deathRecap) and len(_rows_shown("recap", "Death recap")) > 1,
+      "a page with one card: its options there while the recap is on")
+# Pixel-exact controls: at 2560 x 1440 and the game's own UI scale (0.64) a point is 1.2 screen pixels - the switch is
+# then 48 x 24 pixels drawn from that size in its strip, the knob 20, the checkbox 22 (the owner, 2026-10-21: "feels so
+# low resolution"). The strip's layout in Style.lua is read back from the TGA make_controls.py drew.
+lua.execute("""
+KEPT_PU = PixelUtil
+PIXELS = 1440
+PixelUtil = { GetPixelToUIUnitFactor = function() return 768 / PIXELS end }
+local F = getmetatable(CreateFrame())
+F.GetEffectiveScale = function() return 0.64 end
+F.SetTexCoord = function(self, ...) self.tc = { ... } end
+F.SetTexture = function(self, t) self.tex = t end
+F.SetSize = function(self, w, h) self.w, self.h = w, h end
+F.CreateTexture = function(self) local t = setmetatable({ ev = {} }, F) TEXTURES[#TEXTURES + 1] = t return t end
+function PIXEL_CONTROLS()
+    TEXTURES = {}
+    local S = HeadstartNS.Style
+    local sw = S.Switch(CreateFrame(), function() return true end, function() end)
+    local ck = S.Check(CreateFrame(), function() return true end, function() end)
+    return sw, TEXTURES[1], TEXTURES[2], ck, TEXTURES[3], TEXTURES[4], TEXTURES[5]
+end
+""")
+_sw_b, _track, _knob, _ck_b, _line, _fill, _tick = lua.eval("{ PIXEL_CONTROLS() }").values()
+_art = "Interface\\AddOns\\Headstart\\art\\"
+def _strip_at(tex, name, size, wide, cw, ch, lo, edge=True):
+    y = sum(k + 2 for k in range(lo, size))
+    tc = list(tex.tc.values())
+    ok = tex.tex == _art + name and all(abs(a - b) < 1e-9 for a, b in zip(tc, (0, size * wide / cw, y / ch, (y + size) / ch)))
+    try:
+        from PIL import Image
+        img = Image.open(os.path.join(ROOT, "art", name + ".tga")).getchannel("A")
+        row = lambda r: max(img.getpixel((x, r)) for x in range(cw))
+        ok = ok and row(y - 1) == 0 and row(y + size) == 0 and max(row(r) for r in range(y, y + size)) > 0
+        ok = ok and (not edge or (row(y) > 0 and row(y + size - 1) > 0))     # (a box or a pill: edge to edge)
+    except ImportError:
+        pass
+    return ok
+check(_strip_at(_track, "px_pill", 24, 2, 128, 1024, 16) and _strip_at(_knob, "px_knob", 20, 1, 64, 1024, 10)
+      and round(_sw_b.w * 1.2, 6) == 48 and round(_sw_b.h * 1.2, 6) == 24 and round(_knob.w * 1.2, 6) == 20,
+      f"1.2 pixels to a point: the switch 48 x 24 pixels and its knob 20, each its own size of its strip ({_sw_b.w}, {_knob.w})")
+check(_strip_at(_line, "px_box_line", 22, 1, 64, 1024, 14) and _strip_at(_fill, "px_box_fill", 22, 1, 64, 1024, 14)
+      and _strip_at(_tick, "px_tick", 22, 1, 64, 1024, 14, False) and round(_ck_b.w * 1.2, 6) == 22,
+      f"and the checkbox 22 pixels ({_ck_b.w})")
+lua.execute("PIXELS = 3800")       # (5.9 pixels to a point: no strip that size)
+_sw_b, _track, _knob, _ck_b, _line, _fill, _tick = lua.eval("{ PIXEL_CONTROLS() }").values()
+check(_track.tex == _art + "pill" and _knob.tex == _art + "knob" and _sw_b.w == 40 and _ck_b.w == 18 and _line.tex == _art + "box_line",
+      "far more pixels to a point than the strips have: the large textures, 40 x 20 and 18")
+lua.execute("""
+PixelUtil = KEPT_PU
+local F = getmetatable(CreateFrame())
+F.GetEffectiveScale, F.SetTexCoord, F.SetTexture, F.SetSize, F.CreateTexture = nil, nil, nil, nil, nil
+""")
 # /hs journey: with nothing after it (the window), and a made-up journey at a level
-UnitRace = g.UnitRace
-if UnitRace is None:
-    lua.execute('function UnitRace() return "Dwarf", "Dwarf" end')
 for _words, _want in (("journey", None), ("journey test", "Level 50"), ("journey test 60", "Level 60"), ("journey test 999", "Level 60")):
     g.SlashCmdList.HEADSTART(_words)
     _unit = g.HeadstartJourneyWindow.unit.text
@@ -931,11 +1097,12 @@ check(g.HeadstartTransferWindow is not None and g.HeadstartTransferWindow.hidden
 g.HeadstartTransferWindow.Hide(g.HeadstartTransferWindow)
 YR.ShowSettingsTab(YR, "quests")
 _G = YR.SettingsLayout("quests")
-check(_G.lift == 0, "the page opens with its cards open: what it keeps under them stays where it is")
-_G.FoldAll(False)
+_wm = [cd for cd in _G.cards.values() if cd.title == "World marker"][0]
+_G.SetOpen(_wm, True)
+_open = _G.lift
+_G.SetOpen(_wm, False)
 _lift = _G.lift
-_G.FoldAll(True)
-check(_lift > 0 and _G.tail is not None and _G.lift == 0, f"what a page keeps under its cards comes up with them as they fold ({_lift}), and goes back down")
+check(_lift > _open and _G.tail is not None, f"what a page keeps under its cards comes up as a card above it shuts ({_open} to {_lift})")
 g.YippRouteDB.restock = None
 check(True, "settings page with reward settings opens")
 YR.ShowSettingsTab(YR, "trainer")        # the Trainer tab: the class's spells with a choice each
@@ -951,8 +1118,9 @@ check('"Holy Nova", 1,' not in _priest and '"Holy Nova", 2,' in _priest and _hun
       "trainer data: no rank that comes with a talent point (Holy Nova 1), one spell a rank (Immolation Trap), no pet abilities")
 # the QoL tab: the campfire icon, the flight timer, and the reward picker with a hand-picked reward listed
 YR.RewardSettings(YR).chosen[123] = lua.eval('{ item = 1, name = "Sturdy Boots", title = "A Test Quest" }')
-YR.ShowSettingsTab(YR, "qol")
-check(True, "settings QoL tab opens with a hand-picked reward listed")
+YR.ShowSettingsTab(YR, "quests")
+check(YR.WindowTab() == "qol" and YR.SettingsLayout("quests") is not None,
+      "the Quests page, the reward picker's, opens with a hand-picked reward on file")
 YR.RewardSettings(YR).chosen[123] = None
 # the routes switch from chat and on the Route settings page (where the route options dim while it's off)
 was_routes = g.YippRouteDB.routes
@@ -973,20 +1141,123 @@ YR.ShowSettingsTab(YR, "route")
 check(YR.WindowTab() == "levelling", f"Route settings is on the Levelling tab: {YR.WindowTab()}")
 YR.ToggleWindow(YR, "run")
 check(YR.WindowTab() == "levelling", "This run is on the Levelling tab")
-YR.ToggleWindow(YR, "where")              # Where next? builds and fills from the real routes
-check(YR.WindowTab() == "levelling", "Where next? is on the Levelling tab, and fills without an error")
+YR.ToggleWindow(YR, "where")              # Next route builds and fills from the real routes
+check(YR.WindowTab() == "levelling", "Next route is on the Levelling tab, and fills without an error")
+# The Levelling tab made over (the owner, 2026-10-21: "the levelling tab is very confusing for new users"): a menu of
+# four pages and Settings at its foot; every page builds and fills; the editor and Share light All routes in the menu.
+for _key in ("where", "library", "run", "route", "routes", "share"):
+    YR.ToggleWindow(YR, _key)
+    check(YR.WindowTab() == "levelling" and YR.WindowPage() == _key, f"{_key}: on the Levelling tab, built and filled ({YR.WindowPage()})")
+_menu = {k: YR.TourTarget(f"levelling:{k}") for k in ("where", "library", "run", "route")}
+check(all(_menu.values()) and _menu["route"].text.text == "Settings" and _menu["where"].text.text == "Next route"
+      and YR.TourTarget("levelling:builds") is None, "the menu: Next route, All routes, This run, and Settings (Talents is QoL's)")
+check(YR.TourTarget("levelling").text.text == "Routes" and [t.title for t in YR.TourSteps().values() if t.at == "levelling"] == ["Routes"],
+      "the tab is called Routes (Levelling until 2026-10-21), on the tab and in the tour")
+YR.ToggleWindow(YR, "routes")
+_lit = _menu["library"].selected is True and _menu["where"].selected is False
+YR.ToggleWindow(YR, "share")
+check(_lit and _menu["library"].selected is True, "the editor and Share light All routes in the menu")
+# Next route: the one to take, and at most three after it (all of them overran the window: the rest are on All routes)
+YR.ToggleWindow(YR, "where")
+_w = YR.WherePageShown()
+check(_w.best is not None and 1 <= _w.after <= 3 and _w.load in ("Load in RestedXP", "In RestedXP now"),
+      f"Next route: {_w.best} to take, and the next {_w.after}")
+# All routes: this character's, or every race's; the one to take marked; Edit opens it in the editor
+g.YippRouteDB.allRoutes = None
+YR.ToggleWindow(YR, "library")
+_mine = list(YR.LibraryShown().values())
+g.YippRouteDB.allRoutes = True
+YR.RefreshWindow(YR)
+_every = list(YR.LibraryShown().values())
+g.YippRouteDB.allRoutes = None
+YR.RefreshWindow(YR)
+_keys = [r.key for r in _mine]
+check("coldridge" in _keys and "northshire" not in _keys and len(_every) > len(_mine),
+      f"All routes: this character's ({len(_mine)}), every race's ({len(_every)})")
+check(any(r.key == _w.best and r.state in ("Take this one", "In RestedXP", "Your version", "Update waiting") for r in _mine),
+      f"the route to take is marked on All routes ({[(r.key, r.state) for r in _mine][:3]})")
+_edit = g.FindButton("Edit") if hasattr(g, "FindButton") and g.FindButton else None
+lua.execute("""
+function FindButton(label)
+    for _, f in ipairs(FRAMES) do
+        local t = rawget(f, "text")
+        if type(t) == "table" and rawget(t, "text") == label then return f end
+    end
+end""")
+_edit = g.FindButton("Edit")
+_edit.fn(_edit)
+check(YR.WindowPage() == "routes", "Edit on a route opens the editor")
+# with the routes off: their pages are the switch that turns them on; Talents is everyone's
+_was_routes = g.YippRouteDB.routes
+g.YippRouteDB.routes = False
+YR.ToggleWindow(YR, "library")
+_off = YR.WindowPage()
+_off_lit = _menu["library"].selected is True
+YR.ToggleWindow(YR, "builds")
+_talents = YR.WindowShowing("builds") and YR.WindowTab() == "qol"
+g.YippRouteDB.routes = _was_routes
+YR.ToggleWindow(YR, "where")
+check(_off == "routesoff" and _off_lit and _talents,
+      f"routes off: All routes is the switch that turns them on, lit in the menu; Talents (QoL) opens ({_off})")
+# Talents (QoL, Levelling): the trees and the order by level of the build in view; its switch follows that build here
+YR.ToggleWindow(YR, "builds")
+check(YR.WindowTab() == "qol" and YR.SettingsMenuGroups()["builds"] == "Levelling", "Talents is a QoL page, in the Levelling group")
+_b = YR.BuildsShown()
+_kept_build = g.YippSetupCharDB and g.YippSetupCharDB.talentBuild
+YR.TalentFollow(None)
+YR.RefreshWindow(YR)
+_b.follow.scripts.OnClick(_b.follow)
+_followed = YR.TalentFollowed()
+check(_b.cells > 0 and _b.rows > 0 and _followed is not None and _followed.key == YR.BuildsShown().key,
+      f"Talents: {_b.cells} talents on the trees, {_b.rows} lines by level; switched on, the build in view is followed")
+YR.TalentFollow(_kept_build)
+# Route settings: one list - the routes, group play, recording, the splits and the pace - without what moved
+YR.ToggleWindow(YR, "route")
+_L = YR.RouteSettingsLayout()
+_titles = [cd.title for cd in _L.cards.values()]
+check(_titles == ["Routes", "Group play", "Record runs", "Level splits", "Level pace"] and _L.ledger is True,
+      f"Route settings: one list of five ({_titles})")
+_gone = lua.eval("""(function()
+    local gone = { ["Lock position"] = true, ["X position (pixels)"] = true, ["Y position (pixels)"] = true,
+        ["Times over an hour"] = true, ["Background (percent)"] = true, ["Minimap button"] = true, ["Show level splits"] = true }
+    local found = {}
+    for _, f in ipairs(FRAMES) do
+        local t = rawget(f, "title")
+        if type(t) == "string" and gone[t] then found[#found + 1] = t end
+    end
+    return table.concat(found, ", ") end)()""")
+check(_gone == "", f"the splits' place, lock, background and clock, and the minimap button, are not on it ({_gone})")
+_st = YR.SplitsStyle(YR)
+check(_st.lock is True and _st.bg == 0 and _st.clock == "full", "the splits: locked (Arrange places them), no background, the long clock")
+# One-pixel lines: at 1.2 pixels to a point, a border's edge is 1/1.2 of a point
+lua.execute("""
+KEPT_PU = PixelUtil
+PixelUtil = { GetPixelToUIUnitFactor = function() return 768 / 1440 end }
+local F = getmetatable(CreateFrame())
+F.GetEffectiveScale = function() return 0.64 end
+F.SetHeight = function(self, h) self.h = h end
+F.SetWidth = function(self, w) self.w = w end
+HAIR = HeadstartNS.Style.Border(CreateFrame())
+PixelUtil = KEPT_PU
+F.GetEffectiveScale, F.SetHeight, F.SetWidth = nil, nil, nil""")
+check(abs(g.HAIR[1].h * 1.2 - 1) < 1e-9 and abs(g.HAIR[3].w * 1.2 - 1) < 1e-9, f"a border's edge is one screen pixel ({g.HAIR[1].h})")
 YR.ShowSettingsTab(YR, "trainer")
 check(YR.WindowTab() == "qol", "the Trainer page is on the QoL tab")
 # the menu's pages by their names, old ones included (the skins and the talent window had their own)
 for key in ("start", "xpbar", "swing", "chat", "windows", "instances", "main", "rxpskin", "dmgskin", "skins", "talentwin"):
     YR.ShowSettingsTab(YR, key)
 check(True, "Chat, Bars & windows, the two skins and the pages' old names open")
-check(lua.eval('HeadstartNS.WindowTab()') == "qol", "the old names of the merged pages (the skins, the camps) open their page")
+check(lua.eval('HeadstartNS.WindowTab()') == "interface", "the old names of the merged pages (the skins, the camps) open their page"
+      " - the talent window's on the Interface tab")
+for key, tab in (("home", "qol"), ("quests", "qol"), ("group", "qol"), ("general", "qol"), ("xpbar", "interface"), ("swing", "interface"),
+                 ("windows", "interface"), ("talents", "interface"), ("skins", "interface"), ("invites", "qol"), ("talentwin", "interface")):
+    YR.ShowSettingsTab(YR, key)
+    check(YR.WindowTab() == tab, f"{key} opens on the {tab} tab ({YR.WindowTab()})")
 found = YR.SettingsSearch("hourly limit")
 check(found is not None and len(found) == 1 and found[1].key == "instances",
       "the instance tracker's settings are found on the Instances page")
 YR.SettingsGo(found[1])
-check(True, "and going to one opens that page's settings")
+check(YR.WindowTab() == "qol" and YR.SettingsLayout("instances") is not None, "and going to one opens that page, on its tab")
 found = YR.SettingsSearch("micro menu")
 check(found is not None and len(found) >= 1 and all(found[i].key == "windows" for i in range(1, len(found) + 1)),
       "the bag bar and micro menu are on Bars & windows")
@@ -1006,7 +1277,10 @@ missing = lua.eval("""(function()
         for i = 2, #group do
             local f = group[i]
             if not f.go and not have[f.page .. "/" .. f.section] then out[#out + 1] = f.name end
-            if f.get then
+            -- (RestedXP skin can't be on with no RestedXP loaded, as here: that is tested with the main switches)
+            if f.get and f.name == "RestedXP skin" and not YR.RXPSkinAvailable() then
+                if f.get() then out[#out + 1] = f.name .. " reads on without RestedXP" end
+            elseif f.get then
                 local was = f.get() and true or false
                 f.set(not was)
                 if (f.get() and true or false) == was then out[#out + 1] = f.name .. " switch" end
@@ -1016,6 +1290,19 @@ missing = lua.eval("""(function()
     end
     return table.concat(out, ", ") end)()""")
 check(missing == "", f"every card on All features opens a section that exists, and its switch works ({missing})")
+# its groups fold to their heading, say how many are on, and stay as you left them (the owner, 2026-10-20: "should
+# there be some collapse here too?")
+g.YippRouteDB.homeFolded = None
+YR.RefreshWindow(YR)
+_heads = list(YR.HomeHeads().values())
+_auto = [h for h in _heads if h.name == "Automation"][0]
+_cards = list(_auto.cards.values())
+_open = not _auto.shut and all(c.hidden is not True for c in _cards) and " of " in str(_auto.count.text)
+_auto.fn(_auto)
+_shut = _auto.shut is True and all(c.hidden is True for c in _cards) and g.YippRouteDB.homeFolded.Automation is True
+_auto.fn(_auto)
+check(_open and _shut and not _auto.shut and all(c.hidden is not True for c in _cards) and g.YippRouteDB.homeFolded.Automation is None,
+      f"All features: a group starts open, a click on its heading folds it (remembered), again opens it ({_auto.count.text})")
 # the boat timer: off as Headstart comes; on, at Ratchet's dock, it shows the boat there and when it leaves
 check(not YR.Option("boatTimer"), "the boat timer starts off")
 lua.execute("""KEPT_POS = UnitPosition
@@ -1047,7 +1334,8 @@ lua.execute("""
     function WorldMapFrame:RemoveDataProvider(p) p:RemoveAllData() BOAT_PROVIDERS[p] = nil end
     function WorldMapFrame:RegisterDataProviderOnUpdate(p) BOAT_UPDATES[p] = true end
     function WorldMapFrame:UnregisterDataProviderOnUpdate(p) BOAT_UPDATES[p] = nil end
-    function BOAT_CALL(method) for p in pairs(BOAT_PROVIDERS) do p[method](p) end end
+    -- (a tenth of a second on at each frame's call: the map's every-frame call is looked at ten times a second)
+    function BOAT_CALL(method) if method == 'OnUpdate' then NOW = NOW + 0.1 end for p in pairs(BOAT_PROVIDERS) do p[method](p) end end
     function BOAT_COUNT(t) local n = 0 for _ in pairs(t) do n = n + 1 end return n end
     C_Map = C_Map or {}
     KEPT_MAPPOS = C_Map.GetMapPosFromWorldPos
@@ -1062,10 +1350,10 @@ lua.execute("""
     BOAT_CALL("OnShow")""")
 check(YR.BoatMapPins() == 5,
       f"the boats on the world map: an Alliance player's four and Ratchet's, no zeppelins ({YR.BoatMapPins()})")
+# (the other side's too was a setting until 2026-10-21: one still saved shows nothing more)
 lua.execute("YippRouteDB.boatMapOther = true BOAT_CALL('OnUpdate')")
-check(YR.BoatMapPins() == 8, f"Horde zeppelins too: every route with a course ({YR.BoatMapPins()})")
+check(YR.BoatMapPins() == 5, f"an old 'the other side's too' saved: still your own side's ({YR.BoatMapPins()})")
 lua.execute("YippRouteDB.boatMapOther = nil BOAT_CALL('OnUpdate')")
-check(YR.BoatMapPins() == 5, "and off again: back to your own side's")
 lua.execute("UnitFactionGroup = function() return 'Horde' end BOAT_CALL('OnUpdate')")
 check(YR.BoatMapPins() == 4, f"a Horde player's: the three zeppelins and Ratchet's, no Alliance boats ({YR.BoatMapPins()})")
 lua.execute("UnitFactionGroup = function() return 'Alliance' end BOAT_CALL('OnUpdate')")
@@ -1083,6 +1371,11 @@ lua.execute("""local p = HeadstartNS.BoatMapPinFor("ratchetBB")
     BOAT_AT = 0.6 BOAT_CALL("OnUpdate") BOAT_X1 = p.px""")
 _x0, _x1 = lua.eval("BOAT_X0"), lua.eval("BOAT_X1")
 check(_x0 is not None and _x1 is not None and _x1 > _x0, f"the next frame: moved along with the boat ({_x0} -> {_x1})")
+# the map calls every frame; the boats are placed ten times a second (the performance audit, 2026-10-20)
+lua.execute("""local p = HeadstartNS.BoatMapPinFor("ratchetBB")
+    BOAT_PLACED = 0 function p:SetPoint(_, _, _, x) self.px = x BOAT_PLACED = BOAT_PLACED + 1 end
+    for i = 1, 6 do BOAT_AT = 0.6 + i * 0.01 for p in pairs(BOAT_PROVIDERS) do p.OnUpdate(p) end NOW = NOW + 0.02 end""")
+check(1 <= g.BOAT_PLACED <= 2, f"six frames in a tenth of a second: the boat placed once or twice, not six times ({g.BOAT_PLACED})")
 # how big: grows as the map comes closer (zoomed in, or a zone rather than its continent), within bounds
 lua.execute("""C_Map.GetMapWorldSize = function(id) return id == 1414 and 36800 or 5300, 1 end
     BOAT_SCALE = 1
@@ -1108,7 +1401,7 @@ check(YR.BoatMapPins() == 0, "the boat timer off: none")
 # Which combat bars show is each character's own; one that hasn't chosen starts from its class's last choice
 lua.execute("""KEPT_CHARDB, KEPT_CLASS = YippSetupCharDB, UnitClass
     YippRouteDB.swingClass = nil
-    UnitClass = function() return "Warrior", "WARRIOR" end
+    UnitClass = function() return "Warrior", "WARRIOR", 1 end
     YippSetupCharDB = {}
     local s = HeadstartNS.SwingDB() s.on, s.power, s.cast = true, true, false
     WARRIOR_CHAR = YippSetupCharDB
@@ -1128,6 +1421,282 @@ check(g.MAGE_ON == lua.eval("YippRouteDB.swingShared and YippRouteDB.swingShared
       "a mage, no mage having chosen: starts from what the account had before")
 check(g.BACK_ON is True and g.BACK_POWER is True, "and the mage turning them off leaves the warrior's as they were")
 lua.execute("YippSetupCharDB, UnitClass = KEPT_CHARDB, KEPT_CLASS")
+
+# World marker: the map pin in the world - the game works the spot out (its navigation region), Headstart draws on it
+lua.execute("""KEPT_RXP_WP = RXP
+    KEPT_MAP_WP = {}
+    for k, v in pairs(C_Map or {}) do KEPT_MAP_WP[k] = v end
+    WP = { set = nil, tracked = false, sets = 0 }
+    NAV_REGION = CreateFrame("Frame") NAV_ON = false
+    C_Navigation = { GetFrame = function() return NAV_ON and NAV_REGION or nil end, GetDistance = function() return 275.97 end,
+        HasValidScreenPosition = function() return true end, WasClampedToScreen = function() return false end,
+        GetTargetState = function() return 2 end }
+    C_Map = C_Map or {}
+    C_Map.SetUserWaypoint = function(p) WP.set = p WP.sets = WP.sets + 1 return true end
+    C_Map.GetUserWaypoint = function() return WP.set end
+    C_Map.ClearUserWaypoint = function() WP.set = nil end
+    C_Map.CanSetUserWaypointOnMap = function() return true end
+    C_Map.GetBestMapForUnit = function() return 1429 end
+    C_Map.GetMapInfo = function() return { name = "Elwynn Forest" } end
+    WP.quest = 0
+    C_SuperTrack = { SetSuperTrackedUserWaypoint = function(on) WP.tracked = on end, IsSuperTrackingUserWaypoint = function() return WP.tracked end,
+        SetSuperTrackedQuestID = function(q) WP.quest = q if q ~= 0 then WP.tracked = false WP.pin = nil end end,
+        GetSuperTrackedQuestID = function() return WP.quest end,
+        SetSuperTrackedMapPin = function(t, id) WP.pin = { t, id } WP.quest = 0 WP.tracked = false end,
+        GetSuperTrackedMapPin = function() if WP.pin then return WP.pin[1], WP.pin[2] end end,
+        ClearSuperTrackedMapPin = function() WP.pin = nil end,
+        GetHighestPrioritySuperTrackingType = function() if WP.quest ~= 0 then return 0 end if WP.pin then return 6 end
+            if WP.tracked then return 1 end return nil end }
+    KEPT_ENUM_WP = Enum Enum = Enum or {} KEPT_STT_WP, KEPT_STMP_WP = Enum.SuperTrackingType, Enum.SuperTrackingMapPinType
+    Enum.SuperTrackingType = { Quest = 0, UserWaypoint = 1, Corpse = 2, MapPin = 6 }
+    Enum.SuperTrackingMapPinType = { AreaPOI = 0, QuestOffer = 1 }
+    -- (as the game's: the map, a 2D position, and the height if given)
+    UiMapPoint = { CreateFromCoordinates = function(map, x, y, z) return { uiMapID = map, position = { x = x, y = y }, z = z } end }""")
+check(not YR.WorldMarkerShown(), "the world marker starts off: nothing drawn")
+g.SlashCmdList.HEADSTART("way 45 62")
+check(g.WP.set is not None and g.WP.set.uiMapID == 1429 and abs(g.WP.set.position.x - 0.45) < 1e-9 and abs(g.WP.set.position.y - 0.62) < 1e-9 and g.WP.tracked is True,
+      "/headstart way 45 62: a map pin there, in the zone you're in, and tracked")
+lua.execute("YippRouteDB.waypoint = true NAV_ON = true HeadstartNS.ApplyParts()")
+check(YR.WorldMarkerShown() and "276 yd" in YR.WorldMarkerText(), f"turned on: the marker on the game's spot for it, with how far ({YR.WorldMarkerText()})")
+lua.execute("""local m = HeadstartWorldMarker
+    function m:SetAlpha(a) self.al = a end
+    local near = C_Navigation.GetDistance
+    C_Navigation.GetDistance = function() return 450 end m.fn(m, 1) WM_FAR = HeadstartNS.WorldMarkerGoal()
+    C_Navigation.GetDistance = near
+    YippRouteDB.waypointRange = 200 m.fn(m, 1) WM_NEAR = HeadstartNS.WorldMarkerGoal()        -- (a range of its own was a setting until 2026-10-21)
+    YippRouteDB.waypointRange = nil""")
+# a pin put on the map comes untracked (the map's own code): tracked here, a moment later
+lua.execute("""KEPT_HAS_WP = C_Map.HasUserWaypoint C_Map.HasUserWaypoint = function() return WP.set ~= nil end
+    KEPT_AFTER_WP = C_Timer.After C_Timer.After = function(_, fn) fn() end
+    KEPT_MAPFRAME_WP = WorldMapFrame WorldMapFrame = nil              -- (the map shut)
+    WP.tracked = false Fire('USER_WAYPOINT_UPDATED') WM_TRACKED = WP.tracked
+    C_Map.HasUserWaypoint, C_Timer.After, WorldMapFrame = KEPT_HAS_WP, KEPT_AFTER_WP, KEPT_MAPFRAME_WP""")
+check(g.WM_TRACKED is True, "a pin put with Ctrl+click on the map (untracked by the map): tracked, so the marker has a spot")
+# one look for every spot: no beam, the mark over the spot (over a quest's "?"), the same in a jump
+lua.execute("""local m = HeadstartWorldMarker
+    WM_HAS_BEAM = rawget(m, 'beam') ~= nil
+    WP.quest = 179 Fire('SUPER_TRACKING_CHANGED') m.fn(m, 1) WM_QUEST_MARK = m.mark:IsShown()
+    WP.quest = 0 WP.tracked = true Fire('SUPER_TRACKING_CHANGED') m.fn(m, 1) WM_PIN_MARK = m.mark:IsShown()""")
+check(not g.WM_HAS_BEAM and g.WM_QUEST_MARK is True and g.WM_PIN_MARK is True,
+      "no beam: a quest's spot and a map pin's both a mark over the spot")
+check(g.WM_FAR == 0 and g.WM_NEAR == 1 and YR.WorldMarkerRange() == 400,
+      f"farther off than 400 yards: nothing drawn; within it (276 yards, an old range of 200 saved): drawn ({g.WM_FAR}, {g.WM_NEAR})")
+lua.execute("WP.sets = 0 HeadstartWorldMarker.fn(HeadstartWorldMarker, 1)")
+check(g.WP.sets == 0, "looking at the marker sets no pin (a height given to one was not used by the game)")
+lua.execute("NAV_ON = false Fire('NAVIGATION_FRAME_DESTROYED')")
+check(not YR.WorldMarkerShown(), "the game's spot gone (pin reached or taken away): the marker too")
+lua.execute("NAV_ON = true Fire('NAVIGATION_FRAME_CREATED', NAV_REGION)")
+check(YR.WorldMarkerShown(), "a new one: there again")
+g.SlashCmdList.HEADSTART("way")
+check(g.WP.set is None, "/headstart way alone: the pin taken away")
+# following RestedXP's arrow: the pin on its step's spot, set again only when that moves
+lua.execute("""RXP = { arrowFrame = { element = { zone = 1429, x = 40, y = 60 } } }
+    function RXP.UpdateGotoSteps() end function RXP.UpdateMap() end
+    YippRouteDB.waypointRXP = true HeadstartNS.ApplyParts()""")
+check(g.WP.set is not None and abs(g.WP.set.position.x - 0.40) < 1e-9 and abs(g.WP.set.position.y - 0.60) < 1e-9, "Follow RestedXP's arrow: the pin on the arrow's spot")
+lua.execute("WP.sets = 0 HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 0, "RestedXP looking again at the same spot: not set again")
+lua.execute("RXP.arrowFrame.element = { zone = 1429, x = 52, y = 47 } HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 1 and abs(g.WP.set.position.x - 0.52) < 1e-9, "the next step's spot: moved there")
+# a step at an NPC is a pin like any other, RestedXP's spot (the owner, 2026-10-20: "Naowh Forever is very
+# consistent" - the game's own spot for a quest came and went near the NPC and around a hand-in)
+lua.execute("""KEPT_LOG_WP, KEPT_LOGIDX_WP, KEPT_AFTER_FOLLOW = LOG, C_QuestLog.GetLogIndexForQuestID, C_Timer.After
+    LOG = { { 179, true } }
+    C_QuestLog.GetLogIndexForQuestID = function(id) for i, q in ipairs(LOG) do if q[1] == id then return i end end return nil end
+    local step = { elements = {} }
+    step.elements[1] = { tag = "turnin", questId = 179, step = step }
+    step.elements[2] = { tag = "accept", questId = 18, step = step }
+    RXP.arrowFrame.element = { zone = 1429, x = 30, y = 70, step = step }
+    WP.sets = 0 HOOKS.UpdateGotoSteps()""")
+check(g.WP.quest == 0 and g.WP.pin is None and g.WP.sets == 1 and abs(g.WP.set.position.x - 0.30) < 1e-9,
+      "a step that hands in and takes quests: RestedXP's spot as a map pin, nothing else tracked")
+# the game took the pin away: on the way, put back (at most every three seconds); at the spot, arrived
+lua.execute("""KEPT_POS_FOLLOW = UnitPosition function UnitPosition() return 0, 0, 0, 1 end      -- you at (0, 0)
+    local e = RXP.arrowFrame.element e.wx, e.wy, e.instance = 200, 0, 1                         -- 200 yards on
+    KEPT_HAS_FOLLOW = C_Map.HasUserWaypoint C_Map.HasUserWaypoint = function() return WP.set ~= nil end
+    WP.set = nil WP.sets = 0 NOW = NOW + 10 HOOKS.UpdateGotoSteps()""")
+check(g.WP.sets == 1 and g.WP.set is not None, "the game took the pin away on the way (200 yards off): put back")
+lua.execute("WP.set = nil WP.sets = 0 HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 0, "and not again within three seconds")
+lua.execute("RXP.arrowFrame.element.wx = 5 WP.set = nil WP.sets = 0 NOW = NOW + 10 HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 0, "taken away at the spot (5 yards off): you've arrived, it stays away")
+lua.execute("""C_Map.HasUserWaypoint = KEPT_HAS_FOLLOW
+    RXP.arrowFrame.element = { zone = 1429, x = 38, y = 78, step = { elements = {} } } WP.sets = 0 HOOKS.UpdateGotoSteps()""")
+check(g.WP.sets == 1 and abs(g.WP.set.position.x - 0.38) < 1e-9, "the next step: its pin")
+# a hearth step (RestedXP's .hs, "Hearth to Dolanaar"): no marker - the step before's pin taken away (the owner,
+# 2026-10-16: a mark 200 yards off on a hearth step, "only confusing")
+lua.execute("""KEPT_RXPC = RXPCData RXPCData = { currentStep = 2 }
+    RXP.currentGuide = { steps = { { elements = {} }, { elements = { { tag = "hs", text = "Hearth to Dolanaar" } } } } }
+    WP.sets = 0 HOOKS.UpdateGotoSteps()""")
+check(g.WP.set is None and g.WP.sets == 0 and g.WP.pin is None and g.WP.quest == 0,
+      "a hearth step: no marker, the step before's pin taken away")
+lua.execute("WP.sets = 0 HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 0 and g.WP.set is None, "and nothing put up again while it lasts")
+lua.execute("RXPCData.currentStep = 1 HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 1 and abs(g.WP.set.position.x - 0.38) < 1e-9, "hearthed, on the next step: its pin")
+# where RestedXP has no spot, its arrow still holds the step before's: nothing shown (the owner, 2026-10-19: "the
+# wrong place - I think I'm going one place and should be going another")
+lua.execute("RXP.hideArrow = true WP.sets = 0 HOOKS.UpdateGotoSteps()")
+check(g.WP.set is None and g.WP.sets == 0, "RestedXP hides its arrow (an .xp step, an instance): nothing shown, the pin taken away")
+lua.execute("RXP.hideArrow = false HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 1 and abs(g.WP.set.position.x - 0.38) < 1e-9, "its arrow back: the pin back")
+lua.execute("RXP.arrowFrame.element.completed = true WP.sets = 0 HOOKS.UpdateGotoSteps()")
+check(g.WP.set is not None and g.WP.sets == 0,
+      "its spot ticked off while its step goes on (come within RestedXP's radius of the NPC): the pin stays")
+lua.execute("RXP.arrowFrame.element.step.completed = true HOOKS.UpdateGotoSteps()")
+check(g.WP.set is None and g.WP.sets == 0, "the step done too (the arrow still holds it): nothing shown")
+lua.execute("RXP.arrowFrame.element.completed = nil RXP.arrowFrame.element.step.completed = nil HOOKS.UpdateGotoSteps()")
+# RestedXP tracks the arrow step's quest itself (a hand-in): the pin is shown again over it; a quest you track
+# yourself (of no step of the arrow's) is left alone (the log, 2026-10-20: the marker jumped between the two)
+lua.execute("""local step = RXP.arrowFrame.element.step
+    step.elements = { { tag = "turnin", questId = 179, step = step } }
+    KEPT_HAS_GUARD = C_Map.HasUserWaypoint C_Map.HasUserWaypoint = function() return WP.set ~= nil end
+    NOW = NOW + 10 WP.tracked = false WP.quest = 179 Fire('SUPER_TRACKING_CHANGED')""")
+check(g.WP.tracked is True, "RestedXP tracked the step's quest: the pin shown again")
+lua.execute("NOW = NOW + 10 WP.tracked = false WP.quest = 4161 Fire('SUPER_TRACKING_CHANGED')")
+check(g.WP.tracked is False, "a quest of no step of the arrow's (yours): left as it is")
+lua.execute("WP.quest = 0 WP.tracked = true C_Map.HasUserWaypoint = KEPT_HAS_GUARD")
+notes = YR.WorldMarkerNotes()
+texts = [str(notes[i]) for i in range(1, len(notes) + 1)]
+check(len(texts) <= 15 and any("hides its arrow" in t for t in texts) and any("the pin shown again" in t for t in texts)
+      and any("a map pin where RestedXP points" in t for t in texts), f"/headstart way log: what was chosen and why, the last 15 ({texts[-3:]})")
+g.SlashCmdList.HEADSTART("way log")
+# the pin on the NPC where the game has it near RestedXP's spot: a quest to take (its giver on the world map), a
+# quest that is done (where it is handed in); far off, RestedXP's spot (the owner, 2026-10-20: "the marker is far
+# from the NPC")
+lua.execute("""KEPT_QL, KEPT_SIZE, KEPT_ONMAP, KEPT_READY = C_QuestLine, C_Map.GetMapWorldSize, C_QuestLog.GetQuestsOnMap, C_QuestLog.ReadyForTurnIn
+    GIVER = { x = 0.385, y = 0.785 }
+    C_QuestLine = { GetQuestLineInfo = function(q, map) if q == 500 and map == 1429 then return GIVER end end }
+    C_Map.GetMapWorldSize = function() return 4000, 4000 end
+    local step = RXP.arrowFrame.element.step
+    step.elements = { { tag = "accept", questId = 500, step = step } }
+    NOW = NOW + 10 WP.sets = 0 RXP.arrowFrame.element.x = 38.01 HOOKS.UpdateGotoSteps()""")
+check(g.WP.sets == 1 and abs(g.WP.set.position.x - 0.385) < 1e-9 and abs(g.WP.set.position.y - 0.785) < 1e-9,
+      "a quest to take, its giver 28 yards from RestedXP's spot: the pin on the giver")
+lua.execute("GIVER = { x = 0.45, y = 0.785 } NOW = NOW + 10 WP.sets = 0 RXP.arrowFrame.element.x = 38.02 HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 1 and abs(g.WP.set.position.x - 0.3802) < 1e-9,
+      "its giver 280 yards off (another of that name, or the guide means a spot on the way): RestedXP's spot")
+lua.execute("""local step = RXP.arrowFrame.element.step
+    step.elements = { { tag = "turnin", questId = 179, step = step } }
+    READY = false
+    C_QuestLog.ReadyForTurnIn = function(q) return READY end
+    C_QuestLog.GetQuestsOnMap = function(map) return { { questID = 179, x = 0.379, y = 0.781 } } end
+    NOW = NOW + 10 WP.sets = 0 RXP.arrowFrame.element.x = 38.03 HOOKS.UpdateGotoSteps()""")
+check(abs(g.WP.set.position.x - 0.3803) < 1e-9, "a hand-in not done yet (its spot on the map is the objective): RestedXP's spot")
+lua.execute("READY = true NOW = NOW + 10 WP.sets = 0 RXP.arrowFrame.element.x = 38.04 HOOKS.UpdateGotoSteps()")
+check(g.WP.sets == 1 and abs(g.WP.set.position.x - 0.379) < 1e-9, "a hand-in that is done: the pin where the game has it handed in")
+notes = YR.WorldMarkerNotes()
+check("as the game has it" in str(notes[len(notes)]), f"and the log says so ({notes[len(notes)]})")
+lua.execute("""C_QuestLine, C_Map.GetMapWorldSize, C_QuestLog.GetQuestsOnMap, C_QuestLog.ReadyForTurnIn = KEPT_QL, KEPT_SIZE, KEPT_ONMAP, KEPT_READY
+    RXP.arrowFrame.element.x = 38 RXP.arrowFrame.element.step.elements = {} NOW = NOW + 10 HOOKS.UpdateGotoSteps()""")
+# under the mouse the mark says what it stands for: the step's NPC and quests (the owner, 2026-10-20)
+lua.execute("""TIP = {} GameTooltip = { SetOwner = function() end, AddLine = function(_, t) TIP[#TIP + 1] = t end, Show = function() end, Hide = function() end }
+    KEPT_TITLE = C_QuestLog.GetTitleForQuestID C_QuestLog.GetTitleForQuestID = function(q) if q == 500 then return "Report to Goldshire" end end
+    local step = { elements = {} }                  -- (a step of its own: RestedXP's steps don't change their lines)
+    step.elements = { { targets = { "Marshal Dughan::240" } }, { tag = "accept", questId = 500, step = step }, { tag = "turnin", questId = 501, step = step } }
+    KEPT_STEP_WM = RXP.arrowFrame.element.step RXP.arrowFrame.element.step = step
+    NOW = NOW + 10 RXP.arrowFrame.element.x = 38.05 HOOKS.UpdateGotoSteps()
+    KEPT_HAS_TIP = C_Map.HasUserWaypoint C_Map.HasUserWaypoint = function() return WP.set ~= nil end""")
+YR.WorldMarkerTip()
+tip = [str(g.TIP[i]) for i in range(1, len(g.TIP) + 1)]
+check(len(tip) >= 3 and tip[0] == "Marshal Dughan" and "Take: Report to Goldshire" in tip[1] and "Hand in:" in tip[2],
+      f"under the mouse: the step's NPC, the quest to take there by name, the one to hand in ({tip})")
+check(lua.eval("rawget(HeadstartWorldMarker, 'hit')") is None and lua.eval("rawget(HeadstartWorldMarker, 'mouse')") is not True,
+      "the mark takes no mouse: nothing of it stands between the mouse and the NPC (the owner: \"in the way of clicking the NPC\")")
+# the NPC's own tooltip says it instead - unless Quests on NPC tooltips is on (it says it, marked route)
+lua.execute("""TIP = {} KEPT_GT_WM = GameTooltip
+    GameTooltip = { AddLine = function(_, t) TIP[#TIP + 1] = t end, Show = function() end,
+        GetUnit = function() return "Marshal Dughan", "mouseover" end }
+    KEPT_GUID_TIP, KEPT_ISPLAYER_TIP = UnitGUID, UnitIsPlayer
+    function UnitGUID(u) if u == "mouseover" then return "Creature-0-1-2-3-240-0001" end return KEPT_GUID_TIP and KEPT_GUID_TIP(u) end
+    function UnitIsPlayer(u) if u == "mouseover" then return false end return KEPT_ISPLAYER_TIP and KEPT_ISPLAYER_TIP(u) end
+    KEPT_QT_WM = YippRouteDB.questTips YippRouteDB.questTips = false""")
+YR.WorldMarkerUnitTip(g.GameTooltip)
+tip = [str(g.TIP[i]) for i in range(1, len(g.TIP) + 1)]
+check(len(tip) == 2 and "Take: Report to Goldshire" in tip[0] and "Hand in:" in tip[1],
+      f"over the step's NPC itself: its tooltip has the quest to take there and the one to hand in, no second name ({tip})")
+lua.execute("TIP = {} YippRouteDB.questTips = true")
+YR.WorldMarkerUnitTip(g.GameTooltip)
+check(len(g.TIP) == 0, "with Quests on NPC tooltips on: nothing added (it says it already, marked route)")
+lua.execute("""TIP = {} YippRouteDB.questTips = false GameTooltip.GetUnit = function() return "Someone", "mouseover" end
+    function UnitGUID(u) if u == "mouseover" then return "Creature-0-1-2-3-999-0001" end return KEPT_GUID_TIP and KEPT_GUID_TIP(u) end""")
+YR.WorldMarkerUnitTip(g.GameTooltip)
+check(len(g.TIP) == 0, "another NPC: its tooltip as it is")
+lua.execute("""GameTooltip, UnitGUID, UnitIsPlayer = KEPT_GT_WM, KEPT_GUID_TIP, KEPT_ISPLAYER_TIP
+    YippRouteDB.questTips = KEPT_QT_WM""")
+# the step's NPC with a nameplate on the screen: the marker over the plate - right over its "?" - and it stays there
+# as the game takes the pin away at the NPC (the owner, 2026-10-20)
+lua.execute("""PLATE240 = CreateFrame("Frame") function PLATE240:IsVisible() return true end
+    KEPT_NP = C_NamePlate C_NamePlate = { GetNamePlateForUnit = function(u) if u == "nameplate5" then return PLATE240 end end,
+        GetNamePlates = function() return {} end }
+    KEPT_GUID_WM, KEPT_ISPLAYER_WM = UnitGUID, UnitIsPlayer
+    function UnitGUID(u) if u == "nameplate5" then return "Creature-0-1-2-3-240-0001" end return KEPT_GUID_WM and KEPT_GUID_WM(u) end
+    function UnitIsPlayer(u) if u == "nameplate5" then return false end return KEPT_ISPLAYER_WM and KEPT_ISPLAYER_WM(u) end
+    Fire('NAME_PLATE_UNIT_ADDED', 'nameplate5')""")
+check(lua.eval("HeadstartNS.WorldMarkerOnPlate() == PLATE240") and YR.WorldMarkerShown(),
+      "the step's NPC's nameplate comes: the marker over it (right over its quest icon)")
+# Glimmer lights that NPC: the marker out of the way, and a moment after (the owner, 2026-10-22)
+lua.execute("""KEPT_LIT = HeadstartNS.GlimmerLitGiver LIT = false function HeadstartNS.GlimmerLitGiver() return LIT, false, LIT and PLATE240 or nil end
+    local guid, isPlayer = UnitGUID, UnitIsPlayer
+    function UnitGUID(u) if u == "softinteract" then return "Creature-0-1-2-3-240-0001" end return guid(u) end
+    function UnitIsPlayer(u) if u == "softinteract" then return false end return isPlayer(u) end""")
+_before = YR.WorldMarkerHeldBack()
+lua.execute("LIT = true")
+_lit = YR.WorldMarkerHeldBack()
+lua.execute("LIT = false NOW = NOW + 1")
+_moment = YR.WorldMarkerHeldBack()
+lua.execute("NOW = NOW + 1")
+_after = YR.WorldMarkerHeldBack()
+check(not _before and _lit and _moment and not _after,
+      f"Glimmer lights the step's NPC: the marker out of the way, a moment more after, then back ({_before}, {_lit}, {_moment}, {_after})")
+# and seen from the marker itself: its plate is the interact key's target's, Glimmer lighting givers - though Glimmer's
+# own answer says not lit (as in the game, 2026-10-22)
+lua.execute("""NOW = NOW + 5 SOFT = true KEPT_LIGHTS = HeadstartNS.GlimmerLightsGivers function HeadstartNS.GlimmerLightsGivers() return true end
+    local gp = C_NamePlate.GetNamePlateForUnit KEPT_GP = gp
+    C_NamePlate.GetNamePlateForUnit = function(u) if u == "softinteract" and SOFT then return PLATE240 end return gp(u) end""")
+_seen = YR.WorldMarkerHeldBack()
+lua.execute("SOFT = false NOW = NOW + 5")
+_gone = YR.WorldMarkerHeldBack()
+check(_seen and not _gone, f"its plate the interact target's, givers lit: out of the way, though Glimmer says not lit ({_seen}, {_gone})")
+lua.execute("C_NamePlate.GetNamePlateForUnit = KEPT_GP HeadstartNS.GlimmerLightsGivers = KEPT_LIGHTS")
+_now = str(YR.WorldMarkerNow())
+check(_now.startswith("now: marker shown") and "the step's NPC has one true" in _now,
+      f"/headstart way log says how it stands now, against Glimmer's light ({_now[:90]})")
+lua.execute("HeadstartNS.GlimmerLitGiver = KEPT_LIT")
+lua.execute("NAV_ON = false Fire('NAVIGATION_FRAME_DESTROYED')")
+check(YR.WorldMarkerShown() and lua.eval("HeadstartNS.WorldMarkerOnPlate() == PLATE240"),
+      "the game takes the pin away at the NPC: the marker stays over it")
+lua.execute("Fire('NAME_PLATE_UNIT_REMOVED', 'nameplate5')")
+check(not YR.WorldMarkerShown() and YR.WorldMarkerOnPlate() is None, "its plate gone, and no pin: nothing")
+lua.execute("""NAV_ON = true Fire('NAVIGATION_FRAME_CREATED', NAV_REGION)
+    C_NamePlate, UnitGUID, UnitIsPlayer = KEPT_NP, KEPT_GUID_WM, KEPT_ISPLAYER_WM""")
+lua.execute("""C_QuestLog.GetTitleForQuestID = KEPT_TITLE C_Map.HasUserWaypoint = KEPT_HAS_TIP
+    RXP.arrowFrame.element.x = 38 RXP.arrowFrame.element.step = KEPT_STEP_WM RXP.arrowFrame.element.step.elements = {}
+    NOW = NOW + 10 HOOKS.UpdateGotoSteps()""")
+# the taint log: what Headstart did to the action bars, with when (as BugGrabber keeps its errors); a burst is one
+# line, counted; the last 40 kept (the owner, 2026-10-20: an "action blocked" on the bars, and nothing to tell why)
+lua.execute("""KEPT_TAINT = YippRouteDB.taintLog YippRouteDB.taintLog = nil KEPT_TIME = time function time() return CLOCK_T end
+    CLOCK_T = 1000 for _ = 1, 3 do HeadstartNS.TaintNoted("put an action on the bars") end
+    CLOCK_T = 1100 HeadstartNS.TaintNoted("changed the bars the old way")
+    TL = YippRouteDB.taintLog TL1, TL2 = TL[1], TL[2]""")
+check(len(g.TL) == 2 and g.TL1.n == 3 and g.TL1.at == 1000 and g.TL2.at == 1100 and g.TL2.n is None,
+      "the taint log: a burst of three in ten seconds is one line, counted; another thing later its own, each with when")
+lua.execute("for i = 1, 45 do CLOCK_T = 2000 + i * 20 HeadstartNS.TaintNoted('thing ' .. i) end TLN = #YippRouteDB.taintLog")
+check(g.TLN == 40, f"at most 40 kept ({g.TLN})")
+lua.execute("YippRouteDB.taintLog = KEPT_TAINT time = KEPT_TIME")
+kept = g.YippRouteDB.markerLog
+kept = [str(kept[i]) for i in range(1, len(kept) + 1)] if kept else []
+check(len(kept) >= len(texts) and any("hides its arrow" in t for t in kept) and any("the game shows the way to" in t for t in kept),
+      f"and kept in the saved file, with when it showed and hid ({len(kept)} lines, at most 200)")
+lua.execute("RXPCData = KEPT_RXPC RXP.currentGuide = nil UnitPosition = KEPT_POS_FOLLOW")
+lua.execute("""LOG, C_QuestLog.GetLogIndexForQuestID, C_Timer.After = KEPT_LOG_WP, KEPT_LOGIDX_WP, KEPT_AFTER_FOLLOW
+    YippRouteDB.waypointRXP = nil YippRouteDB.waypoint = nil NAV_ON = false HeadstartNS.ApplyParts()
+    Enum.SuperTrackingType, Enum.SuperTrackingMapPinType = KEPT_STT_WP, KEPT_STMP_WP Enum = KEPT_ENUM_WP
+    RXP = KEPT_RXP_WP
+    for _, k in ipairs({ "SetUserWaypoint", "ClearUserWaypoint", "CanSetUserWaypointOnMap", "GetBestMapForUnit", "GetMapInfo" }) do
+        C_Map[k] = KEPT_MAP_WP[k]
+    end""")
+check(not YR.WorldMarkerShown(), "turned off: nothing drawn")
 
 # Put back everything Headstart changed (General page, Character setup, /headstart putback): asked first, and
 # answered, quality of life and Character setup go off (each feature puts back its own as it goes)
@@ -1168,7 +1737,7 @@ missing = lua.eval("""(function()
     return table.concat(out, ", ") end)()""")
 check(missing == "", f"the tour: every hint has the part of the window it points at ({missing})")
 YR.WelcomeShow()
-lua.execute("local b = HeadstartTour.next for i = 1, 8 do b.fn(b) end")
+lua.execute("local b = HeadstartTour.next for i = 1, 9 do b.fn(b) end")
 check(g.HeadstartTour.title.text == "Quality of life" and YR.WindowTab() == "qol", "the tour runs through in the window, on the QoL tab")
 lua.execute("local b = HeadstartTour.next b.fn(b)")
 check(g.HeadstartTour.hidden, "and is gone at Done")
@@ -1181,8 +1750,6 @@ news_missing = lua.eval("""(function()
     for name in pairs(news) do if not have[name] then out[#out + 1] = name end end
     return table.concat(out, ", ") end)()""")
 check(news_missing == "", f"every card under New in this version is a feature there is ({news_missing})")
-check(YR.XPBarSample("rested") == "rested" and YR.XPBarSampleNow() == "rested" and YR.XPBarSample(None) is None,
-      "the XP bar drawn as a sample, and as it really is again")
 accents = lua.eval("""(function()
     local S = HeadstartNS.Style
     local accent, out = S.C.accent, {}
@@ -1234,7 +1801,7 @@ contrast = lua.eval("""(function()
 check(contrast == "", f"text on the accent, the accent on a card and the text colours are readable in every look ({contrast})")
 found = YR.SettingsSearch("button strip")
 check(found is not None and len(found) == 1 and found[1].key == "chat", "the chat's buttons are on Chat")
-found = YR.SettingsSearch("volume channel")
+found = YR.SettingsSearch("battle.net whispers")
 check(found is not None and len(found) == 1 and found[1].key == "chat", "and so is the whisper sound")
 YR.SettingsSearch("")
 # a menu with a button on each line (the speaker on the whisper sounds): it acts on that line's value
@@ -1260,6 +1827,171 @@ YR.ShowSettingsTab(YR, "route")
 check(g.HeadstartMinimapButton is not None and g.HeadstartMinimapButton.hidden is not True, "minimap button shown")
 YR.ShowMinimapButton(YR, False)
 check(g.HeadstartMinimapButton.hidden is True and g.YippRouteDB.minimapButton is False, "minimap button can be hidden")
+# its right-click menu: every window of ours whose feature is on, and Settings and the tour always (the test audit,
+# 2026-10-20: the menu had no test)
+lua.execute("KEPT_RECAP_M, KEPT_LOOT_M = YippRouteDB.deathRecap, YippRouteDB.lootFeed YippRouteDB.deathRecap, YippRouteDB.lootFeed = false, false")
+_menu = [str(e[2]) for e in YR.WindowList().values()]
+check("Settings" in _menu and "Headstart tour" in _menu and "The last time you died" not in _menu and "Loot log" not in _menu,
+      f"the minimap button's menu: Settings and the tour, and no window of a feature that is off ({_menu})")
+lua.execute("YippRouteDB.deathRecap, YippRouteDB.lootFeed = true, true")
+_menu = [str(e[2]) for e in YR.WindowList().values()]
+check("The last time you died" in _menu and "Loot log" in _menu, f"a feature turned on: its window in the menu ({_menu})")
+YR.WindowMenu(g.HeadstartMinimapButton)
+_dm = g.HeadstartDropMenu
+check(_dm is not None and _dm.IsShown(_dm) and len(_dm.options) == len(_menu),
+      f"the menu opens by the button with every window in it ({len(_dm.options) if _dm else None} of {len(_menu)})")
+YR.WindowMenu(g.HeadstartMinimapButton)
+check(not _dm.IsShown(_dm), "and the button again closes it")
+# the button itself: a click opens the window, a right-click the menu, and a drag carries it round the minimap
+lua.execute("""local YR, b = HeadstartNS, HeadstartMinimapButton
+    CLICKED = {}
+    KEPT_TOGGLE, KEPT_MENU = YR.ToggleWindow, YR.WindowMenu
+    YR.ToggleWindow = function() CLICKED[#CLICKED + 1] = "window" end
+    YR.WindowMenu = function(at) CLICKED[#CLICKED + 1] = at == b and "menu" or "menu elsewhere" end
+    b.scripts.OnClick(b, "LeftButton")
+    b.scripts.OnClick(b, "RightButton")
+    YR.ToggleWindow, YR.WindowMenu = KEPT_TOGGLE, KEPT_MENU
+    KEPT_ANGLE = YippRouteDB.minimapAngle
+    Minimap.GetCenter = function() return 100, 100 end
+    Minimap.GetEffectiveScale = function() return 1 end
+    function GetCursorPosition() return 100, 150 end          -- straight above the minimap's middle
+    b.scripts.OnDragStart(b)
+    DRAGGING = b.scripts.OnUpdate ~= nil
+    b.scripts.OnUpdate(b)
+    DRAGGED = YippRouteDB.minimapAngle
+    b.scripts.OnDragStop(b)
+    DROPPED = b.scripts.OnUpdate == nil
+    YippRouteDB.minimapAngle = KEPT_ANGLE""")
+check(list(g.CLICKED.values()) == ["window", "menu"], f"the minimap button: a click opens the window, a right-click the menu by it ({list(g.CLICKED.values())})")
+check(g.DRAGGING and abs(g.DRAGGED - 90) < 0.001 and g.DROPPED,
+      f"dragged: it follows the pointer round the minimap (90 degrees, straight up), and lets go at the drop ({g.DRAGGED})")
+
+# The Characters window (/headstart alts; the test audit, 2026-10-20: its data had tests, the window none): your
+# characters on the left, what the picked one has on the right as a bag shows it, its currencies, and Forget
+lua.execute("""local YR = HeadstartNS
+    KEPT_ALTS, KEPT_ALTS_ON, KEPT_BAGS_A, KEPT_NAME_A = HeadstartAlts, YippRouteDB.alts, BAGS, C_Item.GetItemNameByID
+    BAGS = {}                                   -- (the one you're on carries nothing)
+    C_Item.GetItemNameByID = function(id) return ({ [2589] = "Linen Cloth", [4306] = "Silk Cloth" })[id] end
+    HeadstartAlts = { ["Bo-Realm"] = { name = "Bo", class = "WARRIOR", level = 8, money = 900, seen = CLOCK - 7200,
+        bags = { [2589] = 5, [4306] = 3 }, bank = { [4306] = 10 }, cur = { { id = 77, name = "Honor", qty = 300, icon = 1 } } },
+        ["Cy-Realm"] = { name = "Cy", class = "MAGE", level = 30, money = 100, seen = CLOCK - 86400 * 3, bags = { [2589] = 20 }, bank = {} } }
+    ALT_FROM = #FRAMES
+    local function T(f) return f and rawget(f, "text") or "" end
+    function ALT_SHOWN(kind)
+        local out = {}
+        for i = ALT_FROM + 1, #FRAMES do
+            local f = FRAMES[i]
+            if rawget(f, "hidden") == false then
+                if kind == "chars" and rawget(f, "money") and rawget(f, "sub") then out[#out + 1] = T(f.name) .. " / " .. T(f.sub)
+                elseif kind == "cells" and rawget(f, "edge") and rawget(f, "e") then out[#out + 1] = f.e.item .. "=" .. T(f.count)
+                elseif kind == "lines" and rawget(f, "count") and rawget(f, "icon") and not rawget(f, "edge") then out[#out + 1] = T(f.name) .. " " .. T(f.count) end
+            end
+        end
+        table.sort(out)
+        return out
+    end
+    function ALT_ROW(name)
+        for i = ALT_FROM + 1, #FRAMES do
+            local f = FRAMES[i]
+            if rawget(f, "money") and rawget(f, "sub") and T(f.name):find(name, 1, true) then return f end
+        end
+    end
+    YippRouteDB.alts = false
+    PRINTS = {}
+    ALT_OFF = YR.AltsToggle()
+    ALT_OFF_SAID = PRINTS[1]
+    YippRouteDB.alts = true
+    ALT_OPEN = YR.AltsToggle()""")
+_win = g.HeadstartAltsWindow
+check(g.ALT_OFF is False and "Characters is off" in str(g.ALT_OFF_SAID),
+      f"Characters off: no window, and says where to turn it on ({g.ALT_OFF_SAID})")
+_chars = list(g.ALT_SHOWN("chars").values())
+check(g.ALT_OPEN is True and _win is not None and _win.IsShown(_win) and len(_chars) == 4
+      and any(c.startswith("All characters / 3 of them") for c in _chars) and any("Bo|r / level 8" in c and "2 h ago" in c for c in _chars)
+      and any("Cy|r / level 30" in c and "3 d ago" in c for c in _chars) and any("/ level 1" in c and "you" in c for c in _chars),
+      f"Characters on: the window opens, all of them and each with level and when last played - you too, as you are now ({_chars})")
+_cells = list(g.ALT_SHOWN("cells").values())
+check(_cells == ["2589=25", "4306=13"], f"all characters: each item once, its count summed over bags and banks ({_cells})")
+check("2 different items" in str(_win.note.text), f"and says how many ({_win.note.text})")
+_bo = g.ALT_ROW("Bo")
+_bo.scripts.OnClick(_bo)
+_cells = list(g.ALT_SHOWN("cells").values())
+check(_cells == ["2589=5", "4306=13"] and _win.forget.hidden is False, f"Bo picked: Bo's alone, bags and bank, and Forget offered ({_cells})")
+_win.cur.scripts.OnClick(_win.cur)
+_lines = list(g.ALT_SHOWN("lines").values())
+check(_lines == ["Honor 300"] and len(list(g.ALT_SHOWN("cells").values())) == 0 and _win.search.hidden is True,
+      f"Currencies: Bo's, and no items or search ({_lines})")
+_win["items"].scripts.OnClick(_win["items"])         # (.items: lupa's own, in Python)
+lua.execute("POPUP = nil")
+_win.forget.scripts.OnClick(_win.forget)
+check(g.POPUP == "HEADSTART_FORGET_ALT", "Forget asks first")
+g.StaticPopupDialogs.HEADSTART_FORGET_ALT.OnAccept()
+_chars = list(g.ALT_SHOWN("chars").values())
+check(g.HeadstartAlts["Bo-Realm"] is None and len(_chars) == 3 and any(c.startswith("All characters / 2 of them") for c in _chars)
+      and list(g.ALT_SHOWN("cells").values()) == ["2589=20"] and _win.forget.hidden is True,
+      f"forgotten: Bo is gone from the list and from what is shown, back on all characters ({_chars})")
+check(YR.AltsToggle() is False and _win.hidden is True, "the same again closes it")
+lua.execute("""HeadstartAlts, YippRouteDB.alts, BAGS, C_Item.GetItemNameByID = KEPT_ALTS, KEPT_ALTS_ON, KEPT_BAGS_A, KEPT_NAME_A""")
+
+# Every key of ours (Bindings.xml, Key Bindings > AddOns): named in the list, and doing what its name says (the test
+# audit, 2026-10-20: the keys had no test - one calling a function that isn't there fails only when pressed)
+_bxml = re.sub(r"<!--.*?-->", "", open(os.path.join(ROOT, "Bindings.xml"), encoding="utf-8").read(), flags=re.S)
+_binds = re.findall(r'<Binding name="(\w+)"([^>]*)>\s*(.*?)\s*</Binding>', _bxml, flags=re.S)
+lua.execute("""local YR = HeadstartNS
+    KEYS_DID = {}
+    local function Did(what) return function(...) KEYS_DID[#KEYS_DID + 1] = what end end
+    KEPT_KEYS = { YR.AltsToggle, YR.ChatLogToggle, YR.LootLogToggle, YR.WindowMenu, YR.ToggleWindow, YR.Setup, YR.InviteTarget, YR.LeaveGroup, YR.UseGearSet }
+    YR.AltsToggle, YR.ChatLogToggle, YR.LootLogToggle = Did("alts"), Did("chat"), Did("loot")
+    YR.WindowMenu = function(at) KEYS_DID[#KEYS_DID + 1] = at == nil and "menu at the pointer" or "menu elsewhere" end
+    YR.ToggleWindow, YR.Setup = Did("window"), { LayoutNext = function() KEYS_DID[#KEYS_DID + 1] = "next profile" return true end }
+    YR.InviteTarget, YR.LeaveGroup = Did("invite"), Did("leave")
+    YR.UseGearSet = function(n) KEYS_DID[#KEYS_DID + 1] = "set " .. tostring(n) end""")
+_want = {"HEADSTART_WINDOW": "window", "HEADSTART_MENU": "menu at the pointer", "HEADSTART_LAYOUT": "next profile",
+         "HEADSTART_ALTS": "alts", "HEADSTART_CHATLOG": "chat", "HEADSTART_LOOTLOG": "loot", "HEADSTART_INVITE": "invite",
+         "HEADSTART_LEAVE": "leave", **{f"HEADSTART_GEARSET{i}": f"set {i}" for i in range(1, 6)}}
+_keys_bad = []
+for _name, _attrs, _body in _binds:
+    lua.execute("KEYS_DID = {}")
+    _said = g["BINDING_NAME_" + _name]
+    try:
+        lua.execute(_body)
+        _did = list(g.KEYS_DID.values())
+    except Exception as e:      # (a function that isn't there)
+        _did = [f"error: {e}"]
+    if not (isinstance(_said, str) and _said) or _did != [_want.get(_name)]:
+        _keys_bad.append(f"{_name}: {_said!r} {_did}")
+    if 'header="HEADSTART"' in _attrs and not g.BINDING_HEADER_HEADSTART:
+        _keys_bad.append("BINDING_HEADER_HEADSTART missing")
+check(len(_binds) == len(_want) and not _keys_bad, f"every key: named in Key Bindings, and does what its name says ({len(_binds)} keys; {_keys_bad})")
+lua.execute("""local YR, k = HeadstartNS, KEPT_KEYS
+    YR.AltsToggle, YR.ChatLogToggle, YR.LootLogToggle, YR.WindowMenu, YR.ToggleWindow, YR.Setup, YR.InviteTarget, YR.LeaveGroup, YR.UseGearSet =
+        k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8], k[9]""")
+lua.execute("YippRouteDB.deathRecap, YippRouteDB.lootFeed = KEPT_RECAP_M, KEPT_LOOT_M")
+# /headstart perf: Headstart's memory, and its time a frame where the game's profiler is on
+if YR.PerfLines is not None:
+    lua.execute("""KEPT_PROF = C_AddOnProfiler
+        KEPT_ENUM = Enum
+        Enum = Enum or {}
+        -- (the client's numbers, AddOnProfilerConstantsDocumentation, 70425)
+        Enum.AddOnProfilerMetric = Enum.AddOnProfilerMetric or { SessionAverageTime = 0, RecentAverageTime = 1, PeakTime = 4,
+            CountTimeOver1Ms = 5, CountTimeOver5Ms = 6 }
+        KEPT_MEM, KEPT_ADDONS = GetAddOnMemoryUsage, C_AddOns
+        C_AddOns = { IsAddOnLoaded = function(name) return name == "Headstart" end }   -- (ours loaded: Headstart alone)
+        GetAddOnMemoryUsage = function() return 1234 end
+        C_AddOnProfiler = { IsEnabled = function() return true end, GetAddOnMetric = function(name, m) return m == 1 and 0.05 or 0.02 end,
+            GetTopKAddOnsForMetric = function() return { { addOnName = "RXPGuides", metricValue = 0.4 }, { addOnName = "Headstart", metricValue = 0.05 } } end,
+            GetOverallMetric = function() return 0.5 end }""")
+    _perf = [str(l) for l in YR.PerfLines().values()]
+    check(_perf and _perf[0].startswith("Headstart in all: 1234 KB, 0.050 ms a frame now")
+          and any("The most time a frame now (ms): RXPGuides 0.400, Headstart 0.050" in l for l in _perf)
+          and any("Every addon together: 0.500 ms a frame; Headstart is 10.0%" in l for l in _perf),
+          f"/headstart perf: memory, time a frame, beside the addons that take the most and all together ({_perf})")
+    lua.execute("C_AddOnProfiler = nil")
+    _perf = [str(l) for l in YR.PerfLines().values()]
+    check(_perf and "profiler is off" in _perf[0], f"the game's profiler off: memory alone, and says so ({_perf[0] if _perf else None})")
+    lua.execute("C_AddOnProfiler, Enum, GetAddOnMemoryUsage, C_AddOns = KEPT_PROF, KEPT_ENUM, KEPT_MEM, KEPT_ADDONS")
+else:
+    check(False, "/headstart perf: YR.PerfLines is there (Headstart_Options loaded)")
 # with LibDBIcon there (it is, in the game: Libs/), the button is the library's - registered with
 # where it stood before, and shown and hidden through the library
 _opt = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(open(os.path.join(ROOT, "Options.lua"), encoding="utf-8").read(), "Options.lua")
@@ -1479,7 +2211,7 @@ lua.execute("NPC_IS_PLAYER = false; QUEST = 200")
 n = len(g.PRINTS)
 g.Fire("CHAT_MSG_ADDON", "Headstart", "H	9.9.9	Duo B		0", "PARTY", "Friend-Realm")
 said = [str(g.PRINTS[i]) for i in range(n + 1, len(g.PRINTS) + 1)]
-check(any("has Headstart 9.9.9" in p_ for p_ in said), "a newer Headstart in the party is mentioned")
+check(not any("has Headstart 9.9.9" in p_ for p_ in said), "a newer Headstart in the party: not said in chat")
 lua.execute("IN_GROUP = false")
 
 # Keep what the route needs: 4 Chunks of Boar Meat for Stocking Jetsteam, needed from Coldridge on (before
@@ -1671,6 +2403,37 @@ import smoke_noroutes
 bad += smoke_noroutes.run()
 import smoke_window
 bad += smoke_window.run()
+# Naowh Forever's Glimmer is a part of NaowhForever_QoL since its 1.1.13: asked there whether it is on (ours looked for an
+# addon NaowhForever_Glimmer that is gone - the review, 2026-10-21)
+lua.execute("""KEPT_AO = C_AddOns
+C_AddOns = { IsAddOnLoaded = function(name) return name == "NaowhForever_QoL" end }
+NaowhForever = { Glimmer = { On = function() return NAOWH_GLIMMER end } }
+NAOWH_GLIMMER = true""")
+YR.EllesmereForget()
+_naowh_on = YR.OtherHas("glimmer")
+lua.execute("NAOWH_GLIMMER = false")
+YR.EllesmereForget()
+_naowh_off = YR.OtherHas("glimmer")
+lua.execute("C_AddOns = KEPT_AO NaowhForever = nil")
+YR.EllesmereForget()
+check(_naowh_on == "Naowh Forever" and _naowh_off is None,
+      f"Naowh Forever's Glimmer, in its QoL addon: named while it is on, not while it is off ({_naowh_on}, {_naowh_off})")
+# Glimmer's quest givers while a RestedXP guide leads: the NPCs of the step under its arrow, by name or by ID (2026-10-21)
+_route = lua.eval("""function(YR)
+    local kept = { RXP, UnitName, UnitGUID, UnitIsPlayer }
+    RXP = { arrowFrame = { element = { step = { elements = { { targets = { "Mountaineer Stormpike" } }, { tag = "goto" } } } } } }
+    UnitIsPlayer = function() return false end
+    UnitName = function(u) return u == "a" and "Mountaineer Stormpike" or "Someone Else" end
+    UnitGUID = function(u) return "Creature-0-1-2-3-" .. (u == "a" and "1343" or "77") .. "-0000AB" end
+    local a, b = YR.RouteStepNpc("a"), YR.RouteStepNpc("b")
+    RXP.arrowFrame.element = nil
+    local none = YR.RouteStepNpc("a")
+    RXP, UnitName, UnitGUID, UnitIsPlayer = kept[1], kept[2], kept[3], kept[4]
+    return a, b, none
+end""")
+_a, _b, _none = _route(YR)
+check(_a is True and _b is False and _none is None,
+      f"RestedXP's step: its NPC is it, another isn't, and with no step under the arrow nothing is said ({_a}, {_b}, {_none})")
 import smoke_recap
 bad += smoke_recap.run()
 import smoke_chatlog
@@ -1687,6 +2450,12 @@ import smoke_welcome
 bad += smoke_welcome.run()
 import smoke_cinematic
 bad += smoke_cinematic.run()
+import smoke_questitems
+bad += smoke_questitems.run()
+import smoke_questtips
+bad += smoke_questtips.run()
+import smoke_talents
+bad += smoke_talents.run()
 import smoke_glimmer
 bad += smoke_glimmer.run()
 import smoke_npcmarkers
@@ -1699,20 +2468,10 @@ import smoke_macrohelper
 bad += smoke_macrohelper.run()
 import smoke_pace
 bad += smoke_pace.run()
-# A frame's name is a global, and so is a saved variable's: one name for both and the frame replaces
-# the saved table (or the game's Esc handling finds the table where it looks for the frame).
-import glob as _glob, re as _re
-_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_saved, _frames = set(), set()
-for _toc in _glob.glob(os.path.join(_root, "**", "*.toc"), recursive=True):
-    for _line in open(_toc, encoding="utf-8"):
-        if _line.startswith("## SavedVariables"):
-            _saved.update(n.strip() for n in _line.split(":", 1)[1].split(","))
-for _lua in _glob.glob(os.path.join(_root, "**", "*.lua"), recursive=True):
-    _src = open(_lua, encoding="utf-8", errors="replace").read()
-    _frames.update(_re.findall(r'S\.Window\("([^"]+)"', _src))
-    _frames.update(_re.findall(r'CreateFrame\("\w+",\s*"([^"]+)"', _src))
-_clash = sorted(_saved & _frames)
-print(("ok  " if not _clash else "FAIL"), f"no frame is named as a saved variable is ({', '.join(_clash) or 'none'})")
-bad += bool(_clash)
+# The tests that are scripts of their own - Character setup's (Setup.lua, SetupUI.lua and Layouts.lua have no other),
+# the camping reminder's and the live move's - run here too, so one smoke run is all of it (the test audit,
+# 2026-10-20: these three were run by hand only).
+import smoke_camping
+bad += smoke_camping.run()
+bad += _apart()
 sys.exit(1 if bad else 0)

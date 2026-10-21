@@ -1,13 +1,17 @@
--- The Headstart window. Opened from the minimap button or /yroute. Two tabs at the top, each with
--- its own menu down the left:
+-- The Headstart window. Opened from the minimap button or /yroute. Four tabs at the top - QoL, Interface,
+-- Levelling and Character setup - each with its own menu down the left:
 --
---   Levelling  This run, Share and Route settings, then the routes. A route opens in the editor: the
---              steps on the left; the selected step in full on the right, where every line of it can
---              be changed, added or removed: places (with "Here"), quests, targets, levels to farm
---              to, gold to farm, classes that see it. Save hands it to RestedXP.
---              This run: what this character did; "Add to route" makes any of it a step of the open
---              route. Share: the open route as text, or paste one in.
---   QoL        the settings pages (Find a setting at the top), Instances among them.
+--   Levelling  Next route (where it opens: the route to take, and the next ones), All routes, Talents, This run,
+--              and Settings at the foot of the menu (the owner, 2026-10-21: "the levelling tab is very confusing
+--              for new users" - the route list in the menu, the routes switch at its top). A route opens in the
+--              editor from All routes (Edit) or Next route (See the steps): the steps on the left; the selected
+--              step in full on the right, where every line of it can be changed, added or removed: places (with
+--              "Here"), quests, targets, levels to farm to, gold to farm, classes that see it. Save hands it to
+--              RestedXP. This run: what this character did; "Add to route" makes any of it a step of the open
+--              route. Import a route and Share are at the foot of All routes.
+--   QoL        the settings pages for what Headstart does for you (Find a setting at the top), Instances among them.
+--   Interface  the settings pages for what it puts on your screen and does to Blizzard's: the same menu, its
+--              own pages (CATEGORIES: each page's tab).
 --
 -- This file is the Headstart_Options addon: load on demand, loaded by Headstart the first time the
 -- window is asked for (YR.LoadWindow, Core.lua), so none of it is in memory for someone who never
@@ -15,12 +19,15 @@
 local YR = _G.HeadstartNS
 local S = YR.Style
 
-local W, H, SIDE, HEAD = 1140, 680, 180, 48
+-- (1140 x 680 until 2026-10-20: "the window is too big" - the owner)
+local W, H, HEAD = 980, 600, 48
+-- Every tab's menu is as wide (Levelling's was 180, QoL's 190: the edge moved as you changed tabs); a page is what
+-- is left beside it, under a heading.
+local NAV_W, TITLE_H = 190, 66
+local SIDE = NAV_W
 local PW, PH = W - SIDE, H - HEAD          -- a Levelling page: what is left beside its menu
--- QoL's menu is wider; its pages are what is left beside it, under a heading (as Route settings).
-local NAV_W, TITLE_H = 210, 88
 local CW, CH = W - NAV_W, PH - TITLE_H
-local LIST_W, ROW = 480, 24
+local LIST_W, ROW = 370, 24
 local win, pages, current
 local edit = { key = nil, header = nil, steps = nil, parsed = {}, dirty = false, sel = nil, line = nil, filter = "" }
 local ui = {}
@@ -119,9 +126,10 @@ local function Template(kind)
 end
 
 -- ---------------------------------------------------------------------------
--- A scrolling list of fixed rows. build(row) makes a row's parts once; fill(row, index) fills it.
+-- A scrolling list of fixed rows. build(row) makes a row's parts once; fill(row, index) fills it. quiet: the row
+-- picked is raised, without the accent and its bar (This run: the accent is for switches and the tab you are on).
 -- ---------------------------------------------------------------------------
-local function List(parent, width, count, rowH, fill, total, build)
+local function List(parent, width, count, rowH, fill, total, build, quiet)
     local l = CreateFrame("Frame", nil, parent)
     l:SetSize(width, rowH * count)
     l.rows, l.offset = {}, 0
@@ -138,10 +146,10 @@ local function List(parent, width, count, rowH, fill, total, build)
         r:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end end)
         function r:Select(on)
             self.selected = on
-            if on then self.bg:SetColorTexture(unpack(S.C.accentD))
+            if on then self.bg:SetColorTexture(unpack(quiet and S.C.raised or S.C.accentD))
             elseif self:IsMouseOver() then self.bg:SetColorTexture(unpack(S.C.hover))      -- drawn again under the mouse: still lit
             else self.bg:SetColorTexture(0, 0, 0, 0) end
-            self.bar:SetShown(on)
+            self.bar:SetShown(on and not quiet)
             self:Tools(on or self:IsMouseOver())
         end
         -- buttons made with r:Tool() show only while the row is hovered or selected
@@ -460,23 +468,29 @@ local function BuildInspector(page)
     end })
     ui.head:SetPoint("TOPLEFT", 14, -94)
 
-    -- step switches
-    local function TagSwitch(label, tag, x, width)
-        local t = S.Toggle(body, label, function() return edit.sel and YR.HasTag(Parsed(edit.sel), tag) ~= nil end,
+    -- a step's tags: checkboxes, their names ticking them too (they were switches: a switch is a feature's alone)
+    local function TagCheck(label, tag, x)
+        local box = S.Check(body, function() return edit.sel and YR.HasTag(Parsed(edit.sel), tag) ~= nil end,
             function(on) YR.SetTag(Parsed(edit.sel), tag, on, tag == "completewith" and "next" or nil) Commit() YR:RefreshWindow() end)
-        t:SetPoint("TOPLEFT", x, -128)
-        t:SetWidth(width)
-        return t
+        box:SetPoint("TOPLEFT", x, -130)
+        local name = CreateFrame("Button", nil, body)
+        name.text = S.Text(name, 13, S.C.sub)
+        name.text:SetPoint("LEFT")
+        name.text:SetText(label)
+        name:SetSize(name.text:GetStringWidth() + 4, 20)
+        name:SetPoint("LEFT", box, "RIGHT", 8, 0)
+        name:SetScript("OnClick", function() box:Click() end)
+        return box
     end
-    ui.optional = TagSwitch("Optional", "optional", 14, 118)
-    ui.sticky = TagSwitch("Sticky", "sticky", 136, 100)
-    ui.together = TagSwitch("Ends with the next step", "completewith", 240, 220)
+    ui.optional = TagCheck("Optional", "optional", 14)
+    ui.sticky = TagCheck("Sticky", "sticky", 120)
+    ui.together = TagCheck("Ends with the next step", "completewith", 210)
 
     -- the step's lines
-    local actions = S.Text(body, 12, S.C.accent)
-    actions:SetPoint("TOPLEFT", 14, -162)
+    local actions = S.Text(body, 11, S.C.muted)
+    actions:SetPoint("TOPLEFT", 14, -164)
     actions:SetText("ACTIONS")
-    ui.lines = List(body, CW - 28, 6, 24, function(r, i)
+    ui.lines = List(body, CW - 28, 5, 24, function(r, i)
         local l = Parsed(edit.sel).lines[i]
         r.i = i
         r.icon:SetTexture(l.k == "cmd" and LINE_ICON[l.cmd] or (l.k == "say" and YR.STEP_ICON.note) or nil)
@@ -585,8 +599,8 @@ local function BuildInspector(page)
     end, nil, 96)
     ed.quest.tip = "Pick the quest from your quest log"
 
-    -- add an action
-    ui.add = S.Dropdown(body, 200, AddChoices, function(choice)
+    -- add an action: on the line of the actions' heading, at the right (under the box it ran out of the card)
+    ui.add = S.Dropdown(body, 160, AddChoices, function(choice)
         if not edit.sel then return end
         local lines = Parsed(edit.sel).lines
         local at = (edit.line or #lines) + 1
@@ -595,19 +609,18 @@ local function BuildInspector(page)
         Commit() YR:RefreshWindow()
     end)
     ui.add:SetValue("+  Add action")
-    ui.add.label:SetTextColor(unpack(S.C.accent))
-    ui.add:SetPoint("TOPLEFT", ed, "BOTTOMLEFT", 0, -12)
-    local addNote = S.Text(body, 11, S.C.muted)
-    -- kept inside the card: it wraps onto a second line rather than running past the edge
-    addNote:SetPoint("LEFT", ui.add, "RIGHT", 10, 0)
-    addNote:SetPoint("RIGHT", body, "RIGHT", -14, 0)
-    addNote:SetWordWrap(true)
-    addNote:SetText("New places are where you stand; kill and talk use your target.")
+    ui.add.label:SetTextColor(unpack(S.C.sub))
+    ui.add:SetHeight(22)
+    ui.add:SetPoint("BOTTOMRIGHT", ui.lines, "TOPRIGHT", 0, 4)
+    ui.add:HookScript("OnEnter", function(self) S.Tip(self, "New places are where you stand; kill and talk use your target.") end)
+    ui.add:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    -- the box under the actions down to the card's foot
+    ed:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -14, 12)
 
     ui.raw = S.Button(body, "Edit as text", function() YR:EditRawStep() end, "ghost", 100)
-    ui.raw:SetPoint("BOTTOMRIGHT", -10, 10)
+    ui.raw:SetPoint("TOPRIGHT", -8, -9)
     ui.raw.tip = "The whole step as RestedXP text, for anything the fields don't cover"
-    ui.raw:SetTextColour(S.C.accent)
+    ui.raw:SetTextColour(S.C.sub)
 end
 
 -- The step as RestedXP text in a box over the inspector; Apply puts it back.
@@ -754,6 +767,7 @@ local function BuildRoutes(page)
     local save = S.Button(page, "Save", function()
         if not edit.key then return end
         YR:SaveCustom(edit.key, edit.header, edit.steps)
+        if YR.RouteProgressForget then YR.RouteProgressForget() end
         edit.dirty = false
         YR:RefreshWindow()
         StaticPopup_Show("HEADSTART_RELOAD")
@@ -798,7 +812,7 @@ local function BuildRoutes(page)
     end, nil, 140)
     ui.undoMerge:SetPoint("LEFT", revert, "RIGHT", 16, 0)
     ui.undoMerge.tip = "Back to your route as it was before you took the update"
-    local export = S.Button(page, "Export", function() YR:ToggleWindow("share") YR:ExportOpen() end, nil, 90)
+    local export = S.Button(page, "Share...", function() YR:ShareOpen() end, nil, 90)
     export:SetPoint("BOTTOMRIGHT", -16, 16)
     export.tip = "This route as text, to send to someone"
 end
@@ -819,8 +833,140 @@ local function RefreshRoutes()
     ui.state:SetText(edit.dirty and "|cffffd24aUnsaved changes|r" or (YR:IsCustom(edit.key) and "Your version" or "As shipped"))
     ui.steps:ShowIndex(edit.sel)
     ui.steps:Refresh()
-    for _, t in ipairs(ui.routeTabs) do t:Mark() end
     RefreshInspector()
+end
+
+-- ---------------------------------------------------------------------------
+-- A Levelling page's heading, as a QoL page's (PageHead): its icon, its name and what it is for, over a rule. A page
+-- under another (the editor, Share: under All routes) has the way back before its name. head.right is where a page
+-- puts what it shows at the top right (the middle of its right edge).
+-- ---------------------------------------------------------------------------
+local function LevelHead(page)
+    local h = {}
+    local frame = CreateFrame("Frame", nil, page)
+    frame:SetSize(42, 42)
+    frame:SetPoint("TOPLEFT", 20, -11)
+    S.Border(frame, S.C.lineHi)
+    h.icon = frame:CreateTexture(nil, "ARTWORK")
+    h.icon:SetPoint("TOPLEFT", 1, -1)
+    h.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    h.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    h.back = CreateFrame("Button", nil, page)
+    h.back:SetHeight(20)
+    h.back:SetPoint("TOPLEFT", frame, "TOPRIGHT", 12, 0)
+    h.back.text = S.Text(h.back, 15, S.C.sub)
+    h.back.text:SetPoint("LEFT")
+    h.back:SetScript("OnEnter", function(self) self.text:SetTextColor(unpack(S.C.text)) end)
+    h.back:SetScript("OnLeave", function(self) self.text:SetTextColor(unpack(S.C.sub)) end)
+    h.back:Hide()
+    h.slash = S.Text(page, 15, S.C.muted)
+    h.slash:SetPoint("LEFT", h.back, "RIGHT", 6, 0)
+    h.slash:SetText("/")
+    h.slash:Hide()
+    h.title = S.Text(page, 17)
+    h.desc = S.Text(page, 12, S.C.muted)
+    h.desc:SetPoint("TOPLEFT", frame, "TOPRIGHT", 12, -26)
+    h.desc:SetJustifyH("LEFT")
+    h.right = CreateFrame("Frame", nil, page)
+    h.right:SetSize(1, 1)
+    h.right:SetPoint("RIGHT", page, "TOPRIGHT", -24, -31)
+    local strip = page:CreateTexture(nil, "BORDER")
+    strip:SetPoint("TOPLEFT", 16, -TITLE_H + 4)
+    strip:SetPoint("TOPRIGHT", -16, -TITLE_H + 4)
+    S.Hair(strip, "h")
+    S.Set(strip, S.C.line)
+    --- o: icon, title, desc, back ({ its name, what it does }), right (how wide what stands at the top right is)
+    function h:Set(o)
+        self.icon:SetTexture(o.icon)
+        self.title:SetText(o.title or "")
+        self.title:ClearAllPoints()
+        self.back:SetShown(o.back ~= nil)
+        self.slash:SetShown(o.back ~= nil)
+        if o.back then
+            self.back.text:SetText(o.back[1])
+            self.back:SetWidth(self.back.text:GetStringWidth() + 2)
+            self.back:SetScript("OnClick", o.back[2])
+            self.title:SetPoint("LEFT", self.slash, "RIGHT", 6, 0)
+        else
+            self.title:SetPoint("TOPLEFT", frame, "TOPRIGHT", 12, -2)
+        end
+        self.desc:SetText(o.desc or "")
+        self.desc:SetPoint("RIGHT", page, "RIGHT", -24 - (o.right or 0), 0)
+    end
+    return h
+end
+
+-- A rounded panel (the settings list's look): the card's colour, a line round it, and a soft shadow under it when
+-- it stands out from the page.
+local function Panel(f, shadow, color)
+    S.Rounded(f, "BACKGROUND", "round"):SetVertexColor(unpack(color or S.C.card))
+    S.Rounded(f, "BORDER", "roundline"):SetVertexColor(unpack(S.C.line))
+    if shadow then S.Shadow(f, 14, 3, 0.5) end
+    return f
+end
+
+-- Two choices side by side in one rounded track, the one picked raised (All routes: this character's or every race's).
+--   get() is true for the first; set(first) picks.
+local function Segmented(parent, first, second, get, set)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetHeight(28)
+    S.Rounded(f, "BACKGROUND", "round"):SetVertexColor(unpack(S.C.field))
+    S.Rounded(f, "BORDER", "roundline"):SetVertexColor(unpack(S.C.line))
+    local function Part(label, value)
+        local p = CreateFrame("Button", nil, f)
+        p:SetHeight(22)
+        p.fill = S.Rounded(p, "BACKGROUND", "round")
+        p.text = S.Text(p, 13, S.C.sub)
+        p.text:SetPoint("CENTER")
+        p:SetScript("OnClick", function() set(value) end)
+        p:SetScript("OnEnter", function(self) self.text:SetTextColor(unpack(S.C.text)) end)
+        p:SetScript("OnLeave", function() f:Refresh() end)
+        function p:SetLabel(t)
+            self.text:SetText(t)
+            self:SetWidth(math.floor(self.text:GetStringWidth() + 24))
+        end
+        p:SetLabel(label)
+        return p
+    end
+    f.first, f.second = Part(first, true), Part(second, false)
+    f.first:SetPoint("LEFT", 3, 0)
+    f.second:SetPoint("LEFT", f.first, "RIGHT", 0, 0)
+    function f:Refresh()
+        local on = get() and true or false
+        for _, p in ipairs({ self.first, self.second }) do
+            local picked = (p == self.first) == on
+            p.fill:SetVertexColor(unpack(picked and S.C.raised or { 0, 0, 0, 0 }))
+            p.text:SetTextColor(unpack(picked and S.C.text or S.C.muted))
+        end
+        self:SetWidth(self.first:GetWidth() + self.second:GetWidth() + 6)
+    end
+    f:Refresh()
+    return f
+end
+
+-- Seconds as "2 h 12 m" (under an hour "12 m").
+local function Clock(sec)
+    sec = math.floor(sec or 0)
+    local h, m = math.floor(sec / 3600), math.floor(sec / 60) % 60
+    return h > 0 and ("%d h %02d m"):format(h, m) or ("%d m"):format(m)
+end
+
+-- A little round light (green: running), with words after it, at a point.
+local function StateLight(parent)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(10, 20)
+    f.dot = f:CreateTexture(nil, "ARTWORK")
+    f.dot:SetSize(7, 7)
+    f.dot:SetPoint("LEFT")
+    S.ArtTexture(f.dot, "dot")
+    f.text = S.Text(f, 13, S.C.sub)
+    f.text:SetPoint("LEFT", f.dot, "RIGHT", 7, 0)
+    function f:Set(text, color)
+        self.text:SetText(text)
+        self.dot:SetVertexColor(unpack(color or S.C.muted))
+        self:SetWidth(14 + self.text:GetStringWidth())
+    end
+    return f
 end
 
 -- ---------------------------------------------------------------------------
@@ -833,7 +979,7 @@ local ACTION_ICON = { accept = YR.STEP_ICON.accept, turnin = YR.STEP_ICON.turnin
 
 -- The details of one logged action, for the panel beside the list: for a quest its whole story
 -- (taken, done, handed in: when, where, from whom, what it gave), else what the log knows.
-local DETAIL_W = 330
+local DETAIL_W = 258
 local KIND_NAME = { accept = "Took a quest", complete = "Finished a quest's objectives", turnin = "Handed in a quest",
     level = "Level up", death = "Died", buy = "Bought", learn = "Learned", hearth = "Hearthstone", sell = "Sold",
     loot = "Looted" }
@@ -929,85 +1075,122 @@ local function ShowDetails()
 end
 
 local function BuildRun(page)
-    local title = S.Text(page, 17)
-    title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("What this character did")
-    run.hint = S.Text(page, 12, S.C.muted)
-    run.hint:SetPoint("TOPLEFT", 16, -40)
-    run.list = List(page, PW - 32 - DETAIL_W - 12, math.floor((PH - 130) / 26), 26, function(r, i)
+    run.head = LevelHead(page)
+    run.head:Set({ icon = 134376, title = "This run", desc = "What this character did, in order. Save it as a route of your own.",
+        right = 190 })
+    run.state = StateLight(page)
+    run.state:SetPoint("RIGHT", run.head.right, "RIGHT", 0, 0)
+
+    -- recording: the switch, and stopping the run (its clock and its log) here
+    local top = -(TITLE_H + 12)
+    local strip = CreateFrame("Frame", nil, page)
+    strip:SetPoint("TOPLEFT", 16, top)
+    strip:SetPoint("TOPRIGHT", -24, top)
+    strip:SetHeight(54)
+    Panel(strip, true)
+    local name = S.Text(strip, 14)
+    name:SetPoint("TOPLEFT", 16, -11)
+    name:SetText("Record this run")
+    run.name = name
+    local note = S.Text(strip, 12, S.C.muted)
+    note:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -4)
+    note:SetText("Every quest, trainer, vendor, flight and death, as you play.")
+    run.record = S.Switch(strip, function() return YR.Option("logging") end, function(on) YR:SetLogging(on) YR:RefreshWindow() end)
+    run.record:SetPoint("RIGHT", -16, 0)
+    -- Stop run: the splits clock and the log end here, so a run finished (or abandoned) is timed to
+    -- that moment. A run with a mistake in it can be kept out of "vs best".
+    run.stop = S.Button(strip, "Stop this run", function()
+        if YR:RunStopped() then YR:ResumeRun() else YR:StopRun() end
+        YR:RefreshWindow()
+    end, "ghost", 124)
+    run.stop:SetTextColour(S.C.sub)
+    run.stop:SetPoint("RIGHT", run.record, "LEFT", -12, 0)
+
+    -- what it did, and the one picked in full beside it
+    local listTop = top - 54 - 12
+    local h = PH + listTop - 58
+    local listW = PW - 16 - 24 - DETAIL_W - 12
+    local frame = CreateFrame("Frame", nil, page)
+    frame:SetPoint("TOPLEFT", 16, listTop)
+    frame:SetSize(listW, h)
+    Panel(frame)
+    run.list = List(frame, listW - 6, math.floor((h - 8) / 30), 30, function(r, i)
         local a = run.actions[i]
         r.action, r.index = a, i
         r:Select(run.sel == i)
         r.icon:SetTexture(ACTION_ICON[a.e[2]])
         r.label:SetText(a.label)
+        r.label:SetTextColor(unpack(run.sel == i and S.C.text or S.C.sub))
         r.when:SetText(date("%H:%M", a.e[1]))
     end, function() return run.actions and #run.actions or 0 end, function(r)
-        r.when = S.Text(r, 11, S.C.muted)
+        r.when = S.Text(r, 12, S.C.muted)
         r.when:SetPoint("LEFT", 10, 0)
         r.icon = r:CreateTexture(nil, "ARTWORK")
         r.icon:SetSize(16, 16)
-        r.icon:SetPoint("LEFT", 52, 0)
-        r.label = S.Text(r, 13)
-        r.label:SetPoint("LEFT", 76, 0)
-        r.label:SetPoint("RIGHT", -150, 0)
+        r.icon:SetPoint("LEFT", 50, 0)
+        r.label = S.Text(r, 13, S.C.sub)
+        r.label:SetPoint("LEFT", 74, 0)
+        r.label:SetPoint("RIGHT", -118, 0)
+        -- (on the row under the mouse and the one picked only: on every row it was a column of orange)
         local add = S.Button(r, "+  Add to route", function() if r.action.step then YR:InsertStep(r.action.step) end end,
-            "ghost", 124)
-        add:SetPoint("RIGHT", -6, 0)
-        add:SetHeight(22)
-        add:SetTextColour(S.C.accent)
+            "ghost", 112)
+        add:SetPoint("RIGHT", -2, 0)
+        add:SetHeight(24)
+        add:SetTextColour(S.C.sub)
         add.tip = "Put this in the open route as a step, after the selected step"
+        add:Hide()
+        add:HookScript("OnLeave", function() if not r.selected and not r:IsMouseOver() then r:Tools(false) end end)
+        r.tools[#r.tools + 1] = add
         r:SetScript("OnClick", function(self)
             run.sel = self.index
             run.list:Refresh()
             ShowDetails()
         end)
-    end)
-    run.list:SetPoint("TOPLEFT", 16, -66)
-    local frame = CreateFrame("Frame", nil, page)
-    frame:SetPoint("TOPLEFT", run.list, -1, 1)
-    frame:SetPoint("BOTTOMRIGHT", run.list, 1, -1)
-    S.Border(frame)
-    -- the details panel
+    end, true)
+    run.list:SetPoint("TOPLEFT", 4, -4)
     local panel = CreateFrame("Frame", nil, page)
-    panel:SetPoint("TOPLEFT", run.list, "TOPRIGHT", 12, 1)
-    panel:SetSize(DETAIL_W, run.list:GetHeight() + 2)
-    S.Fill(panel, S.C.card)
-    S.Border(panel)
+    panel:SetPoint("TOPLEFT", frame, "TOPRIGHT", 12, 0)
+    panel:SetSize(DETAIL_W, h)
+    Panel(panel)
     run.detail = S.Text(panel, 13)
-    run.detail:SetPoint("TOPLEFT", 14, -14)
-    run.detail:SetPoint("RIGHT", -14, 0)
+    run.detail:SetPoint("TOPLEFT", 16, -14)
+    run.detail:SetPoint("RIGHT", -16, 0)
     run.detail:SetWordWrap(true)
     run.detail:SetSpacing(4)
     run.detail:SetJustifyV("TOP")
-    run.linkLabel = S.Text(panel, 11, S.C.muted)
-    run.linkLabel:SetPoint("BOTTOMLEFT", 14, 44)
-    run.link = S.Input(panel, { width = DETAIL_W - 28 })
-    run.link:SetPoint("BOTTOMLEFT", 14, 14)
+    run.link = S.Input(panel, { width = DETAIL_W - 32 })
+    run.link:SetPoint("BOTTOMLEFT", 16, 14)
     run.link:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
-    run.record = S.Toggle(page, "Record this run", function() return YR.Option("logging") end,
-        function(on) YR:SetLogging(on) end)
-    run.record:SetPoint("BOTTOMLEFT", 16, 20)
-    -- Stop run: the splits clock and the log end here, so a run finished (or abandoned) is timed to
-    -- that moment. A run with a mistake in it can be kept out of "vs best".
-    run.stop = S.Button(page, "Stop this run", function()
-        if YR:RunStopped() then YR:ResumeRun() else YR:StopRun() end
-        YR:RefreshWindow()
-    end, nil, 130)
-    run.stop:SetPoint("BOTTOMRIGHT", -16, 16)
-    run.counts = S.Toggle(page, "A run to beat", function() return YR:RunCounts() end,
-        function(on) YR:SetRunCounts(on) end)
-    run.counts:SetWidth(150)
-    run.counts:SetPoint("RIGHT", run.stop, "LEFT", -20, -3)
-    run.counts.tip = "Off: other characters' splits don't compare against this run (a missed quest, a test)"
+    run.linkLabel = S.Text(panel, 12, S.C.muted)
+    run.linkLabel:SetPoint("BOTTOMLEFT", run.link, "TOPLEFT", 0, 6)
+    run.where = S.Text(panel, 12, S.C.muted)
+    run.where:SetPoint("BOTTOMLEFT", 16, 70)
+    run.where:SetWidth(DETAIL_W - 32)
+    run.where:SetWordWrap(true)
+
+    -- the foot: whether this run is one to beat, and making it a route
+    run.counts = S.Check(page, function() return YR:RunCounts() end, function(on) YR:SetRunCounts(on) end)
+    run.counts:SetPoint("BOTTOMLEFT", 18, 21)
+    local beat = CreateFrame("Button", nil, page)
+    beat.text = S.Text(beat, 13, S.C.sub)
+    beat.text:SetPoint("LEFT")
+    beat.text:SetText("A run to beat")
+    beat:SetSize(beat.text:GetStringWidth() + 4, 20)
+    beat:SetPoint("LEFT", run.counts, "RIGHT", 8, 0)
+    beat:SetScript("OnClick", function() run.counts:Click() end)
+    local beatNote = S.Text(page, 12, S.C.muted)
+    beatNote:SetPoint("LEFT", beat, "RIGHT", 8, 0)
+    beatNote:SetText("other characters' splits compare against it")
     -- This character's whole run as a route of its own (MyRoutes.lua): every stop a step, to reorder and
     -- edit in Routes and to play in RestedXP. Saving again replaces it.
-    run.save = S.Button(page, "Save as route", function() YR.AskSaveRunAsRoute() end, "primary", 130)
-    run.save:SetPoint("RIGHT", run.counts, "LEFT", -20, 3)
+    run.save = S.Button(page, "Save as route", function() YR.AskSaveRunAsRoute() end, "primary", 120)
+    run.save:SetPoint("BOTTOMRIGHT", -24, 16)
     run.save.tip = "Your run as your own route: every quest stop, trainer, vendor, flight, death skip and grind"
-        .. " a step, in the order you played. Edit and reorder it in Routes; RestedXP lists it under My routes."
+        .. " a step, in the order you played. Edit and reorder it under All routes; RestedXP lists it under My routes."
         .. " Saving again replaces it. Our routes stay as they are"
-    run.delete = S.Button(page, "Delete my route", function() YR.AskDeleteMyRoutes() end, nil, 130)
-    run.delete:SetPoint("RIGHT", run.save, "LEFT", -10, 0)
+    run.delete = S.Button(page, "Delete my route...", function() YR.AskDeleteMyRoutes() end, "ghost", 130)
+    run.delete:SetTextColour(S.C.sub)
+    run.delete:SetPoint("RIGHT", run.save, "LEFT", -6, 0)
     run.delete.tip = "Delete the route you saved for this race (asks first). Your run log stays, so you can save it again"
 end
 
@@ -1021,8 +1204,8 @@ local function RefreshRun()
         run.madeOf, run.madeAt = ev, ev and #ev or 0
         run.actions = YR:RunActions()
     end
-    run.hint:SetText(("%d actions. Click one for its details; Add to route puts it in %s, after step %s."):format(#run.actions,
-        edit.key and YR.GuideName(edit.key) or "the open route", edit.sel or "-"))
+    run.where:SetText(edit.key and ("Add to route puts it in %s, after step %s."):format(YR.GuideName(edit.key), edit.sel or "-")
+        or "Open a route under All routes to add to it.")
     -- follow the newest actions, but don't jump away from where you were reading
     if run.seen ~= #run.actions then
         run.seen = #run.actions
@@ -1031,17 +1214,23 @@ local function RefreshRun()
     run.list:Refresh()
     ShowDetails()
     run.record:Refresh()
-    local stopped = YR:RunStopped()
+    local on, stopped = YR.Option("logging"), YR:RunStopped()
+    run.name:SetTextColor(unpack(on and S.C.text or S.C.sub))
     run.stop:SetLabel(stopped and "Resume this run" or "Stop this run")
     run.stop.tip = stopped and "Carry on with this run: the time it was stopped doesn't count"
         or "End this run now: the splits and the log stop here"
     run.counts:Refresh()
+    local played = YR.SplitsPlayed and YR.SplitsPlayed()
+    if not on then run.state:Set("Not recording")
+    elseif stopped then run.state:Set("Stopped")
+    else run.state:Set("Recording" .. (type(played) == "number" and ("  ·  " .. Clock(played)) or ""), S.C.green) end
 end
 
 -- ---------------------------------------------------------------------------
--- Share
+-- Share: a route as text, to send (Share, from All routes or the editor), or one pasted in (Import a route).
+-- Under All routes: its heading leads back there.
 -- ---------------------------------------------------------------------------
-local share = {}
+local share = { mode = "import" }
 
 function YR:ExportOpen()
     if not (edit.key and share.box) then return end
@@ -1051,15 +1240,24 @@ function YR:ExportOpen()
     share.hint:SetText("Selected: press Ctrl+C to copy.")
 end
 
+--- Share the route open in the editor ("export"), or paste one in ("import").
+function YR:ShareOpen(mode)
+    share.mode = mode or "export"
+    YR:ToggleWindow("share")
+    if share.mode == "export" then
+        YR:ExportOpen()
+    elseif share.box then
+        share.box:SetText("")
+        share.hint:SetText("")
+        share.box:SetFocus()
+    end
+end
+
 local function BuildShare(page)
-    local title = S.Text(page, 17)
-    title:SetPoint("TOPLEFT", 16, -16)
-    title:SetText("Share a route")
-    share.hint = S.Text(page, 12, S.C.muted)
-    share.hint:SetPoint("TOPLEFT", 16, -40)
-    share.hint:SetText("Export the open route and copy it, or paste someone's route here and import it.")
-    local area = S.ScrollArea(page, PW - 32, PH - 132)
-    area:SetPoint("TOPLEFT", 16, -64)
+    share.head = LevelHead(page)
+    local top = -(TITLE_H + 12)
+    local area = S.ScrollArea(page, PW - 40, PH - TITLE_H - 12 - 58)
+    area:SetPoint("TOPLEFT", 16, top)
     S.Fill(area, S.C.field)
     S.Border(area)
     local box = CreateFrame("EditBox", nil, area)
@@ -1067,25 +1265,38 @@ local function BuildShare(page)
     box:SetAutoFocus(false)
     box:SetFont(S.FONT, 12, "")
     box:SetTextColor(unpack(S.C.text))
-    box:SetWidth(PW - 48)
+    box:SetWidth(PW - 56)
     box:SetTextInsets(10, 10, 10, 10)
     box:SetScript("OnEscapePressed", box.ClearFocus)
     area:SetScrollChild(box)
     area:SetScript("OnMouseDown", function() box:SetFocus() end)
     share.box = box
-    local export = S.Button(page, "Export open route", function() YR:ExportOpen() end, "primary", 150)
-    export:SetPoint("BOTTOMLEFT", 16, 16)
-    local import = S.Button(page, "Import", function()
+    share.hint = S.Text(page, 12, S.C.muted)
+    share.hint:SetPoint("BOTTOMLEFT", 18, 24)
+    share.hint:SetPoint("RIGHT", page, "RIGHT", -230, 0)
+    share.go = S.Button(page, "Import", function()
+        if share.mode == "export" then YR:ExportOpen() return end
         local done, why = YR:ImportGuide(box:GetText())
         share.hint:SetText(done and ("|cff66dd88Imported:|r " .. done .. ". Reload to use it.") or ("|cffff7070Not imported:|r " .. why))
         if done then
             if edit.key then Open(edit.key) end
             StaticPopup_Show("HEADSTART_RELOAD")
         end
-    end, nil, 100)
-    import:SetPoint("LEFT", export, "RIGHT", 8, 0)
-    local clear = S.Button(page, "Clear", function() box:SetText("") end, "ghost", 70)
-    clear:SetPoint("LEFT", import, "RIGHT", 8, 0)
+    end, "primary", 110)
+    share.go:SetPoint("BOTTOMRIGHT", -24, 16)
+    local clear = S.Button(page, "Clear", function() box:SetText("") share.hint:SetText("") end, "ghost", 70)
+    clear:SetTextColour(S.C.sub)
+    clear:SetPoint("RIGHT", share.go, "LEFT", -6, 0)
+end
+
+local function RefreshShare()
+    win.subtitle:SetText("")
+    local export = share.mode == "export"
+    share.head:Set({ icon = 237381, back = { "All routes", function() YR:ToggleWindow("library") end },
+        title = export and ("Share " .. (edit.key and YR.GuideName(edit.key) or "a route")) or "Import a route",
+        desc = export and "Copy this text and send it: whoever pastes it under Import a route has the route."
+            or "Paste a route someone shared with you, then Import. You can open it and change it like your own." })
+    share.go:SetLabel(export and "Select all" or "Import")
 end
 
 -- ---------------------------------------------------------------------------
@@ -1126,14 +1337,16 @@ for _, k in ipairs(YR.REWARD_KINDS) do KIND_LABEL[k.key] = k.label end
 -- label the first sentence of its details, so what a setting does can be read without pointing at
 -- anything; the (i) after the label still shows the whole text. Every row goes into settings.index for
 -- the search box. controls collects the controls (and the masters' dimmers) for Refresh.
---   On a QoL page (fold: its key) with more than one card, a card folds to its head: click the head
---   and its rows go, click again and they are back. Open is how a card starts - every setting and
---   switch in sight, nothing to press first (it started folded, with an "Open all" at the page's
---   right; the owner, 2026-10-14) - and the ones you folded are remembered
---   (YippRouteDB.cardsOpen["page:Card"] == false). The cards under a folded one move up, the page gets as much
---   shorter, and whatever a page put under its cards (L.Tail) moves with them. The search and a
---   page's links open the card they lead to.
+--   On a QoL page (fold: its key) the cards are a ledger (the owner, 2026-10-21, picking it of three designs:
+--   "Quiet ledger"): one list down the page, each feature a card the page's width - its icon, its name, a line
+--   on what it does and its switch in the head - and its options under it, one to a line, only while it is on.
+--   Nothing folds by hand: a feature that is off is its head alone. The cards under one move as it opens or
+--   shuts, and so does whatever a page put under its cards (L.Tail).
 local ROW_H, ROW_TIP_H, CARD_HEAD = 34, 48, 40
+local LEDGER_HEAD, INDENT, LEDGER_ROW = 54, 54, 38      -- a ledger card's head; where its name and settings start; a setting's row
+-- Cards side by side (a QoL or Interface page): CARD_GAP between the two columns, STACK_H a row whose name doesn't fit
+-- beside its control (the name above it, the control under it at the right).
+local CARD_GAP, STACK_H = 12, 54
 local TOP_CARD = "On this page"       -- the card of switches every QoL page begins with
 -- A slider on a settings row: the compact kind, all one width, so it shares a row with another setting.
 local function RowSlider(parent, min, max, step, get, set)
@@ -1163,19 +1376,27 @@ local CARD_OTHER = {
     ["XP bar"] = "xpbar", ["Trinket buttons"] = "trinketBar", ["Swing timer"] = "swing", ["Glimmer"] = "glimmer",
 }
 
-local function RowPage(page, controls, bottom, fold)
+local function RowPage(page, controls, bottom, fold, side)
     local area = S.ScrollArea(page, CW - 24, CH - (bottom or 64))
     area:SetPoint("TOPLEFT", 16, -4)
     local c = area.content
     c:SetWidth(CW - 40)
     local L = { c = c, colW = CW - 40, y = -6, col = 0, rowIndex = 0, area = area, lift = 0 }
+    -- (the settings pages: a ledger, one card under another; Character setup's (side): cards side by side, each half
+    -- the page wide - see Lay, below)
+    L.masonry = fold ~= nil or side == true
+    L.ledger = fold ~= nil
+    local HEAD = L.ledger and LEDGER_HEAD or CARD_HEAD
+    L.half = math.floor((L.colW - CARD_GAP) / 2)
     local card       -- the card rows go into now: { frame, top, rows }
+    local Lay        -- (a card's rows put in place as it ends: below)
 
     L.cards = {}        -- every card of the page, in the order it was built: { frame, top, span, items, entries, live }
     local function EndCard()
         L.col = 0                       -- the next card starts a row of its own
         if not card then return end
-        card.height = card.top - L.y + 6
+        if card.flow then L.y = Lay(card) end       -- (cards side by side: its rows go in now its width is known)
+        card.height = card.top - L.y + (L.ledger and 0 or 6)
         card.frame:SetHeight(card.height)
         L.y = L.y - 6 - 14
         card.span = card.top - L.y      -- the room it takes, the gap under it included
@@ -1183,39 +1404,23 @@ local function RowPage(page, controls, bottom, fold)
         card = nil
     end
 
-    --- Whether a card is folded to its head.
+    --- On a ledger a feature's settings open and shut with a click on its row, and stay as you left them
+    --- (YippRouteDB.cardsOpen["page:Card"] = true while open; shut to begin with, the page a list of features).
+    local function IsOpen(cd)
+        local kept = YippRouteDB.cardsOpen
+        return type(kept) == "table" and kept[fold .. ":" .. cd.title] == true
+    end
+    function L.SetOpen(cd, open)
+        local kept = type(YippRouteDB.cardsOpen) == "table" and YippRouteDB.cardsOpen or {}
+        YippRouteDB.cardsOpen = kept
+        kept[fold .. ":" .. cd.title] = open and true or nil
+        L.Reflow()
+    end
+    --- Whether a card is its head alone: on a ledger, one whose settings are shut (or that has none).
     local function Shut(cd)
-        if not fold or cd.isTop or #L.cards < 2 then return false end
-        local open = YippRouteDB.cardsOpen
-        return open ~= nil and open[fold .. ":" .. cd.title] == false
+        return L.ledger and (not cd.options or not IsOpen(cd)) or false
     end
-    --- A card folded or opened (open nil: the other way), and the page laid out again.
-    function L.Fold(cd, open)
-        if not fold or #L.cards < 2 then return end
-        local kept = YippRouteDB.cardsOpen or {}
-        YippRouteDB.cardsOpen = kept
-        local key = fold .. ":" .. cd.title
-        if open == nil then open = kept[key] == false end
-        if open then kept[key] = nil else kept[key] = false end
-        L.Reflow()
-    end
-    --- Every card of the page opened, or folded.
-    function L.FoldAll(open)
-        if not fold or #L.cards < 2 then return end
-        local kept = YippRouteDB.cardsOpen or {}
-        YippRouteDB.cardsOpen = kept
-        for _, cd in ipairs(L.cards) do
-            if open then kept[fold .. ":" .. cd.title] = nil else kept[fold .. ":" .. cd.title] = false end
-        end
-        L.Reflow()
-    end
-    --- Whether any card of the page is folded (nil on a page whose cards don't fold).
-    function L.AnyShut()
-        if not fold or #L.cards < 2 then return nil end
-        for _, cd in ipairs(L.cards) do if Shut(cd) then return true end end
-        return false
-    end
-    --- How long the page is with every card open: Reflow takes off what the folded ones save.
+    --- How long the page is with every card open: Reflow takes off what the shut ones save.
     function L.Length(h)
         L.length = h
         c:SetHeight(math.max(10, h - L.lift))
@@ -1233,36 +1438,113 @@ local function RowPage(page, controls, bottom, fold)
     --- The cards of features that are off go under the ones that are on (the first card, the page's
     --- switches, stays first), and a folded card is only its head. Called as the page is built and
     --- whenever it is refreshed, or a card is folded or opened.
+    --- On a page whose cards stand side by side, each card goes where the two columns end higher (the left one
+    --- when they end level); a card the page's width goes under both.
     function L.Reflow()
         local list = L.cards
-        if #list < 2 then return end
+        if L.ledger then
+            -- one card under the other in one rounded panel, a line between them, a shadow under it
+            local first = list[1] and list[1].top or L.y
+            local top = first
+            for i, cd in ipairs(list) do
+                local shut = Shut(cd)
+                local shift = top - cd.top
+                if cd.divider then cd.divider:SetShown(i > 1) end
+                if cd.arrow then
+                    S.ArtTexture(cd.arrow, shut and "down" or "up")
+                end
+                if shift ~= (cd.shift or 0) or shut ~= (cd.shut or false) then
+                    cd.shift, cd.shut, cd.x = shift, shut, 0
+                    cd.frame:ClearAllPoints()
+                    cd.frame:SetPoint("TOPLEFT", 0, cd.top + shift)
+                    cd.frame:SetHeight(shut and HEAD or cd.height)
+                    for _, it in ipairs(cd.items) do
+                        it[1]:SetShown(not shut)
+                        it[1]:ClearAllPoints()
+                        it[1]:SetPoint("TOPLEFT", it[2], it[3] + shift)
+                    end
+                    for _, e in ipairs(cd.entries) do e.y = (shut and cd.top or e.y0) + shift end
+                end
+                top = top - (shut and HEAD or cd.height)
+            end
+            if #list > 0 then
+                if not L.box then
+                    L.box = CreateFrame("Frame", nil, c)
+                    L.box:SetFrameLevel(c:GetFrameLevel() + 1)          -- (under the cards: Section)
+                    S.Rounded(L.box, "BACKGROUND", "round"):SetVertexColor(unpack(S.C.card))
+                    S.Rounded(L.box, "BORDER", "roundline"):SetVertexColor(unpack(S.C.line))
+                    S.Shadow(L.box, 14, 3, 0.5)
+                end
+                L.box:ClearAllPoints()
+                L.box:SetPoint("TOPLEFT", 0, first)
+                L.box:SetSize(L.colW, first - top + 8)         -- (8 under the last: its band clear of the round corners)
+                top = top - 8
+            end
+            L.bottom = top - 14
+            local lift = L.endY and (L.bottom - L.endY) or 0
+            if lift ~= L.lift then
+                L.lift = lift
+                if L.length then c:SetHeight(math.max(10, L.length - lift)) end
+                if L.tail then
+                    L.tail:ClearAllPoints()
+                    L.tail:SetPoint("TOPLEFT", 0, lift)
+                end
+                if area.UpdateScrollChildRect then area:UpdateScrollChildRect() end
+                local range = area.GetVerticalScrollRange and area:GetVerticalScrollRange() or 0
+                local at = area.GetVerticalScroll and area:GetVerticalScroll() or 0
+                if type(range) == "number" and type(at) == "number" and at > range and area.SetVerticalScroll then
+                    area:SetVerticalScroll(math.max(0, range))
+                end
+            end
+            return
+        end
+        if #list < 2 then
+            -- one card alone on its page: the page's width (half of it, with nothing beside it, was a hole)
+            local cd = list[1]
+            if cd and cd.flow and not cd.full then
+                cd.wide = true
+                local bottom = Lay(cd)
+                cd.height = cd.top - bottom + 6
+                cd.frame:SetHeight(cd.height)
+            end
+            L.bottom = cd and (cd.top - cd.height - 14) or L.y
+            return
+        end
         local order, off = {}, {}
         for _, cd in ipairs(list) do
             if cd.isTop or not cd.live or cd.live() then order[#order + 1] = cd else off[#off + 1] = cd end
         end
         for _, cd in ipairs(off) do order[#order + 1] = cd end
-        local y = list[1].top
+        local ends = { list[1].top, list[1].top }       -- where each column ends (both, without cards side by side)
         for _, cd in ipairs(order) do
-            local shift, shut = y - cd.top, Shut(cd)
-            if shift ~= (cd.shift or 0) or shut ~= (cd.shut or false) then
-                cd.shift, cd.shut = shift, shut
+            local shut = Shut(cd)
+            local span = shut and (HEAD + 14) or (cd.span or 0)
+            local x, top
+            if L.masonry and not cd.full then
+                local k = ends[1] >= ends[2] and 1 or 2
+                x, top = (k - 1) * (L.half + CARD_GAP), ends[k]
+                ends[k] = top - span
+            else
+                x, top = 0, math.min(ends[1], ends[2])
+                ends[1], ends[2] = top - span, top - span
+            end
+            local shift = top - cd.top
+            if shift ~= (cd.shift or 0) or shut ~= (cd.shut or false) or x ~= (cd.x or 0) then
+                cd.shift, cd.shut, cd.x = shift, shut, x
                 cd.frame:ClearAllPoints()
-                cd.frame:SetPoint("TOPLEFT", 0, cd.top + shift)
-                cd.frame:SetHeight(shut and CARD_HEAD or cd.height)
+                cd.frame:SetPoint("TOPLEFT", x, cd.top + shift)
+                cd.frame:SetHeight(shut and HEAD or cd.height)
                 for _, it in ipairs(cd.items) do
                     it[1]:SetShown(not shut)
                     it[1]:ClearAllPoints()
-                    it[1]:SetPoint("TOPLEFT", it[2], it[3] + shift)
+                    it[1]:SetPoint("TOPLEFT", x + it[2], it[3] + shift)
                 end
                 -- where the search and the page's links scroll to (a folded card's rows: its head)
                 for _, e in ipairs(cd.entries) do e.y = (shut and cd.top or e.y0) + shift end
             end
-            if cd.arrow then
-                cd.arrow:Show()
-                cd.arrow:SetRotation(shut and -math.pi / 2 or math.pi)      -- (the art points up: turned right, or down)
-            end
-            y = y - (shut and (CARD_HEAD + 14) or (cd.span or 0))
         end
+        local y = math.min(ends[1], ends[2])
+        L.bottom = y                    -- (where the cards end as they stand now: a page that sets its own length)
         -- folded cards make the page that much shorter, and what stands under the cards comes up with them
         local lift = fold and L.endY and (y - L.endY) or 0
         if lift ~= L.lift then
@@ -1283,7 +1565,8 @@ local function RowPage(page, controls, bottom, fold)
     function L.Break() EndCard() end
 
     --- Start a card. opts: icon (a texture or file ID), master = { get, set } for its one switch, find =
-    --- other words the search box finds it by.
+    --- other words the search box finds it by, free = its rows in use while the switch is off (a viewer),
+    --- wide = the page's width though it is only settings.
     function L.Section(title, note, opts)
         EndCard()
         opts = opts or {}
@@ -1300,42 +1583,65 @@ local function RowPage(page, controls, bottom, fold)
         local f = CreateFrame("Frame", nil, c)
         f:SetPoint("TOPLEFT", 0, L.y)
         f:SetWidth(L.colW)
-        f:SetHeight(CARD_HEAD)
-        S.Fill(f, S.C.card)
-        S.Border(f, S.C.line)
-        local strip = f:CreateTexture(nil, "BACKGROUND", nil, 1)
-        strip:SetPoint("TOPLEFT", 1, -1)
-        strip:SetPoint("TOPRIGHT", -1, -1)
-        strip:SetHeight(CARD_HEAD - 1)
-        S.Set(strip, ZEBRA)
-        -- on a page whose cards fold: an arrow before the icon, shown once the page turns out to
-        -- have more than one card (Reflow)
-        local folds = fold and not opts.top
-        local arrow
-        if folds then
-            arrow = f:CreateTexture(nil, "ARTWORK")
-            arrow:SetSize(10, 10)
-            arrow:SetPoint("TOPLEFT", 11, -15)
-            S.ArtTexture(arrow, "up")
-            arrow:SetVertexColor(unpack(S.C.sub))
-            arrow:Hide()
+        f:SetHeight(HEAD)
+        f.note = note
+        if L.ledger then
+            -- (on the panel the list sits in, above it: a line above each but the first - Reflow)
+            f:SetFrameLevel(c:GetFrameLevel() + 3)
+            local line = f:CreateTexture(nil, "BORDER")
+            line:SetPoint("TOPLEFT", 1, 0)
+            line:SetPoint("TOPRIGHT", -1, 0)
+            S.Hair(line, "h")
+            S.Set(line, S.C.line)
+            f.divider = line
+        else
+            S.Fill(f, S.C.card)
+            S.Border(f, S.C.line)
         end
-        local x = folds and 30 or 14
+        if not L.ledger then
+            local strip = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+            strip:SetPoint("TOPLEFT", 1, -1)
+            strip:SetPoint("TOPRIGHT", -1, -1)
+            strip:SetHeight(HEAD - 1)
+            S.Set(strip, ZEBRA)
+        end
+        local x = 14
         if opts.icon then
             local ic = f:CreateTexture(nil, "ARTWORK")
-            ic:SetSize(22, 22)
-            ic:SetPoint("TOPLEFT", folds and 28 or 12, -9)
+            local size = L.ledger and 26 or 22
+            ic:SetSize(size, size)
+            ic:SetPoint("TOPLEFT", L.ledger and 16 or 12, L.ledger and -14 or -9)
             ic:SetTexture(opts.icon)
             ic:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            x = folds and 64 or 48
+            x = L.ledger and INDENT or 48
+            f.icon = ic
+            if L.ledger and f.CreateMaskTexture then
+                -- (smaller, its corners rounded: a game icon at 32 read as the page zoomed in - the owner, 2026-10-21)
+                local mask = f:CreateMaskTexture()
+                mask:SetTexture(S.ART .. "iconmask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+                mask:SetAllPoints(ic)
+                ic:AddMaskTexture(mask)
+            end
         end
         local t = S.Text(f, 14)
-        t:SetPoint("TOPLEFT", x, -12)
+        t:SetPoint("TOPLEFT", x, L.ledger and -11 or -12)
         t:SetText(title)
-        if note then
+        f.name = t
+        -- On a ledger, the line under the name says what the feature does (its note: the whole of it, with the
+        -- details, as you rest on the head). Elsewhere only another addon doing the same is written there, after
+        -- the name: that is to be seen before anything is switched on.
+        if L.ledger and note then
+            local n = S.Text(f, 12, other and S.C.gold or S.C.muted)
+            n:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -3)
+            n:SetPoint("RIGHT", f, "RIGHT", -170, 0)            -- (clear of "N settings" and the switch)
+            f.noteText = n
+            n:SetJustifyH("LEFT")
+            n:SetWordWrap(false)
+            n:SetText((note:gsub("^(%l)", string.upper)))
+        elseif other then
             local n = S.Text(f, 11, S.C.muted)
             n:SetPoint("LEFT", t, "RIGHT", 10, 0)
-            n:SetPoint("RIGHT", f, "TOPRIGHT", opts.master and -170 or -124, -CARD_HEAD / 2)
+            n:SetPoint("RIGHT", f, "TOPRIGHT", L.masonry and (opts.master and -64 or -16) or (opts.master and -170 or -124), -HEAD / 2)
             n:SetJustifyH("LEFT")
             n:SetWordWrap(false)
             n:SetText(note)
@@ -1350,9 +1656,12 @@ local function RowPage(page, controls, bottom, fold)
         end
         local rowsHere = {}
         card = { frame = f, top = L.y, rows = rowsHere, items = {}, entries = {}, isTop = opts.top and true or false,
-            title = title, arrow = arrow or false }
-        local mine = card
-        card.open = function() if mine.shut then L.Fold(mine, true) end end
+            title = title, wide = opts.wide and true or false, free = opts.free and true or false, divider = f.divider }
+        if L.masonry then card.flow = {} end         -- (its rows, sub-headings and drawings, in order: Lay puts them in place)
+        if L.ledger then
+            local mine = card
+            card.open = function() if not IsOpen(mine) then L.SetOpen(mine, true) end end     -- (the search, to what it found)
+        end
         L.cards[#L.cards + 1] = card
         if section then section.y0 = section.y section.of = card card.entries[#card.entries + 1] = section end
         if settings.index and settings.building then
@@ -1360,11 +1669,7 @@ local function RowPage(page, controls, bottom, fold)
             if e and e.row == f then e.y0 = e.y e.of = card card.entries[#card.entries + 1] = e end
         end
         card.head = L.HeadRow(f, title)
-        if folds then
-            -- the head folds and opens the card (its switch, a child of the card, is over it and keeps its own clicks)
-            card.head:EnableMouse(true)
-            card.head:SetScript("OnMouseUp", function() L.Fold(mine) end)
-        end
+        if note then card.head.tip = note end
         -- Whether what this card is about is on: the page's switches at its top say (L.features, by
         -- the card's name - a card can stand for several, and is lit while any of them is on), or the
         -- card's own master, or opts.on for a card that follows something else. Off: the whole card
@@ -1387,27 +1692,43 @@ local function RowPage(page, controls, bottom, fold)
             -- the feature is off - a setting that looks dead and still changes when clicked is worse
             -- than one that looks alive.
             local block = CreateFrame("Frame", nil, c)
-            block:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -CARD_HEAD)
+            block:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -HEAD)
             block:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT")
             block:SetFrameLevel(f:GetFrameLevel() + 40)
             block:EnableMouse(true)
             block:Hide()
             f.block = block
             local function Dim()
-                local on = live() and true or false
+                local on = (opts.free or live()) and true or false      -- (free: its rows are in use either way)
+                if L.ledger then
+                    -- off: its icon and name quiet, and its settings (if open) quiet and asleep
+                    if f.icon then f.icon:SetDesaturated(not live()) f.icon:SetAlpha(live() and 1 or 0.5) end
+                    f.name:SetTextColor(unpack(live() and S.C.text or S.C.muted))
+                    for _, r in ipairs(rowsHere) do r:SetAlpha(on and 1 or 0.45) end
+                    block:SetShown(not on)
+                    return
+                end
                 for _, r in ipairs(rowsHere) do r:SetAlpha(on and 1 or 0.40) end
                 f:SetAlpha(on and 1 or 0.50)
                 block:SetShown(not on)
             end
             if opts.master and not feats then
                 local set = opts.master[2]
-                local sw = S.Switch(f, live, function(on) set(on) Dim() YR:RefreshWindow() end)
-                sw:SetPoint("TOPRIGHT", -14, -11)
+                local mine = card
+                local sw = S.Switch(f, live, function(on)
+                    set(on)
+                    -- switched on: its settings open, to be seen as it starts (off leaves them as they are)
+                    if on and L.ledger and mine.options and not IsOpen(mine) then L.SetOpen(mine, true) end
+                    Dim()
+                    YR:RefreshWindow()
+                end)
+                if L.ledger then sw:SetPoint("RIGHT", f, "TOPRIGHT", -16, -HEAD / 2) else sw:SetPoint("TOPRIGHT", -14, -11) end
+                f.switch = sw
                 controls[#controls + 1] = sw
             end
             controls[#controls + 1] = { Refresh = Dim }
         end
-        L.y = L.y - CARD_HEAD
+        L.y = L.y - HEAD
         L.rowIndex = 0
         return f
     end
@@ -1472,7 +1793,7 @@ local function RowPage(page, controls, bottom, fold)
             -- about the card, not a setting
             local f = card.frame
             f.about = (f.about and (f.about .. "\n\n") or "") .. tip
-            if card.head then card.head.tip = f.about end
+            if card.head then card.head.tip = (f.note and (f.note .. "\n\n") or "") .. f.about end
             control:Hide()
             if settings.index and settings.building then
                 local e = { key = settings.building, label = label, tip = tip,
@@ -1483,6 +1804,7 @@ local function RowPage(page, controls, bottom, fold)
             return f
         end
         label = (label:gsub("^%s+", ""))              -- (an indented name was a sub-setting in the one-column page)
+        if card and card.flow then return L.FlowRow(label, control, tip) end
         local h = ROW_H
         local inset = card and 1 or 0
         local full = L.colW - 2 * inset
@@ -1511,13 +1833,13 @@ local function RowPage(page, controls, bottom, fold)
             local line = r:CreateTexture(nil, "BORDER")
             line:SetPoint("TOPLEFT", (wide or left) and 12 or GUTTER, 0)
             line:SetPoint("TOPRIGHT", (wide or not left) and -12 or -GUTTER, 0)
-            line:SetHeight(1)
+            S.Hair(line, "h")
             S.Set(line, S.C.line)
             if left and not wide then
                 local split = r:CreateTexture(nil, "BORDER")
                 split:SetPoint("TOPRIGHT", 0, 0)
                 split:SetPoint("BOTTOMRIGHT", 0, 0)
-                split:SetWidth(1)
+                S.Hair(split, "v")
                 S.Set(split, S.C.lineHi)
             end
             card.rows[#card.rows + 1] = r
@@ -1558,9 +1880,209 @@ local function RowPage(page, controls, bottom, fold)
         L.rowIndex = L.rowIndex + 1
         return r
     end
+    -- A row on a page of cards side by side: made now, put in place by Lay once its card is done and its width is
+    -- known (half the page, or the whole of it). The same parts as a row above: the line over it, the split down
+    -- the middle (in a card the page's width), the name, the control at the right, the details on resting.
+    function L.FlowRow(label, control, tip)
+        local r = CreateFrame("Frame", nil, c)
+        r:SetSize(L.half, ROW_H)
+        r:SetFrameLevel(card.frame:GetFrameLevel() + 2)
+        r.line = r:CreateTexture(nil, "BORDER")
+        S.Hair(r.line, "h")
+        S.Set(r.line, S.C.line)
+        r.split = r:CreateTexture(nil, "BORDER")
+        S.Hair(r.split, "v")
+        S.Set(r.split, S.C.lineHi)
+        r.split:Hide()
+        r.hl = S.Fill(r, S.C.hover, "BACKGROUND", 1)
+        r.hl:Hide()
+        r.flash = S.Fill(r, S.C.accentD, "BACKGROUND", 2)
+        r.flash:Hide()
+        r.label = S.Text(r, 13)
+        r.label:SetText(label)
+        r.label:SetJustifyH("LEFT")
+        r.label:SetWordWrap(false)
+        r.control, r.infoBtn, r.title, r.tip = control, false, label, tip
+        rows[#rows + 1] = r
+        Paint(r)
+        control:SetParent(r)
+        local cw = control.GetWidth and control:GetWidth() or 0
+        r.wide = cw > WIDE
+        -- every dropdown in half a row is one width
+        if not r.wide and control.options and control.SetWidth then control:SetWidth(DROP_W) cw = DROP_W end
+        r.cw = cw
+        if control.isCheck then
+            -- (its whole row ticks it, and lights its box under the mouse)
+            r:EnableMouse(true)
+            r:SetScript("OnMouseUp", function() if control:IsEnabled() then control:Click() end end)
+            r:SetScript("OnEnter", function() control:Hover(true) end)
+            r:SetScript("OnLeave", function() control:Hover(false) end)
+        end
+        controls[#controls + 1] = control
+        card.rows[#card.rows + 1] = r
+        local e
+        if settings.index and settings.building then
+            e = { key = settings.building, label = label, tip = tip, row = r, area = area, y = card.top, y0 = card.top, of = card }
+            settings.index[#settings.index + 1] = e
+            card.entries[#card.entries + 1] = e
+        end
+        card.flow[#card.flow + 1] = { kind = "row", r = r, e = e }
+        L.rowIndex = L.rowIndex + 1
+        return r
+    end
+    -- A row put in place: x, top and w in the card, mode "single" (alone in a card half the page wide), "left" or
+    -- "right" (one of two in a card the page's width), "wide" (a control too wide for half: the whole row). Returns
+    -- its height: a name that doesn't fit beside a wide control goes above it.
+    local function PlaceRow(r, x, top, w, mode)
+        local padL = mode == "right" and GUTTER or mode == "ledger" and INDENT - 1 or 16
+        local padR = mode == "left" and GUTTER or 16
+        local room = w - padL - padR - r.cw - 10
+        local need = r.label.GetStringWidth and r.label:GetStringWidth()
+        local stacked = (mode == "single" or mode == "ledger") and r.cw > 120 and type(need) == "number" and need > room
+        local h = stacked and STACK_H or mode == "ledger" and LEDGER_ROW or ROW_H
+        r:SetSize(w, h)
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", x, top)
+        r.line:ClearAllPoints()
+        r.line:SetPoint("TOPLEFT", mode == "right" and GUTTER or 12, 0)
+        r.line:SetPoint("TOPRIGHT", mode == "left" and -GUTTER or -12, 0)
+        -- the two halves are two columns: a rule down the middle, also where the right half is empty
+        r.split:ClearAllPoints()
+        r.split:SetPoint("TOPRIGHT", 0, 0)
+        r.split:SetPoint("BOTTOMRIGHT", 0, 0)
+        r.split:SetShown(mode == "left")
+        if mode == "ledger" then
+            -- a line from the name's edge to the card's, between one setting and the next (Lay hides the first's)
+            r.line:ClearAllPoints()
+            r.line:SetPoint("TOPLEFT", INDENT - 1, 0)
+            r.line:SetPoint("TOPRIGHT", 0, 0)
+            r.label:SetTextColor(unpack(S.C.sub))
+        end
+        r.label:ClearAllPoints()
+        r.control:ClearAllPoints()
+        if stacked then
+            r.label:SetPoint("TOPLEFT", padL, -9)
+            r.label:SetWidth(w - padL - padR)
+            r.control:SetPoint("BOTTOMRIGHT", -padR, 7)
+        else
+            r.label:SetPoint("LEFT", padL, 0)
+            r.label:SetWidth(math.max(40, room))
+            r.control:SetPoint("RIGHT", -padR, 0)
+        end
+        return h
+    end
+    -- A card's rows put in place as it ends. A card of settings alone: half the page wide, its rows one under the
+    -- other. One with something drawn in it (L.Block: a preview, a tree), or asked to be (opts.wide), or alone on
+    -- its page: the page's width, two settings to a row. Returns where the card's rows end.
+    function Lay(cd)
+        if L.ledger then
+            -- The card's width. Its settings in a band under its row, a shade darker and the card's width (no box in a
+            -- box), their names at the edge of the feature's name, rows of 40 with a line between, the controls
+            -- under its switch; a sub-heading likewise, a drawing (a tree, a list) the band's width.
+            cd.full = true
+            local inner = L.colW - 2
+            cd.frame:SetWidth(inner + 2)
+            local top0 = cd.top - HEAD
+            local y = top0
+            cd.items = {}
+            local rows, firstRow = 0, true
+            for _, it in ipairs(cd.flow) do
+                local r, x, top = it.r, 1, y
+                if it.kind == "row" then
+                    y = y - PlaceRow(r, x, top, inner, "ledger")
+                    r.line:SetShown(not firstRow)
+                    firstRow = false
+                    rows = rows + 1
+                else
+                    if it.kind == "sub" then x = INDENT - 17 end
+                    r:SetSize(inner - x + 1, it.h)
+                    r:ClearAllPoints()
+                    r:SetPoint("TOPLEFT", x, top)
+                    if it.kind == "sub" and r.line then r.line:Hide() end
+                    y = y - it.h
+                    firstRow = true
+                end
+                cd.items[#cd.items + 1] = { r, x, top }
+                if it.e then it.e.y, it.e.y0 = top, top end
+            end
+            cd.options = #cd.flow > 0
+            if cd.options then
+                y = y - 4
+                if not cd.band then
+                    cd.band = CreateFrame("Frame", nil, c)
+                    cd.band:SetFrameLevel(cd.frame:GetFrameLevel() + 1)
+                    S.Fill(cd.band, S.C.well)
+                    local line = cd.band:CreateTexture(nil, "BORDER")
+                    line:SetPoint("TOPLEFT") line:SetPoint("TOPRIGHT") S.Hair(line, "h")
+                    S.Set(line, S.C.line)
+                end
+                cd.band:SetSize(inner, top0 - y)
+                cd.band:ClearAllPoints()
+                cd.band:SetPoint("TOPLEFT", 1, top0)            -- (where it is as built: Reflow moves it with the card)
+                table.insert(cd.items, 1, { cd.band, 1, top0 })
+                -- "N settings" and its arrow, before the switch: a click on the row opens or shuts them
+                local f = cd.frame
+                if not cd.more then
+                    cd.more = S.Text(f, 12, S.C.muted)
+                    cd.arrow = f:CreateTexture(nil, "ARTWORK")
+                    cd.arrow:SetSize(10, 10)
+                    cd.arrow:SetVertexColor(unpack(S.C.muted))
+                    cd.arrow:SetPoint("RIGHT", f, "TOPRIGHT", f.switch and -68 or -16, -HEAD / 2)
+                    cd.more:SetPoint("RIGHT", cd.arrow, "LEFT", -6, 0)
+                    local head, mine = cd.head, cd
+                    head:SetFrameLevel(f:GetFrameLevel())      -- (under its switch, which keeps its own clicks)
+                    head:EnableMouse(true)
+                    head:SetScript("OnMouseUp", function() L.SetOpen(mine, not IsOpen(mine)) end)
+                end
+                local n = rows > 0 and rows or 1
+                cd.more:SetText(n == 1 and "1 setting" or (n .. " settings"))
+            end
+            return y
+        end
+        local full = cd.wide
+        for _, it in ipairs(cd.flow) do if it.kind == "block" then full = true end end
+        cd.full = full and true or false
+        local inner = (full and L.colW or L.half) - 2
+        cd.frame:SetWidth(inner + 2)
+        local half = math.floor(inner / 2)
+        local y, col, rowTop = cd.top - HEAD, 0, nil
+        cd.items = {}
+        for _, it in ipairs(cd.flow) do
+            local r, x, top = it.r, 1, nil
+            if it.kind == "row" and full and not r.wide and col == 1 then
+                x, top = 1 + half, rowTop
+                PlaceRow(r, x, top, inner - half, "right")
+                col = 0
+            elseif it.kind == "row" then
+                top = y
+                local h = PlaceRow(r, x, top, (not full or r.wide) and inner or half,
+                    not full and "single" or r.wide and "wide" or "left")
+                rowTop, y = top, y - h
+                col = (full and not r.wide) and 1 or 0
+            else
+                -- a sub-heading or a drawing: the card's whole width
+                top, col = y, 0
+                r:SetSize(inner, it.h)
+                r:ClearAllPoints()
+                r:SetPoint("TOPLEFT", x, top)
+                y = y - it.h
+            end
+            cd.items[#cd.items + 1] = { r, x, top }
+            if it.e then it.e.y, it.e.y0 = top, top end
+        end
+        return y
+    end
     -- Something of its own in a card, the card's whole width and as tall as it needs: a preview.
     -- Refreshed with the page's controls when it has a Refresh.
     function L.Block(frame, h)
+        if card and card.flow then
+            frame:SetParent(c)
+            frame:SetSize(L.colW - 2, h)
+            frame:SetFrameLevel(card.frame:GetFrameLevel() + 2)
+            card.flow[#card.flow + 1] = { kind = "block", r = frame, h = h }
+            if frame.Refresh then controls[#controls + 1] = frame end
+            return frame
+        end
         local inset = card and 1 or 0
         L.col = 0
         frame:SetParent(c)
@@ -1582,8 +2104,14 @@ local function RowPage(page, controls, bottom, fold)
         local h = 26
         local r = CreateFrame("Frame", nil, c)
         r:SetSize(L.colW - (card and 2 or 0), h)
-        r:SetPoint("TOPLEFT", card and 1 or 0, L.y)
-        if card then
+        if card and card.flow then
+            r:SetFrameLevel(card.frame:GetFrameLevel() + 2)
+            card.rows[#card.rows + 1] = r
+            card.flow[#card.flow + 1] = { kind = "sub", r = r, h = h }
+        else
+            r:SetPoint("TOPLEFT", card and 1 or 0, L.y)
+        end
+        if card and not card.flow then
             r:SetFrameLevel(card.frame:GetFrameLevel() + 2)
             card.rows[#card.rows + 1] = r
             card.items[#card.items + 1] = { r, 1, L.y }
@@ -1591,12 +2119,13 @@ local function RowPage(page, controls, bottom, fold)
         local line = r:CreateTexture(nil, "BORDER")
         line:SetPoint("TOPLEFT", 12, 0)
         line:SetPoint("TOPRIGHT", -12, 0)
-        line:SetHeight(1)
+        S.Hair(line, "h")
         S.Set(line, S.C.line)
-        local t = S.Text(r, 10, S.C.accent)
+        r.line = line
+        local t = S.Text(r, 10, L.ledger and S.C.muted or S.C.accent)
         t:SetPoint("BOTTOMLEFT", 16, 5)
         t:SetText((text or ""):upper())
-        L.y = L.y - h
+        if not (card and card.flow) then L.y = L.y - h end
         return r
     end
     -- a card's own details: shown when you rest on its head (the rows under it have theirs)
@@ -1604,7 +2133,7 @@ local function RowPage(page, controls, bottom, fold)
         local hit = CreateFrame("Frame", nil, c)
         hit:SetPoint("TOPLEFT", f, "TOPLEFT", 1, -1)
         hit:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)          -- (it takes no clicks: the link and the switch still do)
-        hit:SetHeight(CARD_HEAD - 2)
+        hit:SetHeight(HEAD - 2)
         hit.hl = S.Fill(hit, S.C.hover, "BACKGROUND", 1)
         hit.hl:Hide()
         hit.title = title
@@ -1615,7 +2144,11 @@ local function RowPage(page, controls, bottom, fold)
 end
 
 local function BuildRouteSettings(page)
-    local L = RowPage(page, settings.controls, 106)
+    -- (one list in a rounded panel, as the QoL pages since 2026-10-21; it was two columns of cards. The minimap button
+    -- is General's, on the QoL tab; where the level splits stand is Arrange on screen's, and their background and
+    -- clock are what they always were: STYLE_SETTLED, Splits.lua.)
+    local L = RowPage(page, settings.controls, 16, "route")
+    settings.routeL = L
     local c = L.c
     local Section, Row = L.Section, L.Row
     local function Opt(key) return function() return YR.Option(key) end end
@@ -1623,94 +2156,99 @@ local function BuildRouteSettings(page)
     local st = function() return YR:SplitsStyle() end
     local function Style(field) return function(v) st()[field] = v YR:ApplySplitsStyle() end end
 
-    Section("Routes", "off by default", { icon = 134269 })
-    Row("Routes (account-wide)", S.Switch(c, function() return YR.RoutesOn() end,
-        function(on) YR.SetRoutesOn(on) YR:RefreshWindow() end),
-        "Loads your saved, imported and edited routes into RestedXP, and keeps and buys the items they"
-        .. " need. Off: none of that runs, and the settings below are inactive. Takes a /reload. Also"
-        .. " /headstart routes on|off.")
-
-    Section("General", nil, { icon = 134063 })
-    Row("Minimap button", S.Switch(c, Opt("minimapButton"), SetOpt("minimapButton", function(on) YR:ShowMinimapButton(on) end)))
-    -- Everything after this is about the routes: dimmed while they're off (RefreshRouteSettings).
-    settings.routeRows = {}
-    local plainRow = Row
-    Row = function(...)
-        local r = plainRow(...)
-        settings.routeRows[#settings.routeRows + 1] = r
-        return r
-    end
-    Row("Record runs", S.Switch(c, Opt("logging"), SetOpt("logging", function(on) YR:SetLogging(on) end)),
-        "Records quests, levels, deaths, purchases, sales, quest loot and your position every 2 seconds."
-        .. " Used by This run and the route analysis.")
-    Row("Protect route items", S.Switch(c, Opt("sellGuard"), SetOpt("sellGuard")),
+    Section("Routes", "Headstart's routes in RestedXP, and the items they need kept and bought. Takes a /reload.",
+        { icon = 134269, find = "routes restedxp guide reload", master = { function() return YR.RoutesOn() end,
+            function(on) YR.SetRoutesOn(on) YR:RefreshWindow() end } })
+    Row("Keep the items a route needs", S.Check(c, Opt("sellGuard"), SetOpt("sellGuard")),
         "Marks items a route quest still needs on their tooltip, and warns you when you sell one so you"
         .. " can buy it back.")
-    Row("Buy skipped items later", S.Switch(c, Opt("buyLater"), SetOpt("buyLater")),
+    Row("Buy skipped items later", S.Check(c, Opt("buyLater"), SetOpt("buyLater")),
         "Reminds you of a purchase the route skipped because you were short on money. Once you can afford"
         .. " it and it is still an upgrade, chat tells you where, and a vendor who sells it asks whether to"
         .. " buy. Hold Shift as you open the vendor to skip.")
-    Row("Camping 101 reminder", S.Switch(c, Opt("campReminder"), SetOpt("campReminder")),
-        "Dun Morogh: tells you when your bags hold enough ore and stone to take Blacksmithing to 20 for"
-        .. " Camping 101, and where to go. Repeats each time you enter Kharanos until it is done.")
-    Row("Release at death skips", S.Switch(c, Opt("deathSkipRelease"), SetOpt("deathSkipRelease")),
+    Row("Abandon skipped quests", S.Check(c, Opt("skipQuests"), SetOpt("skipQuests")),
+        "Abandons a quest the route skips when it is accepted within a second of its window opening, which is"
+        .. " how another addon accepts it (a very quick click of yours looks the same). Only with a routes addon"
+        .. " that lists such quests. Once a session: accept the quest again and it stays. Off until you turn it on.")
+    Row("Skip quest", S.Check(c, Opt("questSkip"), SetOpt("questSkip")),
+        "Adds Skip quest to the right-click menu of RestedXP's steps: every step of that quest is skipped, and"
+        .. " the quest stays in your log. Right-click a skipped step to undo, or /headstart unskip. Off until you"
+        .. " turn it on.")
+    Row("Release at death skips", S.Check(c, Opt("deathSkipRelease"), SetOpt("deathSkipRelease")),
         "Releases your spirit at once when the current route step tells you to die and respawn, and"
         .. " accepts the Spirit Healer's resurrection without asking, at whatever that costs in the game. It goes by"
         .. " the step that is showing, so a death you didn't plan on such a step is released too. Off until you"
         .. " turn it on.")
-    Row("Abandon skipped quests", S.Switch(c, Opt("skipQuests"), SetOpt("skipQuests")),
-        "Abandons a quest the route skips when it is accepted within a second of its window opening, which is"
-        .. " how another addon accepts it (a very quick click of yours looks the same). Only with a routes addon"
-        .. " that lists such quests. Once a session: accept the quest again and it stays. Off until you turn it on.")
-    Row("Skip quest", S.Switch(c, Opt("questSkip"), SetOpt("questSkip")),
-        "Adds Skip quest to the right-click menu of RestedXP's steps: every step of that quest is skipped, and"
-        .. " the quest stays in your log. Right-click a skipped step to undo, or /headstart unskip. Off until you"
-        .. " turn it on.")
+    Row("Camping 101 reminder", S.Check(c, Opt("campReminder"), SetOpt("campReminder")),
+        "Dun Morogh: tells you when your bags hold enough ore and stone to take Blacksmithing to 20 for"
+        .. " Camping 101, and where to go. Repeats each time you enter Kharanos until it is done.")
 
-    Section("Group play", "for a duo or trio on the same route", { icon = 134149 })
+    Section("Group play", "For a duo or trio on the same route: roles, and its quests shared.", { icon = 134149,
+        find = "group party duo trio role" })
     local role = S.Dropdown(c, 190, YR.ROLES, function(v) YR:SetRole(v) YR:RefreshWindow() end)
     function role:Refresh()
         for _, r in ipairs(YR.ROLES) do if r[1] == YR:Role() then self:SetValue(r[2]) end end
     end
     Row("Role", role, "Routes with a group version give each role its own steps. Agree on roles with your group. Solo:"
         .. " the normal route.")
-    Row("Share route quests", S.Switch(c, Opt("groupShare"), SetOpt("groupShare")),
+    Row("Share route quests", S.Check(c, Opt("groupShare"), SetOpt("groupShare")),
         "Shares a route quest with your party as soon as you accept it. Off until you turn it on.")
-    Row("Accept shared route quests", S.Switch(c, Opt("groupAccept"), SetOpt("groupAccept")),
+    Row("Accept shared route quests", S.Check(c, Opt("groupAccept"), SetOpt("groupAccept")),
         "Accepts quests and escorts on the route that your party shares, from anyone in the party. Other"
         .. " quests still ask. Hold Shift to decide yourself (an escort that has already started is taken"
         .. " either way). Off until you turn it on.")
-    Row("Party steps", S.Switch(c, Opt("groupPanel"), SetOpt("groupPanel", function() YR:RefreshParty() end)),
+    Row("Party steps", S.Check(c, Opt("groupPanel"), SetOpt("groupPanel", function() YR:RefreshParty() end)),
         "Shows a small list under the splits: each party member with Headstart, their role and their"
         .. " current step.")
 
-    Section("Level pace", "off by default", { icon = 134376 })
-    Row("Level pace", S.Switch(c, Opt("paceWatch"), SetOpt("paceWatch")),
-        "Shows the XP you still need and the time to level at your pace, under the RestedXP guide. Says once"
-        .. " when a quest step pays clearly less than grinding where you are, or has cost you two deaths.")
-
-    Section("Level splits", nil, { icon = 236562 })
-    Row("Show level splits", S.Switch(c, Opt("showSplits"), SetOpt("showSplits", function(on) YR:ShowSplits(on) end)))
-    Row("Lock position", S.Switch(c, function() return st().lock end, Style("lock")),
-        "Locked: the box can't be dragged, and clicks pass through it.")
-    Row("Text size", RowSlider(c, 10, 24, 1, function() return st().size end, Style("size")))
-    Row("Levels listed", RowSlider(c, 1, 60, 1, function() return st().rows end, Style("rows")),
-        "How many finished levels are listed below the current one.")
-    Row("Show XP per hour", S.Switch(c, function() return st().rate end, Style("rate")))
-    Row("Show time to ding", S.Switch(c, function() return st().ding end, Style("ding")))
-    local CLOCKS = { { "full", "1:50:19" }, { "short", "1h 50m" } }
-    local clock
-    clock = S.Dropdown(c, 120, CLOCKS, function(v) Style("clock")(v) clock:Refresh() end)
-    function clock:Refresh()
-        for _, o in ipairs(CLOCKS) do if o[1] == st().clock then self:SetValue(o[2]) end end
+    -- (the logs take room whether anything is recorded or not: their rows work with the switch off - free)
+    Section("Record runs", "Every character's run kept, for This run and routes of your own.", { icon = 134328, free = true,
+        find = "record runs log logs delete", master = { Opt("logging"), SetOpt("logging", function(on) YR:SetLogging(on) end) } })
+    local function Ago(t)
+        local d = math.floor((time() - t) / 86400)
+        return d < 1 and "today" or d == 1 and "yesterday" or (d .. " days ago")
     end
-    Row("Times over an hour", clock, "How times of an hour or more are written. The short form drops the seconds.")
-    Row("Level column", S.Switch(c, function() return st().levelCol end, Style("levelCol")),
-        "Shows how long each level took.")
-    Row("Total column", S.Switch(c, function() return st().totalCol end, Style("totalCol")),
-        "Shows your played time from level 1 at each level.")
-    Row("Vs best column", S.Switch(c, function() return st().vs end, Style("vs")),
-        "Shows your total against your best run at each level: ahead in green, behind in red.")
+    local total = CreateFrame("Frame", nil, c)
+    total:SetSize(330, 24)
+    total.text = S.Text(total, 13, S.C.sub)
+    total.text:SetPoint("RIGHT")
+    function total:Refresh()
+        local n, kb = 0, 0
+        for _, l in ipairs(YR.LogSummary()) do n, kb = n + 1, kb + l.kb end
+        self.text:SetText(("%d character%s, about %s"):format(n, n == 1 and "" or "s",
+            kb >= 1024 and ("%.1f MB"):format(kb / 1024) or (kb .. " KB")))
+    end
+    Row("On this account", total, "Each character's quests, levels, deaths and position samples, for This run,"
+        .. " the level splits and the route analysis. All of them load on every character, so old ones are worth deleting")
+    local pick = S.Dropdown(c, 240, function()
+        local out = {}
+        for _, l in ipairs(YR.LogSummary()) do
+            out[#out + 1] = { l.key, ("%s  |cff999999%d KB, %s|r"):format(l.key, l.kb, Ago(l.last)) }
+        end
+        if #out == 0 then out[1] = { false, "No logs", S.C.muted } end
+        return out
+    end, function(key)
+        if key then StaticPopup_Show("HEADSTART_DELETE_LOG", key, nil, key) end
+    end)
+    function pick:Refresh() self:SetValue("Pick a character...") end
+    Row("Delete a character's log", pick, "Asks first. This character's log starts again from now")
+    Row("Delete logs not played for (days)", S.Stepper(c, YR.LogKeepDays,
+        function(v) YippRouteDB.logKeepDays = math.max(0, v) end, 0, 365, 5, 110),
+        "At login, the logs of characters you haven't played for this many days are deleted. Never this"
+        .. " character's, a fastest run's (one the level splits compare with) or one a route of yours was"
+        .. " saved from. 30 unless you set another number; 0 keeps them all")
+    local scan = S.Button(c, "Delete", function()
+        if YR.DeleteScan() then YR.Print("deleted the quest scan.") end
+        YR:RefreshWindow()
+    end, nil, 90)
+    function scan:Refresh() self:SetEnabled(type(_G.HeadstartScanDB) == "table" and _G.HeadstartScanDB.scan ~= nil) end
+    Row("The quest scan's results", scan, "What /headstart scan read (quest XP, objectives) for the route data."
+        .. " Only needed until it's been taken out of the saved file")
+
+    Section("Level splits", "Your time at each level, against your best run. Placed with Arrange on screen.", { icon = 236562,
+        find = "splits time level best run compare", master = { Opt("showSplits"), SetOpt("showSplits", function(on) YR:ShowSplits(on) end) } })
+    Row("XP per hour", S.Check(c, function() return st().rate end, Style("rate")))
+    Row("Time to ding", S.Check(c, function() return st().ding end, Style("ding")))
     local COMPARE = { { "any", "Any run" }, { "class", "Same class" }, { "race", "Same class and race" },
         { "route", "Same class and start route" } }
     local compare
@@ -1724,61 +2262,26 @@ local function BuildRouteSettings(page)
     end
     Row("Compare with", compare, "Which of your runs the comparison columns use: any run, only your class, your class and race,"
         .. " or your class on the same start route (a Lean opener against Lean runs). Dwarf and Gnome count as one, since they share a start.")
-    Row("Show the ± level column", S.Switch(c, function() return st().levelVs end, Style("levelVs")),
+    Row("Level column", S.Check(c, function() return st().levelCol end, Style("levelCol")),
+        "Shows how long each level took.")
+    Row("Total column", S.Check(c, function() return st().totalCol end, Style("totalCol")),
+        "Shows your played time from level 1 at each level.")
+    Row("Vs best column", S.Check(c, function() return st().vs end, Style("vs")),
+        "Shows your total against your best run at each level: ahead in green, behind in red.")
+    Row("The ± level column", S.Check(c, function() return st().levelVs end, Style("levelVs")),
         "Shows what each level gained or lost against the same level of your best run: -0:40 is 40"
         .. " seconds faster.")
-    Row("Background (percent)", RowSlider(c, 0, 100, 5, function() return st().bg end, Style("bg")),
-        "How dark the box behind the splits is. 0: none.")
-    Row("X position (pixels)", RowSlider(c, 0, 3000, 1, function() return YR:SplitsPosition()[1] end,
-        function(v) YR:SetSplitsPosition(v, nil) end, 280))
-    Row("Y position (pixels)", RowSlider(c, 0, 2000, 1, function() return YR:SplitsPosition()[2] end,
-        function(v) YR:SetSplitsPosition(nil, v) end, 280))
+    Row("Text size", RowSlider(c, 10, 24, 1, function() return st().size end, Style("size")))
+    Row("Levels listed", RowSlider(c, 1, 60, 1, function() return st().rows end, Style("rows")),
+        "How many finished levels are listed below the current one.")
 
-    -- The logs take room whether the routes are on or not, so these rows are never dimmed.
-    Section("Run logs", "all characters, stored account-wide", { icon = 134328 })
-    local function Ago(t)
-        local d = math.floor((time() - t) / 86400)
-        return d < 1 and "today" or d == 1 and "yesterday" or (d .. " days ago")
-    end
-    local total = CreateFrame("Frame", nil, c)
-    total:SetSize(330, 24)
-    total.text = S.Text(total, 13)
-    total.text:SetPoint("RIGHT")
-    function total:Refresh()
-        local n, kb = 0, 0
-        for _, l in ipairs(YR.LogSummary()) do n, kb = n + 1, kb + l.kb end
-        self.text:SetText(("%d character%s, about %s"):format(n, n == 1 and "" or "s",
-            kb >= 1024 and ("%.1f MB"):format(kb / 1024) or (kb .. " KB")))
-    end
-    plainRow("On this account", total, "Each character's quests, levels, deaths and position samples, for This run,"
-        .. " the level splits and the route analysis. All of them load on every character, so old ones are worth deleting")
-    local pick = S.Dropdown(c, 330, function()
-        local out = {}
-        for _, l in ipairs(YR.LogSummary()) do
-            out[#out + 1] = { l.key, ("%s  |cff999999%d KB, %s|r"):format(l.key, l.kb, Ago(l.last)) }
-        end
-        if #out == 0 then out[1] = { false, "No logs", S.C.muted } end
-        return out
-    end, function(key)
-        if key then StaticPopup_Show("HEADSTART_DELETE_LOG", key, nil, key) end
-    end)
-    function pick:Refresh() self:SetValue("Pick a character...") end
-    plainRow("Delete a character's log", pick, "Asks first. This character's log starts again from now")
-    plainRow("Delete logs not played for (days)", S.Stepper(c, YR.LogKeepDays,
-        function(v) YippRouteDB.logKeepDays = math.max(0, v) end, 0, 365, 5, 110),
-        "At login, the logs of characters you haven't played for this many days are deleted. Never this"
-        .. " character's, a fastest run's (one the level splits compare with) or one a route of yours was"
-        .. " saved from. 30 unless you set another number; 0 keeps them all")
-    local scan = S.Button(c, "Delete", function()
-        if YR.DeleteScan() then YR.Print("deleted the quest scan.") end
-        YR:RefreshWindow()
-    end, nil, 90)
-    function scan:Refresh() self:SetEnabled(type(_G.HeadstartScanDB) == "table" and _G.HeadstartScanDB.scan ~= nil) end
-    plainRow("The quest scan's results", scan, "What /headstart scan read (quest XP, objectives) for the route data."
-        .. " Only needed until it's been taken out of the saved file")
+    Section("Level pace", "Under the RestedXP guide: the XP you still need, and the time to level at your pace.", { icon = 132307,
+        find = "pace xp grind deaths", master = { Opt("paceWatch"), SetOpt("paceWatch") } })
 
     L.Break()
-    c:SetHeight(-L.y + 40)
+    L.Length(-L.y + 40)
+    L.Reflow()
+    settings.controls[#settings.controls + 1] = { Refresh = L.Reflow }
 end
 
 -- Quest rewards, on the QoL tab: a section of rows, the priority list, then the rewards you chose
@@ -1788,17 +2291,17 @@ local rew = {}
 local function BuildRewards(L)
     local c, colW = L.c, L.colW
     local Section, Row = L.Section, L.Row
-    Section("Quest rewards", "set per class", { icon = 134939 })
+    Section("Quest rewards", "set per class", { icon = 134939, find = "pick quest rewards hand in",
+        master = { function() return YR:RewardSettings(ViewClass()).on end, function(on) YR:RewardSettings(ViewClass()).on = on end } })
     Row("Class", ClassPicker(c), "The class whose reward settings you are viewing. Each class has its own.")
-    Row("Pick quest rewards", S.Switch(c, function() return YR:RewardSettings(ViewClass()).on end,
-        function(on) YR:RewardSettings(ViewClass()).on = on end),
+    Row("About quest rewards", S.Text(c, 12, S.C.muted),
         "Chooses a reward and hands the quest in when it offers a choice, up to the level below. The choice"
         .. " is final. Off until you turn it on. Hold Shift when handing in to choose yourself.")
     Row("Up to level", RowSlider(c, 1, 60, 1, function() return YR:RewardSettings(ViewClass()).maxLevel end,
         function(v) YR:RewardSettings(ViewClass()).maxLevel = v end))
-    Row("Reuse my earlier choice", S.Switch(c, function() return YR:RewardSettings(ViewClass()).remember end,
+    Row("Reuse my earlier choice", S.Check(c, function() return YR:RewardSettings(ViewClass()).remember end,
         function(on) YR:RewardSettings(ViewClass()).remember = on end), "Takes the reward you picked by hand for the same quest before.")
-    Row("Ask when a green is offered", S.Switch(c, function() return YR:RewardSettings(ViewClass()).greenStop end,
+    Row("Ask when a green is offered", S.Check(c, function() return YR:RewardSettings(ViewClass()).greenStop end,
         function(on) YR:RewardSettings(ViewClass()).greenStop = on end),
         "Leaves the choice to you when a green or better item is among the rewards. RestedXP's own picks"
         .. " wait too. Hold Shift when talking to an NPC to stop all quest automation for that window.")
@@ -1827,7 +2330,7 @@ local function BuildRewards(L)
         r.num:SetPoint("LEFT", 12, 0)
         r.label = S.Text(r, 13)
         r.label:SetPoint("LEFT", 40, 0)
-        r.switch = S.Switch(r, function() local db = YR:RewardSettings(ViewClass()) return not db.off[db.order[i]] end,
+        r.switch = S.Check(r, function() local db = YR:RewardSettings(ViewClass()) return not db.off[db.order[i]] end,
             function(on) local db = YR:RewardSettings(ViewClass()) db.off[db.order[i]] = (not on) or nil YR:RefreshWindow() end)
         r.switch:SetPoint("RIGHT", -72, 0)
         local function Swap(d)
@@ -1902,9 +2405,8 @@ end
 
 local function RefreshRouteSettings()
     for _, ctl in ipairs(settings.controls) do if ctl.Refresh then ctl:Refresh() end end
-    local on = YR.RoutesOn()
-    for _, r in ipairs(settings.routeRows or {}) do r:SetAlpha(on and 1 or 0.4) end
 end
+function YR.RouteSettingsLayout() return settings.routeL end      -- (for the tests)
 
 -- ---------------------------------------------------------------------------
 -- Character setup: what a new character gets from your main, part by part
@@ -1966,7 +2468,7 @@ local function BuildSetup(page)
     local rule = card:CreateTexture(nil, "BORDER")
     rule:SetPoint("TOPLEFT", 1, -64)
     rule:SetPoint("TOPRIGHT", -1, -64)
-    rule:SetHeight(1)
+    S.Hair(rule, "h")
     rule:SetColorTexture(unpack(S.C.line))
     setup.ui = S.Text(card, 14)
     setup.ui:SetPoint("TOPLEFT", 14, -76)
@@ -2072,14 +2574,15 @@ local function BuildSetup(page)
     local L, Section, Row
     local need      -- the macro count further down: every choice it depends on asks it to count again
     local function Recount() if need then need:Refresh() end setup.Pending() end
-    local function Sw(key) local b = S.Switch(L.c, function() return o()[key] end, function(on) o()[key] = on Recount() end) return b end
+    local function Sw(key) local b = S.Check(L.c, function() return o()[key] end, function(on) o()[key] = on Recount() end) return b end
     -- the rows that follow go on this tab
     local function Page(key)
         if L then
             L.Break()
-            L.c:SetHeight(-L.y + 20)
+            L.Reflow()
+            L.c:SetHeight(-(L.bottom or L.y) + 20)
         end
-        L = RowPage(tabs[key], setup.controls, 186)
+        L = RowPage(tabs[key], setup.controls, 186, nil, true)
         Section, Row = L.Section, L.Row
     end
 
@@ -2139,14 +2642,14 @@ local function BuildSetup(page)
     Row("Delete profile", del, "Deletes the active profile. Asks first. A class's first profile can't be deleted.")
 
     Section("This profile", "what it saves besides bars", { icon = 134063 })
-    local ownUI = S.Switch(L.c, function() return Mine() and YS.ProfileOwnUI() end, function(on)
+    local ownUI = S.Check(L.c, function() return Mine() and YS.ProfileOwnUI() end, function(on)
         if Mine() then YS.SetProfileOwnUI(on) end
         YR:RefreshWindow()
     end)
     Row("Include interface", ownUI, "Remembers which Edit Mode layout is on, which extra bars show and where RestedXP's windows"
         .. " are, and puts them back when you switch to this profile. It remembers which layout, not what is in it: give each"
         .. " profile its own layout in Edit Mode first. Off: switching profile only changes your bars.")
-    Row("Save bar changes automatically", S.Switch(L.c, function() return YS.Remembers() end, function(on)
+    Row("Save bar changes automatically", S.Check(L.c, function() return YS.Remembers() end, function(on)
         if on then YippSetupDB.remember = nil else YippSetupDB.remember = false end
         YR:RefreshWindow()
     end), "Saves a change to your bars into the active profile a few seconds after you make it. Buttons"
@@ -2290,7 +2793,7 @@ local function BuildSetup(page)
     end, nil, 90)
     function uiDel:Refresh() self:SetEnabled(YS:SharedUI() ~= nil and YS.UIName() ~= YS.UIDefault()) end
     Row("Delete interface", uiDel, "Deletes the interface this character uses. Asks first. The one new characters get can't be deleted.")
-    Row("Keep it up to date", S.Switch(L.c, function() return YS.UIFollows() end, function(on)
+    Row("Keep it up to date", S.Check(L.c, function() return YS.UIFollows() end, function(on)
         if on then _G.YippSetupDB.uiFollow = nil else _G.YippSetupDB.uiFollow = false end
     end), "Saves the interface again when you change something on the character it was saved on: when you leave Edit"
         .. " Mode and when you log out. The other characters on it take the change at their next login and say so in chat."
@@ -2314,8 +2817,26 @@ local function BuildSetup(page)
         .. " A chat tab the saved interface doesn't have is closed, and chat windows can't be put back by undo.")
     Row("Camera distance", Sw("camera"), "Zooms out as far as on the character you copied from. Also applied once to a new character after"
         .. " the intro.")
-    Row("Pick my race's RestedXP route", Sw("guide"))
-    Row("RestedXP window positions", S.Switch(L.c, function() return o().rxpFrames ~= false end,
+    Row("RestedXP guide for a new character", Sw("guide"), "A new character (level 5 or below) starts on the RestedXP guide set for"
+        .. " its race below. Not set: Headstart's opener for the race where the routes are installed, or else RestedXP's"
+        .. " own starter for the race.")
+    -- which guide, race by race, for the account (the race shown first is this character's)
+    local guideRace = select(2, UnitRace("player")) or "Human"
+    local guidePick
+    local racePick = S.Dropdown(L.c, 160, YS.GUIDE_RACES, function(r) guideRace = r if guidePick then guidePick:Refresh() end end)
+    function racePick:Refresh() for _, x in ipairs(YS.GUIDE_RACES) do if x[1] == guideRace then self:SetValue(x[2]) end end end
+    Row("Race", racePick, "The race whose starting guide is shown and set below. Each race has its own, for every character on the"
+        .. " account.")
+    guidePick = S.Dropdown(L.c, 300, function() return YS.StartGuideChoices(guideRace) end, function(v)
+        YS.PickStartGuide(guideRace, v)
+        guidePick:Refresh()
+    end)
+    function guidePick:Refresh() self:SetValue(YS.StartGuideLabel(guideRace)) end
+    Row("New characters of that race start on", guidePick, "For every new character of the race above. Every guide RestedXP has"
+        .. " loaded that begins at level 1; one for some classes only says so, and a character it isn't for starts on the"
+        .. " default instead. Default: Headstart's opener for the race where the routes are installed (the first one that"
+        .. " is for the character - the default shown is the one this character would get), or else RestedXP's own starter.")
+    Row("RestedXP window positions", S.Check(L.c, function() return o().rxpFrames ~= false end,
         function(on) o().rxpFrames = on Recount() end),
         "Places RestedXP's guide window, arrow, and item and target buttons where they were on the"
         .. " character the interface was saved on.")
@@ -2324,6 +2845,11 @@ local function BuildSetup(page)
     Page("new")
     Section("New characters and levelling", nil, { icon = 132307 })
     Row("Setup window on new characters", Sw("popup"), "A new character's first login offers Apply both: your bars and your interface.")
+    Row("Set up new characters by themselves", S.Check(L.c, function() return _G.YippSetupDB and _G.YippSetupDB.autoSetup == true end,
+        function(on) _G.YippSetupDB.autoSetup = on or nil end),
+        "A new character's first login puts your saved bars and interface on at once - Apply both, without the window. With no"
+        .. " bars saved for its class the window opens instead; with no interface saved, the bars alone. It asks first where it"
+        .. " would take something off, and the reload at the end is still asked. Every class, every character on this account.")
     local uiFirst = S.Dropdown(L.c, 200, UINames, function(name) Said(YS.UISetDefault(name)) end)
     function uiFirst:Refresh()
         self:SetValue(YS.UIRecord() and YS.UIDefault() or "none saved yet")
@@ -2334,7 +2860,8 @@ local function BuildSetup(page)
     -- (The intro cinematic had a switch of its own here, beside Quality of life's Skip cinematics: two
     -- switches for one thing, and turning that one off did not stop this. It follows that one now.)
     L.Break()
-    L.c:SetHeight(-L.y + 20)
+    L.Reflow()
+    L.c:SetHeight(-(L.bottom or L.y) + 20)
     ShowTab(setup.tab or "profiles")
 end
 
@@ -2380,11 +2907,11 @@ local function BuildTrainer(page)
     local L = RowPage(page, trainer.controls, 64)
     local c = L.c
     local Section, Row = L.Section, L.Row
-    Section("Class trainer", "spells learned as the trainer opens", { icon = 133741 })
-    -- (as it is set, not as it runs: with all of quality of life off this read "off" whatever it was, and
+    -- (its switch as it is set, not as it runs: with all of quality of life off this read "off" whatever it was, and
     -- a click then wrote "on")
-    Row("Auto-train", S.Switch(c, function() return YR.OptionSet("autoTrain") end,
-        function(on) YippRouteDB.autoTrain = on YR:SyncRxpTrainer() end),
+    Section("Class trainer", "spells learned as the trainer opens", { icon = 133741, find = "auto-train auto train",
+        master = { function() return YR.OptionSet("autoTrain") end, function(on) YippRouteDB.autoTrain = on YR:SyncRxpTrainer() end } })
+    Row("About auto-train", S.Text(c, 12, S.C.muted),
         "Buys your class's spells the moment you open your class trainer: every spell below that isn't set to"
         .. " Never, up to the level you set, as far as your gold goes above what you keep. It is on for every character"
         .. " of the account, while the rest of this page is each class's. It doesn't ask: chat says what it learned"
@@ -2399,7 +2926,7 @@ local function BuildTrainer(page)
     -- with, never less than a full repair, and a sum saved for something on top. What they left is one
     -- click away under the trainer's window. (A sum per level, then a full repair alone, came before it:
     -- the owner wanted gold left for everything else, and for the mace he buys at 7, 2026-10-14.)
-    Row("Keep part of your money (percent)", RowSlider(c, 0, 100, 10, function() return YR.TrainerShare() end,
+    Row("Money kept (percent)", RowSlider(c, 0, 100, 10, function() return YR.TrainerShare() end,
         function(v) YR.TrainerData().share = v end),
         "Spells set to \"If I can afford it\" are only learned while you leave with this share of the money you came"
         .. " with, and never less than a full repair of your gear: 50 leaves half, so there is gold left for everything"
@@ -2424,16 +2951,20 @@ local function BuildTrainer(page)
     Row("Money to save", save,
         "Kept on top of that, for something you are saving up for: the weapon you mean to buy at level 7, your mount."
         .. " Write it as 1g 50s, 75s or 2 (gold); empty it once you have bought it.")
+    Row("Save for the route's next buy", S.Check(c, function() return YR.TrainerRouteBuyOn() end,
+        function(on) YippRouteDB.trainerRouteBuy = (not on) and false or nil end),
+        "On one of Headstart's routes: the price of the next thing the route buys - a weapon at a vendor ahead - is kept"
+        .. " back too, until you have it. Only \"If I can afford it\" spells wait for it; this never buys anything.")
     local _, class = UnitClass("player")
     -- What the class trainer teaches (Data/TrainerSpells.lua: every rank, by level), one row a spell, at
     -- the level of the first rank a trainer has for it. Sinister Strike is here at 6: you start with
     -- rank 1, and rank 2 is the first one you pay for. A talent's own ranks are not a trainer's.
-    local levels, ranks = {}, {}
+    local levels, ranks, ids = {}, {}, {}
     local race = YR.RaceBit and YR.RaceBit() or 0
     for _, e in ipairs((YR.TrainerSpells or {})[class] or {}) do
         local name, lvl = e[3], e[2]
         if lvl <= TRAIN_TO and not name:find("%(Passive") and not name:find("%(DND%)") and (e[5] == 0 or race == 0 or bit.band(e[5], race) ~= 0) then
-            if not levels[name] or lvl < levels[name] then levels[name] = lvl end
+            if not levels[name] or lvl < levels[name] then levels[name], ids[name] = lvl, e[1] end
             ranks[name] = (ranks[name] or 0) + 1
         end
     end
@@ -2464,9 +2995,10 @@ local function BuildTrainer(page)
     local icons = (YR.PlannerSpells or {})[class] or {}
     for _, e in ipairs(list) do
         local name, lvl = e[1], e[2]
-        -- the spell's icon from the spell data, so spells not learned yet have theirs too
+        -- the spell's icon from the spell data, so spells not learned yet have theirs too (by its ID where the planner's
+        -- data hasn't got it - Dual Wield, Mail: the game knows a spell by its name only once you have it)
         local d = icons[name]
-        local icon = d and d[2] or (C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(name))
+        local icon = d and d[2] or (C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(ids[name]))
         local dd = S.Dropdown(c, 150, YR.TRAINER_CHOICES, function(v)
             YR.SetTrainerChoice(name, v)
             trainer.refresh()
@@ -2495,6 +3027,108 @@ end
 -- One page per kind of thing, so none of them is a wall of switches. Each keeps its own list of
 -- controls to refresh.
 local qolPages = {}
+-- ---------------------------------------------------------------------------
+-- Main switches for the cards whose feature is several settings - choices, sliders, more than one switch - rather
+-- than one (the owner, 2026-10-20: "settings without on/off? It shouldn't be like that: everything must be able to
+-- be switched on and off, each with its own main switch"). Off puts the card's settings to what they are with the
+-- feature off and keeps what you had chosen (YippRouteDB.kept[name]); on puts that back - or, the first time,
+-- `first`. It reads as on while any of them isn't off, or since you switched it on.
+--   parts: { { read, write, off }, ... }; first: { [part] = value } (or a function giving it); after(on); can(say):
+--   whether it can be on at all (another addon it works on is loaded) - it reads off where it can't, and switched on
+--   then it says why and stays off (say: true when switched on).
+-- Returns { get, set }, as a card's master and an All features card take it.
+-- ---------------------------------------------------------------------------
+local function Kept(name, parts, first, after, can)
+    local function Off(p)
+        local v = p[1]()
+        return v == p[3] or (p[3] == false and v == nil) or (p[3] == nil and v == false)
+    end
+    local function IsOn()
+        if can and not can() then return false end
+        if type(YippRouteDB.cardOn) == "table" and YippRouteDB.cardOn[name] then return true end
+        for _, p in ipairs(parts) do if not Off(p) then return true end end
+        return false
+    end
+    local function TurnTo(on)
+        YippRouteDB.kept = type(YippRouteDB.kept) == "table" and YippRouteDB.kept or {}
+        YippRouteDB.cardOn = type(YippRouteDB.cardOn) == "table" and YippRouteDB.cardOn or {}
+        if on and can and not can(true) then return end
+        if on then
+            local was = YippRouteDB.kept[name] or (type(first) == "function" and first()) or first or {}
+            for i, p in ipairs(parts) do if was[i] ~= nil then p[2](was[i]) end end
+            YippRouteDB.kept[name], YippRouteDB.cardOn[name] = nil, true
+        else
+            local was = {}
+            for i, p in ipairs(parts) do if not Off(p) then was[i] = p[1]() end end
+            YippRouteDB.kept[name] = next(was) and was or nil
+            for _, p in ipairs(parts) do p[2](p[3]) end
+            YippRouteDB.cardOn[name] = nil
+        end
+        if after then after(on) end
+    end
+    return { IsOn, TurnTo }
+end
+-- a part that is one of Headstart's options (YR.Option: its default counts), or a field that is on only when true
+local function OptPart(k, after)
+    return { function() return YR.OptionSet(k) end, function(v) YippRouteDB[k] = v and true or false if after then after() end end, false }
+end
+local function TruePart(k) return { function() return YippRouteDB[k] == true end, function(v) YippRouteDB[k] = v and true or nil end, false } end
+local MASTER = {
+    invites = Kept("invites", {
+        { function() return YR.AcceptInvitesSet() end, function(v) YippRouteDB.acceptInvites = v end, "off" },
+        { function() return YR.WhisperInviteSet() end, function(v) YippRouteDB.whisperInvite = v end, "off" },
+    }, { "friends", "friends" }),
+    questShare = Kept("questShare", {
+        { function() return YippRouteDB.shareAll == true end, function(v) YippRouteDB.shareAll = v and true or false end, false },
+        { function() return YR.AcceptFromSet() end, function(v) YippRouteDB.acceptFrom = v end, "off" },
+    }, { [2] = "friends" }),
+    reminders = Kept("reminders", { OptPart("remindTrainer"), OptPart("remindTalents", function() YR.TalentNotice() end), OptPart("durability") },
+        { true, true, true }),
+    mountSwim = Kept("mountSwim", { TruePart("trinketMount"), TruePart("trinketSwim") }, { true }),
+    dmgSkin = Kept("dmgSkin", { { function()
+        local m = YippRouteDB.dmgSkin
+        return (m == "headstart" or m == "blizzard") and m or "off"
+    end, function(v) YR.SetDamageSkin(v) end, "off" } }, { "headstart" }),
+    -- (without RestedXP there is nothing to skin: the switch read On and did nothing - the review, 2026-10-21)
+    rxpSkin = Kept("rxpSkin", { { function() return YR.RXPSkinModeSet() end, function(v) YR.SetRXPSkin(v) end, "off" } }, { "headstart" },
+        nil, function(say)
+            if YR.RXPSkinAvailable() then return true end
+            if say then YR.Print("RestedXP isn't loaded: nothing to skin.") end
+            return false
+        end),
+    chatButtons = Kept("chatButtons", {
+        { function() return YippRouteDB.chatStrip or "show" end, function(v) YippRouteDB.chatStrip = v ~= "show" and v or nil end, "show" },
+        TruePart("chatTTSHide"), TruePart("chatSocialHide"),
+    }, { "slim" }, function() YR.BarHideApply() end),
+    whisperSound = Kept("whisperSound", { { function() return YippRouteDB.whisperSound or "off" end,
+        function(v) YippRouteDB.whisperSound = v ~= "off" and v or nil end, "off" } }, function()
+        local list = YR.WhisperSounds()
+        for _, o in ipairs(list) do if o[1] ~= "off" and o[1] ~= "file" then return { o[1] } end end
+        return {}
+    end),
+    bagBars = Kept("bagBars", {
+        { function() return YippRouteDB.bagBar or "show" end, function(v) YR.SetBarHide("bagBar", v) end, "show" },
+        { function() return YippRouteDB.microMenu or "show" end, function(v) YR.SetBarHide("microMenu", v) end, "show" },
+    }, { "hover", "hover" }),
+    windowScale = Kept("windowScale", {
+        { function() return YR.WindowScale("social") end, function(v) YR.SetWindowScale("social", v) end, 100 },
+        { function() return YR.WindowScale("lfg") end, function(v) YR.SetWindowScale("lfg", v) end, 100 },
+    }),
+    bagMove = Kept("bagMove", { TruePart("moveBag"), TruePart("moveReagentBag") }, { true }, function()
+        YR.MoverPlace("bag")
+        YR.MoverPlace("reagentBag")
+    end),
+    talentWin = Kept("talentWin", {
+        { function() return YR.TalentFade() end, function(v) YR.SetTalentFade(v) end, 0 },
+        OptPart("talentFadeSlider", function() YR.TalentFadeApply() end),
+        { function() return YR.TalentScale() end, function(v) YR.SetTalentScale(v) end, 100 },
+        OptPart("talentEarly", function() YR.ApplyParts() if YR.TalentEarlyApply then YR.TalentEarlyApply() end end),
+        OptPart("talentMove", function() YR.TalentPlace() end),
+    }, { [2] = true, [5] = true }),
+}
+--- The main switches of the cards that have several settings (for the tests): { name = { get, set } }.
+function YR.CardMasters() return MASTER end
+
 local function QoLPage(key, build)   -- (TOP_CARD: the card of switches every page begins with)
     qolPages[key] = { controls = {} }
     return function(page)
@@ -2517,40 +3151,67 @@ local function QoLPage(key, build)   -- (TOP_CARD: the card of switches every pa
     end
 end
 
--- NPC markers (NpcMarkers.lua): an icon on the nameplate of the NPC RestedXP's step says to talk to, and on quest
--- mobs. On the Journey page.
-local function NpcMarkerSections(L, c, Section, Row, Opt)
-        Section("NPC markers", "who to talk to, on their nameplate", { find = "npc marker nameplate talk target quest giver mob objective icon restedxp",
-            icon = 132053, master = { Opt("npcMarkers"), function(on) YippRouteDB.npcMarkers = on YR.ApplyParts() end } })
-        Row("About NPC markers", S.Text(c, 12, S.C.muted),
-            "Marks the NPC your RestedXP step says to talk to: ! when you take a quest there, ? when you hand one in,"
-            .. " a speech bubble for anything else. Only while that step is the one you're on.")
-        local function Flag(label, key, help)
-            Row(label, S.Switch(c, function() return YippRouteDB[key] ~= false end, function(on)
-                YippRouteDB[key] = (not on) and false or nil
-                YR.SettingChanged()
-            end), help)
-        end
-        Flag("Quest mobs", "npcMarkersMobs", "A sword on enemies you still need for a quest in your log.")
-        Flag("Show friendly NPC nameplates", "npcMarkersPlates",
-            "Turns the game's friendly NPC nameplates on while this is on, and back as they were when it goes off.")
-        Row("Size", RowSlider(c, 14, 40, 2, function() return YR.NpcMarkerSize() end,
-            function(v) YippRouteDB.npcMarkersSize = v ~= 22 and v or nil YR.SettingChanged() end))
+-- Quest item buttons (QuestItems.lua): the items a quest gave you that you use, on screen. On the Journey page
+-- with the other things of the road (the menu has no room for a page more).
+local function QuestItemSections(L, c, Section, Row, Opt)
+        Section("Quest item buttons", "the items quests gave you, a click away", { find = "quest items use active items rewards bag",
+            icon = 133631, master = { Opt("questItems"), function(on) YippRouteDB.questItems = on YR.QuestItemsApply() end } })
+        Row("About quest item buttons", S.Text(c, 12, S.C.muted),
+            "A button for each item in your bags that a quest gave you as its reward and that you use, like Really Sticky"
+            .. " Glue or a Sprouted Frond - not food and drink, potions, bandages or recipes. A click uses it, as from your bags; its"
+            .. " cooldown and how many you have show on it. Shift+right-click takes one off. The buttons change out of combat.")
+        Row("Quest items too", S.Check(c, function() return YippRouteDB.questItemsQuest == true end, function(on)
+            YippRouteDB.questItemsQuest = on or nil
+            YR.QuestItemsApply()
+        end), "Also the items the game counts as quest items, with a use: a vial to fill, a sapling to plant.")
+        Row("Size", RowSlider(c, 24, 56, 2, function() return tonumber(YippRouteDB.questItemsSize) or 36 end,
+            function(v) YippRouteDB.questItemsSize = v ~= 36 and v or nil YR.QuestItemsApply() end))
+        local DIRS = { { "row", "In a row" }, { "column", "In a column" } }
+        local dir
+        dir = S.Dropdown(c, 180, DIRS, function(v)
+            YippRouteDB.questItemsVertical = v == "column" or nil
+            YR.QuestItemsApply()
+            dir:Refresh()
+        end)
+        function dir:Refresh() self:SetValue(YippRouteDB.questItemsVertical == true and "In a column" or "In a row") end
+        Row("Buttons", dir)
+        Row("Hidden buttons", S.Button(c, "Show again", function() YR.QuestItemsShowHidden() end, nil, 110),
+            "Shift+right-click a button to hide it. This brings back every button you hid on this character.")
 end
 
--- The camp icon (Camp.lua) and the flight timer (Flight.lua): on the Journey page, the things of the
--- road. (They had a page of their own, two small cards - merged at the owner's asking, 2026-10-14.)
+-- Quests on NPC tooltips (QuestTips.lua) and quest mob markers (NpcMarkers.lua): on the Journey page.
+local function QuestTipSections(L, c, Section, Row, Opt)
+        Section("Quests on NPC tooltips", "what an NPC has for you", { find = "quest tooltip npc available hand in giver",
+            icon = 132049, master = { Opt("questTips"), function(on) YippRouteDB.questTips = on YR.ApplyParts() end } })
+        Row("About quests on tooltips", S.Text(c, 12, S.C.muted),
+            "An NPC's tooltip lists the quests it has for you: ! to take, ? to hand in. From your RestedXP route (the"
+            .. " steps ahead that take or hand in a quest there, marked route), and from what each NPC offered when you"
+            .. " talked to it - remembered for all your characters, and listed until you have done the quest. Not in combat."
+            .. " With QuestieDB installed - the Questie team's quest database, which works without Questie - every quest an"
+            .. " NPC has for you is listed, talked to or not. With Questie's own quests on NPC tooltips on, Questie's are"
+            .. " shown and these are left out.")
+end
+
+local function NpcMarkerSections(L, c, Section, Row, Opt)
+        Section("Quest mob markers", "enemies you need for a quest, on their nameplate", { find = "npc markers nameplate quest mob objective kill loot icon sword",
+            icon = 131013, master = { Opt("npcMarkers"), function(on) YippRouteDB.npcMarkers = on YR.ApplyParts() end } })
+        Row("About quest mob markers", S.Text(c, 12, S.C.muted),
+            "A sword on the nameplate of an enemy you still need for a quest - one to kill, or one that drops what a quest"
+            .. " wants - and on the mobs your RestedXP step names. Quest givers show their own ! and ?. With Questie's"
+            .. " nameplate icons on, Questie's are shown and these are left out.")
+end
+
+-- The camp icon (Camp.lua), the flight timer (Flight.lua) and the boat timer: on the Journey page, the things of
+-- the road. (They had a page of their own, two small cards - merged at the owner's asking, 2026-10-14. The world
+-- marker and the quest helpers stood here too, until they had a Quests page of their own: 2026-10-20.)
 local function RoadSections(L, c, Section, Row, Opt)
         Section("Flight timer", "time left while you fly", { icon = 132239,
             master = { Opt("flightTimer"), function(on) YippRouteDB.flightTimer = on YR:SetFlightTimer(on) end } })
-        Row("Portrait marker", S.Switch(c, Opt("flightFace"), function(on)
-            YippRouteDB.flightFace = on
-            if YR.FlightFace then YR.FlightFace() end
-        end), "Marks your position on the bar with your character's portrait. Off: a lit dot.")
         Row("About the timer", S.Text(c, 12, S.C.muted),
-            "Shows where you fly from and to, and the time left. A flight is timed the first time you take"
-            .. " it. Before that the bar uses RestedXP's time or an estimate. Drag the bar to move it."
-            .. " /headstart flight shows a sample.")
+            "Shows where you fly to and from, the time left and the clock time you land. Land lands you at the next"
+            .. " flight point on the way, and Blizzard's own Land button is hidden while the card shows. A flight is"
+            .. " timed the first time you take it; before that the card uses RestedXP's time or an estimate. Move it"
+            .. " with Arrange. /headstart flight shows a sample.")
 
         Section("Boat timer", "when the boat at your dock leaves", { find = "boat zeppelin ship ferry dock schedule nauticus",
             icon = 134440, master = { Opt("boatTimer"), function(on) YippRouteDB.boatTimer = on YR.BoatTimerApply() end } })
@@ -2559,36 +3220,47 @@ local function RoadSections(L, c, Section, Row, Opt)
             .. " times are Headstart's own timetable, kept right by what Headstart players see as they ride: each tells"
             .. " the others in guild and group when a boat left or got in, whether they show this timer or not."
             .. " Shift-drag the timer to move it.")
-        Row("On the world map", S.Switch(c, function() return YippRouteDB.boatMap ~= false end, function(on)
+        Row("On the world map", S.Check(c, function() return YippRouteDB.boatMap ~= false end, function(on)
             YippRouteDB.boatMap = (not on) and false or nil
             YR.BoatTimerApply()
         end), "Your side's boats and zeppelins on the world map, plus the Ratchet boat, each where it is now. Point"
             .. " at one for where it is bound and when it gets in.")
-        local horde = UnitFactionGroup("player") == "Horde"
-        Row(horde and "Alliance boats too" or "Horde zeppelins too", S.Switch(c, function() return YippRouteDB.boatMapOther == true end, function(on)
-            YippRouteDB.boatMapOther = on or nil
-            YR.BoatTimerApply()
-        end), horde and "Shows the Alliance's boats on the world map as well." or "Shows the Horde's zeppelins on the world map as well.")
 
         Section("Camp icon", "lit near a camp, or while its buff runs", { find = "campfire", icon = 135805, master = { Opt("camp"), YR.SetCampIcon } })
-        Row("Show the camp's buffs", S.Switch(c, Opt("campList"), YR.SetCampList),
+        Row("Show the camp's buffs", S.Check(c, Opt("campList"), YR.SetCampList),
             "Lists the stat the camp gives and its shorter buffs with their time left. Buffs can't be read in"
             .. " combat, so the list dims and shows what it last saw.")
-        Row("Always show", S.Switch(c, Opt("campAlways"), YR.SetCampAlways),
+        Row("Always show", S.Check(c, Opt("campAlways"), YR.SetCampAlways),
             "Keeps a grey icon on screen away from camps. Off: the icon only shows near a camp or while its"
             .. " buff runs.")
-        Row("Lock position", S.Switch(c, Opt("campLocked"), YR.SetCampLocked),
-            "Turn off to drag the icon. A preview with a coloured edge shows while it is unlocked. Also"
-            .. " /headstart camp unlock.")
+end
+
+-- The quest helpers (the world marker, Waypoint.lua; quest item buttons; quest mob markers; quests on NPC tooltips):
+-- the first cards of the Quests page.
+local function QuestSections(L, c, Section, Row, Opt)
+        Section("World marker", "your map pin, shown in the world", { find = "waypoint map pin marker arrow tomtom navigation poi",
+            icon = 132181, master = { Opt("waypoint"), function(on) YippRouteDB.waypoint = on YR.ApplyParts() end } })
+        Row("About the world marker", S.Text(c, 12, S.C.muted),
+            "Shows your map pin in the world: a mark and how far it is, seen from afar, with an arrow at the"
+            .. " screen's edge while it is behind you. Forever doesn't show the game's own. Put a pin with Ctrl+click"
+            .. " on the world map, or /headstart way 45 62 in the zone you're in; /headstart way alone takes it away.")
+        Row("Follow RestedXP's arrow", S.Check(c, Opt("waypointRXP"), function(on) YippRouteDB.waypointRXP = on YR.ApplyParts() end),
+            "Puts your map pin where RestedXP's arrow points, the spot of the step you're on, so the next stop stands in"
+            .. " the world. Nothing on a hearth step. A pin of your own is moved when the step changes.")
+
+        QuestItemSections(L, c, Section, Row, Opt)
         NpcMarkerSections(L, c, Section, Row, Opt)
+        QuestTipSections(L, c, Section, Row, Opt)
 end
 
 local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
-        Section("Bank deposit", "hold Shift at the bank to skip it", { find = "auto bank mats", icon = 133639 })
-        Row("Deposit when the bank opens", S.Switch(c, Opt("bankAuto"), function(on) YippRouteDB.bankAuto = on end),
-            "Moves the items chosen below from your bags to the bank, and lists them in chat. Quest items,"
-            .. " items for quests you can still do, and AutoFeed's food and water always stay. Stops when the"
-            .. " bank is full.")
+        Section("Bank deposit", "a Deposit button on the bank window", { find = "auto bank mats deposit", icon = 133639,
+            master = { Opt("bankButton"), YR.SetBankButton } })
+        Row("About the Deposit button", S.Text(c, 12, S.C.muted),
+            "Adds a Deposit button under the bank window. A click moves the items chosen below from your bags to"
+            .. " the bank and lists them in chat. Quest items, items for quests you can still do, and AutoFeed's food"
+            .. " and water always stay. Nothing goes by itself when the bank opens. Where a bag addon hides the bank"
+            .. " window, the button stands at the top of the screen. Also /headstart bank.")
         local MATS = { { "mine", "Not for my professions" }, { "all", "All of them" }, { "off", "None" } }
         local mats
         mats = S.Dropdown(c, 190, MATS, function(v) YippRouteDB.bankMats = v mats:Refresh() end)
@@ -2598,15 +3270,15 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
         Row("Crafting mats", mats, "Which crafting materials to deposit. \"Not for my professions\" keeps what your own professions"
             .. " use: ore for a miner, linen for a tailor. Items you use rather than craft with, like dynamite,"
             .. " always stay.")
-        Row("Recipes I can't learn yet", S.Switch(c, Opt("bankRecipes"), function(on) YippRouteDB.bankRecipes = on end),
+        Row("Recipes I can't learn yet", S.Check(c, Opt("bankRecipes"), function(on) YippRouteDB.bankRecipes = on end),
             "Deposits recipes for a profession you don't have, or that need more skill. A recipe you can"
             .. " learn now stays in your bags.")
-        Row("Bank window button", S.Switch(c, Opt("bankButton"), YR.SetBankButton),
-            "Adds a \"Bank mats\" button under the bank window to deposit on a click (where a bag addon hides"
-            .. " the bank window, it stands at the top of the screen while the bank is open). Off until you turn it"
-            .. " on. Also /headstart bank.")
 
-        Section("Mail to alt", "mats and recipes sent to another character", { icon = 133471 })
+        Section("Mail to alt", "mats and recipes sent to another character", { icon = 133471, find = "mail button send alt",
+            master = { Opt("mailButton"), YR.SetMailButton } })
+        Row("About mail to alt", S.Text(c, 12, S.C.muted),
+            "Adds a \"Send to <alt>\" button under the mail window: a click mails the items chosen below to your alt. Also"
+            .. " /headstart mail. Off until you turn it on.")
         local alt = CreateFrame("Frame", nil, c)
         alt:SetSize(190, 24)
         alt.input = S.Input(alt, { width = 190, placeholder = "Name Surname", onCommit = function(t)
@@ -2614,9 +3286,7 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
             local bare = YR.MailRecipientMissingSurname()
             if bare then
                 YR.Print(("mail on Forever needs the full name: %s's surname too, as the character shows it."):format(bare))
-            elseif full then
-                YR.Print("mail goes to " .. full .. ".")
-            end
+            end         -- (a name that is right isn't said back: the field shows it)
             YR:RefreshWindow()
         end })
         alt.input:SetPoint("RIGHT")
@@ -2628,7 +3298,7 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
         Row("Recipient", alt, "The character to mail to, on this realm and faction. Forever needs the full name: name and"
             .. " surname. Type only the name and Headstart adds the surname if it knows the character. Nothing"
             .. " is sent while you play the recipient.")
-        Row("Send when the mailbox opens", S.Switch(c, function() return YippRouteDB.mailAuto == true end,
+        Row("Send when the mailbox opens", S.Check(c, function() return YippRouteDB.mailAuto == true end,
             function(on) YippRouteDB.mailAuto = on end),
             "Sends as soon as you open a mailbox, without asking, from every character on this realm except the"
             .. " recipient. Check the name: mail to a wrong name is gone. Hold Shift as you open the mailbox to"
@@ -2641,7 +3311,7 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
             for _, o in ipairs(MMATS) do if o[1] == YR.MailMats() then self:SetValue(o[2]) end end
         end
         Row("Crafting mats", mmats, "Which crafting materials to send. Works like the bank setting.")
-        Row("Recipes I can't learn yet", S.Switch(c, Opt("mailRecipes"), function(on) YippRouteDB.mailRecipes = on end))
+        Row("Recipes I can't learn yet", S.Check(c, Opt("mailRecipes"), function(on) YippRouteDB.mailRecipes = on end))
         local mlist = CreateFrame("Frame", nil, c)
         mlist:SetSize(200, 24)
         local minput = S.Input(mlist, { width = 200, placeholder = "Shift-click an item to add it", onCommit = function(t)
@@ -2674,8 +3344,6 @@ local BuildBags = QoLPage("bags", function(L, c, Section, Row, Opt)
             self.text:SetText(#parts > 0 and table.concat(parts, ", ") or "nothing yet")
         end
         Row("Always-send list", mshow)
-        Row("Mail window button", S.Switch(c, Opt("mailButton"), YR.SetMailButton),
-            "Adds a \"Send to <alt>\" button under the mail window. Off until you turn it on.")
 
 end)
 
@@ -2687,18 +3355,18 @@ local BuildAlts = QoLPage("alts", function(L, c, Section, Row, Opt)
             .. " all of them for an item. Also on the bag button, a key binding, the minimap button's"
             .. " right-click menu, and /headstart alts. A character is recorded when you play it with this on,"
             .. " and its bank when you open it. Soulbound items, quest items and the hearthstone are left out.")
-        Row("Bag button", S.Switch(c, function() return YippRouteDB.altsBagButton ~= false end, function(on)
+        Row("Bag button", S.Check(c, function() return YippRouteDB.altsBagButton ~= false end, function(on)
             YippRouteDB.altsBagButton = on
             YR.AltsBagButtons()
         end), "Adds a small round mark at the left of the money on your bag. Hover it for every character's gold, click it for"
             .. " the Characters window.")
-        Row("Include food, drink and grey items", S.Switch(c, function() return YippRouteDB.altsAll == true end,
+        Row("Include food, drink and grey items", S.Check(c, function() return YippRouteDB.altsAll == true end,
             function(on) YippRouteDB.altsAll = on end), "Shows food, drink and grey items in the window and in tooltips. Off by default: they are mostly"
             .. " clutter.")
-        Row("Item tooltips", S.Switch(c, function() return YippRouteDB.altsTooltip ~= false end,
+        Row("Item tooltips", S.Check(c, function() return YippRouteDB.altsTooltip ~= false end,
             function(on) YippRouteDB.altsTooltip = on end), "Adds a line to item tooltips with the other characters that have the item: \"Duplo: 4x, bank"
             .. " 12x\".")
-        Row("Gold tooltip", S.Switch(c, function() return YippRouteDB.altsGold ~= false end,
+        Row("Gold tooltip", S.Check(c, function() return YippRouteDB.altsGold ~= false end,
             function(on) YippRouteDB.altsGold = on end),
             "Hover the coins on your bag to see every character's gold and the total. /headstart gold prints"
             .. " it in chat.")
@@ -2713,7 +3381,8 @@ local BuildAlts = QoLPage("alts", function(L, c, Section, Row, Opt)
 end)
 
 local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
-        Section("Restock", "hold Shift at a vendor to skip it", { find = "vendor buy reagents ammo", icon = 133785,
+        Section("Restock", "tops your bags up to the numbers you set; hold Shift at a vendor to skip it",
+            { find = "vendor buy reagents ammo", icon = 133785,
             master = { Opt("restock"), function(on) YippRouteDB.restock = on end } })
         Row("Gold to keep", S.Stepper(c, function() return YippRouteDB.restockReserve or 0 end,
             function(v) YippRouteDB.restockReserve = v end, 0, 1000, 1, 110),
@@ -2721,16 +3390,26 @@ local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
         if YR.RestockShoots() then
             Row("Ammo to keep", S.Stepper(c, function() return YR.RestockAmmo() end,
                 function(v) YR.SetRestockAmmo(v) end, 0, 4000, 100, 110),
-                "Buys the best arrows or bullets you can use for your ranged weapon, or more of your throwing"
-                .. " weapon. Each class has its own number. 0: buy none.")
+                "How many to have: with 400 in your bags and 1000 set, 600 are bought. The best arrows or bullets you can use"
+                .. " for your ranged weapon, or more of your throwing weapon. Each class has its own number. 0: none.")
         end
         for _, r in ipairs(YR.RestockReagents()) do
             local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(r.item)
             if not name and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(r.item) end
-            Row(name or ("Reagent for " .. r.why), S.Stepper(c, function() return YR.RestockCount(r.item, r.default) end,
-                function(v) YR.SetRestockCount(r.item, v) end, 0, 200, 1, 110),
-                ("For %s. Bought only while you know it%s. 0: never"):format(r.why,
-                    #r.spells > 1 and " (of several ranks, only the top one you know)" or ""))
+            local count = S.Stepper(c, function() return YR.RestockCount(r.item, r.default) end,
+                function(v) YR.SetRestockCount(r.item, v) end, 0, 200, 1, 110)
+            local row = Row(name or ("Reagent for " .. r.why), count,
+                ("How many to have, for %s: topped up to it while you know it%s. 0: none (a usual number: %d)."):format(r.why,
+                    #r.spells > 1 and " (of several ranks, only the top one you know)" or "", r.default or 0))
+            -- (the item's name, once the game has it: before, the row says what it is for)
+            if not name and row and rawget(row, "label") then
+                local plain = count.Refresh
+                function count:Refresh()
+                    plain(self)
+                    local now = C_Item.GetItemNameByID and C_Item.GetItemNameByID(r.item)
+                    if now then row.label:SetText(now) end
+                end
+            end
         end
         local custom = CreateFrame("Frame", nil, c)
         custom:SetSize(200, 24)
@@ -2771,13 +3450,37 @@ local BuildVendors = QoLPage("vendors", function(L, c, Section, Row, Opt)
         Row("Your list", list)
 end)
 
+-- Group: invites accepted and sent on a whisper, the Invite and Leave buttons, and the quest group finder.
 local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
-        Section("Invite and Leave buttons", "group up for a kill, and leave again", { find = "quick group invite leave", icon = 134149 })
-        Row("Invite and Leave buttons", S.Switch(c, Opt("groupBar"), YR.SetGroupBar),
+        Section("Invites", "accepted, and sent on a whisper", { find = "auto accept invite whisper inv keyword", icon = 134149,
+            master = MASTER.invites })
+        local WHO = { { "friends", "Guildies and friends" }, { "anyone", "Anyone" }, { "off", "Nobody" } }
+        local function WhoDrop(key, get)
+            local d
+            d = S.Dropdown(c, 190, WHO, function(v) YippRouteDB[key] = v d:Refresh() end)
+            function d:Refresh() for _, o in ipairs(WHO) do if o[1] == get() then self:SetValue(o[2]) end end end
+            return d
+        end
+        Row("Invite on whisper", WhoDrop("whisperInvite", YR.WhisperInviteSet),
+            "Invites these players when they whisper you the keyword. Only while you are solo or lead a group"
+            .. " with room.")
+        local word = CreateFrame("Frame", nil, c)
+        word:SetSize(110, 24)
+        word.input = S.Input(word, { width = 110, placeholder = "inv", onCommit = function(t)
+            YippRouteDB.whisperWord = strtrim(t or "") ~= "" and strtrim(t) or nil
+        end })
+        word.input:SetPoint("RIGHT")
+        function word:Refresh() if not self.input:HasFocus() then self.input:SetText(YippRouteDB.whisperWord or "") end end
+        Row("Keyword", word, "The whole whisper must be this word. Upper or lower case doesn't matter. Default: \"inv\".")
+        Row("Accept invites from", WhoDrop("acceptInvites", YR.AcceptInvitesSet),
+            "Accepts group invites from these players at once. Hold Shift as the invite arrives to decide"
+            .. " yourself.")
+
+        Section("Invite and Leave buttons", "group up for a kill, and leave again", { find = "quick group invite leave", icon = 134149,
+            master = { Opt("groupBar"), YR.SetGroupBar } })
+        Row("About the buttons", S.Text(c, 12, S.C.muted),
             "Shows a small bar with two buttons: Invite your target, and Leave group. Both have key bindings"
-            .. " (Key Bindings, AddOns, Headstart), and /headstart inv and /headstart leave.")
-        Row("Lock position", S.Switch(c, Opt("groupBarLocked"), YR.SetGroupBarLocked),
-            "Turn off to drag the bar.")
+            .. " (Key Bindings, AddOns, Headstart), and /headstart inv and /headstart leave. Move it with Arrange.")
         if not YR.QuestLFGAvailable then return end         -- (shelved: QuestLFG.lua)
         Section("Quest group finder", "ask chat for a group, see who answers", { find = "lfg looking for group", icon = 133884,
             master = { Opt("questLFG"), function(on) YippRouteDB.questLFG = on end } })
@@ -2805,7 +3508,7 @@ local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
         function words:Refresh() if not self:HasFocus() then self:SetValue(YippRouteDB.questLFGText or "") end end
         Row("Message", words, "The text that is posted. {quest} is the quest's name and must be included; {level} is its level."
             .. " Default: \"LFG {quest}\".")
-        Row("Watch for others", S.Switch(c, function() return YippRouteDB.questLFGWatch ~= false end,
+        Row("Watch for others", S.Check(c, function() return YippRouteDB.questLFGWatch ~= false end,
             function(on) YippRouteDB.questLFGWatch = on end),
             "Lists players who name one of your quests in chat, and tells you in one chat line. Off: chat is"
             .. " only read while your own request is up.")
@@ -2813,15 +3516,18 @@ local BuildGroup = QoLPage("group", function(L, c, Section, Row, Opt)
             "Moves the eye back to the left of the quest tracker.")
 end)
 
+-- The classes whose talent builds can be looked at (the Levelling tab's Talents page).
+local TALENT_CLASSES = { { 1, "Warrior" }, { 2, "Paladin" }, { 3, "Hunter" }, { 4, "Rogue" }, { 5, "Priest" },
+    { 7, "Shaman" }, { 8, "Mage" }, { 9, "Warlock" }, { 11, "Druid" } }
+
 local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
-        Section("Reminders", "said when something needs doing", { find = "ding level up trainer talents repair", icon = 134376 })
-        Row("Trainer reminder", S.Switch(c, Opt("remindTrainer"), function(on) YippRouteDB.remindTrainer = on end),
-            "Tells you when you level, and at login, which spells your class trainer has for you and roughly"
-            .. " what they cost. Prices are remembered from your trainer visits (/headstart trainer).")
-        Row("Level-up stats in chat", S.Switch(c, Opt("levelUpStats"), function(on) YippRouteDB.levelUpStats = on end),
-            "Prints what you gained when you level, as Classic did: \"You have gained 19 hit points. Your"
-            .. " Strength increases by 1.\"")
-        Row("Unspent talent points", S.Switch(c, Opt("remindTalents"), function(on)
+        Section("Reminders", "said when something needs doing", { find = "ding level up trainer talents repair", icon = 134376,
+            master = MASTER.reminders })
+        Row("New at your trainer", S.Check(c, Opt("remindTrainer"), function(on) YippRouteDB.remindTrainer = on end),
+            "A small window when you level: the spells your class trainer has new for you at that level, with about what"
+            .. " they cost. Point at one for the spell; trained, it goes from the window. Prices are remembered from your"
+            .. " trainer visits. Placed with Arrange on screen.")
+        Row("Unspent talent points", S.Check(c, Opt("remindTalents"), function(on)
             YippRouteDB.remindTalents = on
             YR.TalentNotice()
         end), "Tells you while you have talent points to spend: a small icon and a line of words near the top of the"
@@ -2839,7 +3545,7 @@ local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
         end
         Row("Talent points shown as", shown, "On screen it stays while there are points to spend, and moves in Arrange (/hs move)."
             .. " A line in chat is said once, at the login and when you level.")
-        Row("Durability warning", S.Switch(c, Opt("durability"), function(on) YippRouteDB.durability = on end),
+        Row("Durability warning", S.Check(c, Opt("durability"), function(on) YippRouteDB.durability = on end),
             "Warns once when your most damaged item drops below the first number, and again when you enter a"
             .. " town or inn below the second.")
         Row("Warn below (percent)", S.Stepper(c, function() return YippRouteDB.durWarn or 25 end,
@@ -2851,14 +3557,15 @@ local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
         Row("About craftable items", S.Text(c, 12, S.C.muted),
             "Tells you in chat when you know a recipe, carry the mats, and have none of the item. Once, and"
             .. " again after you run out.")
-        Row("  Sharpening stones and weightstones", S.Switch(c, Opt("craftStones"), function(on) YippRouteDB.craftStones = on end),
+        Row("  Sharpening stones and weightstones", S.Check(c, Opt("craftStones"), function(on) YippRouteDB.craftStones = on end),
             "Blacksmithing. Only the kind your weapon takes: stones for blades, weights for blunt weapons.")
-        Row("  Wizard and mana oil", S.Switch(c, Opt("craftOils"), function(on) YippRouteDB.craftOils = on end), "Enchanting.")
-        Row("  Bandages", S.Switch(c, Opt("craftBandages"), function(on) YippRouteDB.craftBandages = on end), "First Aid.")
+        Row("  Wizard and mana oil", S.Check(c, Opt("craftOils"), function(on) YippRouteDB.craftOils = on end), "Enchanting.")
+        Row("  Bandages", S.Check(c, Opt("craftBandages"), function(on) YippRouteDB.craftBandages = on end), "First Aid.")
         Row("  Remind when I have fewer than", S.Stepper(c, function() return YippRouteDB.craftBelow or 1 end,
             function(v) YippRouteDB.craftBelow = v end, 1, 100, 1, 110), "1: only when you have none.")
-        Section("Level-up screenshot", nil, { find = "ding screenshots", icon = 134441 })
-        Row("Screenshot on level-up", S.Switch(c, Opt("levelShot"), function(on) YippRouteDB.levelShot = on end),
+        Section("Level-up screenshot", "a screenshot as you level", { find = "ding screenshots", icon = 134441,
+            master = { Opt("levelShot"), function(on) YippRouteDB.levelShot = on end } })
+        Row("About the screenshot", S.Text(c, 12, S.C.muted),
             "Takes a screenshot a moment after you level, so the animation is in it. Saved in your"
             .. " Screenshots folder.")
 end)
@@ -2872,21 +3579,17 @@ local BuildRecap = QoLPage("recap", function(L, c, Section, Row, Opt)
             .. " fight by spell. Sources are filled in by the game after the fight. Nothing is shown during"
             .. " combat. Where the game hides the numbers, which it may do in instances and battlegrounds, the"
             .. " recap says how many hits were hidden.")
-        Row("Events shown", S.Stepper(c, function() return math.max(3, math.min(12, tonumber(YippRouteDB.deathRows) or 8)) end,
-            function(v) YippRouteDB.deathRows = v end, 3, 12, 1, 110), "How many of your last events the recap lists.")
-        Row("Killing blow in chat", S.Switch(c, function() return YippRouteDB.deathChat == true end,
+        Row("Killing blow in chat", S.Check(c, function() return YippRouteDB.deathChat == true end,
             function(on) YippRouteDB.deathChat = on end), "Also prints the killing blow as one chat line. Only you see it.")
         local last = S.Button(c, "Open", function()
             if not YR.RecapShow() then YR.Print("no death recorded for this character yet.") end
         end, nil, 90)
-        Row("Last death", last, "Opens the recap of this character's last death. Also /headstart death.")
-        Row("Preview", S.Button(c, "Preview", function() YR.RecapSample() end, nil, 90),
-            "Shows the recap with sample data.")
+        Row("Your last death", last, "Opens the recap of this character's last death. Also /headstart death.")
 end)
 
 local BuildLoot = QoLPage("loot", function(L, c, Section, Row, Opt)
         local function Sw(key)
-            return S.Switch(c, function() return YippRouteDB[key] ~= false end, function(on) YippRouteDB[key] = on end)
+            return S.Check(c, function() return YippRouteDB[key] ~= false end, function(on) YippRouteDB[key] = on end)
         end
         Section("Loot feed", "recent loot, in lines that fade", { icon = 133784,
             master = { Opt("lootFeed"), function(on) YippRouteDB.lootFeed = on YR.LootFeedApply() end } })
@@ -2899,15 +3602,13 @@ local BuildLoot = QoLPage("loot", function(L, c, Section, Row, Opt)
         end)
         function look:Refresh() self:SetValue(YippRouteDB.lootStyle == "cards" and "Cards" or "Lines") end
         Row("Look", look, "Lines: plain text with a small icon. Cards: each line on a dark plate with a bigger icon.")
-        Row("Vendor price", S.Switch(c, function()
+        Row("Vendor price", S.Check(c, function()
             if YippRouteDB.lootPrice == nil then return YippRouteDB.lootStyle == "cards" end
             return YippRouteDB.lootPrice == true
         end, function(on)
             YippRouteDB.lootPrice = on
             YR.LootFeedApply()
         end), "Shows what the item sells for to a vendor at the right of its line, for the whole stack.")
-        Row("Items", Sw("lootItems"), "Shows looted items with icon and name in their quality colour. The same item looted again adds"
-            .. " to the count on its line.")
         local QUALITY = { { 0, "Everything" }, { 1, "Common (white) and better" }, { 2, "Uncommon (green) and better" },
             { 3, "Rare (blue) and better" } }
         local quality
@@ -2919,29 +3620,17 @@ local BuildLoot = QoLPage("loot", function(L, c, Section, Row, Opt)
             local now = tonumber(YippRouteDB.lootQuality) or 0
             for _, o in ipairs(QUALITY) do if o[1] == now then self:SetValue(o[2]) end end
         end
-        Row("  Lowest quality shown", quality, "Items below this are hidden from the feed. They are still in the loot log.")
+        Row("Items shown", quality, "Items below this quality are left out of the feed. They are still in the loot log.")
         Row("Looted money", Sw("lootMoney"), "Shows looted money, and your share in a group.")
         Row("Experience", Sw("lootXP"), "Shows experience gained. Kills in a row add up on one line.")
-        Row("Reputation", Sw("lootRep"))
-        Row("Seconds on screen", S.Stepper(c, function() return math.max(2, math.min(15, tonumber(YippRouteDB.lootSeconds) or 4)) end,
-            function(v) YippRouteDB.lootSeconds = v end, 2, 15, 1, 110))
-        Row("Lock position", S.Switch(c, function() return YippRouteDB.lootLock ~= false end, function(on)
-            YippRouteDB.lootLock = on
-            YR.LootFeedApply()
-        end), "Turn off to drag the feed. Its area is outlined while it is unlocked.")
-        Row("Preview", S.Button(c, "Sample", function()
-            if not YR.LootFeedSample() then YR.Print("turn the loot feed on first.") end
-        end, nil, 90), "Shows a few sample lines on the feed.")
-        Row("Reset position", S.Button(c, "Reset", function() YR.LootFeedResetPosition() end, nil, 90))
+        Row("Reputation", Sw("lootRep"), "Shows reputation gained.")
 
-        Section("Loot log", "everything looted, and session totals", { find = "gold per hour session", icon = 133785 })
+        -- (the log was a card of its own, with no switch: it is recorded while the loot feed is on - the feed's card)
+        L.Sub("Loot log")
         Row("Loot log", S.Button(c, "Open", function() YR.LootLogToggle() end, nil, 90),
             "Opens the log of every item and reputation gain with its time. It also shows this session's"
             .. " totals and hourly rates for money, vendor value and experience. Recorded while the loot feed is"
             .. " on. Also /headstart loot.")
-        local count = S.Text(c, 12, S.C.sub)
-        function count:Refresh() self:SetText(("%d entries"):format(YR.LootLogCount())) end
-        Row("Entries kept", count, "The newest 800 entries, per character.")
         StaticPopupDialogs["HEADSTART_CLEAR_LOOTLOG"] = {
             text = "Headstart: clear this character's loot log?",
             button1 = "Clear",
@@ -3047,9 +3736,9 @@ end
 
 local BuildGlimmer = QoLPage("glimmer", function(L, c, Section, Row, Opt)
         local function Sub(key)
-            return S.Switch(c, function() return YippRouteDB[key] ~= false end, function(on) YippRouteDB[key] = on YR.SettingChanged() end)
+            return S.Check(c, function() return YippRouteDB[key] ~= false end, function(on) YippRouteDB[key] = on YR.SettingChanged() end)
         end
-        Section("Glimmer", "herbs, ore, chests and quest objects light up as you walk up", {
+        Section("Glimmer", "quest givers, quest objects, herbs, ore and chests light up as you walk up", {
             find = "glimmer sparkle glow shine herbs herbalism ore mining vein node chest treasure quest object bobber fishing",
             icon = 136246, master = { Opt("glimmer"), function(on) YippRouteDB.glimmer = on YR.SettingChanged() end } })
         local preview = L.Block(GlimmerPreview(c), 150)
@@ -3078,17 +3767,35 @@ local BuildGlimmer = QoLPage("glimmer", function(L, c, Section, Row, Opt)
         end
         Row("Colour", colour, "By chance of a skill-up: herbs and ore in the trainer's colours (orange, yellow, green, grey) and"
             .. " red when your skill is too low; chests gold, quest objects yellow, the bobber blue.")
-        Row("Size (percent)", S.Stepper(c, function() return tonumber(YippRouteDB.glimmerSize) or 100 end,
-            function(v) YippRouteDB.glimmerSize = v ~= 100 and v or nil Changed() end, 50, 200, 10, 110))
-        Row("Brightness (percent)", S.Stepper(c, function() return tonumber(YippRouteDB.glimmerBright) or 100 end,
-            function(v) YippRouteDB.glimmerBright = v ~= 100 and v or nil Changed() end, 20, 100, 10, 110))
         L.Sub("What lights up")
-        Row("Herbs", Sub("glimmerHerbs"))
-        Row("Ore", Sub("glimmerOre"))
+        Row("Herbs", Sub("glimmerHerbs"), "With Herbalism.")
+        Row("Ore", Sub("glimmerOre"), "With Mining.")
         Row("Chests", Sub("glimmerChests"))
-        Row("Quest objects", Sub("glimmerQuest"), "Objects one of your quests needs: a crate to search, a plant to pick.")
+        Row("Quest objects", Sub("glimmerQuest"), "Objects one of your quests needs: a crate to search, a plant to pick."
+            .. " Orange sparkles fall over them, as over quest givers.")
+        Row("Their quest line over them", Sub("glimmerQuestText"), "The quest's own line, with its count: \"Gnoll Paw: 3/8\".")
+        Row("Quest givers", Sub("glimmerGivers"), "An NPC with a quest for you, to take or to hand in: orange sparkles over it, the"
+            .. " game's own quest glimmer made large. With a RestedXP guide leading, only the NPC its step is at.")
+        Row("Their quest's name over them", Sub("glimmerGiverText"), "The quest it has for you, and +1 for each more, over its"
+            .. " name.")
         Row("Fishing bobber", Sub("glimmerFishing"))
-        Row("In instances", S.Switch(c, function() return YippRouteDB.glimmerInstances == true end,
+        -- the game's interact key: Glimmer lights nothing without it, and it is yours to turn off (Glimmer.lua)
+        local key = CreateFrame("Frame", nil, c)
+        key:SetSize(260, 24)
+        key.text = S.Text(key, 13, S.C.sub)
+        key.text:SetPoint("RIGHT", -100, 0)
+        key.button = S.Button(key, "Turn it on", function() YR.GlimmerInteractKeyOn() key:Refresh() end, nil, 90)
+        key.button:SetPoint("RIGHT")
+        function key:Refresh()
+            local on = YR.GlimmerInteractKey and YR.GlimmerInteractKey()
+            self.text:SetText(on and "On" or "|cffffb000Off: nothing lights up|r")
+            self.text:ClearAllPoints()
+            self.text:SetPoint("RIGHT", on and 0 or -100, 0)
+            self.button:SetShown(not on)
+        end
+        Row("Interact key", key, "The game's Enable Interact Key (Options, Controls): Glimmer lights the object it would use."
+            .. " Glimmer turns it on as you switch Glimmer on; turned off by you, it stays off until you turn it on here.")
+        Row("In instances", S.Check(c, function() return YippRouteDB.glimmerInstances == true end,
             function(on) YippRouteDB.glimmerInstances = on or nil YR.SettingChanged() end),
             "Off: nothing lights up in dungeons and raids.")
         Row("About Glimmer", S.Text(c, 12, S.C.muted),
@@ -3096,7 +3803,7 @@ local BuildGlimmer = QoLPage("glimmer", function(L, c, Section, Row, Opt)
             .. " fight. Glimmer turns on the game's soft targeting for objects, and shows the object's name plate while it is lit;"
             .. " both go back as they were when you turn Glimmer off.")
         L.Sub("Quest loot")
-        Row("Quest loot sparkle", S.Switch(c, function() return YippRouteDB.glimmerLoot == true end,
+        Row("Quest loot sparkle", S.Check(c, function() return YippRouteDB.glimmerLoot == true end,
             function(on) YippRouteDB.glimmerLoot = on or nil YR.SettingChanged() end),
             "The game's own sparkle, on quest givers, quest objects and quest loot, seen from far off: the game draws it"
             .. " only while its outline effect is off, so this turns the outline off (two graphics settings). It is the"
@@ -3110,35 +3817,17 @@ end)
 -- and accepted - and the quest rewards picked for you. Pages of their own under Automation since 2026-10-15
 -- (they were rows of Group & invites and the end of Upgrades & rewards): everything that acts for you is
 -- where All features has it, one grouping for the menu and that page alike.
+-- Quests: the quest helpers, then quests shared in a party and the rewards picked for you. (It was "Quests & invites",
+-- with the invites first; those are the Group page's now - the owner, 2026-10-20: better categories.)
 local BuildQuests = QoLPage("quests", function(L, c, Section, Row, Opt)
-        Section("Invites", "accepted, and sent on a whisper", { find = "auto accept invite whisper inv keyword", icon = 134149 })
-        local WHO = { { "friends", "Guildies and friends" }, { "anyone", "Anyone" }, { "off", "Nobody" } }
-        local function WhoDrop(key, get)
-            local d
-            d = S.Dropdown(c, 190, WHO, function(v) YippRouteDB[key] = v d:Refresh() end)
-            function d:Refresh() for _, o in ipairs(WHO) do if o[1] == get() then self:SetValue(o[2]) end end end
-            return d
-        end
-        Row("Invite on whisper", WhoDrop("whisperInvite", YR.WhisperInviteSet),
-            "Invites these players when they whisper you the keyword. Only while you are solo or lead a group"
-            .. " with room.")
-        local word = CreateFrame("Frame", nil, c)
-        word:SetSize(110, 24)
-        word.input = S.Input(word, { width = 110, placeholder = "inv", onCommit = function(t)
-            YippRouteDB.whisperWord = strtrim(t or "") ~= "" and strtrim(t) or nil
-        end })
-        word.input:SetPoint("RIGHT")
-        function word:Refresh() if not self.input:HasFocus() then self.input:SetText(YippRouteDB.whisperWord or "") end end
-        Row("Keyword", word, "The whole whisper must be this word. Upper or lower case doesn't matter. Default: \"inv\".")
-        Row("Accept invites from", WhoDrop("acceptInvites", YR.AcceptInvitesSet),
-            "Accepts group invites from these players at once. Hold Shift as the invite arrives to decide"
-            .. " yourself.")
+        QuestSections(L, c, Section, Row, Opt)
 
-        Section("Quest sharing", "share your quests, accept your party's", { find = "party quests auto accept", icon = 134327 })
-        Row("Share quests I accept", S.Switch(c, function() return YippRouteDB.shareAll == true end,
+        Section("Quest sharing", "share your quests, accept your party's", { find = "party quests auto accept", icon = 134327,
+            master = MASTER.questShare })
+        Row("Share quests I accept", S.Check(c, function() return YippRouteDB.shareAll == true end,
             function(on) YippRouteDB.shareAll = on end),
             "Shares every quest you accept from an NPC with your party. Off: only quests from a route are"
-            .. " shared (Levelling, Settings, Group play).")
+            .. " shared (Routes, Settings, Group play).")
         local FROM = { { "friends", "Guildies and friends" }, { "party", "Anyone in my party" }, { "off", "Nobody" } }
         local from
         from = S.Dropdown(c, 190, FROM, function(v) YippRouteDB.acceptFrom = v from:Refresh() end)
@@ -3185,11 +3874,7 @@ local BuildGear = QoLPage("gear", function(L, c, Section, Row, Opt)
             for _, o in ipairs(QUAL) do if o[1] == (YippRouteDB.upgradeQuality or 2) then self:SetValue(o[2]) end end
         end
         Row("Highest quality", qual, "Items above this quality are not announced. Blues and better are usually worth judging yourself.")
-        Row("Minimum gain (percent)", S.Stepper(c, function() return YippRouteDB.upgradeMin or 2 end,
-            function(v) YippRouteDB.upgradeMin = v YR.UpgradesForget() end, 0, 100, 1, 110),
-            "Applies when an item trades one thing for another, like less DPS for more armor. An item that is"
-            .. " better with no loss, or fills an empty slot, is always announced.")
-        Row("Equip window", S.Switch(c, Opt("upgradeButton"), function(on) YippRouteDB.upgradeButton = on end),
+        Row("Equip window", S.Check(c, Opt("upgradeButton"), function(on) YippRouteDB.upgradeButton = on end),
             "Shows a small window with an Equip button. Off: a chat line only.")
 end)
 
@@ -3442,7 +4127,7 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
             return dd
         end
         local function Flag(key, offUnlessOn)
-            return S.Switch(c, function()
+            return S.Check(c, function()
                 if offUnlessOn then return YippRouteDB[key] == true end
                 return YippRouteDB[key] ~= false
             end, function(on)
@@ -3451,12 +4136,17 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
             end)
         end
         Row("Size", RowSlider(c, 24, 64, 2, Num("trinketBarSize", 38), SetNum("trinketBarSize")))
-        Row("Layout", S.Switch(c, function() return YippRouteDB.trinketBarVertical == true end, function(on)
-            YippRouteDB.trinketBarVertical = on or nil
+        local DIRS = { { "side", "Side by side" }, { "stacked", "One above the other" } }
+        local dir
+        dir = S.Dropdown(c, 180, DIRS, function(v)
+            YippRouteDB.trinketBarVertical = v == "stacked" or nil
             Applied()
-        end), "On: the bottom trinket's button stands under the top one's. Off: side by side.")
-        Row("Visible", Pick("trinketBarShow", { { "always", "Always" }, { "combat", "In combat" }, { "nocombat", "Out of combat" } }, "always"),
-            "When the buttons are on screen. While the position is unlocked they always show, so you can drag them.")
+            dir:Refresh()
+        end)
+        function dir:Refresh() self:SetValue(YippRouteDB.trinketBarVertical == true and "One above the other" or "Side by side") end
+        Row("Buttons", dir)
+        Row("When shown", Pick("trinketBarShow", { { "always", "Always" }, { "combat", "In combat" }, { "nocombat", "Out of combat" } }, "always"),
+            "When the buttons are on screen.")
         Row("Left-click", Pick("trinketBarLeft", { { "list", "Lists your trinkets" }, { "use", "Uses the trinket" } }, "list"),
             "What a left-click on a button does. A right-click does the other. Changes out of combat.")
         Row("List on hover", Flag("trinketFlyHover", true), "Opens a button's list of trinkets when the mouse rests on it, and closes it when the"
@@ -3466,10 +4156,6 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
             .. " your bags, and a click on one equips it. In combat the swap waits until the fight ends."
             .. " The other click uses the trinket. Right-click a trinket in the list to add it to your"
             .. " swap order or remove it. The preview works: try the settings on it.")
-        Row("Lock position", S.Switch(c, Opt("trinketBarLocked"), function(on) YippRouteDB.trinketBarLocked = on Applied() end),
-            "Turn off to drag the buttons.")
-        Row("Reset position", S.Button(c, "Reset", function() if YR.TrinketResetPosition then YR.TrinketResetPosition() end end, nil, 90),
-            "Puts the buttons back at the bottom middle of the screen. Out of combat.")
 
         Section("Trinket auto-swap", "in the order you set below", { find = "swap trinkets", icon = 133437,
             master = { function() return YippRouteDB.trinketAuto == true end,
@@ -3480,18 +4166,19 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
             .. " order is left alone. Swaps wait until you are out of combat. A green dot on a button means that"
             .. " slot is being swapped.")
         local function SlotSwitch(slot)
-            return S.Switch(c, function() return YR.TrinketDB().auto[slot] ~= false end,
+            return S.Check(c, function() return YR.TrinketDB().auto[slot] ~= false end,
                 function(on) if on then YR.TrinketDB().auto[slot] = nil else YR.TrinketDB().auto[slot] = false end if YR.TrinketPaint then YR.TrinketPaint() end end)
         end
         Row("Top trinket slot", SlotSwitch(13))
         Row("Bottom trinket slot", SlotSwitch(14), "Off: this slot keeps what you equip in it.")
-        Row("Pause while PvP flagged", S.Switch(c, Opt("trinketPvpPause"), function(on) YippRouteDB.trinketPvpPause = on end),
+        Row("Pause while PvP flagged", S.Check(c, Opt("trinketPvpPause"), function(on) YippRouteDB.trinketPvpPause = on end),
             "Stops every automatic swap, here and under Mounted and swimming, while you are flagged for PvP. Your own"
             .. " clicks and equipment set keys still work.")
 
-        Section("Mounted and swimming", "swap an item in while you ride or swim", { find = "swap rules carrot", icon = 132239 })
+        Section("Mounted and swimming", "swap an item in while you ride or swim", { find = "swap rules carrot", icon = 132239,
+            master = MASTER.mountSwim })
         local carrot = C_Item.GetItemNameByID and C_Item.GetItemNameByID(11122) or "Carrot on a Stick"
-        Row("Mounted: " .. carrot, S.Switch(c, function() return YippRouteDB.trinketMount == true end,
+        Row("Mounted: " .. carrot, S.Check(c, function() return YippRouteDB.trinketMount == true end,
             function(on) YippRouteDB.trinketMount = on end),
             "Equips Carrot on a Stick in a trinket slot while you are mounted, and your trinket again when"
             .. " you dismount. Only if you carry one.")
@@ -3502,7 +4189,7 @@ local BuildTrinkets = QoLPage("trinkets", function(L, c, Section, Row, Opt)
             for _, o in ipairs(SLOT_CHOICE) do if o[1] == (YippRouteDB.trinketMountSlot or 14) then self:SetValue(o[2]) end end
         end
         Row("Slot", slotDrop)
-        Row("Swimming", S.Switch(c, function() return YippRouteDB.trinketSwim == true end,
+        Row("Swimming", S.Check(c, function() return YippRouteDB.trinketSwim == true end,
             function(on) YippRouteDB.trinketSwim = on end), "Equips an item of your choice while you swim, and what you wore again when you leave the water.")
         local swim = S.Input(c, { width = 200, placeholder = "Shift-click the item", onCommit = function(t)
             -- the box shows the item's name, which isn't an item to read back: only a link, an ID or an
@@ -3619,24 +4306,8 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         local function Get(key) return function() return db()[key] end end
         Section("XP bar", "replaces Blizzard's", { find = "experience rested", icon = 236562,
             master = { function() return YR.XPBarOn() end, Set("on") } })
-        Row("Hide Blizzard's bar", S.Switch(c, Get("hideBlizz"), Set("hideBlizz")),
+        Row("Hide Blizzard's bar", S.Check(c, Get("hideBlizz"), Set("hideBlizz")),
             "Hides Blizzard's experience and reputation bar while Headstart's bar is shown.")
-        Row("Lock position", S.Switch(c, Get("lock"), Set("lock")), "Turn off to drag the bar.")
-        Row("Reset position", S.Button(c, "Reset", function() YR.XPBarResetPosition() end, nil, 90),
-            "Moves the bar to the middle of the screen, above the action bars.")
-        Row("Width", RowSlider(c, 150, 1800, 10, Get("w"), Set("w"), 260))
-        Row("Height", RowSlider(c, 4, 40, 1, Get("h"), Set("h"), 260))
-        local PREVIEW = { { "live", "Live" }, { "plain", "No rested XP" }, { "rested", "Rested" },
-            { "quests", "Rested, with completed quests" } }
-        local preview
-        preview = S.Dropdown(c, 220, PREVIEW, function(v) YR.XPBarSample(v ~= "live" and v or nil) preview:Refresh() end)
-        function preview:Refresh()
-            local now = YR.XPBarSampleNow() or "live"
-            for _, o in ipairs(PREVIEW) do if o[1] == now then self:SetValue(o[2]) end end
-        end
-        Row("Preview", preview, "Draws the bar in a sample state, so you can set the colours without waiting for rested XP."
-            .. " The text keeps showing your real numbers. Back to Live when you leave this page.")
-        if c.HookScript then c:HookScript("OnHide", function() if YR.XPBarSampleNow() then YR.XPBarSample(nil) end end) end
 
         L.Sub("Look")
         local TEX = { { "flat", "Flat" }, { "smooth", "Smooth" }, { "blizzard", "Blizzard's" } }
@@ -3652,12 +4323,7 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
             self:SetValue(shown)
         end
         Row("Colours", pal, "The bar's colours, as a set: your XP, the same while rested, the completed-quests part and how far"
-            .. " your rested XP reaches. Use Preview above to see each state.")
-        local TICKS = { { 0, "None" }, { 10, "Every tenth" }, { 20, "Every twentieth" }, { 4, "Quarters" } }
-        local ticks
-        ticks = S.Dropdown(c, 170, TICKS, function(v) Set("ticks")(v) ticks:Refresh() end)
-        function ticks:Refresh() for _, o in ipairs(TICKS) do if o[1] == db().ticks then self:SetValue(o[2]) end end end
-        Row("Ticks", ticks)
+            .. " your rested XP reaches.")
         Row("Text size", RowSlider(c, 8, 20, 1, Get("font"), Set("font"), 260))
 
         L.Sub("Text")
@@ -3669,7 +4335,7 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         end
         Row("Text", layout, "What is written on, over and under the bar, as a ready layout. Your own: you write it yourself in"
             .. " the card below.")
-        Row("Show text on mouseover only", S.Switch(c, Get("textHover"), Set("textHover")))
+        Row("Show text on mouseover only", S.Check(c, Get("textHover"), Set("textHover")))
 
         Section("XP bar: your own text", "used while Text is Your own", { icon = 134327, on = function() return YR.XPBarLayoutNow() == "own" end })
         local TOKENS = "{level} {xp} {max} {left} {pct} {pctq} {rested} {restedpct} {rate} {ding} {mobs} {kill} {played}"
@@ -3687,11 +4353,11 @@ local BuildXPBar = QoLPage("xpbar", function(L, c, Section, Row, Opt)
         TextRow("Left", "left")
         TextRow("Middle", "center")
         TextRow("Right", "right")
-        Row("Text above the bar", S.Switch(c, Get("over"), Set("over")), "Adds three more text slots just above the bar.")
+        Row("Text above the bar", S.Check(c, Get("over"), Set("over")), "Adds three more text slots just above the bar.")
         TextRow("Over, left", "left0")
         TextRow("Over, middle", "center0")
         TextRow("Over, right", "right0")
-        Row("Text below the bar", S.Switch(c, Get("under"), Set("under")), "Adds three more text slots just below the bar.")
+        Row("Text below the bar", S.Check(c, Get("under"), Set("under")), "Adds three more text slots just below the bar.")
         TextRow("Under, left", "left2")
         TextRow("Under, middle", "center2")
         TextRow("Under, right", "right2")
@@ -3721,60 +4387,26 @@ local BuildSwing = QoLPage("swing", function(L, c, Section, Row, Opt)
             end
             return d
         end
-        -- One bar's place and size, for the bars a card is about: Move bars, which bar, width, height, reset.
-        local function Placement(bars, unlocked, unlock, swing)
-            Row("Move bars", S.Switch(c, unlocked, function(on) unlock(on) YR.SwingApply() end),
-                "Shows these bars with their names, to be dragged where you want them. Each keeps its own place. Turn"
-                .. " off when you are done.")
-            local picked = bars[1][1]
-            local which
-            which = S.Dropdown(c, 180, bars, function(v) picked = v YR:RefreshWindow() end)
-            function which:Refresh() for _, o in ipairs(bars) do if o[1] == picked then self:SetValue(o[2]) end end end
-            Row("Bar", which, "The bar the rows below are for.")
-            local function Resize(i, least, most)
-                return function() return (select(i, YR.SwingBarSize(picked))) end, function(v)
-                    local w, h = YR.SwingBarSize(picked)
-                    local d = db()
-                    d.size = d.size or {}
-                    d.size[picked] = { i == 1 and math.max(least, math.min(most, v)) or w, i == 2 and math.max(least, math.min(most, v)) or h }
-                    YR.SwingApply()
-                end
-            end
-            local getW, setW = Resize(1, 60, 600)
-            local getH, setH = Resize(2, 4, 60)
-            Row("Width", RowSlider(c, 60, 600, 5, getW, setW))
-            Row("Height", RowSlider(c, 4, 60, 1, getH, setH))
-            if swing then
-                Row("This bar on", S.Switch(c, function() return not (db().use and db().use[picked] == false) end, function(on)
-                    local d = db()
-                    d.use = d.use or {}
-                    d.use[picked] = (not on) and false or nil
-                    YR.SwingApply()
-                end), "Off: this swing bar isn't shown.")
-            end
-            Row("Reset this bar", S.Button(c, "Reset", function()
-                local d = db()
-                if d.size then d.size[picked] = nil end
-                YR.SwingResetPosition(picked)
-                YR:RefreshWindow()
-            end, nil, 90), "Puts this bar back in the stack at the bottom middle of the screen, at the size the look sets.")
-        end
 
         Section("Swing timer", "Blizzard's bars restyled, or Headstart's own", { icon = 132349,
             master = { function() return db().on == true end, Set("on") } })
         Row("Bars", Pick("style", { { "blizzard", "Blizzard's, restyled" }, { "own", "Headstart's own" } }, 180),
-            "Blizzard's: the game's swing bars in this look, placed and sized in Edit Mode, all moved as Edit Mode moves"
-            .. " them. Headstart's own: bars drawn by Headstart, each moved and sized by itself further down this"
-            .. " card; Blizzard's are made invisible while they show.")
-        Row("Visible", Pick("show", { { "always", "Always" }, { "combat", "In combat" }, { "swing", "While swinging" } }, 180),
-            "When Headstart's own swing bars show. Blizzard's bars have their own setting in Edit Mode (Esc, Edit Mode: click"
-            .. " a swing bar), with their size and place.")
-        Row("Preview", S.Switch(c, function() return YR.SwingPreviewing() end, function(on)
-            local running, why = YR.SwingPreview(on)
-            if on and not running then YR.Print(why or "turn the swing timer on first.") end
-        end), "Keeps sample swings running on every bar while you change things. Stops when you turn it off, close this"
-            .. " window or enter combat.")
-        if c.HookScript then c:HookScript("OnHide", function() if YR.SwingPreviewing() then YR.SwingPreview(false) end end) end
+            "Blizzard's: the game's swing bars in this look, placed and sized in Edit Mode. Headstart's own: bars drawn by"
+            .. " Headstart, placed and sized in Arrange; Blizzard's are made invisible while they show. The ranged bar"
+            .. " stands in the main hand's place: the one swinging shows.")
+        Row("When shown", Pick("show", { { "always", "Always" }, { "combat", "In combat" }, { "swing", "While swinging" },
+            { "fade", "Faded between swings" } }, 180),
+            "When Headstart's own swing bars show. Faded between swings: always there, see-through until they swing."
+            .. " Blizzard's bars have their own setting in Edit Mode (Esc, Edit Mode: click a swing bar), with their size and place.")
+        -- sample swings on the bars while this page is open, so a change is seen as it is made (it was a switch)
+        local function SwingSamples() if db().on == true and not InCombatLockdown() then YR.SwingPreview(true) end end
+        if c.HookScript then
+            c:HookScript("OnShow", SwingSamples)
+            c:HookScript("OnHide", function() if YR.SwingPreviewing() then YR.SwingPreview(false) end end)
+        end
+        -- (only if the page is seen: a search builds every page, and a page never shown is never hidden - the samples
+        -- ran on your bars until the next fight; the review, 2026-10-21)
+        if c.IsVisible and c:IsVisible() then SwingSamples() end
         L.Sub("Look")
         local LOOKS = { { "soft", "Soft" }, { "slim", "Slim" }, { "classic", "Classic" } }
         local looks
@@ -3788,23 +4420,20 @@ local BuildSwing = QoLPage("swing", function(L, c, Section, Row, Opt)
             .. " Classic: shaded bars in blue and orange.")
         Row("Colours", Choice(YR.SWING_PALETTES, function() return db().palette end, YR.SwingPalette),
             "The bars' colours, as a set: the three hands, a hand out of range, and the health bar.")
-        Row("Frame", Choice(YR.SWING_FRAMES, YR.SwingFrameNow, YR.SwingFrame),
-            "The line round each bar. Bronze matches the frames of Blizzard's action buttons.")
-        Row("Texture", Pick("texture", { { "smooth", "Soft" }, { "flat", "Flat" }, { "blizzard", "Glossy" } }, 180))
-        Row("Text", Choice(YR.SWING_TEXTS, YR.SwingTextNow, YR.SwingText))
-        Row("Text size", S.Stepper(c, Get("font"), Set("font"), 8, 24, 1, 110))
-        Row("Font", Pick("fontFace", { { "blizzard", "Blizzard's" }, { "headstart", "Headstart's" } }, 180))
-        Row("Show out of range", S.Switch(c, Get("range"), Set("range")),
-            "Writes Out of range on a swing bar, and greys its fill, while your target is out of range for that attack.")
-        Row("Range bar", S.Switch(c, Get("rangeBar"), Set("rangeBar")),
-            "A bar that says In range or Out of range for the target you have, in combat and out of it, with how far it"
-            .. " is in steps of 5 yards. Shows while you have a living target you can attack. A hunter's also says Melee range.")
-        L.Sub("Place and size (Headstart's own bars)")
-        Placement({ { "main", "Main hand" }, { "off", "Off hand" }, { "ranged", "Ranged" }, { "range", "Range bar" } },
-            function() return db().lock == false end, function(on) db().lock = not on end, true)
+        Row("Text size", S.Stepper(c, Get("font"), Set("font"), 8, 24, 1, 110),
+            "The bars' words; the range text is four sizes larger.")
+        L.Sub("Range")
+        Row("Range bar", S.Check(c, Get("rangeBar"), Set("rangeBar")),
+            "A bar that says Melee range, Charge range (a spell with a least reach), Dead zone (too near for that, too far for"
+            .. " melee), In range (within your spells' reach) or Out of range, in red, for the target you"
+            .. " have, each in its own colour, with how far it is in steps of 5 yards. Made narrow, it shows the yards alone."
+            .. " Shows while you have a living target you can attack. A hunter's says Melee range, In range, Dead zone or Out of range.")
+        Row("Range text", S.Check(c, Get("rangeText"), Set("rangeText")),
+            "How far your target is, in yards, as a line of text of its own that you can put anywhere with Arrange."
+            .. " /headstart range says how it was told.")
 
         local function OwnBar(key)
-            return S.Switch(c, function() return db()[key] == true end, function(on)
+            return S.Check(c, function() return db()[key] == true end, function(on)
                 db()[key] = on or nil
                 YR.ApplyParts()
                 YR.SwingApply()
@@ -3846,65 +4475,28 @@ local BuildSwing = QoLPage("swing", function(L, c, Section, Row, Opt)
               end } })
         Row("Health bar", OwnBar("health"), "A bar of your health, drawn by Headstart.")
         Row("Power bar", OwnBar("power"), "A bar of your rage, energy or mana, in the game's colour for it.")
-        Row("Combo points", S.Switch(c, function() return YR.ResourceBarWanted("combo") end, function(on)
+        Row("Combo points", S.Check(c, function() return YR.ResourceBarWanted("combo") end, function(on)
             db().combo = on and true or false
             YR.ApplyParts()
             YR.SwingApply()
             YR:RefreshWindow()
         end), "Your combo points as a row of squares that fill, in the same look. On with the power bar unless you turn it"
             .. " off. Only on a class that has them.")
-        Row("Combo points colour", Pick("comboColor", { { "swing", "Swing timer's" }, { "class", "Class colour" } }, 180),
-            "Swing timer's: the colour of the main-hand swing bar, so they read as one set.")
-        Row("Visible", Pick("resShow", { { "always", "Always" }, { "combat", "In combat" } }, 180))
-        Row("Health in class colour", S.Switch(c, function() return db().healthClass == true end, Set("healthClass")))
+        Row("When shown", Pick("resShow", { { "always", "Always" }, { "combat", "In combat" } }, 180))
+        Row("Health in class colour", S.Check(c, function() return db().healthClass == true end, Set("healthClass")))
         L.Sub("Look")
-        -- These bars wear the swing timer's look until one is picked for them here.
-        local function ResLook() return YR.ResourceLook() end
-        local SAME = { "same", "Same as the swing timer" }
-        local RES_FRAMES = { SAME }
-        for _, o in ipairs(YR.SWING_FRAMES) do RES_FRAMES[#RES_FRAMES + 1] = o end
-        Row("Frame", Choice(RES_FRAMES, function() return YR.ResourceLookOwn() and YR.SwingFrameNow(ResLook()) or "same" end,
-            function(v)
-                if v == "same" then
-                    YR.ResourceLookOwn(false)
-                    YR.SwingApply()
-                else
-                    YR.ResourceLookOwn(true)
-                    YR.SwingFrame(v, ResLook())
-                end
-                YR:RefreshWindow()
-            end), "The line round each bar. Same as the swing timer: these bars follow whatever look the swing timer has.")
-        local RES_TEX = { SAME, { "smooth", "Soft" }, { "flat", "Flat" }, { "blizzard", "Glossy" } }
-        local resTex
-        resTex = S.Dropdown(c, 180, RES_TEX, function(v)
-            if v == "same" then
-                YR.ResourceLookOwn(false)
-            else
-                YR.ResourceLookOwn(true)
-                ResLook().texture = v
-            end
-            YR.SwingApply()
-            YR:RefreshWindow()
-        end)
-        function resTex:Refresh()
-            local now = YR.ResourceLookOwn() and ResLook().texture or "same"
-            for _, o in ipairs(RES_TEX) do if o[1] == now then self:SetValue(o[2]) end end
-        end
-        Row("Texture", resTex)
         Row("Text", Pick("resText", { { "all", "Percent and number" }, { "pct", "Percent" }, { "value", "Number" }, { "none", "None" } }, 180),
             "What the health and power bars say: the percent at the left, how much you have at the right.")
         Row("Colours", Pick("resTone", { { "bright", "Blizzard's" }, { "muted", "Darker" } }, 180),
-            "Blizzard's: the game's own colours for health, energy, rage and mana. Darker takes them down a little.")
-        L.Sub("Place and size")
-        Placement({ { "health", "Health" }, { "power", "Power" }, { "combo", "Combo points" } },
-            function() return db().resLock == false end, function(on) if on then db().resLock = false else db().resLock = nil end end, false)
+            "Blizzard's: the game's own colours for health, energy, rage and mana. Darker takes them down a little."
+            .. " The frame and texture are the swing timer's.")
         L.Sub("Blizzard's own resource bar")
-        Row("Hide while Headstart's bars show", S.Switch(c, function() return db().resHideBlizz ~= false end, function(on)
+        Row("Hide while Headstart's bars show", S.Check(c, function() return db().resHideBlizz ~= false end, function(on)
             if on then db().resHideBlizz = nil else db().resHideBlizz = false end
             YR.SwingApply()
         end), "Makes Blizzard's resource bar and its combo points invisible while Headstart's health or power bar is on, so"
             .. " you do not see both. It shows again in Edit Mode.")
-        Row("Hide the spend flash", S.Switch(c, function() return YippRouteDB.powerFlashOff == true end, function(on)
+        Row("Hide the spend flash", S.Check(c, function() return YippRouteDB.powerFlashOff == true end, function(on)
             YippRouteDB.powerFlashOff = on or nil
             YR.ApplyParts()
             YR.PowerFlashApply()
@@ -3913,7 +4505,7 @@ local BuildSwing = QoLPage("swing", function(L, c, Section, Row, Opt)
 
         -- The cast bar: a bar of Headstart's own for your casts, in the swing timer's look.
         local function CastSwitch(key)
-            return S.Switch(c, function() return db()[key] ~= false end, function(on)
+            return S.Check(c, function() return db()[key] ~= false end, function(on)
                 if on then db()[key] = nil else db()[key] = false end
                 YR.SwingApply()
             end)
@@ -3929,9 +4521,6 @@ local BuildSwing = QoLPage("swing", function(L, c, Section, Row, Opt)
         Row("Time left", CastSwitch("castTime"), "The seconds left, at the right end of the bar.")
         Row("Hide Blizzard's cast bar", CastSwitch("castHideBlizz"),
             "Makes Blizzard's own cast bar invisible while Headstart's is on, so you do not see both.")
-        L.Sub("Place and size")
-        Placement({ { "cast", "Cast bar" } },
-            function() return db().castLock == false end, function(on) if on then db().castLock = false else db().castLock = nil end end, false)
 end)
 
 -- ---------------------------------------------------------------------------
@@ -3999,15 +4588,11 @@ local BuildInstanceSettings = QoLPage("instances", function(L, c, Section, Row, 
             .. " the game refuses an entry, the log shows the count at that moment.")
         Row("Daily limit", S.Stepper(c, function() return YippRouteDB.instanceDay or 30 end,
             function(v) YippRouteDB.instanceDay = v end, 1, 100, 1, 110), "How many new instances the game allows per day. 30 on Classic.")
-        Row("Re-entry window (minutes)", S.Stepper(c, function() return YippRouteDB.instanceSame or 30 end,
-            function(v) YippRouteDB.instanceSame = v end, 1, 120, 5, 110),
-            "Entering the same dungeon again within this time, with the same group leader and no reset,"
-            .. " counts as the same instance. Used when the game doesn't reveal the instance's ID.")
-        Row("Account-wide count", S.Switch(c, function() return YippRouteDB.instanceAccount == true end,
+        Row("Account-wide count", S.Check(c, function() return YippRouteDB.instanceAccount == true end,
             function(on) YippRouteDB.instanceAccount = on end),
             "Counts all your characters toward one limit, as later expansions do. Off: each character has its"
             .. " own count, as in Classic.")
-        Row("On-screen warning", S.Switch(c, Opt("instanceWarn"), function(on) YippRouteDB.instanceWarn = on end),
+        Row("On-screen warning", S.Check(c, Opt("instanceWarn"), function(on) YippRouteDB.instanceWarn = on end),
             "Shows a warning in the middle of the screen one instance before the limit, and at it. Chat"
             .. " always tells you.")
         local HUD = { { "icon", "A small icon" }, { "log", "A small log" }, { "off", "Nothing" } }
@@ -4018,19 +4603,12 @@ local BuildInstanceSettings = QoLPage("instances", function(L, c, Section, Row, 
             hudMode:Refresh()
         end)
         function hudMode:Refresh() for _, o in ipairs(HUD) do if o[1] == YR.InstanceHudMode() then self:SetValue(o[2]) end end end
-        Row("Display", hudMode, "Icon: this hour's count, coloured green, yellow or red, with the wait for a free slot. Hover it"
-            .. " for today's count and your latest runs. Log: the same as text. Click either to open the instance log."
-            .. " Shift-drag to move.")
-        Row("Always show", S.Switch(c, function() return YippRouteDB.instanceHudAlways == true end, function(on)
+        Row("On screen", hudMode, "Icon: this hour's count, coloured green, yellow or red, with the wait for a free slot. Hover it"
+            .. " for today's count and your latest runs. Log: the same as text. Click either to open the instance log.")
+        Row("Always show", S.Check(c, function() return YippRouteDB.instanceHudAlways == true end, function(on)
             YippRouteDB.instanceHudAlways = on
             YR.InstanceHudApply()
         end), "Off: shown only inside an instance, or when you have entered one this hour.")
-        Row("Runs in the on-screen log", S.Stepper(c, function() return YippRouteDB.instanceHudRows or 3 end, function(v)
-            YippRouteDB.instanceHudRows = v
-            YR.InstanceHudApply()
-        end, 0, 8, 1, 110))
-        Row("Reset position", S.Button(c, "Reset", function() YR.InstanceHudResetPosition() end, nil, 90),
-            "Moves it back to the left of the screen.")
 end)
 
 -- ---------------------------------------------------------------------------
@@ -4046,16 +4624,7 @@ local BuildJourney = QoLPage("journey", function(L, c, Section, Row, Opt)
             "Your latest chapter: how far you travelled, where the hours went, the gold you earned, your best find and more, a page"
             .. " at a time. A chapter is written when you reach level 20, 30, 40, 50 and 60, and at no other level - before the"
             .. " first, the window says when it comes. Also /hs journey")
-        -- a made-up journey at one of the levels a chapter is written at
-        local TRY = { { 20, "Level 20" }, { 30, "Level 30" }, { 40, "Level 40" }, { 50, "Level 50" }, { 60, "Level 60" } }
-        local try = S.Dropdown(c, 190, TRY, function(level)
-            YR.JourneyToast(level)
-            YR.JourneyShow(level)
-        end)
-        function try:Refresh() self:SetValue("Pick a level") end
-        Row("Try it with a sample", try, "Shows the note and the window with a made-up journey at that level, the chapters before it"
-            .. " included. A pit stop on the way, the whole road at 60. Nothing of yours is changed. Also /hs journey test 60")
-        Row("Note when a chapter is written", S.Switch(c, function() return YippRouteDB.journeyToast ~= false end, function(on)
+        Row("Note when a chapter is written", S.Check(c, function() return YippRouteDB.journeyToast ~= false end, function(on)
             if on then YippRouteDB.journeyToast = nil else YippRouteDB.journeyToast = false end
         end), "A small note at the top of the screen for a few seconds when you reach level 20, 30, 40, 50 or 60. Click it to read the"
             .. " chapter. Off: the chapter is written all the same.")
@@ -4102,7 +4671,7 @@ local function InstanceLog()
         t:SetText(h[2])
     end
     local rule = heads:CreateTexture(nil, "BORDER")
-    rule:SetPoint("BOTTOMLEFT") rule:SetPoint("BOTTOMRIGHT", -8, 0) rule:SetHeight(1)
+    rule:SetPoint("BOTTOMLEFT") rule:SetPoint("BOTTOMRIGHT", -8, 0) S.Hair(rule, "h")
     rule:SetColorTexture(unpack(S.C.line))
     inst.empty = S.Text(page, 13, S.C.muted)
     inst.empty:SetPoint("TOPLEFT", 26, -198)
@@ -4211,8 +4780,10 @@ end
 -- had its own, two small pages in the menu).
 local BuildSkins = QoLPage("skins", function(L, c, Section, Row, Opt)
         do
-            Section("Damage meter skin", "a tidy top bar for the game's meter", { find = "dps details", icon = 132349 })
-            local LOOKS = { { "off", "Blizzard's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard, tidied" } }
+            Section("Damage meter skin", "a tidy top bar for the game's meter", { find = "dps details", icon = 132349,
+                master = MASTER.dmgSkin })
+            -- (Blizzard's own is the switch off: not a choice of look as well)
+            local LOOKS = { { "headstart", "Headstart" }, { "blizzard", "Blizzard, tidied" } }
             local look
             look = S.Dropdown(c, 190, LOOKS, function(v)
                 YR.SetDamageSkin(v)
@@ -4223,7 +4794,7 @@ local BuildSkins = QoLPage("skins", function(L, c, Section, Row, Opt)
             end)
             function look:Refresh()
                 local set = YippRouteDB.dmgSkin        -- as you picked it, also while quality of life is off
-                set = (set == "headstart" or set == "blizzard") and set or "off"
+                set = (set == "headstart" or set == "blizzard") and set or "headstart"
                 for _, o in ipairs(LOOKS) do if o[1] == set then self:SetValue(o[2]) end end
             end
             Row("Look", look, "Both looks tidy the top bar: the title on the left, the timer and buttons on the right."
@@ -4240,7 +4811,7 @@ local BuildSkins = QoLPage("skins", function(L, c, Section, Row, Opt)
                 return YippRouteDB.dmgSkinFrame or YR.DamageSkinFrame()
             end
             Row("Accent colour", Swatch(c, "accent", Accent, YR.DamageSkinApply), "Colours the title and the line under the top bar.")
-            Row("Use class colour", S.Switch(c, function() return YippRouteDB.dmgSkinClass == true end, function(on)
+            Row("Use class colour", S.Check(c, function() return YippRouteDB.dmgSkinClass == true end, function(on)
                 YippRouteDB.dmgSkinClass = on
                 YR.DamageSkinApply()
             end))
@@ -4252,14 +4823,20 @@ local BuildSkins = QoLPage("skins", function(L, c, Section, Row, Opt)
             end, nil, 90))
         end
         do
-            Section("RestedXP skin", "another look for RestedXP's window", { find = "rxp guide", icon = 134939 })
-            local LOOKS = { { "off", "RestedXP's own" }, { "headstart", "Headstart" }, { "blizzard", "Blizzard" } }
+            Section("RestedXP skin", "another look for RestedXP's window", { find = "rxp guide", icon = 134939,
+                master = MASTER.rxpSkin })
+            -- (RestedXP's own is the switch off)
+            local LOOKS = { { "headstart", "Headstart" }, { "blizzard", "Blizzard" } }
             local look
             look = S.Dropdown(c, 190, LOOKS, function(v)
                 if not YR.SetRXPSkin(v) then YR.Print("RestedXP isn't loaded: nothing to skin.") end
                 look:Refresh()
             end)
-            function look:Refresh() for _, o in ipairs(LOOKS) do if o[1] == YR.RXPSkinModeSet() then self:SetValue(o[2]) end end end
+            function look:Refresh()
+                local set = YR.RXPSkinModeSet()
+                set = set ~= "off" and set or "headstart"
+                for _, o in ipairs(LOOKS) do if o[1] == set then self:SetValue(o[2]) end end
+            end
             Row("Look", look, "Headstart: flat and dark, a thin border and one accent colour. Blizzard: the game's own frame"
                 .. " and gold titles. RestedXP's own: the theme you had before. Both looks are also in RestedXP's"
                 .. " theme list.")
@@ -4276,24 +4853,11 @@ local BuildSkins = QoLPage("skins", function(L, c, Section, Row, Opt)
             Row("Accent colour", Swatch(c, "accent", Accent, YR.RXPSkinApply),
                 "Colours the title, the current step, the scroll bar, map pins and tooltip links in the Headstart"
                 .. " look.")
-            Row("Use class colour", S.Switch(c, function() return YippRouteDB.rxpSkinClass == true end, function(on)
+            Row("Use class colour", S.Check(c, function() return YippRouteDB.rxpSkinClass == true end, function(on)
                 YippRouteDB.rxpSkinClass = on
                 YR.RXPSkinApply()
             end), "Uses each character's class colour as the accent.")
             Row("Background", Swatch(c, "back", Back, YR.RXPSkinApply), "The window's fill colour and opacity.")
-            local PRESETS = {
-                { { 0.40, 0.66, 1.00 }, "Blue" }, { { 0.25, 0.85, 0.75 }, "Teal" }, { { 0.40, 0.85, 0.45 }, "Green" },
-                { { 1.00, 0.78, 0.25 }, "Gold" }, { { 1.00, 0.55, 0.20 }, "Orange" }, { { 0.95, 0.35, 0.35 }, "Red" },
-                { { 0.95, 0.45, 0.75 }, "Pink" }, { { 0.65, 0.50, 1.00 }, "Purple" },
-            }
-            local preset = S.Dropdown(c, 190, PRESETS, function(v)
-                YippRouteDB.rxpSkinAccent = { v[1], v[2], v[3] }
-                YippRouteDB.rxpSkinClass = nil
-                YR.RXPSkinApply()
-                YR:RefreshWindow()
-            end)
-            preset:SetValue("Pick one")
-            Row("Accent presets", preset)
             Row("Reset colours", S.Button(c, "Reset", function()
                 YippRouteDB.rxpSkinAccent, YippRouteDB.rxpSkinBack, YippRouteDB.rxpSkinClass = nil, nil, nil
                 YR.RXPSkinApply()
@@ -4304,7 +4868,8 @@ end)
 
 -- Chat: Blizzard's buttons beside the chat (BarHide.lua), and the whisper sound (Whisper.lua).
 local BuildChat = QoLPage("chat", function(L, c, Section, Row, Opt)
-        Section("Chat buttons", "slim or hide the buttons beside chat", { icon = "Interface\\Icons\\INV_Misc_Note_01" })
+        Section("Chat buttons", "slim or hide the buttons beside chat", { icon = "Interface\\Icons\\INV_Misc_Note_01",
+            master = MASTER.chatButtons })
         local STRIP = { { "show", "As Blizzard has it" }, { "slim", "Slim, with small icons" }, { "hide", "Hidden" } }
         local strip
         strip = S.Dropdown(c, 210, STRIP, function(v)
@@ -4319,11 +4884,11 @@ local BuildChat = QoLPage("chat", function(L, c, Section, Row, Opt)
         Row("Button strip", strip, "Slim: the strip beside chat is a third narrower, with small plain buttons. Hidden: the strip and"
             .. " the chat menu are removed. Either way, the chat window can then sit closer to the screen edge"
             .. " in Edit Mode.")
-        Row("Hide the text-to-speech button", S.Switch(c, function() return YippRouteDB.chatTTSHide == true end, function(on)
+        Row("Hide the text-to-speech button", S.Check(c, function() return YippRouteDB.chatTTSHide == true end, function(on)
             YippRouteDB.chatTTSHide = on or nil
             YR.BarHideApply()
         end), "Hides the speaker button above the strip.")
-        Row("Hide the social button", S.Switch(c, function() return YippRouteDB.chatSocialHide == true end, function(on)
+        Row("Hide the social button", S.Check(c, function() return YippRouteDB.chatSocialHide == true end, function(on)
             YippRouteDB.chatSocialHide = on or nil
             YR.BarHideApply()
         end), "Hides the friends button above chat. Your key binding for the social window still works.")
@@ -4335,25 +4900,18 @@ local BuildChat = QoLPage("chat", function(L, c, Section, Row, Opt)
             .. " log window shows the lines as text you can select and copy. Filter by chat window, and search."
             .. " Lines the game marks as secret are not recorded.")
         Row("Chat log window", S.Button(c, "Open", function() YR.ChatLogOpen() end, nil, 90), "Opens the log. Also /headstart chat, and the button beside chat.")
-        Row("Chat button", S.Switch(c, function() return YippRouteDB.chatLogButton ~= false end, function(on)
+        Row("Button beside chat", S.Check(c, function() return YippRouteDB.chatLogButton ~= false end, function(on)
             YippRouteDB.chatLogButton = on
             YR.ChatLogApply()
         end), "Adds a small button beside chat that opens the log.")
-        Row("Restore chat after reload", S.Switch(c, function() return YippRouteDB.chatLogRestore ~= false end,
+        Row("Restore chat after reload", S.Check(c, function() return YippRouteDB.chatLogRestore ~= false end,
             function(on) YippRouteDB.chatLogRestore = on end),
             "Puts the last lines back into each chat window after a login or reload, so you can scroll up as"
             .. " before.")
-        Row("  Lines restored per window", S.Stepper(c, YR.ChatLogRestoreLines, function(v) YippRouteDB.chatLogRestoreLines = v end,
-            10, 500, 10, 110))
-        Row("Lines kept", S.Stepper(c, YR.ChatLogMax, function(v) YippRouteDB.chatLogMax = v end, 200, 5000, 100, 110),
-            "The log keeps this many of the newest lines. Shift-click changes it by a thousand.")
-        Row("Keep between sessions", S.Switch(c, function() return YippRouteDB.chatLogKeep ~= false end,
+        Row("Keep between sessions", S.Check(c, function() return YippRouteDB.chatLogKeep ~= false end,
             function(on) YippRouteDB.chatLogKeep = on end),
             "Keeps the log when you log out, with a marker where each session began. Off: the log starts"
             .. " empty at every login.")
-        local count = S.Text(c, 12, S.C.sub)
-        function count:Refresh() self:SetText(("%d lines"):format(YR.ChatLogCount())) end
-        Row("Lines stored", count)
         StaticPopupDialogs["HEADSTART_CLEAR_CHATLOG"] = {
             text = "Headstart: clear this character's chat log?",
             button1 = "Clear",
@@ -4366,7 +4924,7 @@ local BuildChat = QoLPage("chat", function(L, c, Section, Row, Opt)
         Row("Clear the log", S.Button(c, "Empty", function() StaticPopup_Show("HEADSTART_CLEAR_CHATLOG") end, nil, 90),
             "Deletes this character's chat log. Asks first.")
 
-        Section("Whisper sound", "your own sound for whispers", { icon = 133469 })
+        Section("Whisper sound", "your own sound for whispers", { icon = 133469, master = MASTER.whisperSound })
         local sound
         sound = S.Dropdown(c, 240, YR.WhisperSounds, function(v)
             YippRouteDB.whisperSound = v ~= "off" and v or nil
@@ -4377,37 +4935,15 @@ local BuildChat = QoLPage("chat", function(L, c, Section, Row, Opt)
         Row("Sound", sound, "The sound played when you are whispered. Click the speaker on a line to hear it. Sounds from"
             .. " LibSharedMedia addons such as Details and WeakAuras are listed too. The game's own whisper"
             .. " sound still plays.")
-        local file
-        file = S.Input(c, { width = 240, placeholder = "AddOns\\whisper.ogg", onCommit = function(t)
-            t = (t or ""):gsub("^%s+", ""):gsub("%s+$", "")
-            YippRouteDB.whisperFile = t ~= "" and t or nil
-            if YR.WhisperFile() then
-                YippRouteDB.whisperSound = "file"
-                if not YR.PlayWhisperSound("file") then
-                    YR.Print("the game can't play " .. YR.WhisperFile() .. ". A file put there while the game runs is found only after the game is started again.")
-                end
-            elseif YippRouteDB.whisperSound == "file" then
-                YippRouteDB.whisperSound = nil
-            end
-            YR.SettingChanged()
-            sound:Refresh()
-        end })
-        function file:Refresh() if not self:HasFocus() then self:SetValue(YippRouteDB.whisperFile or "") end end
-        Row("Custom sound file", file, "An .ogg or .mp3 inside the game's Interface folder, as a path from there: AddOns\\whisper.ogg."
-            .. " Press Enter to select and play it. A new file is only found after the game is restarted; a"
-            .. " reload is not enough.")
-        local CHANNEL = { { "Master", "Master (heard with effects turned down)" }, { "SFX", "Sound effects" }, { "Dialog", "Dialog" } }
-        local channel
-        channel = S.Dropdown(c, 240, CHANNEL, function(v) YippRouteDB.whisperChannel = v channel:Refresh() end)
-        function channel:Refresh() for _, o in ipairs(CHANNEL) do if o[1] == YR.WhisperChannel() then self:SetValue(o[2]) end end end
-        Row("Volume channel", channel, "Which of the game's volume sliders the sound follows.")
-        Row("Battle.net whispers", S.Switch(c, Opt("whisperBNet"), function(on) YippRouteDB.whisperBNet = on end))
+        Row("Battle.net whispers too", S.Check(c, Opt("whisperBNet"), function(on) YippRouteDB.whisperBNet = on end),
+            "Plays the sound for a Battle.net whisper as well.")
 end)
 
--- Blizzard's bars and windows: the bag bar and micro menu out of the way (BarHide.lua), the talent
--- window (TalentFade.lua: see-through, size, moving it) and the bag windows moved (Movers.lua).
+-- Blizzard's bars and windows: the bag bar and micro menu out of the way (BarHide.lua), Blizzard's windows scaled,
+-- and the bag windows moved (Movers.lua). (The talent window is the Talents page's.)
 local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
-        Section("Bag bar and micro menu", "hidden, or shown on mouseover", { find = "blizzard bars hide", icon = 133633 })
+        Section("Bag bar and micro menu", "hidden, or shown on mouseover", { find = "blizzard bars hide", icon = 133633,
+            master = MASTER.bagBars })
         local BAR = { { "show", "As Blizzard has it" }, { "hover", "Only under the mouse" }, { "hide", "Hidden" } }
         local function BarDrop(key)
             local d
@@ -4423,25 +4959,7 @@ local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
             .. " is open.")
         Row("Micro menu", BarDrop("microMenu"), "The row of small menu buttons. Same choices as the bag bar. Your key bindings keep working.")
 
-        Section("Talent window", "see-through and movable", { find = "fade transparent", icon = 136243 })
-        Row("Background transparency (percent)", RowSlider(c, 0, 100, 5, YR.TalentFade, YR.SetTalentFade, 260),
-            "How much of the talent window's background is faded out. 0: Blizzard's own. Talents, text and"
-            .. " buttons stay solid.")
-        Row("Sliders on the talent window", S.Switch(c, Opt("talentFadeSlider"), function(on)
-            YippRouteDB.talentFadeSlider = on
-            YR.TalentFadeApply()
-        end), "Adds transparency and scale sliders to the bottom of the talent window.")
-        Row("Scale (percent)", RowSlider(c, 50, 150, 1, YR.TalentScale, YR.SetTalentScale, 260),
-            "Makes the talent window smaller or larger. 100: Blizzard's size. Not in combat.")
-        Row("Move by dragging", S.Switch(c, Opt("talentMove"), function(on)
-            YippRouteDB.talentMove = on
-            YR.TalentPlace()
-        end), "Drag the talent window by its title bar or any empty area. It opens there from then on. The"
-            .. " spellbook is the same window and moves with it. Not in combat.")
-        Row("Reset position", S.Button(c, "Reset", function() YR.TalentResetPosition() end, nil, 90),
-            "Moves the window back to the middle of the screen.")
-
-        Section("Window scale", "100 is Blizzard's size", { find = "window sizes", icon = 134063 })
+        Section("Window scale", "100 is Blizzard's size", { find = "window sizes", icon = 134063, master = MASTER.windowScale })
         Row("Social window (percent)", RowSlider(c, 50, 150, 5, function() return YR.WindowScale("social") end,
             function(v) YR.SetWindowScale("social", v) end, 260),
             "Scale of the friends and guild window.")
@@ -4453,12 +4971,12 @@ local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
             YR:RefreshWindow()
         end, nil, 90))
 
-        Section("Bag position", "move the bag windows", { icon = "Interface\\Icons\\INV_Misc_Bag_09" })
-        Row("Move the combined bag", S.Switch(c, function() return YippRouteDB.moveBag == true end, function(on)
+        Section("Bag position", "move the bag windows", { icon = "Interface\\Icons\\INV_Misc_Bag_09", master = MASTER.bagMove })
+        Row("Move the combined bag", S.Check(c, function() return YippRouteDB.moveBag == true end, function(on)
             YippRouteDB.moveBag = on
             YR.MoverPlace("bag")
         end), "Drag Blizzard's combined bag by its title bar. It opens there from then on. Not in combat.")
-        Row("Move the reagent bag", S.Switch(c, function() return YippRouteDB.moveReagentBag == true end, function(on)
+        Row("Move the reagent bag", S.Check(c, function() return YippRouteDB.moveReagentBag == true end, function(on)
             YippRouteDB.moveReagentBag = on
             YR.MoverPlace("reagentBag")
         end), "The same for the reagent bag.")
@@ -4468,45 +4986,73 @@ local BuildWindows = QoLPage("windows", function(L, c, Section, Row, Opt)
         end, nil, 90), "Both bags open where Blizzard puts them again.")
 end)
 
+-- Talents: the talent window (TalentFade.lua: see-through, size, moving it) and the talent builds (Talents.lua).
+-- (Both were cards on Bars & windows, until the Interface tab gave them room: 2026-10-20.)
+-- (the builds first: their card is the page's width, and a half card before it left a hole beside it)
+-- The talent window (TalentFade.lua). Talent builds - what to take at each level - were a card here until 2026-10-21;
+-- they are the Levelling tab's Talents page now ("the talent planner belongs somewhere else than Interface" - the owner).
+local BuildTalents = QoLPage("talents", function(L, c, Section, Row, Opt)
+        Section("Talent window", "see-through and movable", { find = "fade transparent", icon = 136243, master = MASTER.talentWin, wide = true })
+        Row("Background transparency (percent)", RowSlider(c, 0, 100, 5, YR.TalentFade, YR.SetTalentFade, 260),
+            "How much of the talent window's background is faded out. 0: Blizzard's own. Talents, text and"
+            .. " buttons stay solid.")
+        Row("Sliders on the talent window", S.Check(c, Opt("talentFadeSlider"), function(on)
+            YippRouteDB.talentFadeSlider = on
+            YR.TalentFadeApply()
+        end), "Adds transparency and scale sliders to the bottom of the talent window.")
+        Row("Scale (percent)", RowSlider(c, 50, 150, 1, YR.TalentScale, YR.SetTalentScale, 260),
+            "Makes the talent window smaller or larger. 100: Blizzard's size; never larger than fits your screen. Not in combat.")
+        Row("Talents before level 10", S.Check(c, Opt("talentEarly"), function(on)
+            YippRouteDB.talentEarly = on
+            YR.ApplyParts()
+            if YR.TalentEarlyApply then YR.TalentEarlyApply() end
+        end), "Your talent key (N) opens Headstart's Talents page before level 10: your class's trees and what to take"
+            .. " at each level, to look at and plan. The points to spend come at 10.")
+        Row("Move by dragging", S.Check(c, Opt("talentMove"), function(on)
+            YippRouteDB.talentMove = on
+            YR.TalentPlace()
+        end), "Drag the talent window by its title bar or any empty area. It opens there from then on. The"
+            .. " spellbook is the same window and moves with it. Not in combat.")
+        Row("Reset position", S.Button(c, "Reset", function() YR.TalentResetPosition() end, nil, 90),
+            "Moves the window back to the middle of the screen.")
+end)
+
 -- General: what is about no one thing you do - the game's cinematics, and Headstart itself (its minimap button,
 -- the colour of its windows). The owner looked for Skip cinematics under Bars & windows and would never have
 -- found it there (2026-10-14); Leatrix Plus keeps such things on pages of their own too ("System" and
 -- "Settings"). First in the menu after All features, under no group: where you look for what fits nowhere.
 local BuildGeneral = QoLPage("general", function(L, c, Section, Row, Opt)
-        Section("Cinematics", "skipped as they start", { find = "skip cinematic intro movie opening", icon = 133885 })
-        Row("Skip cinematics", S.Switch(c, Opt("skipCinematic"), function(on) YippRouteDB.skipCinematic = on end),
-            "Ends a cinematic as it starts: a new character's opening flight over its zone. Hold Shift as it"
-            .. " starts (as you enter the world) to watch that one. On unless you turn it off.")
+        Section("Intro cinematic", "skipped on a new character", { find = "skip cinematic intro movie opening", icon = 133885,
+            master = { Opt("skipCinematic"), function(on) YippRouteDB.skipCinematic = on end } })
+        Row("About skipping it", S.Text(c, 12, S.C.muted),
+            "Ends a new character's opening flight over its zone as it starts. Every other cinematic plays. Hold Shift as"
+            .. " you enter the world to watch it. On unless you turn it off.")
 
         -- (its only switch was on the routes' settings page, which is not there while the routes are off -
         -- as on every new install)
-        Section("Headstart's minimap button", "the button by the minimap", { find = "minimap icon button hide", icon = 134269 })
-        Row("Minimap button", S.Switch(c, function() return YR.OptionSet("minimapButton") end, function(on) YR:ShowMinimapButton(on) end),
+        Section("Headstart's minimap button", "the button by the minimap", { find = "minimap icon button hide", icon = 134269,
+            master = { function() return YR.OptionSet("minimapButton") end, function(on) YR:ShowMinimapButton(on) end } })
+        Row("About the button", S.Text(c, 12, S.C.muted),
             "Headstart's own button by the minimap: left click opens this window, right click a menu of its windows. Off: /headstart"
             .. " and /hs still open them.")
 
         Section("Headstart's look", "the colour of Headstart's own windows", { find = "accent colour color theme", icon = 134123 })
         local options = {}
         for _, a in ipairs(S.ACCENTS) do options[#options + 1] = { a[1], a[2] } end
-        local was = YippRouteDB.accent
         local accent
         accent = S.Dropdown(c, 190, options, function(v)
+            local was = YippRouteDB.accent
             YippRouteDB.accent = v ~= "ember" and v or nil
+            -- (said once, in chat: a row kept for these words stood empty under the colour until one was picked)
+            if YippRouteDB.accent ~= was then YR.Print("the new colour shows after Reload UI (the button at the bottom of this window).") end
             YR:RefreshWindow()
         end)
         function accent:Refresh()
             local now = YippRouteDB.accent or "ember"
             for _, a in ipairs(S.ACCENTS) do if a[1] == now then self:SetValue(a[2]) end end
         end
-        local note = S.Text(c, 12, S.C.muted)
-        function note:Refresh()
-            local changed = YippRouteDB.accent ~= was
-            self:SetText(changed and "Reload UI to see it." or "")
-            self:SetTextColor(unpack(changed and S.C.gold or S.C.muted))
-        end
         Row("Accent colour", accent, "The colour of Headstart's windows: their edges, switches and buttons. A new one shows after"
             .. " Reload UI.")
-        Row("", note)
 
         Section("Put back everything", "your screen as it was before Headstart", { find = "undo revert reset restore uninstall remove put back",
             icon = 134520 })
@@ -4542,52 +5088,34 @@ local function HomeFeatures()
     local function F(icon, name, desc, page, section, get, set)
         return { icon = icon, name = name, desc = desc, page = page, section = section, get = get, set = set }
     end
-    local function State(f, state) f.state = state return f end
     -- a setting on a card that holds other things too: not a switch for the whole card (see QoLPage)
     local function Plain(f) f.plain = true return f end
-    local function OnOff(on) return on and "On" or "Off" end
-    local function HowMany(keys)
-        return function()
-            local n = 0
-            for _, k in ipairs(keys) do if YR.OptionSet(k) then n = n + 1 end end
-            return ("%d of %d on"):format(n, #keys)
-        end
-    end
-    local setup = F(134166, "Profiles and bar planner", "Your bars, macros and interface on every character.")
+    local setup = F(134166, "Bar profiles & planner", "Your bars, macros and interface on every character.", nil, nil,
+        function() return YR.SetupOn() end, YR.SetSetupOn)
     setup.go = function() YR:ShowSettingsTab("setup") end
-    setup.state = function() return OnOff(YR.SetupOn()) end
+    local talents = F(132222, "Talent builds", "What to take at each level, followed here.", nil, nil,
+        function() return YR.TalentFollowed and YR.TalentFollowed() ~= nil end, function(on)
+            if not on then YR.TalentFollow(nil) return end
+            local list = YR.TalentBuildsOf and YR.TalentBuildsOf(YR.TalentClassID()) or {}
+            if list[1] then YR.TalentFollow(list[1].key) end
+        end)
+    talents.go = function() YR:ShowSettingsTab("builds") end
+    -- (General's two cards - the intro cinematic, the minimap button - stood first until 2026-10-20: "general
+    -- settings don't need to be in All features" - the owner. They are on General, last in the menu.)
     local groups = {
-        { "General",
-            F(133885, "Skip cinematics", "A new character's opening flight, ended as it starts.", "general", "Cinematics",
-                Toggle("skipCinematic")),
-            F(134269, "Minimap button", "Headstart's button by the minimap.", "general", "Headstart's minimap button",
-                function() return YR.OptionSet("minimapButton") end, function(on) YR:ShowMinimapButton(on) end),
-        },
-        { "Automation",
-            F(133741, "Auto-train", "Buys your class's spells as the trainer opens.", "trainer", "Class trainer",
-                Toggle("autoTrain", function() YR:SyncRxpTrainer() end)),
-            F(133785, "Restock", "Buys reagents, ammo and your list at vendors.", "vendors", "Restock", Toggle("restock")),
-            F(133639, "Bank deposit", "Moves mats and recipes to the bank for you.", "bags", "Bank deposit", Toggle("bankAuto")),
-            State(F(133471, "Mail to alt", "Sends mats and recipes to another character.", "bags", "Mail to alt"),
-                function() return YR.MailRecipient() or "No recipient" end),
-            State(F(134149, "Accept invites", "Group invites accepted, and who whispers \"inv\" invited.", "quests", "Invites"),
-                function() return OnOff(YR.AcceptInvitesSet() ~= "off" or YR.WhisperInviteSet() ~= "off") end),
-            State(F(134327, "Quest sharing", "Share your quests, accept your party's.", "quests", "Quest sharing"),
-                function() return OnOff(YippRouteDB.shareAll == true or YR.AcceptFromSet() ~= "off") end),
-            State(F(132739, "Quest rewards", "A reward picked and the quest handed in, up to a level.", "quests", "Quest rewards"),
-                function() return OnOff(YR:RewardSettings().on == true) end),
-        },
         { "Levelling",
-            F(236562, "XP bar", "Rested and quest XP on a bar of your own.", "xpbar", "XP bar",
-                function() return YR.XPBarOn() end, function(on) YR.XPBarDB().on = on YR.XPBarApply() end),
-            State(F(134376, "Reminders", "Trainer, talent points and repairs, said in time.", "reminders", "Reminders"),
-                HowMany({ "remindTrainer", "remindTalents", "durability", "levelUpStats" })),
-            F(133685, "Craftable items", "Says when you can make stones, oils or bandages.", "reminders", "Craftable items",
-                Toggle("craftRemind")),
-            F(134441, "Level-up screenshot", "A screenshot every time you level.", "reminders", "Level-up screenshot",
-                Toggle("levelShot")),
-            F(134237, "Instance tracker", "Dungeon entries counted against the limits.", "instances", "Instance tracker",
-                Toggle("instanceTrack", function() if YR.InstanceHudApply then YR.InstanceHudApply() end end)),
+            F(132181, "World marker", "Your map pin, shown in the world.", "quests", "World marker",
+                Toggle("waypoint", function() YR.ApplyParts() end)),
+            F(133631, "Quest item buttons", "Quest items and rewards you use, a click away.", "quests", "Quest item buttons",
+                Toggle("questItems", function() YR.QuestItemsApply() end)),
+            F(131013, "Quest mob markers", "Enemies you need for a quest, marked.", "quests", "Quest mob markers",
+                Toggle("npcMarkers", function() YR.ApplyParts() end)),
+            F(132049, "Quests on NPC tooltips", "What an NPC has for you, when you hover it.", "quests",
+                "Quests on NPC tooltips", Toggle("questTips", function() YR.ApplyParts() end)),
+            F(134327, "Quest sharing", "Share your quests, accept your party's.", "quests", "Quest sharing",
+                MASTER.questShare[1], MASTER.questShare[2]),
+            F(132739, "Quest rewards", "A reward picked and the quest handed in, up to a level.", "quests", "Quest rewards",
+                function() return YR:RewardSettings().on == true end, function(on) YR:RewardSettings().on = on end),
             F(134939, "Journey", "Your road logged: distance, time, gold, loot.", "journey", "Journey",
                 function() return YippRouteDB.journey ~= false end,
                 function(on) if on then YippRouteDB.journey = nil else YippRouteDB.journey = false end YR.ApplyParts() end),
@@ -4597,10 +5125,52 @@ local function HomeFeatures()
                 Toggle("boatTimer", function() YR.BoatTimerApply() end)),
             F(135805, "Camp icon", "Lit near a camp, or while its buff runs.", "journey", "Camp icon",
                 Toggle("camp", function(on) YR.SetCampIcon(on) end)),
-            F(132053, "NPC markers", "Who your RestedXP step says to talk to, marked.", "journey", "NPC markers",
-                Toggle("npcMarkers", function() YR.ApplyParts() end)),
+            F(134376, "Reminders", "Trainer, talent points and repairs, said in time.", "reminders", "Reminders",
+                MASTER.reminders[1], MASTER.reminders[2]),
+            F(133685, "Craftable items", "Says when you can make stones, oils or bandages.", "reminders", "Craftable items",
+                Toggle("craftRemind")),
+            F(134441, "Level-up screenshot", "A screenshot every time you level.", "reminders", "Level-up screenshot",
+                Toggle("levelShot")),
+            F(134237, "Instance tracker", "Dungeon entries counted against the limits.", "instances", "Instance tracker",
+                Toggle("instanceTrack", function() if YR.InstanceHudApply then YR.InstanceHudApply() end end)),
+            talents,
         },
-        { "Combat",
+        { "Automation",
+            F(133741, "Auto-train", "Buys your class's spells as the trainer opens.", "trainer", "Class trainer",
+                Toggle("autoTrain", function() YR:SyncRxpTrainer() end)),
+            F(133785, "Restock", "Buys reagents, ammo and your list at vendors.", "vendors", "Restock", Toggle("restock")),
+            F(133639, "Bank deposit", "A Deposit button that moves mats and recipes to the bank.", "bags", "Bank deposit", Toggle("bankButton", YR.SetBankButton)),
+            F(133471, "Mail to alt", "Sends mats and recipes to another character.", "bags", "Mail to alt",
+                function() return YR.OptionSet("mailButton") end, YR.SetMailButton),
+        },
+        { "Loot & gear",
+            F(136246, "Glimmer", "Herbs, ore, chests and quest objects light up.", "glimmer", "Glimmer",
+                Toggle("glimmer", function() YR.SettingChanged() end)),
+            F(133784, "Loot feed", "Recent loot, in lines that fade.", "loot", "Loot feed",
+                Toggle("lootFeed", function() YR.LootFeedApply() end)),
+            F(132739, "Upgrade estimate", "DPS and toughness change on item tooltips.", "gear", "Upgrade estimate",
+                Toggle("simTooltip")),
+            F(133071, "Upgrade alerts", "Says when loot beats what you wear.", "gear", "Upgrade alerts", Toggle("upgrades")),
+            F("Interface\\Icons\\INV_Misc_Bag_09", "Characters", "Bags, bank and gold of your other characters.", "alts",
+                "Characters", Toggle("alts")),
+        },
+        { "Social",
+            F("Interface\\Icons\\INV_Misc_Note_01", "Chat buttons", "Slim or hide the buttons beside chat.", "chat", "Chat buttons",
+                MASTER.chatButtons[1], MASTER.chatButtons[2]),
+            F(134939, "Chat log", "Search and copy chat, past sessions too.", "chat", "Chat log",
+                Toggle("chatLog", function() YR.ChatLogApply() end)),
+            F(133469, "Whisper sound", "Your own sound for whispers.", "chat", "Whisper sound",
+                MASTER.whisperSound[1], MASTER.whisperSound[2]),
+            F(134149, "Accept invites", "Group invites accepted, and who whispers \"inv\" invited.", "group", "Invites",
+                MASTER.invites[1], MASTER.invites[2]),
+            F(134149, "Invite & Leave buttons", "Group up for a kill, and leave again.", "group", "Invite and Leave buttons",
+                Toggle("groupBar", function(on) YR.SetGroupBar(on) end)),
+            F(133884, "Quest group finder", "Ask chat for a group, see who answers.", "group", "Quest group finder",
+                Toggle("questLFG")),
+        },
+        { "On screen",
+            F(236562, "XP bar", "Rested and quest XP on a bar of your own.", "xpbar", "XP bar",
+                function() return YR.XPBarOn() end, function(on) YR.XPBarDB().on = on YR.XPBarApply() end),
             F(132349, "Swing timer", "Bars for your auto-attacks.", "swing", "Swing timer",
                 function() return YR.SwingDB().on == true end, function(on) YR.SwingDB().on = on YR.SwingApply() end),
             F(136048, "Health bar", "Your health on a bar of Headstart's own.", "swing", "Health and power bars",
@@ -4623,42 +5193,19 @@ local function HomeFeatures()
             F(237274, "Death recap", "What killed you, shown when you die.", "recap", "Death recap",
                 Toggle("deathRecap", function() YR.RecapApply() end)),
         },
-        { "Loot & gear",
-            F(136246, "Glimmer", "Herbs, ore, chests and quest objects light up.", "glimmer", "Glimmer",
-                Toggle("glimmer", function() YR.SettingChanged() end)),
-            F(133784, "Loot feed", "Recent loot, in lines that fade.", "loot", "Loot feed",
-                Toggle("lootFeed", function() YR.LootFeedApply() end)),
-            F(132739, "Upgrade estimate", "DPS and toughness change on item tooltips.", "gear", "Upgrade estimate",
-                Toggle("simTooltip")),
-            F(133071, "Upgrade alerts", "Says when loot beats what you wear.", "gear", "Upgrade alerts", Toggle("upgrades")),
-            F("Interface\\Icons\\INV_Misc_Bag_09", "Characters", "Bags, bank and gold of your other characters.", "alts",
-                "Characters", Toggle("alts")),
+        { "Blizzard's UI",
+            F(133633, "Bag bar and micro menu", "Hidden, or shown on mouseover.", "windows", "Bag bar and micro menu",
+                MASTER.bagBars[1], MASTER.bagBars[2]),
+            F(134063, "Window scale", "Blizzard's windows smaller or larger.", "windows", "Window scale",
+                MASTER.windowScale[1], MASTER.windowScale[2]),
+            F(136243, "Talent window", "See-through and movable.", "talents", "Talent window",
+                MASTER.talentWin[1], MASTER.talentWin[2]),
+            F(132349, "Damage meter skin", "A tidy top bar for the game's damage meter.", "skins", "Damage meter skin",
+                MASTER.dmgSkin[1], MASTER.dmgSkin[2]),
+            F(134939, "RestedXP skin", "Another look for RestedXP's window.", "skins", "RestedXP skin",
+                MASTER.rxpSkin[1], MASTER.rxpSkin[2]),
         },
-        { "Social",
-            F(134939, "Chat log", "Search and copy chat, past sessions too.", "chat", "Chat log",
-                Toggle("chatLog", function() YR.ChatLogApply() end)),
-            State(F(133469, "Whisper sound", "Your own sound for whispers.", "chat", "Whisper sound"),
-                function() return OnOff(YippRouteDB.whisperSound ~= nil) end),
-            State(F("Interface\\Icons\\INV_Misc_Note_01", "Chat buttons", "Slim or hide the buttons beside chat.", "chat", "Chat buttons"),
-                function() return OnOff(YippRouteDB.chatStrip ~= nil or YippRouteDB.chatTTSHide == true or YippRouteDB.chatSocialHide == true) end),
-            F(134149, "Invite and Leave buttons", "Group up for a kill, and leave again.", "group", "Invite and Leave buttons",
-                Toggle("groupBar", function(on) YR.SetGroupBar(on) end)),
-            F(133884, "Quest group finder", "Ask chat for a group, see who answers.", "group", "Quest group finder",
-                Toggle("questLFG")),
-        },
-        { "Interface",
-            State(F(133633, "Bag bar and micro menu", "Hidden, or shown on mouseover.", "windows", "Bag bar and micro menu"),
-                function() return OnOff(YippRouteDB.bagBar ~= nil or YippRouteDB.microMenu ~= nil) end),
-            State(F(136243, "Talent window", "See-through and movable.", "windows", "Talent window"),
-                function() return OnOff(YR.TalentFade() > 0 or YR.Option("talentMove")) end),
-            State(F(134063, "Window scale", "Blizzard's windows smaller or larger.", "windows", "Window scale"),
-                function() return OnOff(type(YippRouteDB.windowScale) == "table" and next(YippRouteDB.windowScale) ~= nil) end),
-            State(F(132349, "Damage meter skin", "A tidy top bar for the game's damage meter.", "skins", "Damage meter skin"),
-                function() return OnOff(YR.DamageSkinMode() ~= "off") end),
-            State(F(134939, "RestedXP skin", "Another look for RestedXP's window.", "skins", "RestedXP skin"),
-                function() return OnOff(YR.RXPSkinMode() ~= "off") end),
-            setup,
-        },
+        { "Character setup", setup },
     }
     -- a feature that is shelved has no card (QuestLFG.lua)
     for _, group in ipairs(groups) do
@@ -4692,7 +5239,7 @@ local function HomeCard(parent, f, w)
     name:SetText(f.name)
     local desc = S.Text(b, 11, S.C.muted)
     desc:SetPoint("TOPLEFT", 46, -27)
-    desc:SetWidth(w - 46 - 10)
+    desc:SetWidth(w - 46 - 62)
     desc:SetHeight(26)
     desc:SetWordWrap(true)
     desc:SetJustifyV("TOP")
@@ -4729,8 +5276,8 @@ local function HomeCard(parent, f, w)
 end
 
 -- What is new in this version: the same cards, first on the page, until you hide them.
-local NEWS_FOR = "0.10.0-beta7"
-local NEWS = { ["Glimmer"] = true }
+local NEWS_FOR = "0.10.0-beta8"
+local NEWS = { ["World marker"] = true, ["Quest item buttons"] = true, ["Quest mob markers"] = true, ["Quests on NPC tooltips"] = true }
 function YR.HomeNews() return NEWS_FOR, NEWS end
 
 local function BuildHome(page)
@@ -4835,60 +5382,147 @@ local function BuildHome(page)
     end
     body:SetPoint("TOPLEFT", 0, -newsH)
 
-    local y = -4
-    for _, group in ipairs(groups) do
-        local top = y
-        y = Head(body, group[1], y)
-        local list = {}
-        for i = 2, #group do list[#list + 1] = group[i] end
-        y = Grid(body, list, y) - 4
-        if group[1] == "Automation" then
-            -- (the group the tour points at: its heading and its cards)
-            local span = CreateFrame("Frame", nil, body)
-            span:SetPoint("TOPLEFT", 0, top)
-            span:SetSize(CW - 40, top - y - 6)
-            tourAt.automation = span
+    -- Each group folds to its heading: a click on it and its cards go, again and they are back; the heading says how
+    -- many of its features are on, folded or not (the owner, 2026-10-20: "should there be some collapse here too?").
+    -- Open is how a group starts, as a page's cards do; the ones you fold are remembered (YippRouteDB.homeFolded).
+    local heads = {}
+    local function LayBody()
+        local folded = type(YippRouteDB.homeFolded) == "table" and YippRouteDB.homeFolded or {}
+        local y = -4
+        for _, h in ipairs(heads) do
+            local top, shut = y, folded[h.name] == true
+            h.shut = shut
+            h:ClearAllPoints()
+            h:SetPoint("TOPLEFT", 0, y)
+            h.arrow:SetRotation(shut and -math.pi / 2 or math.pi)     -- (the art points up: turned right, or down)
+            h:Count()
+            y = y - 26
+            for i, card in ipairs(h.cards) do
+                card:SetShown(not shut)
+                if not shut then
+                    local col = (i - 1) % 3
+                    card:ClearAllPoints()
+                    card:SetPoint("TOPLEFT", col * (w + gap), y)
+                    if col == 2 or i == #h.cards then y = y - 58 - gap end
+                end
+            end
+            y = y - 4
+            if h.span then          -- (the group the tour points at: its heading and its cards)
+                h.span:ClearAllPoints()
+                h.span:SetPoint("TOPLEFT", 0, top)
+                h.span:SetSize(CW - 40, math.max(22, top - y - 6))
+            end
         end
+        bodyH = -y
+        body:SetHeight(bodyH)
     end
-    bodyH = -y
-    body:SetHeight(bodyH)
+    for _, group in ipairs(groups) do
+        local h = CreateFrame("Button", nil, body)
+        h:SetSize(CW - 40, 22)
+        h.name = group[1]
+        h.arrow = h:CreateTexture(nil, "ARTWORK")
+        h.arrow:SetSize(10, 10)
+        h.arrow:SetPoint("LEFT", 2, -2)
+        S.ArtTexture(h.arrow, "up")
+        h.arrow:SetVertexColor(unpack(S.C.muted))
+        h.text = S.Text(h, 11, S.C.muted)
+        h.text:SetPoint("LEFT", 18, -2)
+        h.text:SetText(group[1]:upper())
+        h.count = S.Text(h, 11, S.C.muted)
+        h.count:SetPoint("RIGHT", -2, -2)
+        h.count:SetJustifyH("RIGHT")
+        h.cards, h.span, h.shut = {}, false, false
+        for i = 2, #group do
+            local card = HomeCard(body, group[i], w)
+            front.cards[#front.cards + 1] = card
+            h.cards[#h.cards + 1] = card
+        end
+        function h:Count()
+            local on = 0
+            for i = 2, #group do
+                local f = group[i]
+                if f.get and f.get() then on = on + 1 end
+            end
+            self.count:SetText(("%d of %d on"):format(on, #group - 1))
+        end
+        h:SetScript("OnEnter", function(self) self.text:SetTextColor(unpack(S.C.text)) end)
+        h:SetScript("OnLeave", function(self) self.text:SetTextColor(unpack(S.C.muted)) end)
+        h:SetScript("OnClick", function(self)
+            YippRouteDB.homeFolded = type(YippRouteDB.homeFolded) == "table" and YippRouteDB.homeFolded or {}
+            YippRouteDB.homeFolded[self.name] = (not YippRouteDB.homeFolded[self.name]) or nil
+            LayBody()
+            Lay()
+        end)
+        if group[1] == "Automation" then
+            h.span = CreateFrame("Frame", nil, body)
+            tourAt.automation = h.span
+        end
+        heads[#heads + 1] = h
+    end
+    front.heads, front.layBody = heads, LayBody
+    LayBody()
     Lay()
 end
 
 local function RefreshHome()
     for _, card in ipairs(front.cards) do card:Refresh() end
+    if front.layBody then front.layBody() end   -- (each heading's count of what is on)
     if front.lay then front.lay() end           -- (the beta's banner: there, or hidden for now)
 end
+--- All features' group headings once the page is built (for the tests): each with its name, shut, cards.
+function YR.HomeHeads() return front.heads end
 --- The cards on the first page (for the tests): { { name, on or state }, ... } once it has been opened.
 function YR.HomeFeatures() return HomeFeatures() end
 function YR.SettingsIndex() return settings.index or {} end
---- A QoL page's layout once it is built: its cards, and Fold / FoldAll / AnyShut for them.
+--- A QoL page's layout once it is built: its cards, and Reflow (the tests).
 function YR.SettingsLayout(key) return qolPages[key] and qolPages[key].L end
 --- How far down QoL's menu reaches, and the room it has (for the tests).
 function YR.SettingsMenuFits() return settings.navBottom, PH end
 
--- QoL's menu: All features and General first, then the pages in six groups - and the All features page has the
--- same groups in the same order, General's two cards first (the owner, 2026-10-15: "All features has another
--- grouping than the menu - what is best?"; one map to learn, not two). Every page is named after the thing it
--- is about, the name a player would look for, and one thing has one place:
---   General         cinematics, Headstart's minimap button, the colour of its windows
---   Automation      what acts for you: the class trainer, restock, the bank and mail, quests and invites
+-- The menu, on two tabs - and the All features page has the same groups in the same order (the owner,
+-- 2026-10-15: "All features has another grouping than the menu - what is best?"; one map to learn, not two).
+-- Every page is named after the thing it is about, the name a player would look for, and one thing has one place.
+-- QoL, what Headstart does for you:
+--   Levelling       the quest helpers, sharing and rewards; the journey and its timers; reminders; instances
+--   Automation      what acts for you: the class trainer, restock, the bank and mail
 --                   (Leatrix Plus opens on its Automation page too; nothing on without the player knowing)
---   Levelling       the XP bar, reminders, the instance tracker, the journey (with the flight timer and camps)
---   Combat          combat bars, trinkets, the death recap
 --   Loot & gear     Glimmer, the loot feed and log, upgrades, your other characters
---   Social          chat, the Invite and Leave buttons and the quest group finder
---   Interface       Blizzard's bars and windows, skins for the damage meter and RestedXP
+--   Social          chat; invites, the Invite and Leave buttons and the quest group finder
+--   Headstart       General: cinematics, Headstart's minimap button, the colour of its windows (last: not a feature)
+-- Interface, what it puts on your screen and does to Blizzard's:
+--   On screen       the XP bar, combat bars, trinkets, the death recap
+--   Blizzard's UI   Blizzard's bars and windows, the talent window and builds, skins for the damage meter and RestedXP
 -- (Regrouped 2026-10-14 at the owner's asking; the small pages merged and Quality of life's switch moved to All
--- features the same day; General, Automation and one grouping for both on 2026-10-15.)
+-- features the same day; General, Automation and one grouping for both on 2026-10-15; the Interface tab, the
+-- Quests and Talents pages, invites to Group and General last on 2026-10-20: "better sidebar groups".)
 -- Each page says what is on it under its name (its sections, as links: PageHead).
+local BuildLibrary, RefreshLibrary, BuildBuilds, RefreshBuilds          -- (made in a block of their own, below)
 local CATEGORIES = {
-    { key = "home", label = "All features", build = BuildHome, refresh = RefreshHome, icon = "Interface\\AddOns\\Headstart\\art\\logo",
+    -- QoL: what Headstart does for you
+    { key = "home", tab = "qol", label = "All features", build = BuildHome, refresh = RefreshHome, icon = "Interface\\AddOns\\Headstart\\art\\logo",
       scope = "Every character on this account",
       desc = "Everything Headstart does. Switch a feature on here; click its card for the settings." },
-    { key = "general", label = "General", build = BuildGeneral, refresh = QoLRefresh("general"), icon = 134064,
-      status = function() return YR.Option("skipCinematic") end, scope = "Every character on this account",
-      desc = "Cinematics skipped, Headstart's minimap button, the colour of its windows, and putting everything back." },
+    { group = "Levelling", tab = "qol" },
+    { key = "quests", label = "Quests", build = BuildQuests, refresh = QoLRefresh("quests", RefreshRewards), icon = 236664,
+      status = function() return YR.Option("waypoint") or YR.Option("questItems") or YR.Option("npcMarkers") or YR.Option("questTips")
+          or YippRouteDB.shareAll == true or YR.AcceptFromSet() ~= "off" or YR:RewardSettings().on == true end,
+      scope = "Every character; quest rewards per class",
+      desc = "Your map pin in the world, quest items a click away, quest mobs marked, quests on tooltips, sharing and rewards." },
+    -- (a Levelling tab page for a day, 2026-10-21, then here: "keep Levelling, and move Talents in" - the owner)
+    { key = "builds", label = "Talents", build = function(f) BuildBuilds(f) end, refresh = function() RefreshBuilds() end, icon = 132222,
+      status = function() return YR.TalentFollowed and YR.TalentFollowed() ~= nil end,
+      scope = "Every character; the build you follow per character",
+      desc = "What to take at each level. Follow a build, and the talent points notice says which talent is next." },
+    { key = "journey", label = "Journey", build = BuildJourney, refresh = QoLRefresh("journey"), icon = 134939,
+      status = function() return YippRouteDB.journey ~= false or YR.Option("flightTimer") or YR.Option("camp") or YR.Option("boatTimer") end,
+      scope = "Every character; each has its own journey",
+      desc = "Your road as a story, the flight and boat timers, and the camp icon." },
+    { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134376,
+      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") end, scope = "Every character on this account",
+      desc = "Said when something needs doing: the trainer, talent points to spend (on screen), repairs, items to craft." },
+    { key = "instances", label = "Instance tracker", build = BuildInstanceSettings, refresh = RefreshInstances, icon = 134237,
+      status = function() return YR.Option("instanceTrack") end, scope = "Every character on this account",
+      desc = "The dungeons and raids you entered this hour and today, against the limits." },
     { group = "Automation" },
     { key = "trainer", label = "Class trainer", build = BuildTrainer, refresh = function() trainer.refresh() end, icon = 133741,
       status = function() return YR.Option("autoTrain") end, scope = function() return "Every " .. (UnitClass("player") or "character") .. " on this account" end,
@@ -4897,38 +5531,8 @@ local CATEGORIES = {
       status = function() return YR.Option("restock") end, scope = "Every character on this account",
       desc = "Reagents, ammo and your own list bought back up to the count you keep." },
     { key = "bags", label = "Bank & mail", build = BuildBags, refresh = QoLRefresh("bags"), icon = 133633,
-      status = function() return YR.Option("bankAuto") or YR.Option("bankButton") or YR.Option("mailButton") end, scope = "Every character on this account",
+      status = function() return YR.Option("bankButton") or YR.Option("mailButton") end, scope = "Every character on this account",
       desc = "Crafting mats and recipes moved to the bank, or mailed to another character." },
-    { key = "quests", label = "Quests & invites", build = BuildQuests, refresh = QoLRefresh("quests", RefreshRewards), icon = 134327,
-      status = function() return YR.AcceptInvitesSet() ~= "off" or YR.WhisperInviteSet() ~= "off" or YR.AcceptFromSet() ~= "off"
-          or YippRouteDB.shareAll == true or YR:RewardSettings().on == true end,
-      scope = "Every character; quest rewards per class",
-      desc = "Invites accepted and sent on a whisper, quests shared and accepted, and quest rewards picked for you." },
-    { group = "Levelling" },
-    { key = "xpbar", label = "XP bar", build = BuildXPBar, refresh = QoLRefresh("xpbar"), icon = 236562,
-      status = function() return YR.XPBarOn() end, scope = "Every character on this account",
-      desc = "Your own experience bar: size, position, colours and text." },
-    { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134327,
-      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") or YR.Option("levelUpStats") end, scope = "Every character on this account",
-      desc = "Said when something needs doing: the trainer, talent points to spend (on screen), repairs, items to craft." },
-    { key = "instances", label = "Instance tracker", build = BuildInstanceSettings, refresh = RefreshInstances, icon = 134237,
-      status = function() return YR.Option("instanceTrack") end, scope = "Every character on this account",
-      desc = "The dungeons and raids you entered this hour and today, against the limits." },
-    { key = "journey", label = "Journey", build = BuildJourney, refresh = QoLRefresh("journey"), icon = 134939,
-      status = function() return YippRouteDB.journey ~= false or YR.Option("flightTimer") or YR.Option("camp") or YR.Option("boatTimer") or YR.Option("npcMarkers") end,
-      scope = "Every character; each has its own journey",
-      desc = "Your road logged and told as a story, a timer while you fly, and the camp icon." },
-    { group = "Combat" },
-    { key = "swing", label = "Combat bars", build = BuildSwing, refresh = QoLRefresh("swing"), icon = "Interface\\Icons\\INV_Sword_04",
-      status = function() return YR.SwingOn() or YippRouteDB.powerFlashOff == true end, scope = "Which bars show per character; the look for all",
-      desc = "Blizzard's swing bars in a look of your own, and its resource bar without the spend flash." },
-    { key = "trinkets", label = "Trinkets & gear sets", build = BuildTrinkets, refresh = QoLRefresh("trinkets", RefreshTrinkets),
-      icon = 133434, status = function() return YR.Option("trinketBar") or YippRouteDB.trinketAuto == true end,
-      scope = "Every character; the swap order per character",
-      desc = "Trinket buttons, automatic trinket swaps, and key bindings for equipment sets." },
-    { key = "recap", label = "Death recap", build = BuildRecap, refresh = QoLRefresh("recap"), icon = 237274,
-      status = function() return YR.Option("deathRecap") end, scope = "Every character on this account",
-      desc = "What killed you and the hits before it, shown when you die." },
     { group = "Loot & gear" },
     { key = "glimmer", label = "Glimmer", build = BuildGlimmer, refresh = QoLRefresh("glimmer"), icon = 136246,
       status = function() return YR.Option("glimmer") end, scope = "Every character on this account",
@@ -4948,21 +5552,58 @@ local CATEGORIES = {
           or YippRouteDB.whisperSound ~= nil or YR.Option("chatLog") end, scope = "Every character on this account",
       desc = "A chat log to search and copy from, a whisper sound, and fewer buttons beside chat." },
     { key = "group", label = "Group", build = BuildGroup, refresh = QoLRefresh("group"), icon = 134149,
-      status = function() return YR.Option("groupBar") or YR.QuestLFGOn() end, scope = "Every character on this account",
-      desc = YR.QuestLFGAvailable and "Invite and Leave buttons, and a group finder for your quests." or "Invite and Leave buttons." },
-    { group = "Interface" },
+      status = function() return YR.AcceptInvitesSet() ~= "off" or YR.WhisperInviteSet() ~= "off" or YR.Option("groupBar") or YR.QuestLFGOn() end,
+      scope = "Every character on this account",
+      desc = YR.QuestLFGAvailable and "Invites accepted and sent on a whisper, Invite and Leave buttons, and a group finder for your quests."
+          or "Invites accepted and sent on a whisper, and Invite and Leave buttons." },
+    { group = "Headstart" },
+    { key = "general", label = "General", build = BuildGeneral, refresh = QoLRefresh("general"), icon = 134064,
+      status = function() return YR.Option("skipCinematic") end, scope = "Every character on this account",
+      desc = "The intro cinematic skipped, Headstart's minimap button, the colour of its windows, and putting everything back." },
+    -- Interface: what Headstart puts on your screen, and what it does to Blizzard's
+    { group = "On screen", tab = "interface" },
+    { key = "xpbar", label = "XP bar", build = BuildXPBar, refresh = QoLRefresh("xpbar"), icon = 236562,
+      status = function() return YR.XPBarOn() end, scope = "Every character on this account",
+      desc = "Your own experience bar: size, position, colours and text." },
+    { key = "swing", label = "Combat bars", build = BuildSwing, refresh = QoLRefresh("swing"), icon = "Interface\\Icons\\INV_Sword_04",
+      status = function() return YR.SwingOn() or YippRouteDB.powerFlashOff == true end, scope = "Which bars show per character; the look for all",
+      desc = "Swing timer, health, power, cast and range bars, and Blizzard's resource bar without the spend flash." },
+    { key = "trinkets", label = "Trinkets & gear sets", build = BuildTrinkets, refresh = QoLRefresh("trinkets", RefreshTrinkets),
+      icon = 133434, status = function() return YR.Option("trinketBar") or YippRouteDB.trinketAuto == true end,
+      scope = "Every character; the swap order per character",
+      desc = "Trinket buttons, automatic trinket swaps, and key bindings for equipment sets." },
+    { key = "recap", label = "Death recap", build = BuildRecap, refresh = QoLRefresh("recap"), icon = 237274,
+      status = function() return YR.Option("deathRecap") end, scope = "Every character on this account",
+      desc = "What killed you and the hits before it, shown when you die." },
+    { group = "Blizzard's UI" },
     { key = "windows", label = "Bars & windows", build = BuildWindows, refresh = QoLRefresh("windows"), icon = 136243,
-      status = function() return YR.TalentFade() > 0 or YR.Option("talentMove") or YippRouteDB.moveBag == true or YippRouteDB.moveReagentBag == true
+      status = function() return YippRouteDB.moveBag == true or YippRouteDB.moveReagentBag == true
           or YippRouteDB.bagBar ~= nil or YippRouteDB.microMenu ~= nil
           or (type(YippRouteDB.windowScale) == "table" and next(YippRouteDB.windowScale) ~= nil) end,
       scope = "Every character on this account",
-      desc = "Blizzard's bag bar and micro menu hidden, and its windows moved, scaled or see-through." },
+      desc = "Blizzard's bag bar and micro menu hidden, its windows scaled, and the bags moved." },
+    { key = "talents", label = "Talent window", build = BuildTalents, refresh = QoLRefresh("talents"), icon = 136243,
+      status = function() return YR.TalentFade() > 0 or YR.Option("talentMove") end,
+      scope = "Every character on this account",
+      desc = "The talent window see-through, larger or smaller, movable, and open before level 10." },
     { key = "skins", label = "Skins", build = BuildSkins, refresh = QoLRefresh("skins"), icon = 132906,
       status = function() return YR.DamageSkinMode() ~= "off" or YR.RXPSkinMode() ~= "off" end, scope = "Every character on this account",
       desc = "Another look for the game's damage meter and for RestedXP's guide window." },
 }
+-- each page is on the tab of the group it is under
+do
+    local tab = "qol"
+    for _, t in ipairs(CATEGORIES) do
+        if t.tab then tab = t.tab else t.tab = tab end
+    end
+end
+--- Which top tab a QoL page is on: "qol" or "interface".
+local function CategoryTab(key)
+    for _, t in ipairs(CATEGORIES) do if t.key == key then return t.tab end end
+    return "qol"
+end
 --- The menu's group of each page, for the tests: { [page key] = group name }, "General" for the pages above
---- the first group (All features has a General group of its own).
+--- the first group (All features).
 function YR.SettingsMenuGroups()
     local out, group = {}, "General"
     for _, t in ipairs(CATEGORIES) do
@@ -4973,8 +5614,8 @@ end
 -- Older names for a page ("qol" was the one long page; the talent window had its own, the two skins and
 -- the camps too).
 local CATEGORY_ALIAS = { qol = "home", main = "home", start = "home", rxpskin = "skins", dmgskin = "skins", camps = "journey",
-    rewards = "quests", invites = "quests",
-    talentwin = "windows", death = "recap", characters = "alts" }
+    rewards = "quests", invites = "group", waypoint = "quests", interface = "xpbar",
+    talentwin = "talents", talentbuilds = "builds", death = "recap", characters = "alts" }
 
 -- A main switch at the top of a side menu: its name, the switch at the right, and what it does when you
 -- point at it. QoL's menu has Quality of life, Levelling's has Routes.
@@ -5000,6 +5641,8 @@ end
 local function ShowTab(key, quiet)
     key = CATEGORY_ALIAS[key] or key
     settings.tab = key
+    settings.lastOn = settings.lastOn or {}
+    settings.lastOn[CategoryTab(key)] = key          -- (the page each tab opens on, coming back to it)
     if quiet then return end
     for _, t in ipairs(CATEGORIES) do
         if t.key then
@@ -5071,90 +5714,10 @@ local function PageHead(page)
     local strip = page:CreateTexture(nil, "BORDER")
     strip:SetPoint("TOPLEFT", 16, -TITLE_H + 4)
     strip:SetPoint("TOPRIGHT", -16, -TITLE_H + 4)
-    strip:SetHeight(1)
+    S.Hair(strip, "h")
     S.Set(strip, S.C.line)
-    -- The page's sections as a row of links under its description: what is on the page at a glance.
-    -- A click scrolls to the section and lights it up for a moment; the link of the section at the
-    -- top of the view is the one filled in, and follows as you scroll. Made once per page; only the
-    -- page showing has its links up.
-    local links = {}        -- [page key] = { chip, ... }
-    local function Mark(row, index)
-        for i, chip in ipairs(row) do chip:SetOn(i == index) end
-    end
-    -- Which section is at the top of the view now.
-    local function AtTop(list)
-        local area = list[1].area
-        local scroll = area.GetVerticalScroll and area:GetVerticalScroll() or 0
-        local range = area.GetVerticalScrollRange and area:GetVerticalScrollRange() or 0
-        if range > 0 and scroll >= range - 1 then
-            -- at the very bottom the last sections can't reach the top: the lowest one in view counts
-            return #list
-        end
-        local at = 1
-        for i, sec in ipairs(list) do if -sec.y <= scroll + 12 then at = i end end
-        return at
-    end
-    local function Links(t)
-        for _, row in pairs(links) do for _, chip in ipairs(row) do chip:Hide() end end
-        local list = t.key and settings.sections and settings.sections[t.key]
-        if not list or #list < 2 then return end
-        local row = links[t.key]
-        if not row then
-            row = {}
-            links[t.key] = row
-            local x = 74
-            local jumping
-            for i, sec in ipairs(list) do
-                local chip = S.Chip(page, sec.title, function()
-                    if settings.onJump and settings.onJump[t.key] then settings.onJump[t.key]() end
-                    if sec.of and sec.of.open then sec.of.open() end      -- a folded section: opened
-                    -- room under the last section, so every section can be brought to the top (a
-                    -- short page couldn't be scrolled to its lower sections at all)
-                    local content, last = sec.area.content, list[#list]
-                    local need = -last.y + (sec.area.GetHeight and sec.area:GetHeight() or 0) - 6
-                    if content and content.GetHeight and (content:GetHeight() or 0) < need then content:SetHeight(need) end
-                    if sec.area.UpdateScrollChildRect then sec.area:UpdateScrollChildRect() end
-                    local range = sec.area.GetVerticalScrollRange and sec.area:GetVerticalScrollRange() or 0
-                    jumping = true
-                    if sec.area.SetVerticalScroll then sec.area:SetVerticalScroll(math.max(0, math.min(range, -sec.y - 6))) end
-                    jumping = false
-                    Mark(row, i)            -- the one you clicked, also where the page can't scroll that far
-                    -- and the section itself lit for a moment, so the eye finds it
-                    local f = sec.frame
-                    if f then
-                        if not f.jump then
-                            f.jump = f:CreateTexture(nil, "BORDER", nil, 7)
-                            f.jump:SetAllPoints()
-                            S.Set(f.jump, S.C.accentD)
-                            -- held a moment, then faded out gently rather than switched off
-                            f.jumpFade = f.jump:CreateAnimationGroup()
-                            local fade = f.jumpFade:CreateAnimation("Alpha")
-                            fade:SetFromAlpha(1)
-                            fade:SetToAlpha(0)
-                            fade:SetStartDelay(0.35)
-                            fade:SetDuration(1.1)
-                            fade:SetSmoothing("OUT")
-                            f.jumpFade:SetScript("OnFinished", function() f.jump:Hide() end)
-                        end
-                        f.jumpFade:Stop()
-                        f.jump:SetAlpha(1)
-                        f.jump:Show()
-                        f.jumpFade:Play()
-                    end
-                end)
-                chip:SetPoint("TOPLEFT", x, -54)
-                x = x + chip:GetWidth() + 6
-                row[i] = chip
-            end
-            -- scrolled by hand: the link follows
-            local area = list[1].area
-            if area.HookScript then
-                area:HookScript("OnVerticalScroll", function() if not jumping then Mark(row, AtTop(list)) end end)
-            end
-        end
-        for _, chip in ipairs(row) do chip:Show() end
-        Mark(row, AtTop(list))
-    end
+    -- (A row of links to the page's sections stood under its description: a ledger is one short list, and the
+    -- links were one more row of orange to read past - the owner, 2026-10-21.)
     return function(t)
         icon:SetTexture(t.icon)
         title:SetText(t.label)
@@ -5167,15 +5730,17 @@ local function PageHead(page)
         master:SetShown(t.key == "home")
         scopeText:SetShown(t.key ~= "home")
         desc:SetPoint("RIGHT", page, "RIGHT", t.key == "home" and -200 or -20, 0)     -- (clear of the switch)
-        Links(t)
     end
 end
 
 -- QoL: its menu is the window's left side on that tab (ui.sideQ); the page is what is beside it.
 local function BuildSettings(page)
     settings.index = {}
+    -- (what is on the Levelling tab but searched for with the settings: found here, opened there)
+    settings.index[1] = { key = "builds", label = "Talent builds",
+        tip = "What to take at each level, and a build followed on this character.",
+        find = "talent build spec tree level points levelling follow planner", go = function() ShowTab("builds") end }
     settings.sections = {}          -- [page key] = { { title, y, area }, ... }, filled as a page is built
-    settings.onJump = {}
     local nav = ui.sideQ
 
     -- Find a setting: every row's name and details, on every page.
@@ -5194,6 +5759,7 @@ local function BuildSettings(page)
         search:SetValue("")
         search:ClearFocus()             -- or the keys you move with would go on typing into it
         results:Hide()
+        if e.go then e.go() return end          -- (on another tab)
         ShowTab(e.key)
         if e.of and e.of.open then e.of.open() end        -- a setting in a folded card: the card opened
         -- a page just built for the search has never been laid out: its length is worked out first
@@ -5207,12 +5773,17 @@ local function BuildSettings(page)
         text = strtrim(text or ""):lower()
         if text == "" then results:Hide() return end
         BuildAllSettings()
-        local found = {}
+        -- what is named so comes first, then what only says it (a page's place in the menu is no rank: the
+        -- minimap button's own card under a tip that mentions it on a page higher up)
+        local found, said = {}, {}
         for _, e in ipairs(settings.index) do
             -- what a setting is found by is the same at every keystroke: put together once
             e.hay = e.hay or (e.label .. " " .. (e.tip or "") .. " " .. LabelOf(e.key) .. " " .. (e.find or "")):lower()
-            if e.hay:find(text, 1, true) then found[#found + 1] = e end
+            e.name = e.name or (e.label .. " " .. (e.find or "")):lower()
+            if e.name:find(text, 1, true) then found[#found + 1] = e
+            elseif e.hay:find(text, 1, true) then said[#said + 1] = e end
         end
+        for _, e in ipairs(said) do found[#found + 1] = e end
         results.head:SetText(#found == 0 and ("Nothing matches \"" .. text .. "\"")
             or ("%d setting%s"):format(#found, #found == 1 and "" or "s"))
         for i = 1, math.min(#found, 12) do
@@ -5238,7 +5809,7 @@ local function BuildSettings(page)
             local e = found[i]
             b.e = e
             b.name:SetText(strtrim(e.label))
-            b.where:SetText(LabelOf(e.key) .. (e.tip and ("  ·  " .. FirstSentence(e.tip)) or ""))
+            b.where:SetText((e.where or LabelOf(e.key)) .. (e.tip and ("  ·  " .. FirstSentence(e.tip)) or ""))
             b:Show()
         end
         for i = math.min(#found, 12) + 1, #results.items do results.items[i]:Hide() end
@@ -5249,26 +5820,30 @@ local function BuildSettings(page)
     search:SetPoint("TOPLEFT", 12, -12)
     tourAt.search = search
     YR.SettingsSearch, YR.SettingsGo = Search, Go      -- for tests
+    function YR.SettingsSearching() return results:IsShown() end
+    -- A tab at the top clears it too, as a page picked in the menu does: QoL and Interface are one page, and the
+    -- results stood over the other tab's pages (the review, 2026-10-21).
+    function settings.ClearSearch()
+        search:SetValue("")
+        search:ClearFocus()
+        results:Hide()
+    end
 
     -- (Quality of life's own switch, everything on this tab on or off, was at the top of this menu; it is
     -- at the top of All features now - PageHead - and the menu is the pages alone.)
-    local y = -48
+    -- The menu is the pages of the tab that shows - QoL's or Interface's - under their groups (LayNav).
+    local items = {}
     for _, t in ipairs(CATEGORIES) do
         if t.group then
             local g = S.Text(nav, 11, S.C.muted)
-            g:SetPoint("TOPLEFT", 18, y - 8)
             g:SetText(t.group:upper())
-            y = y - 22
+            items[#items + 1] = { tab = t.tab, label = g }
         else
             local b = CreateFrame("Button", nil, nav)
-            -- (21 high, a group's name 22 with room above it: six groups and General, and the menu ends inside the window)
+            -- (21 high, a group's name 22 with room above it)
             b:SetSize(NAV_W - 16, 21)
-            b:SetPoint("TOPLEFT", 8, y)
+            items[#items + 1] = { tab = t.tab, button = b }
             b.bg = S.Fill(b, { 0, 0, 0, 0 })
-            b.bar = b:CreateTexture(nil, "ARTWORK")
-            b.bar:SetPoint("TOPLEFT") b.bar:SetPoint("BOTTOMLEFT") b.bar:SetWidth(2)
-            S.Set(b.bar, S.C.accent)
-            b.bar:Hide()
             b.icon = b:CreateTexture(nil, "ARTWORK")
             b.icon:SetSize(20, 20)
             b.icon:SetPoint("LEFT", 10, 0)
@@ -5284,8 +5859,7 @@ local function BuildSettings(page)
             S.ArtTexture(b.dot, "dot")
             function b:Select(on)
                 self.selected = on
-                self.bg:SetColorTexture(unpack(on and S.C.accentD or { 0, 0, 0, 0 }))
-                self.bar:SetShown(on)
+                self.bg:SetColorTexture(unpack(on and S.C.raised or { 0, 0, 0, 0 }))
                 self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
                 self.icon:SetDesaturated(not on)
                 self.icon:SetAlpha(on and 1 or 0.8)
@@ -5304,11 +5878,33 @@ local function BuildSettings(page)
             b:SetScript("OnClick", function() search:SetValue("") search:ClearFocus() results:Hide() ShowTab(t.key) end)
             t.button = b
             tourAt["menu:" .. t.key] = b
-            y = y - 21
         end
     end
-
-    settings.navBottom = -y          -- how far down the menu reaches (it has to end inside the window)
+    --- The menu of one tab: its groups and pages, top down; the other tab's hidden.
+    settings.navBottoms = {}
+    function settings.LayNav(tab)
+        settings.navTab = tab
+        local y = -48
+        for _, it in ipairs(items) do
+            local f = it.label or it.button
+            f:SetShown(it.tab == tab)
+            if it.tab == tab then
+                f:ClearAllPoints()
+                if it.label then
+                    f:SetPoint("TOPLEFT", 18, y - 8)
+                    y = y - 22
+                else
+                    f:SetPoint("TOPLEFT", 8, y)
+                    y = y - 21
+                end
+            end
+        end
+        -- how far down the menu reaches (it has to end inside the window): the longer tab's
+        settings.navBottoms[tab] = -y
+        settings.navBottom = math.max(settings.navBottoms.qol or 0, settings.navBottoms.interface or 0)
+    end
+    settings.LayNav("interface")
+    settings.LayNav("qol")
     settings.Header = PageHead(page)
 
     for _, t in ipairs(CATEGORIES) do
@@ -5320,28 +5916,36 @@ local function BuildSettings(page)
             t.frame = f          -- built the first time it's shown (RefreshSettings): a fast first open
         end
     end
-    local reload = S.Button(page, "Reload UI", function() ReloadUI() end, nil, 110)
-    reload:SetPoint("BOTTOMLEFT", 16, 14)
-    local close = S.Button(page, "Close", function() win:Hide() end, nil, 110)
-    close:SetPoint("BOTTOMRIGHT", -16, 14)
-    -- (a new install is shown around by the tour, hints over this window: Welcome.lua)
-    local welcome = S.Button(page, "Tour", function() YR.WelcomeShow() end, nil, 110)
-    welcome:SetPoint("RIGHT", close, "LEFT", -8, 0)     -- (pages have buttons of their own beside Reload UI)
-    welcome.tip = "A quick look around this window: where everything is, a hint at a time"
-    local arrange = S.Button(page, "Arrange", function()
+    -- The foot of the window: one button that looks like one, Arrange on screen (where every bar, button and icon of
+    -- ours stands is set there and nowhere else); the rest quiet words. (Five buttons of one weight stood here, Close
+    -- among them, with the window's own X above: the owner, 2026-10-21.)
+    local reload = S.Button(page, "Reload UI", function() ReloadUI() end, "ghost", 90)
+    reload:SetPoint("BOTTOMLEFT", 10, 14)
+    reload:SetTextColour(S.C.sub)
+    local arrange = S.Button(page, "Arrange on screen", function()
         if YR.ArrangeOpen() then win:Hide() end
-    end, nil, 110)
-    arrange:SetPoint("RIGHT", welcome, "LEFT", -8, 0)
+    end, nil, 140)
+    arrange:SetPoint("BOTTOMRIGHT", -16, 14)
     tourAt.arrange = arrange
     arrange.tip = "Move Headstart's bars, buttons and icons on a grid: drag them, or click one and use the arrow keys. Also /hs move"
-    local move = S.Button(page, "Move settings", function() YR.TransferShow() end, nil, 130)
-    move:SetPoint("RIGHT", arrange, "LEFT", -8, 0)
+    -- (a new install is shown around by the tour, hints over this window: Welcome.lua)
+    local welcome = S.Button(page, "Tour", function() YR.WelcomeShow() end, "ghost", 70)
+    welcome:SetPoint("RIGHT", arrange, "LEFT", -6, 0)     -- (pages have buttons of their own beside Reload UI)
+    welcome:SetTextColour(S.C.sub)
+    welcome.tip = "A quick look around this window: where everything is, a hint at a time"
+    local move = S.Button(page, "Move settings", function() YR.TransferShow() end, "ghost", 110)
+    move:SetPoint("RIGHT", welcome, "LEFT", -2, 0)
+    move:SetTextColour(S.C.sub)
     move.tip = "Your settings, bar profiles and routes as a text, to take to another install: the live game, another computer, a friend. Also /headstart transfer"
     settings.tab = "home"
 end
 
 local function RefreshSettings()
     win.subtitle:SetText("")
+    -- the tab of the page that shows (a card on All features, or the search, can lead to the other tab's)
+    local tab = CategoryTab(settings.tab)
+    if settings.navTab ~= tab then settings.LayNav(tab) end
+    for name, b in pairs(ui.topTabs or {}) do b:Select(name == tab) end
     for _, t in ipairs(CATEGORIES) do
         if t.key then
             t.frame:SetShown(t.key == settings.tab)
@@ -5360,11 +5964,453 @@ local function RefreshSettings()
     end
 end
 
+-- (All routes and Talents: their own block, under Lua's two hundred names at a time in one file; their names are
+-- declared above CATEGORIES)
+do
+-- ---------------------------------------------------------------------------
+-- All routes: every route of this character's race and class (or every race's), by level, each with how far you are
+-- in it and what it is to you; load it in RestedXP, or open it in the editor. Import and Share at its foot. (They were
+-- a list folded by level in the menu beside the pages: the owner, 2026-10-21, "the sidebar is confusing".)
+-- ---------------------------------------------------------------------------
+local lib = { rows = {}, heads = {} }
+local LIB_ROW, LIB_HEAD = 40, 28
+
+-- "12-14 Loch Modan (Dwarf/Gnome)": "12-14", "Loch Modan", "Dwarf/Gnome", 12
+local function RouteParts(key)
+    local name = YR.GuideName(key)
+    local range, zone = name:match("^(%d+%-%d+)%s+(.+)$")
+    zone = (zone or name):gsub("%s*%(Launch%)", "")
+    return range or "", (zone:gsub("%s*%b()", "")), zone:match("%((.-)%)"), tonumber(range and range:match("^%d+")) or 0
+end
+
+local function Hex(c) return ("%02x%02x%02x"):format(c[1] * 255, c[2] * 255, c[3] * 255) end
+
+local function LoadRoute(key, first)
+    local ok, why = YR.LoadRouteAt(key, first)
+    YR.Print(ok and ("loaded %s at step %d."):format(YR.GuideName(key), first or 1) or why)
+    YR:RefreshWindow()
+end
+
+local function LibraryRow(c, w)
+    local r = CreateFrame("Button", nil, c)
+    r:SetSize(w, LIB_ROW)
+    r.hl = S.Fill(r, S.C.hover)
+    r.hl:Hide()
+    r.line = r:CreateTexture(nil, "BORDER")
+    r.line:SetPoint("TOPLEFT")
+    r.line:SetPoint("TOPRIGHT")
+    S.Hair(r.line, "h")
+    S.Set(r.line, S.C.line)
+    r.range = S.Text(r, 12, S.C.sub)
+    r.range:SetPoint("LEFT", 14, 0)
+    r.name = S.Text(r, 14)
+    r.name:SetPoint("LEFT", 66, 0)
+    r.name:SetPoint("RIGHT", r, "LEFT", w - 350, 0)
+    r.quests = S.Text(r, 13, S.C.muted)
+    r.quests:SetPoint("LEFT", w - 340, 0)
+    r.state = StateLight(r)
+    r.state:SetPoint("LEFT", w - 236, 0)
+    r.edit = S.Button(r, "Edit", function() Open(r.key) YR:ToggleWindow("routes") end, "ghost", 44)
+    r.edit:SetHeight(26)
+    r.edit:SetTextColour(S.C.sub)
+    r.edit:SetPoint("RIGHT", -8, 0)
+    r.edit.tip = "Open it in the route editor: its steps, to change"
+    r.load = S.Button(r, "Load", function() if r.first then LoadRoute(r.key, r.first) end end, nil, 56)
+    r.load:SetHeight(26)
+    r.load:SetPoint("RIGHT", r.edit, "LEFT", -6, 0)
+    r.load.tip = "Load it in RestedXP, at the first step you haven't done"
+    -- lit under the mouse, over its buttons too
+    local function Leave() if not r:IsMouseOver() then r.hl:Hide() end end
+    r:SetScript("OnEnter", function() r.hl:Show() end)
+    r:SetScript("OnLeave", Leave)
+    for _, b in ipairs({ r.edit, r.load }) do
+        b:HookScript("OnEnter", function() r.hl:Show() end)
+        b:HookScript("OnLeave", Leave)
+    end
+    return r
+end
+
+local function LibraryHead(c, w)
+    local h = CreateFrame("Frame", nil, c)
+    h:SetSize(w, LIB_HEAD)
+    S.Fill(h, S.C.stripe)
+    h.line = h:CreateTexture(nil, "BORDER")
+    h.line:SetPoint("TOPLEFT")
+    h.line:SetPoint("TOPRIGHT")
+    S.Hair(h.line, "h")
+    S.Set(h.line, S.C.line)
+    h.text = S.Text(h, 11, S.C.muted)
+    h.text:SetPoint("BOTTOMLEFT", 14, 6)
+    return h
+end
+
+function BuildLibrary(page)
+    lib.head = LevelHead(page)
+    -- this character's routes, or every race's (YippRouteDB.allRoutes)
+    lib.seg = Segmented(page, "Mine", "Every race", function() return not YippRouteDB.allRoutes end, function(mine)
+        YippRouteDB.allRoutes = (not mine) or nil
+        YR:RefreshWindow()
+    end)
+    lib.seg:SetPoint("RIGHT", page, "TOPRIGHT", -24, -31)
+    local top = -(TITLE_H + 12)
+    local h = PH - TITLE_H - 12 - 58
+    local panel = CreateFrame("Frame", nil, page)
+    panel:SetPoint("TOPLEFT", 16, top)
+    panel:SetSize(PW - 40, h)
+    Panel(panel, true)
+    lib.area = S.ScrollArea(panel, PW - 42, h - 8)
+    lib.area:SetPoint("TOPLEFT", 1, -4)
+    lib.cw = PW - 42 - 14                       -- (its content's width: the scroll bar beside it)
+    lib.none = S.Text(panel, 13, S.C.sub)
+    lib.none:SetPoint("CENTER")
+    lib.none:SetWidth(PW - 140)
+    lib.none:SetWordWrap(true)
+    lib.none:SetJustifyH("CENTER")
+    lib.none:SetText("No routes yet. Play with This run recording and Save as route, or import a route someone shared.")
+    -- the foot: making routes of your own, and moving them between players
+    local hint = S.Text(page, 12, S.C.muted)
+    hint:SetPoint("BOTTOMLEFT", 18, 24)
+    hint:SetText("Your own: play with This run recording, then Save as route.")
+    lib.share = S.Button(page, "Share...", function() YR:ShareOpen("export") end, nil, 120)
+    lib.share:SetPoint("BOTTOMRIGHT", -24, 16)
+    lib.share.tip = "The route open in the editor as text, to send to someone"
+    local import = S.Button(page, "Import a route...", function() YR:ShareOpen("import") end, "ghost", 130)
+    import:SetTextColour(S.C.sub)
+    import:SetPoint("RIGHT", lib.share, "LEFT", -6, 0)
+    import.tip = "Paste a route someone shared with you"
+end
+
+function RefreshLibrary()
+    win.subtitle:SetText("")
+    local race, class = UnitRace("player"), UnitClass("player")
+    lib.seg.first:SetLabel(("%s %s"):format(race or "", class or ""))
+    lib.seg:Refresh()
+    local mine = YR.MyRoutes()
+    local all = YippRouteDB.allRoutes or not next(mine)
+    local list = {}
+    for _, g in ipairs(YR.shipped or {}) do
+        -- (the one open in the editor always: you are working on it)
+        if all or mine[g.key] or g.key == edit.key then
+            local range, short, qual, from = RouteParts(g.key)
+            list[#list + 1] = { key = g.key, range = range, short = short, qual = qual, from = from }
+        end
+    end
+    table.sort(list, function(a, b) if a.from ~= b.from then return a.from < b.from end return a.short < b.short end)
+    lib.head:Set({ icon = 237381, title = "All routes", right = lib.seg:GetWidth() + 12,
+        desc = all and ("%d routes for every race. Load one in RestedXP, or open it to change its steps."):format(#list)
+            or ("%d routes for a %s %s. Load one in RestedXP, or open it to change its steps."):format(#list, race or "", class or "") })
+    local best = YR.WhereNextBest and YR.WhereNextBest()
+    local w = lib.cw
+    local y, bracket, nr, nh = 0, nil, 0, 0
+    local qualHex = Hex(S.C.muted)
+    for _, e in ipairs(list) do
+        local b = math.floor(e.from / 10) * 10
+        if b ~= bracket then
+            bracket, nh = b, nh + 1
+            local hd = lib.heads[nh] or LibraryHead(lib.area.content, w)
+            lib.heads[nh] = hd
+            hd:ClearAllPoints()
+            hd:SetPoint("TOPLEFT", 0, y)
+            hd.line:SetShown(y ~= 0)
+            hd.text:SetText(("LEVELS %d-%d"):format(math.max(b, 1), b + 10))
+            hd:Show()
+            y = y - LIB_HEAD
+        end
+        nr = nr + 1
+        local r = lib.rows[nr] or LibraryRow(lib.area.content, w)
+        lib.rows[nr] = r
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", 0, y)
+        r:Show()
+        r.key = e.key
+        local p = YR.RouteProgressKept and YR.RouteProgressKept(e.key) or { total = 0, done = 0, left = 0 }
+        r.first = p.first
+        local done = p.total > 0 and p.left == 0
+        r.range:SetText(e.range)
+        r.range:SetTextColor(unpack(done and S.C.muted or S.C.sub))
+        r.name:SetText(e.short .. ((all and e.qual) and ("  |cff" .. qualHex .. e.qual .. "|r") or ""))
+        r.name:SetTextColor(unpack(done and S.C.muted or S.C.text))
+        r.quests:SetText(p.total == 0 and "" or done and ("All %d done"):format(p.total)
+            or p.done > 0 and ("%d of %d done"):format(p.done, p.total) or ("%d quests"):format(p.total))
+        local text, color
+        if YR.RouteLoaded and YR.RouteLoaded(e.key) then text, color = "In RestedXP", S.C.green
+        elseif YR:HasUpdate(e.key) then text, color = "Update waiting", S.C.accent
+        elseif YR:IsCustom(e.key) then text, color = "Your version", S.C.gold
+        elseif best and best.key == e.key then text, color = "Take this one", S.C.on
+        elseif done then text = "Done" end
+        r.state:Set(text or "", color)
+        r.state.dot:SetShown(color ~= nil)
+        r.load:SetEnabled(r.first ~= nil)
+        r.canLoad = r.first ~= nil
+        y = y - LIB_ROW
+    end
+    for i = nr + 1, #lib.rows do lib.rows[i]:Hide() end
+    for i = nh + 1, #lib.heads do lib.heads[i]:Hide() end
+    lib.area.content:SetHeight(math.max(10, -y + 4))
+    if lib.area.UpdateBar then lib.area:UpdateBar() end
+    lib.none:SetShown(#list == 0)
+    local short = edit.key and select(2, RouteParts(edit.key))
+    lib.share:SetLabel(short and ("Share " .. short .. "...") or "Share...")
+    lib.share:SetWidth(math.floor(lib.share.text:GetStringWidth() + 32))
+    lib.share:SetEnabled(edit.key ~= nil)
+end
+--- For the tests: All routes' rows as shown - { key, name, quests, state, load (it can be loaded) }.
+function YR.LibraryShown()
+    local out = {}
+    for _, r in ipairs(lib.rows) do
+        if r:IsShown() then
+            out[#out + 1] = { key = r.key, name = r.name:GetText(), quests = r.quests:GetText(), state = r.state.text:GetText(), load = r.canLoad }
+        end
+    end
+    return out
+end
+
+-- ---------------------------------------------------------------------------
+-- Talents: Headstart's builds for a class (Talents.lua) - its three trees with each talent's points, and what to take
+-- at each level beside them - and one followed on this character (the talent points notice then says what is next).
+-- A card on Interface's Talents page until 2026-10-21; the talent window's own settings stay there (Talent window).
+-- ---------------------------------------------------------------------------
+local builds = { cells = {}, tabs = {}, rows = {} }
+local CELL, CELL_GAP, TREE_GAP = 30, 8, 22     -- a talent's icon, the room between two, and between two trees
+local ORDER_ROW = 26
+
+local function BuildsOf(class) return YR.TalentBuildsOf and YR.TalentBuildsOf(class) or {} end
+-- The build in view: the one picked, else the one followed (of your class), else the class's first.
+local function BuildInView()
+    local list = BuildsOf(builds.class)
+    for _, b in ipairs(list) do if b.key == builds.key then return b end end
+    local followed = builds.class == YR.TalentClassID() and YR.TalentFollowed and YR.TalentFollowed()
+    builds.key = followed and followed.key or (list[1] and list[1].key)
+    for _, b in ipairs(list) do if b.key == builds.key then return b end end
+    return nil
+end
+
+function BuildBuilds(page)
+    builds.class = YR.TalentClassID and YR.TalentClassID() or 1
+    local top = -12             -- (under QoL's heading: the page is the frame beneath it)
+    local classOpts = {}
+    for _, o in ipairs(TALENT_CLASSES) do classOpts[#classOpts + 1] = { o[1], o[2] } end
+    builds.classes = S.Dropdown(page, 140, classOpts, function(v) builds.class, builds.key = v, nil YR:RefreshWindow() end)
+    builds.classes:SetPoint("TOPLEFT", 16, top - 3)
+    local function Pick(v)
+        builds.key = v
+        -- (a build picked while one of your class is followed: that one is followed from now on)
+        if builds.class == YR.TalentClassID() and YR.TalentFollowed and YR.TalentFollowed() then YR.TalentFollow(v) end
+        YR:RefreshWindow()
+    end
+    builds.pick = S.Dropdown(page, 290, {}, Pick)
+    builds.pick:SetPoint("LEFT", builds.classes, "RIGHT", 8, 0)
+    -- (its list is made again as it opens, for the class shown)
+    builds.pick:SetScript("OnClick", function(self)
+        local opts = {}
+        for _, b in ipairs(BuildsOf(builds.class)) do opts[#opts + 1] = { b.key, b.name } end
+        S.OpenMenu(self, opts, Pick, 290)
+    end)
+    builds.follow = S.Switch(page, function() return YR.TalentFollowed and YR.TalentFollowed() ~= nil end, function(on)
+        if not on then YR.TalentFollow(nil) YR:RefreshWindow() return end
+        -- the build in view when it is your class's, else your class's first
+        local own = YR.TalentClassID()
+        local key = builds.class == own and builds.key or (BuildsOf(own)[1] and BuildsOf(own)[1].key)
+        if key then YR.TalentFollow(key) end
+        YR:RefreshWindow()
+    end)
+    builds.follow:SetPoint("TOPRIGHT", -24, top - 5)
+    builds.followText = CreateFrame("Button", nil, page)
+    builds.followText.text = S.Text(builds.followText, 13)
+    builds.followText.text:SetPoint("RIGHT")
+    builds.followText.text:SetText("Follow it on this character")
+    builds.followText:SetSize(builds.followText.text:GetStringWidth() + 4, 20)
+    builds.followText:SetPoint("RIGHT", builds.follow, "LEFT", -10, 0)
+    builds.followText:SetScript("OnClick", function() builds.follow:Click() end)
+    builds.followText:SetScript("OnEnter", function(self) S.Tip(self, "This character follows the build in view (of your own"
+        .. " class): the talent points notice says which talent it takes next, and its tooltip the next ones. Pick another"
+        .. " build and that one is followed.") end)
+    builds.followText:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- the three trees
+    local panelTop = top - 30 - 12
+    local h = CH + panelTop - 56                -- (clear of the foot's buttons)
+    local col = CELL + CELL_GAP
+    local treeW = 4 * col - CELL_GAP
+    local trees = CreateFrame("Frame", nil, page)
+    trees:SetPoint("TOPLEFT", 16, panelTop)
+    trees:SetSize(3 * treeW + 2 * TREE_GAP + 32, h)
+    Panel(trees, true)
+    for t = 1, 3 do
+        local x = 16 + (t - 1) * (treeW + TREE_GAP)
+        builds.tabs[t] = S.Text(trees, 14)
+        builds.tabs[t]:SetPoint("TOPLEFT", x, -14)
+        for row = 1, 7 do
+            for c4 = 1, 4 do
+                local b = CreateFrame("Button", nil, trees)
+                b:SetSize(CELL, CELL)
+                b:SetPoint("TOPLEFT", x + (c4 - 1) * col, -40 - (row - 1) * col)
+                b.icon = b:CreateTexture(nil, "ARTWORK")
+                b.icon:SetAllPoints()
+                b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                b.edge = S.Border(b, S.C.line)
+                b.rank = S.Text(b, 11, S.C.text)
+                b.rank:SetFont(S.FONT, 11, "OUTLINE")
+                b.rank:SetPoint("BOTTOMRIGHT", 4, -4)
+                b:SetScript("OnEnter", function(self)
+                    if not self.spell then return end
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    if GameTooltip.SetSpellByID then GameTooltip:SetSpellByID(self.spell) end
+                    if self.levels and #self.levels > 0 then
+                        GameTooltip:AddLine(" ")
+                        GameTooltip:AddLine("This build: level " .. table.concat(self.levels, ", "), 1, 0.82, 0)
+                    end
+                    if self.mine then GameTooltip:AddLine(("You have %d of %d"):format(self.mine, self.max), 0.6, 0.9, 0.6) end
+                    GameTooltip:Show()
+                end)
+                b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                b:Hide()
+                builds.cells[t .. ":" .. row .. ":" .. c4] = b
+            end
+        end
+    end
+    -- what the edges say: taken (yours), in the build
+    local function Legend(x, color, label)
+        local sq = CreateFrame("Frame", nil, trees)
+        sq:SetSize(11, 11)
+        sq:SetPoint("BOTTOMLEFT", x, 18)
+        S.Fill(sq, S.C.field)
+        S.Border(sq, color)
+        local t = S.Text(trees, 12, S.C.muted)
+        t:SetPoint("LEFT", sq, "RIGHT", 7, 0)
+        t:SetText(label)
+        return x + 18 + t:GetStringWidth() + 18
+    end
+    Legend(Legend(16, S.C.boxOn, "Taken"), S.C.boxLine, "In this build")
+    -- (what follows a build says it in the talent points notice: its settings are QoL's, Reminders)
+    local notice = S.Button(trees, "Talent points notice settings", function() YR:ShowSettingsTab("reminders") end, "ghost", 190)
+    notice:SetTextColour(S.C.sub)
+    notice:SetHeight(24)
+    notice:SetPoint("BOTTOMRIGHT", -10, 10)
+    notice.tip = "How the notice tells you of points to spend, and which talent is next: QoL, Reminders"
+    builds.none = S.Text(trees, 13, S.C.sub)
+    builds.none:SetPoint("CENTER")
+    builds.none:SetText("No talent trees for this class yet.")
+
+    -- the order, by level, beside them
+    local list = CreateFrame("Frame", nil, page)
+    list:SetPoint("TOPLEFT", trees, "TOPRIGHT", 12, 0)
+    list:SetPoint("TOPRIGHT", page, "TOPRIGHT", -24, panelTop)
+    list:SetHeight(h)
+    Panel(list)
+    local cap = S.Text(list, 11, S.C.muted)
+    cap:SetPoint("TOPLEFT", 14, -14)
+    cap:SetText("BY LEVEL")
+    local listW = PW - 40 - (3 * treeW + 2 * TREE_GAP + 32) - 12
+    builds.area = S.ScrollArea(list, listW - 2, h - 40)
+    builds.area:SetPoint("TOPLEFT", 1, -34)
+    builds.cw = listW - 2 - 14
+end
+
+local function OrderRow(c, w)
+    local r = CreateFrame("Frame", nil, c)
+    r:SetSize(w, ORDER_ROW)
+    r.bg = S.Fill(r, { 0, 0, 0, 0 })
+    r.lvl = S.Text(r, 12, S.C.muted)
+    r.lvl:SetPoint("LEFT", 14, 0)
+    r.name = S.Text(r, 13, S.C.sub)
+    r.name:SetPoint("LEFT", 58, 0)
+    r.name:SetPoint("RIGHT", -40, 0)
+    r.rank = S.Text(r, 12, S.C.muted)
+    r.rank:SetPoint("RIGHT", -12, 0)
+    return r
+end
+
+function RefreshBuilds()
+    win.subtitle:SetText("")
+    local class = builds.class
+    local build = BuildInView()
+    for _, o in ipairs(TALENT_CLASSES) do if o[1] == class then builds.classes:SetValue(o[2]) end end
+    builds.pick:SetValue(build and build.name or "No builds for this class yet")
+    builds.follow:Refresh()
+    local tree = YR.TalentTrees and YR.TalentTrees[class]
+    for _, b in pairs(builds.cells) do b:Hide() end
+    for t = 1, 3 do builds.tabs[t]:SetText("") end
+    builds.none:SetShown(tree == nil)
+    for _, r in ipairs(builds.rows) do r:Hide() end
+    if not tree then return end
+    local want, levels, spent = {}, {}, { 0, 0, 0 }
+    for i, node in ipairs(build and build.points or {}) do
+        want[node] = (want[node] or 0) + 1
+        levels[node] = levels[node] or {}
+        levels[node][#levels[node] + 1] = 9 + i
+        spent[tree.nodes[node][3]] = spent[tree.nodes[node][3]] + 1
+    end
+    local mine = class == YR.TalentClassID() and YR.TalentRanksNow() or nil
+    for t = 1, 3 do
+        builds.tabs[t]:SetText(("%s  |cff%s%d|r"):format(tree.tabs[t], Hex(S.C.muted), spent[t]))
+        builds.tabs[t]:SetTextColor(unpack(spent[t] > 0 and S.C.text or S.C.muted))
+    end
+    for node, n in pairs(tree.nodes) do
+        local b = builds.cells[n[3] .. ":" .. n[4] .. ":" .. n[5]]
+        if b then
+            local tex = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(n[1])
+            b.icon:SetTexture(tex or 134400)
+            local got, have = want[node] or 0, mine and mine[node] or 0
+            b.icon:SetDesaturated(got == 0 and have == 0)
+            b.icon:SetAlpha((got == 0 and have == 0) and 0.4 or 1)
+            b.rank:SetText(have > 0 and (have .. "/" .. n[2]) or got > 0 and (got .. "/" .. n[2]) or "")
+            b.rank:SetTextColor(unpack(have > 0 and S.C.text or S.C.sub))
+            b.edge:Color(have > 0 and S.C.boxOn or got > 0 and S.C.boxLine or S.C.line)
+            b.spell, b.levels, b.max = n[1], levels[node], n[2]
+            b.mine = mine and mine[node] or nil
+            b:Show()
+        end
+    end
+    -- the order: runs of points in one talent, as levels; the next one to take lit (your own class)
+    local runs, run, count = {}, nil, {}
+    for i, node in ipairs(build and build.points or {}) do
+        count[node] = (count[node] or 0) + 1
+        if run and run.node == node and run.to == 8 + i then
+            run.to, run.rank = 9 + i, count[node]
+        else
+            run = { node = node, from = 9 + i, to = 9 + i, rank = count[node] }
+            runs[#runs + 1] = run
+        end
+    end
+    local w = builds.cw
+    local lit = false
+    builds.lit = nil
+    for i, ru in ipairs(runs) do
+        local r = builds.rows[i] or OrderRow(builds.area.content, w)
+        builds.rows[i] = r
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", 0, -(i - 1) * ORDER_ROW)
+        r:Show()
+        local have = mine and (mine[ru.node] or 0)
+        local nextOne = have and not lit and have < ru.rank
+        if nextOne then lit, builds.lit = true, i end
+        local name = YR.TalentNodeName(class, ru.node)
+        r.lvl:SetText(ru.from == ru.to and tostring(ru.from) or (ru.from .. "-" .. ru.to))
+        r.name:SetText(name .. ((nextOne and have > 0) and ("  (%d of %d taken)"):format(have, ru.rank) or ""))
+        r.name:SetTextColor(unpack(nextOne and S.C.text or S.C.sub))
+        r.rank:SetText(("%d/%d"):format(ru.rank, tree.nodes[ru.node][2]))
+        r.rank:SetTextColor(unpack(nextOne and S.C.text or S.C.muted))
+        r.bg:SetColorTexture(unpack(nextOne and S.C.raised or { 0, 0, 0, 0 }))
+    end
+    builds.area.content:SetHeight(math.max(10, #runs * ORDER_ROW + 4))
+    if builds.area.UpdateBar then builds.area:UpdateBar() end
+end
+--- For the tests: the Talents page as shown - { class, key, cells (talents drawn), rows (lines of the order), follow }.
+function YR.BuildsShown()
+    local cells, rows = 0, 0
+    for _, b in pairs(builds.cells) do if b:IsShown() then cells = cells + 1 end end
+    for _, r in ipairs(builds.rows) do if r:IsShown() then rows = rows + 1 end end
+    return { class = builds.class, key = builds.key, cells = cells, rows = rows, follow = builds.follow, lit = builds.lit }
+end
+
+end
+
 -- ---------------------------------------------------------------------------
 -- Route settings: a Levelling page, under a heading like QoL's pages
 -- ---------------------------------------------------------------------------
-local ROUTE_PAGE = { icon = 134269, label = "Route settings", scope = "Every character on this account",
-    desc = "Routes, run recording, death skips, group play and level splits." }
+local ROUTE_PAGE = { icon = 134063, label = "Route settings", scope = "Every character on this account",
+    desc = "Routes, group play, run recording and level splits." }
 
 local function BuildRoutePage(page)
     PageHead(page)(ROUTE_PAGE)
@@ -5420,7 +6466,7 @@ end
 local routesOff
 local routesWere                -- the routes switch as it was when the window was made (a change takes a reload)
 local function BuildRoutesOff(page)
-    routesOff = OffCard(page, { icon = "Interface\\Icons\\INV_Misc_Map_01", title = "Levelling routes",
+    routesOff = OffCard(page, { icon = "Interface\\Icons\\INV_Misc_Map_01", title = "Routes",
         text = "Records your runs and saves them as your own RestedXP routes. Includes a route editor, level"
             .. " splits, and help keeping and buying the items a route needs.\n\nWhile off, none of it runs and"
             .. " nothing is shown. Account-wide. Takes a /reload.",
@@ -5431,7 +6477,7 @@ end
 
 -- Character setup: its own tab. On: the page. Off (or its addon not there): only the switch.
 local SETUP_PAGE = { icon = 134166, label = "Character setup",
-    scope = function() return "Every " .. (CLASS_NAME[ViewClass()] or "character") .. "; chat and Edit Mode for all" end,
+    scope = function() return "Bars: every " .. (CLASS_NAME[ViewClass()] or "character") .. "'s own. Interface: every character's" end,
     desc = "Profiles for your action bars, and your bars, macros and interface on every character." }
 local setupTab = {}
 local function BuildSetupPage(page)
@@ -5471,56 +6517,70 @@ local function RefreshSetupPage()
 end
 
 -- ---------------------------------------------------------------------------
--- The window: two tabs at the top, QoL and Levelling, each with its own menu down the left
+-- The window: four tabs at the top - QoL, Interface, Levelling, Character setup - each with its own menu down the left
 -- ---------------------------------------------------------------------------
--- tab: which top tab a page is under. nav: shown in Levelling's menu (the routes page is opened from
--- the route list under it instead).
+-- tab: which top tab a page is under ("settings" is QoL's and Interface's, as the page showing on it is: TabOf).
+-- nav: in Levelling's menu (true: top down; "foot": at its foot); under: the menu's page it belongs to (the editor and
+-- Share: All routes'); routes: the routes' own - while they are off, the page that switches them on in its place.
 local PAGES = {
-    { key = "routes", tab = "levelling", build = BuildRoutes, refresh = RefreshRoutes },
-    { key = "where", tab = "levelling", nav = true, label = "Where next?", icon = "Interface\\Icons\\Ability_Hunter_Pathfinding",
-      build = YR.BuildWherePage, refresh = function() win.subtitle:SetText("") YR.RefreshWherePage() end },
-    { key = "run", tab = "levelling", nav = true, label = "This run", icon = "Interface\\Icons\\INV_Misc_PocketWatch_01",
-      build = BuildRun, refresh = RefreshRun },
-    { key = "share", tab = "levelling", nav = true, label = "Share", icon = "Interface\\Icons\\INV_Letter_15", build = BuildShare,
-      refresh = function() win.subtitle:SetText("") end },
+    { key = "where", tab = "levelling", nav = true, routes = true, label = "Next route", icon = 132181,
+      build = function(page)
+          YR.BuildWherePage(page, { head = LevelHead, panel = Panel, light = StateLight, clock = Clock, width = PW, top = TITLE_H,
+              steps = function(key) Open(key) YR:ToggleWindow("routes") end })
+      end, refresh = function() win.subtitle:SetText("") YR.RefreshWherePage() end },
+    { key = "library", tab = "levelling", nav = true, routes = true, label = "All routes", icon = 237381,
+      build = BuildLibrary, refresh = RefreshLibrary },
+    { key = "run", tab = "levelling", nav = true, routes = true, label = "This run", icon = 134376, build = BuildRun, refresh = RefreshRun },
     -- (the menu says Settings: under the Levelling tab it can be no other's - the owner, 2026-10-15; the page's
     -- heading still says Route settings)
-    { key = "route", tab = "levelling", nav = true, label = "Settings", icon = 134269, build = BuildRoutePage,
+    { key = "route", tab = "levelling", nav = "foot", routes = true, label = "Settings", icon = 134063, build = BuildRoutePage,
       refresh = RefreshRoutePage },
+    { key = "routes", tab = "levelling", under = "library", routes = true, build = BuildRoutes, refresh = RefreshRoutes },
+    { key = "share", tab = "levelling", under = "library", routes = true, build = BuildShare, refresh = RefreshShare },
     { key = "routesoff", tab = "levelling", build = BuildRoutesOff, refresh = function() win.subtitle:SetText("") routesOff:Refresh() end },
     { key = "settings", tab = "qol", build = BuildSettings, refresh = RefreshSettings },
     { key = "setup", tab = "setup", build = BuildSetupPage, refresh = RefreshSetupPage },
 }
-local PAGE_TAB = {}
-for _, p in ipairs(PAGES) do PAGE_TAB[p.key] = p.tab end
+local PAGE_TAB, PAGE_BY = {}, {}
+for _, p in ipairs(PAGES) do PAGE_TAB[p.key], PAGE_BY[p.key] = p.tab, p end
 local lastLevelling          -- the Levelling page last shown, for coming back to that tab
-function YR.WindowTab() return PAGE_TAB[current] end      -- for the tests
+local function TabOf(key)
+    if key == "settings" then return CategoryTab(settings.tab) end
+    return PAGE_TAB[key]
+end
+function YR.WindowTab() return TabOf(current) end      -- for the tests
+function YR.WindowPage() return current end
+--- Whether the window is up on this page (a Levelling one, or a QoL or Interface page by its key).
+function YR.WindowShowing(key)
+    return (win and win:IsShown() and (current == key or (current == "settings" and settings.tab == key))) and true or false
+end
 
 local function Show(key)
     if key == "character" then key = "setup" end        -- its name while it was a QoL page
-    -- Levelling with the routes off is one page: the switch
-    if PAGE_TAB[key] == "levelling" and not YR.RoutesOn() then key = "routesoff" end
     if not PAGE_TAB[key] then           -- a QoL page by its own name ("instances", "camps", ...)
         ShowTab(key, true)
         key = "settings"
     end
+    local p = PAGE_BY[key]
+    local navKey = p.under or key       -- lit in the menu: the page, or the one it is under
+    if p.tab == "levelling" and key ~= "routesoff" then lastLevelling = key end
+    -- the routes' own pages, with the routes off: the page that switches them on (Talents is everyone's)
+    if p.routes and not YR.RoutesOn() then key = "routesoff" end
     current = key
-    local tab = PAGE_TAB[key]
-    if tab == "levelling" and key ~= "routesoff" then lastLevelling = key end
+    local tab = TabOf(key)
     S.CloseMenu()
     ui.sideL:SetShown(tab == "levelling")
-    ui.levelBody:SetShown(YR.RoutesOn())
-    ui.sideQ:SetShown(tab == "qol")
+    ui.sideQ:SetShown(tab == "qol" or tab == "interface")
     ui.sideS:SetShown(tab == "setup")
     for name, b in pairs(ui.topTabs) do b:Select(name == tab) end
-    for _, p in ipairs(PAGES) do
+    for _, q in ipairs(PAGES) do
         -- a page is made the first time it is shown (the route editor and QoL with the window)
-        if p.key == key and not p.built then
-            p.built = true
-            p.build(pages[p.key])
+        if q.key == key and not q.built then
+            q.built = true
+            q.build(pages[q.key])
         end
-        pages[p.key]:SetShown(p.key == key)
-        if p.button then p.button:Select(p.key == key) end
+        pages[q.key]:SetShown(q.key == key)
+        if q.button then q.button:Select(q.key == navKey) end
     end
     YR:RefreshWindow()
 end
@@ -5532,28 +6592,30 @@ function YR:ShowSettingsTab(key)
     YR:ToggleWindow(CATEGORY_ALIAS[key] or key or "settings")
 end
 
--- The two tabs: one switch in the middle of the title bar, the half that's showing filled in. Each
--- half has its icon and name; the other half lights up under the mouse.
-local SEG_W, SEG_H = 140, 28
+-- The tabs: one switch in the middle of the title bar, the part that's showing filled in. Each part has its icon
+-- and name; another lights up under the mouse.
+local SEG_W, SEG_H = 128, 28
+-- A tab: its icon and name, and under the one you are on a line of the accent (it was the whole tab filled with it:
+-- the owner, 2026-10-21, "too much orange"; the icons stay: "I don't like that you removed the icons").
 local function Segment(parent, label, icon)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(SEG_W, SEG_H)
-    b.bg = S.Rounded(b, "BACKGROUND", "round", 1)
-    b.text = S.Text(b, 13, S.C.sub)
-    b.text:SetPoint("CENTER", 12, 0)
+    b.text = S.Text(b, 14, S.C.sub)
+    b.text:SetPoint("CENTER", 11, 0)
     b.text:SetText(label)
     b.icon = S.Icon(b, icon, 16)
-    b.icon:SetPoint("RIGHT", b.text, "LEFT", -8, 0)
+    b.icon:SetPoint("RIGHT", b.text, "LEFT", -7, 0)
+    b.line = b:CreateTexture(nil, "ARTWORK")
+    b.line:SetHeight(2)
+    b.line:SetPoint("TOPLEFT", b.icon, "BOTTOMLEFT", 0, -6)
+    b.line:SetPoint("TOPRIGHT", b.text, "BOTTOMRIGHT", 2, -6)
+    S.Set(b.line, S.C.accent)
     local function Paint(self, over)
         local on = self.selected
-        if on then
-            self.bg:SetVertexColor(unpack(S.C.accent))
-        else
-            self.bg:SetVertexColor(1, 1, 1, over and 0.08 or 0)
-        end
-        self.text:SetTextColor(unpack(on and S.C.onAccent or over and S.C.text or S.C.sub))
+        self.line:SetShown(on and true or false)
+        self.text:SetTextColor(unpack((on or over) and S.C.text or S.C.sub))
         self.icon:SetDesaturated(not on)
-        self.icon:SetAlpha(on and 1 or 0.7)
+        self.icon:SetAlpha((on or over) and 1 or 0.7)
     end
     function b:Select(on)
         self.selected = on
@@ -5565,53 +6627,56 @@ local function Segment(parent, label, icon)
     return b
 end
 
--- Both halves in their track, centred in the title bar (head). Returns { levelling = , qol = }.
-local function TopTabs(head, onLevelling, onQoL, onSetup)
+-- All four in their track, centred in the title bar (head). Returns { qol = , interface = , levelling = , setup = }.
+local function TopTabs(head, onLevelling, onQoL, onSetup, onInterface)
     local track = CreateFrame("Frame", nil, head)
-    track:SetSize(SEG_W * 3 + 6, SEG_H + 6)
+    track:SetSize(SEG_W * 4 + 6, SEG_H + 6)
     track:SetPoint("CENTER", head, "CENTER", 0, 0)
     track:SetFrameLevel(head:GetFrameLevel() + 2)      -- over the bar you drag the window by
-    S.Rounded(track, "BACKGROUND", "round"):SetVertexColor(unpack(S.C.field))
-    S.Rounded(track, "BORDER", "roundline"):SetVertexColor(unpack(S.C.lineHi))
     local qol = Segment(track, "QoL", "Interface\\Icons\\Trade_Engineering")
     qol:SetPoint("LEFT", 3, 0)
     qol:SetScript("OnClick", onQoL)
-    local levelling = Segment(track, "Levelling", "Interface\\Icons\\INV_Misc_Map_01")
-    levelling:SetPoint("LEFT", qol, "RIGHT", 0, 0)
+    local interface = Segment(track, "Interface", 134063)
+    interface:SetPoint("LEFT", qol, "RIGHT", 0, 0)
+    interface:SetScript("OnClick", onInterface)
+    -- (called Levelling until 2026-10-21: with Talents on QoL it is the routes alone, and QoL has a Levelling group -
+    -- "yes, call it Routes", the owner. Its key is still "levelling".)
+    local levelling = Segment(track, "Routes", "Interface\\Icons\\INV_Misc_Map_01")
+    levelling:SetPoint("LEFT", interface, "RIGHT", 0, 0)
     levelling:SetScript("OnClick", onLevelling)
     local setupSeg = Segment(track, "Character setup", 134166)
     setupSeg:SetPoint("RIGHT", -3, 0)
     setupSeg:SetScript("OnClick", onSetup)
-    return { levelling = levelling, qol = qol, setup = setupSeg }, track
+    return { levelling = levelling, qol = qol, interface = interface, setup = setupSeg }, track
 end
 
-local function NavButton(parent, label, icon, y, indent)
+local function NavButton(parent, label, icon)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(SIDE - 16, indent and 22 or 30)
-    b:SetPoint("TOPLEFT", 8, y)
+    b:SetSize(SIDE - 16, 32)
     b.bg = S.Fill(b, { 0, 0, 0, 0 })
-    b.bar = b:CreateTexture(nil, "ARTWORK")
-    b.bar:SetPoint("TOPLEFT") b.bar:SetPoint("BOTTOMLEFT") b.bar:SetWidth(2)
-    S.Set(b.bar, S.C.accent)
-    b.bar:Hide()
-    local x = indent and 36 or 10
-    if icon then
-        local i = S.Icon(b, icon, 18)
-        i:SetPoint("LEFT", 10, 0)
-        x = 36
-    end
-    b.text = S.Text(b, indent and 12 or 14, indent and S.C.sub or S.C.text)
-    b.text:SetPoint("LEFT", x, 0)
-    b.text:SetPoint("RIGHT", -6, 0)
+    b.icon = S.Icon(b, icon, 18)
+    b.icon:SetPoint("LEFT", 10, 0)
+    b.text = S.Text(b, 14, S.C.sub)
+    b.text:SetPoint("LEFT", 38, 0)
+    b.text:SetPoint("RIGHT", -22, 0)
     b.text:SetText(label)
+    -- (This run's: green while the run is recorded)
+    b.dot = b:CreateTexture(nil, "OVERLAY")
+    b.dot:SetSize(7, 7)
+    b.dot:SetPoint("RIGHT", -10, 0)
+    S.ArtTexture(b.dot, "dot")
+    b.dot:SetVertexColor(unpack(S.C.green))
+    b.dot:Hide()
     function b:Select(on)
         self.selected = on
-        self.bg:SetColorTexture(unpack(on and (indent and S.C.hover or S.C.accentD) or { 0, 0, 0, 0 }))
-        self.bar:SetShown(on and not indent)
-        if indent then self.text:SetTextColor(unpack(on and S.C.accent or S.C.sub)) end
+        self.bg:SetColorTexture(unpack(on and S.C.raised or { 0, 0, 0, 0 }))
+        self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
+        self.icon:SetDesaturated(not on)
+        self.icon:SetAlpha(on and 1 or 0.8)
     end
     b:SetScript("OnEnter", function(self) if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end end)
     b:SetScript("OnLeave", function(self) if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end end)
+    b:Select(false)
     return b
 end
 
@@ -5648,74 +6713,22 @@ function YR.MyRoutes()
     return set
 end
 
-local function RouteButton(parent, key, y)
-    local b = CreateFrame("Button", nil, parent)
-    b:SetSize(SIDE - 16, 24)
-    b:SetPoint("TOPLEFT", 8, y)
-    b.bg = S.Fill(b, { 0, 0, 0, 0 })
-    b.bar = b:CreateTexture(nil, "ARTWORK")
-    b.bar:SetPoint("TOPLEFT") b.bar:SetPoint("BOTTOMLEFT") b.bar:SetWidth(2)
-    S.Set(b.bar, S.C.accent)
-    b.bar:Hide()
-    local name = YR.GuideName(key)
-    local range, zone = name:match("^(%d+%-%d+)%s+(.+)$")
-    zone = (zone or name):gsub("%s*%(Launch%)", "")
-    b.from = tonumber(range and range:match("^%d+")) or 0
-    b.full, b.short = zone, (zone:gsub("%s*%b()", ""))   -- "Loch Modan (Dwarf/Gnome)" -> "Loch Modan"
-    local badge = CreateFrame("Frame", nil, b)
-    badge:SetSize(38, 16)
-    badge:SetPoint("LEFT", 12, 0)
-    b.badgeBg = S.Fill(badge, S.C.accentD)
-    b.badge = S.Text(badge, 12, S.C.accent)
-    b.badge:SetPoint("CENTER")
-    b.badge:SetText(range or "")
-    b.text = S.Text(b, 12, S.C.sub)
-    b.text:SetPoint("LEFT", badge, "RIGHT", 8, 0)
-    b.text:SetPoint("RIGHT", -16, 0)
-    b.text:SetText(zone)
-    b.dot = b:CreateTexture(nil, "OVERLAY")
-    b.dot:SetSize(10, 10)
-    b.dot:SetPoint("RIGHT", -6, 0)
-    S.ArtTexture(b.dot, "dot")
-    b.dot:SetVertexColor(unpack(S.C.gold))
-    b.key = key
-    function b:Select(on)
-        self.selected = on
-        self.bg:SetColorTexture(unpack(on and S.C.accentD or { 0, 0, 0, 0 }))
-        self.bar:SetShown(on)
-        self.text:SetTextColor(unpack(on and S.C.text or S.C.sub))
-    end
-    -- gold: your edited version; blue: edited, and a newer shipped version is waiting
-    function b:Mark()
-        self.dot:SetShown(YR:IsCustom(self.key))
-        self.dot:SetVertexColor(unpack(YR:HasUpdate(self.key) and S.C.accent or S.C.gold))
-    end
-    b:SetScript("OnEnter", function(self)
-        if not self.selected then self.bg:SetColorTexture(unpack(S.C.hover)) end
-        S.Tip(self, name .. (YR:HasUpdate(self.key) and "\nYour version (edited). A newer shipped version is waiting"
-            or YR:IsCustom(self.key) and "\nYour version (edited)" or "\nAs shipped"))
-    end)
-    b:SetScript("OnLeave", function(self)
-        if not self.selected then self.bg:SetColorTexture(0, 0, 0, 0) end
-        GameTooltip:Hide()
-    end)
-    b:Mark()
-    return b
-end
-
 local function Build()
     win = S.Window("HeadstartWindow", W, H, "Headstart")
     -- The tabs in the middle of the title bar; what a page says about itself (win.subtitle) stays
     -- after the title, cut short where the tabs begin.
     local track
+    local function Tab(go) return function() if settings.ClearSearch then settings.ClearSearch() end go() end end
     ui.topTabs, track = TopTabs(win.title:GetParent(),
-        function() Show(lastLevelling or ((YR.RoutesOn() and #YR.shipped > 0) and "routes" or "route")) end,
-        function() Show("settings") end, function() Show("setup") end)
+        Tab(function() Show(lastLevelling or "where") end),
+        Tab(function() Show(settings.lastOn and settings.lastOn.qol or "home") end), Tab(function() Show("setup") end),
+        Tab(function() Show(settings.lastOn and settings.lastOn.interface or "xpbar") end))
     win.subtitle:SetPoint("RIGHT", track, "LEFT", -16, 0)
-    tourAt.setup, tourAt.levelling = ui.topTabs.setup, ui.topTabs.levelling
+    tourAt.setup, tourAt.levelling, tourAt.interface = ui.topTabs.setup, ui.topTabs.levelling, ui.topTabs.interface
     win.subtitle:SetJustifyH("LEFT")
     win.subtitle:SetWordWrap(false)
-    -- One menu down the left per tab: Levelling's (SIDE wide), QoL's (NAV_W wide, BuildSettings fills it).
+    -- One menu down the left per tab: Levelling's (SIDE wide), QoL's and Interface's (one, NAV_W wide: BuildSettings
+    -- fills it with the tab's pages), Character setup's.
     local function Side(width, color)
         local f = CreateFrame("Frame", nil, win)
         f:SetPoint("TOPLEFT", 1, -HEAD)
@@ -5723,7 +6736,7 @@ local function Build()
         f:SetWidth(width)
         S.Fill(f, color)
         local rule = f:CreateTexture(nil, "BORDER")
-        rule:SetPoint("TOPRIGHT") rule:SetPoint("BOTTOMRIGHT") rule:SetWidth(1)
+        rule:SetPoint("TOPRIGHT") rule:SetPoint("BOTTOMRIGHT") S.Hair(rule, "v")
         S.Set(rule, S.C.line)
         f:Hide()
         return f
@@ -5736,160 +6749,33 @@ local function Build()
         "On: the bar planner, and a main's bars, macros and interface on a new character. Off: none of it is"
         .. " loaded, and nothing is ever placed on your bars for you. For the whole account")
     setupRow:SetPoint("TOPLEFT", 12, -12)
-    -- whose each thing is (the owner, 2026-10-15: say it where Character setup is), under its menu (Editor's
-    -- BuildSetup puts the menu between this and the switch)
-    local whose = S.Text(ui.sideS, 11, S.C.muted)
-    whose:SetPoint("TOPLEFT", 18, -170)
-    whose:SetText("WHOSE IS WHAT")
-    -- (each at its own place, with room for the lines it has: not hung under the one above, whose height
-    -- is its lines' only once the game has drawn it)
-    local y = -194
-    for _, w in ipairs({
-        { 133742, "Bars", "Each class has its own profiles.", 1 },
-        { 134063, "Interface", "Shared. Kept up to date by the character it was saved on; the others take its changes at login.", 3 },
-        { 132288, "Each character's own", "Resource display, swing timer (a new one starts with its class's) and which combat bars show.", 3 },
-    }) do
-        local icon = ui.sideS:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(16, 16)
-        icon:SetPoint("TOPLEFT", 18, y)
-        icon:SetTexture(w[1])
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        local title = S.Text(ui.sideS, 12, S.C.sub)
-        title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 6, -1)
-        title:SetText(w[2])
-        local line = S.Text(ui.sideS, 11, S.C.muted)
-        line:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
-        line:SetWidth(NAV_W - 18 - 22 - 12)
-        line:SetWordWrap(true)
-        line:SetJustifyH("LEFT")
-        line:SetSpacing(2)
-        line:SetHeight(w[4] * 15)
-        line:SetJustifyV("TOP")
-        line:SetText(w[3])
-        y = y - 18 - w[4] * 15 - 10
-    end
+    -- (Whose each thing is - bars each class's, the interface everyone's - stood under the menu here as three entries
+    -- with icons, which read as more settings (the owner, 2026-10-20: "a bit confusing that all of these are settings").
+    -- It is said in the page's own corner now, where every page says whose its settings are: SETUP_PAGE's scope.)
     pages = {}
-    ui.routeTabs = {}
-    -- The routes switch, Levelling's pages, then every route in a list that scrolls (more routes than room)
-    local routes = MasterRow(side, SIDE, "Routes", function() return YR.RoutesOn() end, YR.SetRoutesOn,
-        "On: your routes are loaded into RestedXP, and what they need is kept in your bags and bought for you."
-        .. " Off: none of that. For the whole account; takes a /reload (/headstart routes on|off)")
-    routes:SetPoint("TOPLEFT", 12, -12)
-    local y = -50
-    -- everything under the switch sits on a frame of its own: with the routes off only the switch shows
-    side = CreateFrame("Frame", nil, side)
-    side:SetAllPoints()
-    ui.levelBody = side
+    -- Levelling's menu: its four pages top down, and Settings at its foot (the routes' switch is that page's first
+    -- row). The routes are on All routes: the menu was the switch, the pages and a list of routes folded by level
+    -- (the owner, 2026-10-21: "the sidebar is confusing, with so much in it").
+    local y = -12
     for _, p in ipairs(PAGES) do
         if p.nav then
-            p.button = NavButton(side, p.label, p.icon, y)
+            p.button = NavButton(side, p.label, p.icon)
             p.button:SetScript("OnClick", function() Show(p.key) end)
-            y = y - 34
-        end
-    end
-    local label = S.Text(side, 11, S.C.muted)
-    label:SetPoint("TOPLEFT", 20, y - 8)
-    local listTop = y - 26
-    local list = S.ScrollArea(side, SIDE, H - HEAD + listTop - 40)
-    list:SetPoint("TOPLEFT", 0, listTop)
-    for _, g in ipairs(YR.shipped) do
-        local sub = RouteButton(list.content, g.key, 0)
-        sub:SetScript("OnClick", function()
-            Open(g.key)
-            for _, t in ipairs(ui.routeTabs) do t:Select(t == sub) end
-            Show("routes")
-        end)
-        ui.routeTabs[#ui.routeTabs + 1] = sub
-    end
-    table.sort(ui.routeTabs, function(a, b) return a.from < b.from or (a.from == b.from and a.full < b.full) end)
-    -- "Mine" (default): only the routes this character's race and class follow, without their
-    -- "(Dwarf/Gnome)" qualifiers; "All": every route. The one open in the editor always shows.
-    local toggle = CreateFrame("Button", nil, side)
-    toggle:SetSize(60, 16)
-    toggle:SetPoint("TOPRIGHT", side, "TOPRIGHT", -12, y - 6)
-    toggle.text = S.Text(toggle, 11, S.C.accent)
-    toggle.text:SetPoint("RIGHT")
-    -- Level brackets (1-10, 10-20, 20-30 ...) that fold: a route sits in the bracket it starts in.
-    -- Unless you opened or closed one yourself (YippRouteDB.routeBrackets[from] = true/false), only
-    -- the bracket of the route open in the editor is open.
-    local headers = {}
-    local function Header(from)
-        if headers[from] then return headers[from] end
-        local h = CreateFrame("Button", nil, list.content)
-        h:SetSize(SIDE - 16, 20)
-        h.text = S.Text(h, 11, S.C.muted)
-        h.text:SetPoint("LEFT", 26, 0)
-        h.text:SetText(("LEVELS %d-%d"):format(math.max(from, 1), from + 10))
-        h.arrow = h:CreateTexture(nil, "ARTWORK")
-        h.arrow:SetSize(10, 10)
-        h.arrow:SetPoint("LEFT", 10, 0)
-        S.ArtTexture(h.arrow, "down")
-        h.arrow:SetVertexColor(unpack(S.C.muted))
-        h:SetScript("OnEnter", function(self) self.text:SetTextColor(unpack(S.C.text)) end)
-        h:SetScript("OnLeave", function(self) self.text:SetTextColor(unpack(S.C.muted)) end)
-        h:SetScript("OnClick", function(self)
-            YippRouteDB.routeBrackets = YippRouteDB.routeBrackets or {}
-            YippRouteDB.routeBrackets[from] = not self.open
-            ui.LayoutRoutes()
-        end)
-        headers[from] = h
-        return h
-    end
-    function ui.LayoutRoutes()
-        local mine = YR.MyRoutes()
-        local all = YippRouteDB.allRoutes or not next(mine)
-        -- Headstart comes without routes: until you save a run as one or import one, say how
-        local none = #ui.routeTabs == 0
-        label:SetText(none and "NO ROUTES YET" or all and "ALL ROUTES" or "YOUR ROUTES")
-        toggle.text:SetText(all and "Mine" or "Show all")
-        toggle:SetShown(not none)
-        if none and not ui.noRoutes then
-            ui.noRoutes = S.Text(side, 12, S.C.muted)
-            ui.noRoutes:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -10)
-            ui.noRoutes:SetWidth(SIDE - 36)
-            ui.noRoutes:SetJustifyH("LEFT")
-            ui.noRoutes:SetText("Play with Record runs on, then Save as route under This run. Or paste a route in under Share.")
-        end
-        if ui.noRoutes then ui.noRoutes:SetShown(none) end
-        local chosen = YippRouteDB.routeBrackets or {}
-        local current
-        for _, b in ipairs(ui.routeTabs) do
-            if b.selected then current = math.floor(b.from / 10) * 10 end
-        end
-        for _, h in pairs(headers) do h:Hide() end
-        local ry, bracket, open = 0, nil, true
-        for _, b in ipairs(ui.routeTabs) do
-            local on = all or mine[b.key] or b.selected
-            if on then
-                local from = math.floor(b.from / 10) * 10
-                if from ~= bracket then
-                    bracket = from
-                    if chosen[from] ~= nil then open = chosen[from] else open = current == nil or current == from end
-                    local h = Header(from)
-                    h.open = open
-                    h.arrow:SetRotation(open and 0 or math.pi / 2)
-                    h:ClearAllPoints()
-                    h:SetPoint("TOPLEFT", 8, ry)
-                    h:Show()
-                    ry = ry - 22
-                end
-                on = open
+            if p.nav == "foot" then
+                p.button:SetPoint("BOTTOMLEFT", 8, 12)
+                local rule = side:CreateTexture(nil, "BORDER")
+                rule:SetPoint("BOTTOMLEFT", 12, 52)
+                rule:SetPoint("BOTTOMRIGHT", -12, 52)
+                S.Hair(rule, "h")
+                S.Set(rule, S.C.line)
+            else
+                p.button:SetPoint("TOPLEFT", 8, y)
+                y = y - 34
             end
-            b:SetShown(on)
-            if on then
-                b:ClearAllPoints()
-                b:SetPoint("TOPLEFT", 8, ry)
-                b.text:SetText(all and b.full or b.short)
-                ry = ry - 26
-            end
+            tourAt["levelling:" .. p.key] = p.button
         end
-        list.content:SetHeight(-ry + 8)
     end
-    toggle:SetScript("OnClick", function()
-        YippRouteDB.allRoutes = not YippRouteDB.allRoutes or nil
-        ui.LayoutRoutes()
-    end)
-    ui.LayoutRoutes()
+    ui.runDot = PAGE_BY.run.button.dot
     for _, p in ipairs(PAGES) do
         local page = CreateFrame("Frame", nil, win)
         page:SetPoint("TOPLEFT", p.tab == "levelling" and SIDE or NAV_W, -HEAD)
@@ -5920,16 +6806,13 @@ local function Build()
     for _, g in ipairs(YR.shipped) do
         if type(current) == "string" and Plain(current) == Plain(YR.GuideName(g.key)) then key = g.key end
     end
-    if key then
-        Open(key)
-        for _, t in ipairs(ui.routeTabs) do t:Select(t.key == key) end
-        if ui.LayoutRoutes then ui.LayoutRoutes() end
-    end
+    if key then Open(key) end
 end
 
 function YR:RefreshWindow()
     if not (win and win:IsShown()) then return end
     for _, sw in ipairs(ui.masters or {}) do sw:Refresh() end
+    if ui.runDot then ui.runDot:SetShown(YR.Option("logging") and not (YR.RunStopped and YR:RunStopped())) end
     for _, p in ipairs(PAGES) do
         if p.key == current then p.refresh() end
     end

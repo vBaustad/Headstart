@@ -17,11 +17,11 @@
 --   Account options (YippRouteDB, Settings, QoL, Instances): instanceTrack (off until turned on, since
 --   2026-10-14; an account from before keeps it as it was),
 --   instanceWarn (on unless turned off), instanceAccount (off: each character on its own), instanceHour
---   (5), instanceDay (30), instanceSame (minutes, 30). The log: YippRouteDB.instanceRuns (every
+--   (5), instanceDay (30). The log: YippRouteDB.instanceRuns (every
 --   character's, a week of them), YippRouteDB.instanceLocks.
 --   On screen: a small icon with the count on it (hover for the lot, click for the Instances page) or
 --   a small log with the count and your latest runs; shown while you have an instance this hour or are
---   in one, or always. instanceHud ("icon", "log" or "off"), instanceHudAlways, instanceHudRows (3),
+--   in one, or always. instanceHud ("icon", "log" or "off"), instanceHudAlways,
 --   instanceHudPos. Shift-drag moves it.
 local ADDON, YR = ...
 
@@ -50,6 +50,7 @@ local function Runs()
 end
 
 local function Limit(key, default) return tonumber(YippRouteDB[key]) or default end
+local SAME_MINUTES = 30         -- (entering the same dungeon again within this, with the same leader: the same instance)
 function YR.InstanceLimits() return Limit("instanceHour", 5), Limit("instanceDay", 30) end
 
 local function Mine(r) return YippRouteDB.instanceAccount == true or r.char == YR.CharKey() end
@@ -141,9 +142,9 @@ local function Announce()
         Warn(text .. (" That's the limit: the next one in %s."):format(Clock(wait or 0)))
     elseif hour == perHour - 1 then
         Warn(text .. " One more and you're at the limit for the hour.")
-    else
-        YR.Print(text)
     end
+    -- (an entry under the limits isn't said: the counter on screen has it - the owner, 2026-10-21, "nobody reads
+    -- our chat lines")
 end
 
 -- XP while inside: added as it comes, across level-ups.
@@ -200,7 +201,6 @@ local function GotID(id)
         runs[#runs + 1] = cur
         Recount()
         Announce()
-        YR.Print(("%s is another copy than the last (ID %d, that one was %d): a new instance, it counts."):format(name or "this", id, old.id))
         return
     end
     -- told as a new instance: a run in the log with this very ID is the one you're back in
@@ -212,7 +212,6 @@ local function GotID(id)
             r.left, r.again, r.money0 = nil, (r.again or 0) + 1, cur.money0
             cur = r
             Recount()
-            YR.Print(("back in the same copy of %s (ID %d): the same instance, it doesn't count again."):format(r.name or "the instance", id))
             return
         end
     end
@@ -325,7 +324,7 @@ local function Check()
         -- you were last seen in it, not when you first went in: a reload five hours into a long run
         -- was told as a new instance)
         local stillIn = last and not last.left and now - (last.seen or last.entered) < 4 * HOUR
-        local same = last and (stillIn or (last.left and now - last.left < Limit("instanceSame", 30) * 60
+        local same = last and (stillIn or (last.left and now - last.left < SAME_MINUTES * 60
             and last.leader == leader and not ((resets[map] or 0) >= last.left)))
         if same then
             entry = { reused = true, at = now, left = last.left, again = last.again }
@@ -333,10 +332,7 @@ local function Check()
             cur.left = nil
             cur.money0 = GetMoney()
             -- (a reload or a login inside it is not going back in: only having left and come back is)
-            if not stillIn then
-                cur.again = (cur.again or 0) + 1
-                YR.Print(("back in %s: the same instance, it doesn't count again."):format(name or "the instance"))
-            end
+            if not stillIn then cur.again = (cur.again or 0) + 1 end
         else
             cur = { char = YR.CharKey(), name = name, map = map, difficulty = difficulty, entered = now,
                 leader = leader, level = UnitLevel("player"), xp = 0, money = 0, money0 = GetMoney(), counted = true }
@@ -505,7 +501,7 @@ local function Paint()
         Put(hud.head, ("Instances  %s this hour  %d/%d today%s"):format(count, day, perDay,
             wait and ("  next in " .. Clock(wait)) or ""))
         hud.head:SetTextColor(c[1], c[2], c[3])
-        local s = YR.InstanceSummary(tonumber(YippRouteDB.instanceHudRows) or 3)
+        local s = YR.InstanceSummary(3)
         for i, r in ipairs(s.runs) do
             local row = hud.rows[i]
             if row then

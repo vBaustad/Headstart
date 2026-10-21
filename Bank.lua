@@ -1,11 +1,15 @@
--- Bank: crafting mats and recipes you can't use yet go to the bank by themselves.
--- When the bank opens (and with the button on the bank window) the bags are walked, and every stack
--- the settings pick is right-clicked into the bank, one at a time: with the bank open that is what a
--- right-click does. Hold Shift as the bank opens to keep everything.
+-- Bank: crafting mats and recipes you can't use yet put in the bank on a click.
+-- The Deposit button on the bank window walks the bags, and every stack the settings pick is
+-- right-clicked into the bank, one at a time: with the bank open that is what a right-click does.
+-- Nothing goes by itself as the bank opens (the owner, 2026-10-20: "instead of it sending everything
+-- to the bank by itself, let it be a deposit button - now I can't open and close the bank and open it
+-- again if I take things out, it always goes back in"). A stack is clicked only once nothing in the
+-- bags is still on its way and nothing is on the cursor: a click into a move under way left an item
+-- locked until a relog ("stuck on item is locked").
 --
 --   What goes (account options in YippRouteDB, Settings, QoL):
---     bankAuto     on unless turned off: when the bank opens
---     bankButton   on unless turned off: a button on the bank window does the same at any time
+--     bankButton   off until turned on: the Deposit button (and /headstart bank at any open bank)
+--     (bankAuto - depositing as the bank opened - is gone; one saved is not read)
 --     bankMats     "mine" (default) | "all" | "off": crafting mats - "mine" keeps whatever a
 --                  profession you have crafts with, and banks the rest
 --     bankRecipes  on unless turned off: recipes for a profession you haven't got, or that need
@@ -24,8 +28,9 @@ local TRADE_GOODS, RECIPE, QUEST = 7, 9, 12    -- item classes
 local REAGENT_CLASS = { [5] = true, [15] = true }
 -- Trade goods you use rather than craft with: dynamite, target dummies. Never banked as mats.
 local IN_USE = { [2] = true, [3] = true }      -- Explosives, Devices
-local STEP = 0.15                              -- seconds between two moves: one stack per tick
+local STEP = 0.25                              -- seconds between two moves: one stack per tick
 local TRIES = 4                                -- ticks a stack may sit unmoved before the bank is full
+local WAIT = 40                                -- ticks to wait for the bags or the cursor before giving up
 
 local bankOpen = false
 local run                                      -- the deposit in progress, or nil
@@ -187,6 +192,18 @@ local function Slot(bag, slot)
     return info.itemID, info.stackCount or 1, info.isLocked
 end
 
+-- Whether anything in the bags is still on its way somewhere (ours, or one you moved), or on the cursor.
+local function Busy()
+    if (CursorHasItem and CursorHasItem()) or (GetCursorInfo and GetCursorInfo() ~= nil) then return "cursor" end
+    for _, bag in ipairs(Bags()) do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local item, _, locked = Slot(bag, slot)
+            if item and locked then return "locked" end
+        end
+    end
+    return nil
+end
+
 --- Everything that goes, as a list of stacks in bag order.
 local function Pick()
     local have, list = Professions(), {}
@@ -242,6 +259,16 @@ local function Step()
         if s.tries >= TRIES then return Finish("the bank is full") end
         return
     end
+    -- the last move, or one of yours, not done yet - or an item on the cursor: wait for it
+    local busy = Busy()
+    if busy then
+        r.waited = (r.waited or 0) + 1
+        if r.waited >= WAIT then
+            return Finish(busy == "cursor" and "stopped: an item stayed on the cursor" or "stopped: an item stayed locked")
+        end
+        return
+    end
+    r.waited = 0
     -- the bank window still open, looked at right before the click: with it gone, the click would use
     -- the item. (Not the interaction manager's "Banker": on Forever the bank opens without it - seen in
     -- game - and that check stopped every move.)
@@ -282,12 +309,12 @@ local function Button()
     if button or not BankFrame then return button end
     button = CreateFrame("Button", "HeadstartBankButton", BankFrame, "UIPanelButtonTemplate")
     button:SetSize(110, 22)
-    button:SetText("Bank mats")
+    button:SetText("Deposit")
     button:SetPoint("TOPRIGHT", BankFrame, "BOTTOMRIGHT", 0, -2)
     button:SetScript("OnClick", function() YR.DepositToBank(true) end)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Headstart: bank mats")
+        GameTooltip:AddLine("Headstart: deposit")
         local mats = YR.BankMats()
         GameTooltip:AddLine(mats == "all" and "Crafting mats: all of them." or mats == "mine"
             and "Crafting mats no profession of yours crafts with." or "Crafting mats: off.", 1, 1, 1, true)
@@ -318,23 +345,14 @@ local function Stand()
     end
     b:SetShown(YR.Option("bankButton"))
 end
-local function Auto() YR.DepositToBank(false) end
-
--- quiet: the bank was open already when we began to listen (a setting turned on at the bank): the
--- button, but nothing is sent off by itself.
-local function Opened(quiet)
+-- The bank opened: the button. Nothing is sent off by itself.
+local function Opened()
     if bankOpen then return end
     bankOpen = true
     local b = Button()
     if b then
         b:SetShown(YR.Option("bankButton"))
         C_Timer.After(0.2, Stand)
-    end
-    -- Shift as the bank opens: keep everything this time. Read now, not later: by the first tick
-    -- the key may be up.
-    if not quiet and YR.Option("bankAuto") and not IsShiftKeyDown() then
-        -- A moment for the bank's own slots to arrive, so a full bank is seen as full.
-        C_Timer.After(0.3, Auto)
     end
 end
 
@@ -355,9 +373,9 @@ function YR.SetBankButton(on)
     YR.SettingChanged()
 end
 
--- The bank is listened for only while its button or the automation is on (or a deposit was asked
--- for by hand, until that bank closes).
-local function Wanted() return asked or YR.Option("bankButton") or YR.Option("bankAuto") or false end
+-- The bank is listened for only while its button is on (or a deposit was asked for by hand, until that
+-- bank closes).
+local function Wanted() return asked or YR.Option("bankButton") or false end
 
 local BANKER = Enum and Enum.PlayerInteractionType and Enum.PlayerInteractionType.Banker
 local function OnEvent(_, event, kind)
@@ -376,7 +394,7 @@ function YR.StartBank()
     part = YR.Part(Wanted, { "BANKFRAME_OPENED", "BANKFRAME_CLOSED", "PLAYER_INTERACTION_MANAGER_FRAME_SHOW",
         "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" }, OnEvent, {
         -- turned on at an open bank: the button is there at once
-        start = function() if Showing() then Opened(true) end end,
+        start = function() if Showing() then Opened() end end,
         -- the button follows its own switch while the bank stays listened for
         again = function() if button and bankOpen then button:SetShown(YR.Option("bankButton")) end end,
         stop = function()

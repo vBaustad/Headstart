@@ -34,6 +34,10 @@ local GREEN, RED, WHITE, GREY, BLUE = "|cff40ff40", "|cffff5050", "|cffffffff", 
 
 local STYLE_DEFAULT = { size = 14, lock = false, rate = true, ding = true, vs = true, rows = 20, bg = 0,
     clock = "full", levelCol = true, totalCol = true, levelVs = true }
+-- Taken out of the window (the owner, 2026-10-21, the Levelling tab made over: "fewer settings"): where the box
+-- stands is set in Arrange alone, so it is locked - clicks go through it - and it has no background and the long
+-- clock, whatever an older version stored.
+local STYLE_SETTLED = { lock = true, bg = 0, clock = "full" }
 
 -- What's missing is filled in once for a style table, not on every read: this is asked for some
 -- two hundred times each time the box is drawn.
@@ -43,6 +47,7 @@ function YR:SplitsStyle()
     if st and styleFilled == st then return st end
     if not st then st = {} YippRouteDB.splitsStyle = st end
     for k, v in pairs(STYLE_DEFAULT) do if st[k] == nil then st[k] = v end end
+    for k, v in pairs(STYLE_SETTLED) do st[k] = v end
     styleFilled = st
     return st
 end
@@ -693,13 +698,7 @@ local function OnEvent(_, event, level, atLevel)
     if rec and not rec.stopped then
         rec.levels[level] = rec.elapsed
         C_Timer.After(1, AskPlayed)          -- and check our count against the server's
-        local pb = Fastest()
-        local theirs = pb and pb.levels[level]
-        -- (the splits' own line: this part is on for the XP bar's numbers too, and with the splits
-        -- off it said so at every level all the same)
-        if YR.Option("showSplits") then
-            YR.Print(("level %d at %s%s"):format(level, Clock(rec.elapsed), theirs and ("  " .. Delta(rec.elapsed - theirs)) or ""))
-        end
+        -- (the time at each level was said in chat as well: the splits on screen have it - the owner, 2026-10-21)
     end
     Refresh()
 end

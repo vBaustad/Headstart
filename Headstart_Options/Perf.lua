@@ -47,7 +47,9 @@ function YR.PerfLines()
             local names = {}
             for _, t in ipairs(top) do
                 if type(t) == "table" and t.addOnName then
-                    names[#names + 1] = ("%s %.3f"):format(t.addOnName, Metric(t.addOnName, M.RecentAverageTime) or 0)
+                    -- (each comes with its time: AddOnProfilerResult.metricValue)
+                    local v = type(t.metricValue) == "number" and t.metricValue or Metric(t.addOnName, M.RecentAverageTime)
+                    names[#names + 1] = ("%s %.3f"):format(t.addOnName, v or 0)
                 end
             end
             if #names > 0 then out[#out + 1] = "The most time a frame now (ms): " .. table.concat(names, ", ") end

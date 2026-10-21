@@ -81,6 +81,15 @@ C_Item = { GetDetailedItemLevelInfo = function(link) return Worn(link)[4] end,
         print(("ok  " if ok else "FAIL"), what)
         bad += not ok
 
+    # what a class trainer teaches beyond the class's own lines: Dual Wield, Mail and Plate Mail (the owner, 2026-10-21:
+    # "rogues can train Dual Wield, but it isn't in the train list" - auto-train left it as not a class spell)
+    def taught(cls, name):
+        return [e[2] for e in YR.TrainerSpells[cls].values() if e[3] == name]
+    check(taught("ROGUE", "Dual Wield") == [10] and taught("WARRIOR", "Dual Wield") == [20] and taught("HUNTER", "Dual Wield") == [20]
+          and taught("PALADIN", "Plate Mail") == [40] and taught("WARRIOR", "Plate Mail") == [40]
+          and taught("HUNTER", "Mail") == [40] and taught("SHAMAN", "Mail") == [40]
+          and not taught("MAGE", "Dual Wield") and not taught("WARRIOR", "Mail") and not taught("WARRIOR", "Polearms"),
+          "the trainer's own skills: Dual Wield (rogue 10, warrior and hunter 20), Plate Mail and Mail at 40; not the weapon master's")
     g.YippRouteDB.autoTrain = None
     check(YR.Option("autoTrain") is False, "auto-train is off until you turn it on")
     g.YippRouteDB.autoTrain = True
@@ -252,8 +261,8 @@ C_Item = { GetDetailedItemLevelInfo = function(link) return Worn(link)[4] end,
         { "Apprentice Riding", "", "available", 800000, 40 },
     }""")
     got = visit(5000000)
-    check(got == [] and any("nothing here is one of your class's spells" in g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1)),
-          f"a weapon master or a riding trainer: nothing bought with 500 gold in the bag, and it says why ({got})")
+    check(got == [] and not any("nothing here" in g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1)),
+          f"a weapon master or a riding trainer: nothing bought with 500 gold in the bag, and nothing said ({got})")
     lua.execute('LIST[#LIST + 1] = { "Holy Light", "Rank 3", "available", 1000, 12 }')
     got = visit(5000000)
     check(got == ["Holy Light Rank 3"], f"a list that mixes them: the class's spell, and none of the others ({got})")
@@ -264,6 +273,35 @@ C_Item = { GetDetailedItemLevelInfo = function(link) return Worn(link)[4] end,
     lua.execute("YRT.TrainerSpells = KEPT_SPELLS UnitClass = CLASS_WAS")
     check(got == [], f"no spell list for the class: nothing bought ({got})")
     check(visit(10000) != [], "(and with the class back, it buys again)")
+
+    # the route's next buy (a weapon ahead, not had): its price kept back by "If I can afford it" spells (the
+    # owner, 2026-10-16: Gouge trained in Dolanaar, then no money for the Stiletto)
+    kept_list = g.LIST
+    lua.execute('''local d = YRT.TrainerData()
+        KEPT_D = { share = d.share, save = d.save, spells = d.spells, v = d.v }
+        d.share, d.save, d.spells, d.v = 0, 0, {}, 2
+        LIST = { { "Seal of the Crusader", "Rank 1", "available", 200, 6 } }
+        ROUTE_BUY = { name = "Stiletto", price = 401, item = 2494 }
+        KEPT_NEXT = YRT.NextRouteBuy YRT.NextRouteBuy = function() return ROUTE_BUY end''')
+    said = lambda: " ".join(str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1))
+    got = visit(500)
+    check(got == [] and "Stiletto your route buys next (4s 1c)" in said(),
+          f"5s, a 2s spell, the route's Stiletto at 4s 1c ahead: the spell waits, and chat says for what ({said()})")
+    check(visit(700) == ["Seal of the Crusader Rank 1"], "7s: enough for both, the spell learned")
+    lua.execute("YippRouteDB.trainerRouteBuy = false")
+    check(visit(500) == ["Seal of the Crusader Rank 1"], "Save for the route's next buy off: learned as before")
+    lua.execute("YippRouteDB.trainerRouteBuy = nil YRT.SetTrainerChoice('Seal of the Crusader', 'always')")
+    check(visit(500) == ["Seal of the Crusader Rank 1"], "an Always spell: learned whatever the route buys next")
+    lua.execute("YRT.SetTrainerChoice('Seal of the Crusader', 'gold') YRT.TrainerData().share = 50 ROUTE_BUY.price = 100")
+    got = visit(2000)
+    check(got == ["Seal of the Crusader Rank 1"] and "route buys next" not in said(),
+          f"the share keeps more than the buy costs: the share is what counts ({said()})")
+    lua.execute("ROUTE_BUY = nil YRT.TrainerData().share = 0")
+    check(visit(500) == ["Seal of the Crusader Rank 1"], "nothing ahead to buy: learned")
+    lua.execute('''local d = YRT.TrainerData()
+        d.share, d.save, d.spells, d.v = KEPT_D.share, KEPT_D.save, KEPT_D.spells, KEPT_D.v
+        YRT.NextRouteBuy = KEPT_NEXT''')
+    g.LIST = kept_list
 
     # On is on: no question, on a character it has never bought on either (the user, 2026-10-13, at his own
     # trainer: "hvis det er paa, saa er det paa"). It asked the first time on each character for a while.

@@ -43,7 +43,7 @@ local function OnQuest(q) return C_QuestLog.IsOnQuest and C_QuestLog.IsOnQuest(q
 local function Complete(q) return C_QuestLog.IsComplete and C_QuestLog.IsComplete(q) end
 
 local function Say(msg)
-    YR.Print(msg)
+    -- (mid-screen only: the same line in chat too was the one nobody read - the owner, 2026-10-21)
     -- On the game's own line for messages, mid-screen. (It went into Blizzard's raid warning frame
     -- through RaidNotice_AddMessage: code of Blizzard's run from here, which leaves what it writes on
     -- that frame ours - and a real raid warning, whose text the game keeps from addons in an instance,
@@ -91,7 +91,6 @@ local function Check(arriving)
         end
     end
 end
-YR.CampingCheck = Check   -- for tests
 
 -- Free while off (YR.Part, Core.lua): with the routes or the reminder off nothing is listened for.
 -- With them on, only taking or losing a quest and a loading screen - and, where they could have

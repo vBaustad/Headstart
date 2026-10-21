@@ -33,11 +33,6 @@ function Obj:GetFrameLevel() return 5 end
 function Obj:SetBackdropColor(r, g, b, a) rawset(self, "fillAlpha", a) end
 function Obj:SetBackdropBorderColor(r, g, b, a) rawset(self, "edgeAlpha", a) rawset(self, "edgeColour", { r, g, b }) end
 ATLASES = { ["heavybronze-frame-background"] = true, ["heavybronze-frame-basic"] = true }
-LAYOUT = { TopLeftCorner = { x = -8, y = 16 }, TopRightCorner = { x = 4, y = 16 }, BottomLeftCorner = { x = -8, y = -3 } }
-NineSliceUtil = {
-    GetLayout = function(name) return name == "ButtonFrameTemplateNoPortrait" and LAYOUT or nil end,
-    ApplyLayoutByName = function(frame, name) rawset(frame, "layout", name) end,
-}
 function Obj:SetHeight(h) rawset(self, "height", h) end
 function Obj:SetMaxLines(n) rawset(self, "maxLines", n) end
 function Obj:GetMinMaxValues() return rawget(self, "lo") or 0, rawget(self, "hi") or 0 end

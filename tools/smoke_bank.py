@@ -2,10 +2,10 @@
 
     python tools/smoke_bank.py      (exit code 1 on any failure; tools/smoke.py runs it too)
 
-A Tailor with Mining opens the bank: what a profession of theirs crafts with stays, other mats go,
-recipes go only when they can't be learned yet, and quest items, dynamite, what the route needs and
-AutoFeed's food never go. Then: Shift as the bank opens, a full bank, the bank closing half way,
-each setting, and the button.
+A Tailor with Mining presses Deposit at the bank: what a profession of theirs crafts with stays, other
+mats go, recipes go only when they can't be learned yet, and quest items, dynamite, what the route needs
+and AutoFeed's food never go. Then: nothing as the bank opens, a full bank, the bank closing half way, an
+item locked or on the cursor, and each setting.
 """
 import os
 import sys
@@ -70,13 +70,13 @@ NUM_BAG_SLOTS = 4
 CLASS = {}
 C_Item = { GetItemInfoInstant = function(id) local c = CLASS[id] if not c then return nil end return id, nil, nil, nil, nil, c[1], c[2] end }
 -- bags[bag][slot] = itemID; the bank takes BANKROOM stacks
-BAGS, BANK, BANKROOM = {}, {}, 99
+BAGS, BANK, BANKROOM, LOCKED = {}, {}, 99, {}
 C_Container = {
     GetContainerNumSlots = function(bag) return bag <= 4 and 16 or 0 end,
     GetContainerItemInfo = function(bag, slot)
         local id = BAGS[bag] and BAGS[bag][slot]
         if not id then return nil end
-        return { itemID = id, stackCount = 5, isLocked = false }
+        return { itemID = id, stackCount = 5, isLocked = LOCKED[bag * 100 + slot] == true }
     end,
     UseContainerItem = function(bag, slot)
         if #BANK >= BANKROOM then return end            -- the game says the bank is full; nothing moves
@@ -128,6 +128,7 @@ YippRouteDB = { bankButton = true, mailButton = true, restock = true, bankAuto =
 SlashCmdList = {}
 strsplit = function() end
 strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
+function wipe(t) for k in pairs(t) do t[k] = nil end return t end
 ''')
     YR = lua.table()
     for f in ("Core.lua", "Data/Crafting.lua", "Bank.lua", "Mail.lua"):
@@ -176,13 +177,13 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     def banked():
         return sorted(g.BANK[i] for i in range(1, len(g.BANK) + 1))
 
-    def visit(shift=False):
-        g.SHIFT = shift
+    # at the bank, Deposit pressed
+    def visit():
         g.Fire("BANKFRAME_OPENED")
         lua.execute("RunAfter()")
+        g.HeadstartBankButton._OnClick()
         lua.execute("Tick(40)")
         g.Fire("BANKFRAME_CLOSED")
-        g.SHIFT = False
 
     YR.StartBank()
     # the login: what is wanted comes on. Nobody is at the bank then (this fake's windows count as
@@ -203,9 +204,40 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     check(2672 not in banked(), "meat the route still needs stays")
     lua.execute("NEED_MEAT = false")
 
+    # opening the bank: nothing goes by itself - taken out, closed and opened again, it stays out (the owner,
+    # 2026-10-20: "it always goes back in")
     fill()
-    visit(shift=True)
-    check(banked() == [], "Shift as the bank opens: nothing goes")
+    g.Fire("BANKFRAME_OPENED")
+    lua.execute("RunAfter() Tick(40)")
+    g.Fire("BANKFRAME_CLOSED")
+    g.Fire("BANKFRAME_OPENED")
+    lua.execute("RunAfter() Tick(40)")
+    check(banked() == [] and g.HeadstartBankButton._shown is True and g.HeadstartBankButton._text == "Deposit",
+          "the bank opened, twice: nothing goes by itself - the Deposit button is there")
+    g.Fire("BANKFRAME_CLOSED")
+    # something locked in the bags (a move of yours under way), or an item on the cursor: it waits for it
+    fill()
+    lua.execute("LOCKED[0 * 100 + 1] = true")
+    g.Fire("BANKFRAME_OPENED")
+    lua.execute("RunAfter()")
+    g.HeadstartBankButton._OnClick()
+    lua.execute("Tick(10)")
+    check(banked() == [], "an item still locked: nothing clicked while it is")
+    lua.execute("LOCKED = {} CURSOR = { bag = 1, slot = 16 } Tick(10)")
+    check(banked() == [], "an item on the cursor: nothing clicked while it is")
+    lua.execute("CURSOR = nil Tick(40)")
+    check(banked() == [2406, 2449, 2672, 4292], f"both let go: the deposit goes on ({banked()})")
+    g.Fire("BANKFRAME_CLOSED")
+    fill()
+    lua.execute("CURSOR = { bag = 1, slot = 16 } PRINTS = {}")
+    g.Fire("BANKFRAME_OPENED")
+    lua.execute("RunAfter()")
+    g.HeadstartBankButton._OnClick()
+    lua.execute("Tick(60)")
+    check(banked() == [] and any("cursor" in g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1)),
+          "an item kept on the cursor: it stops after a while, and says why")
+    lua.execute("CURSOR = nil")
+    g.Fire("BANKFRAME_CLOSED")
 
     fill()
     lua.execute("KNOWN[%d] = true" % recipe(2406)[2])
@@ -225,21 +257,13 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     g.YippRouteDB.bankMats = None
     g.YippRouteDB.bankRecipes = None
 
+    # a saved "deposit as the bank opens" from before is not read
     fill()
-    g.YippRouteDB.bankAuto = False
-    visit()
-    check(banked() == [], "not when I open the bank: nothing goes by itself")
-    g.Fire("BANKFRAME_OPENED")
-    g.HeadstartBankButton._OnClick()
-    lua.execute("Tick(40)")
-    check(banked() == [2406, 2449, 2672, 4292], "the button banks the same at any time")
-    g.Fire("BANKFRAME_CLOSED")
-    g.YippRouteDB.bankAuto = None
-    fill()
-    visit()
-    check(banked() == [], "never set: nothing goes by itself (banking as the bank opens is off until you turn it on)")
-    g.Fire("BANKFRAME_CLOSED")
     g.YippRouteDB.bankAuto = True
+    g.Fire("BANKFRAME_OPENED")
+    lua.execute("RunAfter() Tick(40)")
+    check(banked() == [], "bankAuto saved from before: nothing goes by itself")
+    g.Fire("BANKFRAME_CLOSED")
 
     # a bank with room for two stacks: two go, then it stops and says so
     fill()
@@ -252,23 +276,20 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     # the bank closes after the first stack: no more clicks (a click away from the bank would USE the item)
     fill()
     g.Fire("BANKFRAME_OPENED")
-    lua.execute("RunAfter() Tick(2)")
+    lua.execute("RunAfter()")
+    g.HeadstartBankButton._OnClick()
+    lua.execute("Tick(2)")
     g.Fire("BANKFRAME_CLOSED")
     n = len(banked())
     lua.execute("Tick(20)")
     check(len(banked()) == n and n >= 1, "nothing is clicked once the bank has closed")
 
-    # Forever's bank (the Vanilla BankFrame) isn't a "Banker" to the interaction manager: moves still go
-    lua.execute("C_PlayerInteractionManager = { IsInteractingWithNpcOfType = function() return false end } Enum = Enum or {} Enum.PlayerInteractionType = { Banker = 8 }")
-    fill()
-    lua.execute("BankFrame:Show() PRINTS = {}")
-    visit()
-    check(len(banked()) >= 1 and not any("closed before" in g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1)),
-          f"the interaction manager says no banker: the bank window is open, so it banks anyway ({len(banked())})")
     # the bank window gone mid-way (closed before BANKFRAME_CLOSED reaches us): it stops at once
     fill()
     g.Fire("BANKFRAME_OPENED")
-    lua.execute("RunAfter() BankFrame:Hide() Tick(20)")
+    lua.execute("RunAfter()")
+    g.HeadstartBankButton._OnClick()
+    lua.execute("BankFrame:Hide() Tick(20)")
     check(len(banked()) == 0, f"the bank window closed: nothing is clicked ({banked()})")
     g.Fire("BANKFRAME_CLOSED")
     lua.execute("BankFrame:Show() C_PlayerInteractionManager = nil")
@@ -276,7 +297,9 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     # the newer interaction event opens it too
     fill()
     g.Fire("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", 8)
-    lua.execute("RunAfter() Tick(40)")
+    lua.execute("RunAfter()")
+    g.HeadstartBankButton._OnClick()
+    lua.execute("Tick(40)")
     g.Fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", 8)
     # ---- Mail to my alt -------------------------------------------------------------------------
     YR.StartMail()
@@ -344,6 +367,48 @@ strtrim = function(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
     said = [g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1)]
     check(any("mailed 4 stacks to Bankalt Smith (1 letter, 120c postage)" in p for p in said), f"chat says what went: {said}")
     g.Fire("MAIL_CLOSED")
+
+    # marks: a small mailbox on what Send would mail, on the bag window's own buttons - while the mailbox is open and
+    # before Send is pressed (the owner, 2026-10-20)
+    lua.execute("""function hooksecurefunc(t, k, fn) local was = t[k] t[k] = function(...) local r = was(...) fn(...) return r end end
+        BAGBTN = {}
+        ContainerFrame1 = CreateFrame()
+        ContainerFrame1.EnumerateValidItems = function() local i = 0 return function() i = i + 1 if BAGBTN[i] then return i, BAGBTN[i] end end end
+        ContainerFrame1.UpdateItems = function() end
+        for slot = 1, 16 do
+            local btn = CreateFrame()
+            btn.GetBagID = function() return 0 end
+            btn.GetID = function() return slot end
+            btn.CreateTexture = function(self) local t = CreateFrame() rawset(self, "mark", t) return t end
+            BAGBTN[slot] = btn
+        end
+        NUM_CONTAINER_FRAMES = 1""")
+    marked = lua.eval("function() local t = {} for i, b in ipairs(BAGBTN) do local m = rawget(b, 'mark') if m and m:IsShown() then t[#t + 1] = i end end return t end")
+    as_list = lambda t: [t[i] for i in range(1, len(t) + 1)]
+    fill()
+    lua.execute("SENT = {} PRINTS = {}")
+    g.Fire("MAIL_SHOW")
+    check(as_list(marked()) == [3, 6, 7, 9], f"the mailbox open: a mailbox on earthroot, wolf meat and the two recipes ({as_list(marked())})")
+    lua.execute("ContainerFrame1:UpdateItems()")
+    check(as_list(marked()) == [3, 6, 7, 9], "Blizzard's bag window fills its slots again: the marks drawn again after it")
+    g.HeadstartMailButton._OnClick()
+    check(as_list(marked()) == [], "Send pressed: the marks go")
+    g.Fire("MAIL_SEND_SUCCESS")
+    lua.execute("RunAfter()")
+    check(as_list(marked()) == [], "sent: nothing left to mark")
+    g.Fire("MAIL_CLOSED")
+    fill()
+    g.YippRouteDB.mailAuto = True
+    lua.execute("KEPT_AFTER_M = C_Timer.After C_Timer.After = function() end")
+    g.Fire("MAIL_SHOW")
+    check(as_list(marked()) == [], "sending as the mailbox opens: no marks (it all goes by itself)")
+    g.Fire("MAIL_CLOSED")
+    lua.execute("C_Timer.After = KEPT_AFTER_M")
+    g.YippRouteDB.mailAuto = None
+    fill()
+    g.Fire("MAIL_SHOW")
+    g.Fire("MAIL_CLOSED")
+    check(as_list(marked()) == [], "the mailbox closed: the marks go")
 
     # more than twelve: two letters, the second only once the first went
     lua.execute("BAGS = { [0] = {}, [1] = {} } SENT = {} PRINTS = {}")

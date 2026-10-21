@@ -1,4 +1,4 @@
--- Where next? For a character that didn't follow our routes (levelled by hand, or on RestedXP's own):
+-- Next route: for a character that didn't follow our routes (levelled by hand, or on RestedXP's own):
 -- which of its routes to pick up now, and at which step. From its level and the quests the game says
 -- it has handed in (C_QuestLog.IsQuestFlaggedCompleted, there for every character, logged or not):
 --   * each route this race and class follows, with how many of its quests are done and how many left;
@@ -7,8 +7,8 @@
 --     resort (what's left there is green or grey);
 --   * where to start in it: the first step with a quest you haven't done, and the steps without a
 --     quest right before it (the way there).
--- The Levelling tab's "Where next?" page (Editor.lua) shows it, with a button that loads the route in
--- RestedXP at that step. The routes are whatever this install has: a routes addon's, your saved runs,
+-- The Levelling tab's Next route page (where the tab opens; "Where next?" until 2026-10-21) shows it, with a button that
+-- loads the route in RestedXP at that step; All routes (Editor.lua) shows every route's progress. The routes are whatever this install has: a routes addon's, your saved runs,
 -- imported ones; with none, the page says how to get one.
 local _, YR = ...
 local S = YR.Style
@@ -81,6 +81,33 @@ local function Fit(r, level)
 end
 local FIT_NOTE = { "for your level", "next up", "ends at your level", "below your level" }
 
+-- Each route's progress, kept: the window asks for it at every refresh (Next route, All routes), and walking a route's
+-- steps is the costly part. Kept until something it rests on changes - a quest handed in, the routes there are -
+-- and hand-ins are listened for only while something is kept.
+local progress, progressFor, watch = {}, nil, nil
+local function Forget(self)
+    progress = {}
+    if self and self.UnregisterEvent then self:UnregisterEvent("QUEST_TURNED_IN") end
+end
+--- A route's progress for this character (RouteProgress), kept.
+function YR.RouteProgressKept(key)
+    local stamp = #(YR.shipped or {})
+    if progressFor ~= stamp then progress, progressFor = {}, stamp end
+    local r = progress[key]
+    if not r then
+        r = YR.RouteProgress(key)
+        progress[key] = r
+        if not watch then
+            watch = CreateFrame("Frame")
+            watch:SetScript("OnEvent", Forget)
+        end
+        watch:RegisterEvent("QUEST_TURNED_IN")
+    end
+    return r
+end
+--- What is kept is forgotten (a route saved, or one imported).
+function YR.RouteProgressForget() Forget(watch) end
+
 --- This character's routes, the one to take first. level and done as RouteProgress; keys: the routes
 --- to look at (this race and class's when left out). Each entry has fit (1-4) and note besides
 --- RouteProgress's fields; entries with nothing left come last.
@@ -95,7 +122,7 @@ function YR.WhereNext(level, done, keys)
     end
     local out = {}
     for _, key in ipairs(keys) do
-        local r = YR.RouteProgress(key, done)
+        local r = done and YR.RouteProgress(key, done) or YR.RouteProgressKept(key)
         if r.total > 0 then
             r.fit = Fit(r, level)
             r.note = r.left == 0 and "all done" or FIT_NOTE[r.fit]
@@ -115,10 +142,22 @@ end
 
 local function Plain(s) return (s:gsub("%f[%d]0+(%d)", "%1")) end
 
+--- Whether RestedXP has this route loaded now.
+function YR.RouteLoaded(key)
+    local g = type(RXP) == "table" and type(RXP.currentGuide) == "table" and RXP.currentGuide
+    return (g and type(g.name) == "string" and Plain(g.name) == YR.GuideName(key)) or false
+end
+
+--- The route to take now (WhereNext's first, while it has quests left), or nil.
+function YR.WhereNextBest()
+    local best = YR.WhereNext(UnitLevel("player"))[1]
+    return best and best.left > 0 and best or nil
+end
+
 --- Load a route in RestedXP at a step. Returns true, or nil and why not.
 function YR.LoadRouteAt(key, step)
     if not YR.RoutesOn() then
-        return nil, "Headstart's routes are off: switch Routes on at the top of the Levelling tab, then /reload."
+        return nil, "Headstart's routes are off: switch them on under the Routes tab, Settings, then /reload."
     end
     if type(RXP) ~= "table" or type(RXP.LoadGuide) ~= "function" or type(RXP.guides) ~= "table" then
         return nil, "RestedXP isn't loaded."
@@ -140,10 +179,15 @@ function YR.LoadRouteAt(key, step)
 end
 
 -- ---------------------------------------------------------------------------
--- The page (Levelling, Where next?)
+-- The page (Levelling, Next route: where the tab opens). The route to take - its quests left, where to start, a button
+-- that loads it in RestedXP - with what goes along the way beside it (your talent build, your trainer, this run), and the next few
+-- routes under it. (It was "Where next?": the one to take over a list of every other route, which ran out of the
+-- window - the owner, 2026-10-21: "where next's other routes extend the window".)
+--   api: the window's parts (Editor.lua): head(page), panel(frame, shadow, colour), light(parent), clock(seconds),
+--   steps(key) (the route open in the editor), width and top (the page's, and where under its heading it begins).
 -- ---------------------------------------------------------------------------
 local ui = {}
-local ROW_H, ROWS = 34, 12
+local AFTER, AFTER_ROW, HERO_H, ALONG_W = 3, 40, 206, 236
 
 local function Load(r)
     local ok, why = YR.LoadRouteAt(r.key, r.first)
@@ -152,124 +196,257 @@ local function Load(r)
     else
         YR.Print(why)
     end
+    YR:RefreshWindow()
 end
 
-local function Counts(r)
-    return ("%d of %d quests done, %d left"):format(r.done, r.total, r.left)
+-- "12-14 Loch Modan (Dwarf/Gnome)": "12-14", "Loch Modan"
+local function Parts(name)
+    local range, zone = name:match("^(%d+%-%d+)%s+(.+)$")
+    zone = (zone or name):gsub("%s*%(Launch%)", "")
+    return range, (zone:gsub("%s*%b()", ""))
 end
 
-function YR.BuildWherePage(page)
-    local title = S.Text(page, 17)
-    title:SetPoint("TOPLEFT", 20, -18)
-    title:SetText("Where next?")
-    ui.who = S.Text(page, 12, S.C.muted)
-    ui.who:SetPoint("TOPLEFT", 20, -42)
-    ui.who:SetPoint("RIGHT", -20, 0)
-    ui.who:SetJustifyH("LEFT")
+function YR.BuildWherePage(page, api)
+    ui.api = api
+    ui.head = api.head(page)
+    local width = api.width - 40
+    local heroW = width - ALONG_W - 14
+    local top = -(api.top + 12)
 
     -- the one to take
-    local card = CreateFrame("Frame", nil, page)
-    card:SetPoint("TOPLEFT", 20, -72)
-    card:SetPoint("RIGHT", -20, 0)
-    card:SetHeight(92)
-    S.Fill(card, S.C.card)
-    S.Border(card, S.C.lineHi)
-    local tag = S.Text(card, 11, S.C.accent)
-    tag:SetPoint("TOPLEFT", 16, -12)
-    tag:SetText("TAKE THIS ONE")
-    ui.name = S.Text(card, 17)
-    ui.name:SetPoint("TOPLEFT", 16, -30)
-    ui.detail = S.Text(card, 12, S.C.sub)
-    ui.detail:SetPoint("TOPLEFT", 16, -58)
-    ui.load = S.Button(card, "Load in RestedXP", function() if ui.best then Load(ui.best) end end, "primary", 170)
-    ui.load:SetPoint("RIGHT", -16, 0)
+    local hero = CreateFrame("Frame", nil, page)
+    hero:SetPoint("TOPLEFT", 16, top)
+    hero:SetSize(heroW, HERO_H)
+    api.panel(hero, true)
+    ui.cap = S.Text(hero, 11, S.C.muted)
+    ui.cap:SetPoint("TOPLEFT", 20, -18)
+    ui.chip = CreateFrame("Frame", nil, hero)
+    ui.chip:SetSize(44, 20)
+    ui.chip:SetPoint("TOPLEFT", 20, -40)
+    S.Rounded(ui.chip, "BACKGROUND", "round"):SetVertexColor(unpack(S.C.raised))
+    ui.range = S.Text(ui.chip, 13, S.C.sub)
+    ui.range:SetPoint("CENTER")
+    ui.name = S.Text(hero, 22)
+    ui.meta = S.Text(hero, 13, S.C.sub)
+    ui.meta:SetPoint("TOPLEFT", 20, -72)
+    ui.meta:SetPoint("RIGHT", -20, 0)
+    ui.meta:SetWordWrap(true)
+    ui.meta:SetJustifyV("TOP")
+    ui.track = hero:CreateTexture(nil, "ARTWORK")
+    ui.track:SetPoint("TOPLEFT", 20, -104)
+    ui.track:SetSize(heroW - 40, 4)
+    S.Set(ui.track, S.C.raised)
+    ui.fill = hero:CreateTexture(nil, "OVERLAY")
+    ui.fill:SetPoint("TOPLEFT", ui.track)
+    ui.fill:SetHeight(4)
+    S.Set(ui.fill, S.C.on)
+    ui.barW = heroW - 40
+    ui.progress = S.Text(hero, 12, S.C.muted)
+    ui.progress:SetPoint("TOPLEFT", 20, -116)
+    ui.load = S.Button(hero, "Load in RestedXP", function() if ui.best then Load(ui.best) end end, "primary", 150)
+    ui.load:SetPoint("BOTTOMLEFT", 20, 18)
+    ui.steps = S.Button(hero, "See the steps", function() if ui.best then api.steps(ui.best.key) end end, "ghost", 110)
+    ui.steps:SetTextColour(S.C.sub)
+    ui.steps:SetPoint("LEFT", ui.load, "RIGHT", 6, 0)
+    ui.steps.tip = "Open it in the route editor"
 
-    local head = S.Text(page, 11, S.C.muted)
-    head:SetPoint("TOPLEFT", 20, -184)
-    head:SetText("YOUR OTHER ROUTES")
+    -- what goes along the way: your talent build, your trainer, this run - each a click from its page
+    local along = CreateFrame("Frame", nil, page)
+    along:SetPoint("TOPLEFT", hero, "TOPRIGHT", 14, 0)
+    along:SetSize(ALONG_W, HERO_H)
+    api.panel(along, false, S.C.stripe)
+    local cap = S.Text(along, 11, S.C.muted)
+    cap:SetPoint("TOPLEFT", 16, -16)
+    cap:SetText("ALONG THE WAY")
+    local function Block(y, label, go)
+        local b = CreateFrame("Button", nil, along)
+        b:SetPoint("TOPLEFT", 1, y)
+        b:SetPoint("RIGHT", along, "RIGHT", -1, 0)
+        b:SetHeight(54)
+        b.hl = S.Fill(b, S.C.hover)
+        b.hl:Hide()
+        b.label = S.Text(b, 12, S.C.muted)
+        b.label:SetPoint("TOPLEFT", 15, -6)
+        b.label:SetText(label)
+        b.value = S.Text(b, 14)
+        b.value:SetPoint("TOPLEFT", 15, -21)
+        b.value:SetPoint("RIGHT", -15, 0)
+        b.sub = S.Text(b, 12, S.C.sub)
+        b.sub:SetPoint("TOPLEFT", 15, -38)
+        b.sub:SetPoint("RIGHT", -15, 0)
+        b:SetScript("OnEnter", function(self) self.hl:Show() end)
+        b:SetScript("OnLeave", function(self) self.hl:Hide() end)
+        b:SetScript("OnClick", go)
+        return b
+    end
+    local function Rule(y)
+        local rule = along:CreateTexture(nil, "BORDER")
+        rule:SetPoint("TOPLEFT", 16, y)
+        rule:SetPoint("TOPRIGHT", -16, y)
+        S.Hair(rule, "h")
+        S.Set(rule, S.C.line)
+    end
+    ui.talents = Block(-32, "Talents", function() YR:ToggleWindow("builds") end)
+    Rule(-88)
+    -- (what your class trainer has for you now: the spells you could learn and haven't, and about their price)
+    ui.trainer = Block(-90, "Trainer", function() YR:ShowSettingsTab("trainer") end)
+    Rule(-146)
+    ui.run = Block(-148, "This run", function() YR:ToggleWindow("run") end)
+    ui.runLight = api.light(ui.run)
+    ui.runLight:SetPoint("TOPLEFT", 15, -19)
+    ui.runLight.text:SetFont(S.FONT, 14, "")
+    ui.runLight.text:SetTextColor(unpack(S.C.text))
+
+    -- after that: the next routes, three of them (all of them are on All routes)
+    local afterTop = top - HERO_H - 22
+    ui.afterCap = S.Text(page, 11, S.C.muted)
+    ui.afterCap:SetPoint("TOPLEFT", 18, afterTop)
+    ui.afterCap:SetText("AFTER THAT")
+    ui.all = S.Button(page, "All routes", function() YR:ToggleWindow("library") end, "ghost", 120)
+    ui.all:SetTextColour(S.C.sub)
+    ui.all:SetHeight(24)
+    ui.all:SetPoint("RIGHT", page, "TOPRIGHT", -20, afterTop - 5)
+    local list = CreateFrame("Frame", nil, page)
+    list:SetPoint("TOPLEFT", 16, afterTop - 20)
+    list:SetSize(width, AFTER * AFTER_ROW + 2)
+    api.panel(list)
+    ui.list = list
     ui.rows = {}
-    for i = 1, ROWS do
-        local row = CreateFrame("Frame", nil, page)
-        row:SetPoint("TOPLEFT", 20, -204 - (i - 1) * ROW_H)
-        row:SetPoint("RIGHT", -20, 0)
-        row:SetHeight(ROW_H - 2)
-        S.Fill(row, i % 2 == 1 and S.C.card or S.C.field)
-        row.name = S.Text(row, 13)
-        row.name:SetPoint("LEFT", 14, 0)
-        row.name:SetWidth(330)
-        row.name:SetJustifyH("LEFT")
-        row.name:SetWordWrap(false)
-        row.counts = S.Text(row, 12, S.C.sub)
-        row.counts:SetPoint("LEFT", 360, 0)
+    for i = 1, AFTER do
+        local row = CreateFrame("Frame", nil, list)
+        row:SetPoint("TOPLEFT", 1, -1 - (i - 1) * AFTER_ROW)
+        row:SetSize(width - 2, AFTER_ROW)
+        if i > 1 then
+            local line = row:CreateTexture(nil, "BORDER")
+            line:SetPoint("TOPLEFT")
+            line:SetPoint("TOPRIGHT")
+            S.Hair(line, "h")
+            S.Set(line, S.C.line)
+        end
+        row.range = S.Text(row, 12, S.C.sub)
+        row.range:SetPoint("LEFT", 14, 0)
+        row.name = S.Text(row, 14)
+        row.name:SetPoint("LEFT", 66, 0)
+        row.name:SetPoint("RIGHT", row, "LEFT", width - 310, 0)
+        row.counts = S.Text(row, 13, S.C.muted)
+        row.counts:SetPoint("LEFT", width - 300, 0)
         row.note = S.Text(row, 12, S.C.muted)
-        row.note:SetPoint("LEFT", 590, 0)
-        row.load = S.Button(row, "Load", function() if row.r then Load(row.r) end end, nil, 80)
-        row.load:SetPoint("RIGHT", -8, 0)
+        row.note:SetPoint("LEFT", width - 190, 0)
+        row.load = S.Button(row, "Load", function() if row.r then Load(row.r) end end, nil, 56)
+        row.load:SetHeight(26)
+        row.load:SetPoint("RIGHT", -12, 0)
         row:Hide()
         ui.rows[i] = row
     end
-    ui.more = S.Text(page, 11, S.C.muted)
-    ui.more:SetPoint("BOTTOMLEFT", 20, 16)
-end
-
--- The page is refreshed whenever the window is; walking every route each time is the costly part, so
--- the answer is kept until something it rests on changes: your level, the routes, a quest handed in.
--- Hand-ins are listened for only while there is an answer to throw away: the frame is made the first
--- time the page has one, and stops listening once it has forgotten it.
-local kept, keptFor, watch
-local function Forget(self)
-    kept = nil
-    self:UnregisterEvent("QUEST_TURNED_IN")
 end
 
 function YR.RefreshWherePage()
-    if not ui.who then return end
+    if not ui.head then return end
     local level = UnitLevel("player")
     local race, class = UnitRace("player"), UnitClass("player")
-    local stamp = level .. ":" .. #(YR.shipped or {}) .. ":" .. tostring(YR.RoutesOn()) .. ":" .. tostring(race) .. tostring(class)
-    if not kept or keptFor ~= stamp then
-        kept, keptFor = YR.WhereNext(level), stamp
-        if not watch then
-            watch = CreateFrame("Frame")
-            watch:SetScript("OnEvent", Forget)
-        end
-        watch:RegisterEvent("QUEST_TURNED_IN")
-    end
-    local list = kept
-    ui.who:SetText(("Level %d %s %s. From the quests the game says this character has handed in, whether or not it followed a route."):format(
-        level, race or "", class or ""))
+    local list = YR.WhereNext(level)
     local best = list[1]
     if best and best.left == 0 then best = nil end
     ui.best = best
+    ui.head:Set({ icon = 132181, title = "Next route",
+        desc = ("Level %d %s %s. Picked from the quests you have handed in, route or not."):format(level, race or "", class or "") })
+
+    -- the one to take
+    ui.name:ClearAllPoints()
+    ui.chip:SetShown(best ~= nil)
+    for _, part in ipairs({ ui.track, ui.progress, ui.load, ui.steps }) do part:SetShown(best ~= nil) end
     if best then
-        ui.name:SetText(best.name)
-        ui.detail:SetText(("Start at step %d of %d  ·  %s  ·  %s"):format(best.first or 1, best.steps, Counts(best), best.note))
-    elseif not YR.RoutesOn() then
-        ui.name:SetText("Headstart's routes are off")
-        ui.detail:SetText("Switch Routes on at the top of the menu, then /reload.")
-    elseif #list == 0 then
-        ui.name:SetText("No routes yet")
-        ui.detail:SetText("Save a run as a route under This run, or paste one in under Share: then this page says where to pick it up.")
+        local range, zone = Parts(best.name)
+        ui.cap:SetText("TAKE THIS ONE")
+        ui.range:SetText(range or "")
+        ui.chip:SetWidth(math.floor(ui.range:GetStringWidth() + 16))
+        ui.name:SetPoint("LEFT", ui.chip, "RIGHT", 10, 0)
+        ui.name:SetText(zone)
+        ui.meta:SetText(("%d quests left  ·  start at step %d of %d  ·  %s"):format(best.left, best.first or 1, best.steps, best.note))
+        local part = best.total > 0 and best.done / best.total or 0
+        ui.fill:SetShown(part > 0)
+        ui.fill:SetWidth(math.max(1, ui.barW * part))
+        ui.progress:SetText(("%d of %d quests done"):format(best.done, best.total))
+        local loaded = YR.RouteLoaded(best.key)
+        ui.load:SetLabel(loaded and "In RestedXP now" or "Load in RestedXP")
+        ui.load:SetEnabled(not loaded)
     else
-        ui.name:SetText("Nothing left")
-        ui.detail:SetText("Every quest in this character's routes is handed in.")
+        ui.fill:Hide()
+        ui.name:SetPoint("TOPLEFT", 20, -38)
+        if #list == 0 then
+            ui.cap:SetText("NO ROUTES YET")
+            ui.name:SetText("Make or import one")
+            ui.meta:SetText("Play with This run recording and Save as route, or import a route someone shared under All"
+                .. " routes. Then this page says where to pick it up.")
+        else
+            ui.cap:SetText("ALL DONE")
+            ui.name:SetText("Nothing left")
+            ui.meta:SetText("Every quest in this character's routes is handed in.")
+        end
     end
-    ui.load:SetShown(best ~= nil)
+
+    -- along the way
+    local build = YR.TalentFollowed and YR.TalentFollowed()
+    if build then
+        local nextOne = YR.TalentNextLines and YR.TalentNextLines(1)[1]
+        local points = YR.UnspentTalents and YR.UnspentTalents() or 0
+        ui.talents.value:SetText(build.name)
+        ui.talents.sub:SetText(not nextOne and "Every talent of it taken"
+            or ((type(points) == "number" and points > 0) and "A point to spend: " or "Next: ") .. nextOne)
+    else
+        ui.talents.value:SetText("No build followed")
+        ui.talents.sub:SetText("What to take at each level")
+    end
+    local missing = YR.TrainerMissing and YR.TrainerMissing(level) or {}
+    if #missing > 0 then
+        local icons, total, priced = "", 0, 0
+        for i, m in ipairs(missing) do
+            local tex = i <= 3 and C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(m.id)
+            if tex then icons = icons .. "|T" .. tex .. ":16:16|t " end
+            if m.cost then total, priced = total + m.cost, priced + 1 end
+        end
+        ui.trainer.value:SetText(("%s %d spell%s to learn"):format(icons, #missing, #missing == 1 and "" or "s"))
+        ui.trainer.sub:SetText(priced > 0 and ("About %s%s"):format(YR.Money(total), priced < #missing and ", some not priced yet" or "")
+            or "Prices are learned at your trainer")
+    else
+        local nextAt = YR.TrainerNextLevel and YR.TrainerNextLevel(level)
+        ui.trainer.value:SetText("Nothing to learn now")
+        ui.trainer.sub:SetText(nextAt and ("Something new at level %d"):format(nextAt) or "Every spell learned")
+    end
+    local on, stopped = YR.Option("logging"), YR.RunStopped and YR:RunStopped()
+    local played = YR.SplitsPlayed and YR.SplitsPlayed()
+    ui.runLight:Set(not on and "Not recording" or stopped and "Stopped" or "Recording", (on and not stopped) and S.C.green or nil)
+    ui.run.value:SetText("")
+    ui.run.sub:SetText(type(played) == "number" and ("%s played, level %d"):format(ui.api.clock(played), level)
+        or on and "Every quest and level, as you play" or "Switch it on under This run")
+
+    -- after that: the next ones with something left in them
     local shown = 0
-    for i = 1, ROWS do
+    for i = 1, AFTER do
         local r = list[i + (best and 1 or 0)]
+        if r and r.left == 0 then r = nil end
         local row = ui.rows[i]
         row.r = r
         row:SetShown(r ~= nil)
         if r then
             shown = shown + 1
-            row.name:SetText(r.name)
-            row.counts:SetText(Counts(r))
+            local range, zone = Parts(r.name)
+            row.range:SetText(range or "")
+            row.name:SetText(zone)
+            row.counts:SetText(("%d quests"):format(r.left))
             row.note:SetText(r.note)
-            row.name:SetTextColor(unpack((r.left == 0 or r.fit == 4) and S.C.muted or S.C.text))
-            row.load:SetShown(r.first ~= nil)
+            row.name:SetTextColor(unpack(r.fit == 4 and S.C.muted or S.C.text))
+            row.load:SetEnabled(r.first ~= nil)
         end
     end
-    local rest = #list - (best and 1 or 0) - shown
-    ui.more:SetText(rest > 0 and ("and %d more, further from your level"):format(rest) or "")
+    ui.afterCap:SetShown(shown > 0)
+    ui.list:SetShown(shown > 0)
+    ui.list:SetHeight(math.max(1, shown) * AFTER_ROW + 2)
+    ui.all:SetLabel(("All %d routes"):format(#list))
+    ui.all:SetShown(#list > 0)
+    ui.shown = shown
+end
+--- For the tests: the page as shown - { best (its key), after (the next routes listed), load (its button's words) }.
+function YR.WherePageShown()
+    return { best = ui.best and ui.best.key, after = ui.shown or 0, load = ui.load and ui.load.text:GetText() }
 end

@@ -1,16 +1,17 @@
-"""Smoke test of NPC markers (NpcMarkers.lua), in Lua 5.1 (lupa).
+"""Smoke test of quest mob markers (NpcMarkers.lua), in Lua 5.1 (lupa).
 
     python tools/smoke_npcmarkers.py      (exit code 1 on any failure; tools/smoke.py runs it too)
 
-An icon on the nameplate of the NPC the active RestedXP step's .target names ("!" to take a quest, "?" to hand one
-in, a speech bubble else), a sword on quest mobs, never on a player or a unit the game keeps secret; the game's
-friendly NPC plates on while it is on and put back after. Uses smoke.py's fake game.
+A sword on the nameplate of an enemy you still need for a quest (the game's objective lines on it, the RestedXP
+step's .mob lines), never on a quest giver, a player, a dead enemy or a unit the game keeps secret; none while
+Questie draws its own; the game's friendly NPC plates put back where an earlier version turned them on, and
+never turned on now. Uses smoke.py's fake game.
 """
 import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TALK, OFFER, HANDIN, MOB = 132053, 132049, 132048, 131013
+MOB = 131013
 
 
 def files(folder, toc):
@@ -122,60 +123,90 @@ def run():
     def at(unit):
         return g.NPCM_ICON(g.PLATES[unit])
 
-    check("npcMarkers" in YR.STARTS_OFF and g.CV.nameplateShowFriendlyNpcs == "0" and at("nameplate1") is None,
+    check("npcMarkers" in YR.STARTS_OFF and g.CV.nameplateShowFriendlyNpcs == "0" and at("nameplate4") is None,
           "off on a new install: no icons, the game's friendly plates left as they are")
     # a real hook (the fake one only writes it down): RestedXP's step functions call ours after their own
     lua.execute("""function hooksecurefunc(t, k, fn) local was = t[k] t[k] = function(...) local r = was(...) fn(...) return r end end""")
     db.npcMarkers = True
     YR.ApplyParts()
-    check(g.CV.nameplateShowFriendlyNpcs == "1" and db.npcMarkersWas == "0",
-          "on: friendly NPC plates on, and what they were written down")
-    check(at("nameplate1") == TALK, f"the step's .target NPC gets the speech bubble ({at('nameplate1')})")
-    pt = g.NPCM_PT(g.PLATES.nameplate1)
-    check(pt is not None and pt[1] == "RIGHT" and same(pt[2], g.PLATES.nameplate1.UnitFrame.healthBar),
-          "beside the plate's health bar")
-    check(at("nameplate2") is None, "a player of the same name: nothing")
-    check(at("nameplate6") is None, "a unit the game keeps secret: nothing, and no error")
-    check(at("nameplate9") is None, "an NPC whose name and GUID the game keeps secret: nothing, and no error")
-    check(at("nameplate3") is None, "an enemy that counts for nothing: nothing")
+    check(g.CV.nameplateShowFriendlyNpcs == "0" and g.CV_WRITES == 0, "on: the game's friendly plates never turned on")
     check(at("nameplate4") == MOB, "an enemy with a quest objective of yours not done: the sword")
+    pt = g.NPCM_PT(g.PLATES.nameplate4)
+    check(pt is not None and pt[1] == "RIGHT" and same(pt[2], g.PLATES.nameplate4.UnitFrame.healthBar),
+          "beside the plate's health bar")
+    check(at("nameplate1") is None, "the NPC the step says to talk to (a quest giver): nothing - the game shows its own ! and ?")
+    check(at("nameplate2") is None, "a player: nothing")
+    check(at("nameplate6") is None, "a unit the game keeps secret: nothing, and no error")
+    check(at("nameplate9") is None, "an enemy whose name and GUID the game keeps secret: nothing, and no error")
+    check(at("nameplate3") is None, "an enemy that counts for nothing: nothing")
     check(at("nameplate5") is None, "an enemy whose objective is done: nothing")
 
-    # the step takes a quest, then hands one in: "!" then "?" (RestedXP moving on calls its SetStep)
-    lua.execute("""table.insert(STEP.elements, { tag = "accept", questId = 1 }) RXP.SetStep(3)""")
-    check(at("nameplate1") == TALK, "a step change is looked at a moment after, not at once")
+    # a step with a .mob line: that mob gets the sword; by its id in the guide too
+    lua.execute("""table.insert(STEP.elements, { mobs = { "Small Crag Boar" }, textOnly = true }) RXP.SetStep(3)""")
+    check(at("nameplate3") is None, "a step change is looked at a moment after, not at once")
     g.Later()
-    check(at("nameplate1") == OFFER, f"a quest to take at the NPC: ! ({at('nameplate1')})")
-    lua.execute("""table.insert(STEP.elements, { tag = "turnin", questId = 2 }) RXP.UpdateStepCompletion() Later()""")
-    check(at("nameplate1") == HANDIN, "and one to hand in as well: ? first")
-    lua.execute("""STEP.elements[4].completed = true STEP.elements[3].completed = true RXP.UpdateStepCompletion() Later()""")
-    check(at("nameplate1") == TALK, "both done: the speech bubble again")
-
-    # the guide's name with its id, and RestedXP holding only the id (a client in another language): by the id
-    lua.execute("""STEP.elements[2].targets = { "714" } RXP.SetStep(3) Later()""")
-    check(at("nameplate1") == TALK, "only the NPC's id in the guide: matched by the id in its GUID")
-    lua.execute("""STEP.elements[2].targets = { "Someone Else::714" } RXP.SetStep(3) Later()""")
-    check(at("nameplate1") == TALK, '"Name::id": matched by the id')
-    # a step with a .mob line: that mob gets the sword
-    lua.execute("""table.insert(STEP.elements, { mobs = { "Small Crag Boar" }, textOnly = true }) RXP.SetStep(3) Later()""")
     check(at("nameplate3") == MOB, "the step's .mob: the sword")
-    db.npcMarkersMobs = False
-    YR.ApplyParts()
-    check(at("nameplate3") is None and at("nameplate4") is None and at("nameplate1") == TALK,
-          "Quest mobs off: no swords, the NPC still marked")
-    db.npcMarkersMobs = None
-    # the step moves on: the NPC is no longer the one
-    lua.execute("""RXP.RXPFrame.activeSteps = {} RXP.SetStep(4) Later()""")
-    check(at("nameplate1") is None, "the step over: its NPC's icon goes")
+    lua.execute("""U.nameplate3.guid = "Creature-0-1-2-3-1125-0000" STEP.elements[3].mobs = { "Someone Else::1125" } RXP.SetStep(3) Later()""")
+    check(at("nameplate3") == MOB, '"Name::id" in the guide: matched by the id in its GUID')
+    lua.execute("""U.nameplate3.dead = true RXP.SetStep(3) Later()""")
+    check(at("nameplate3") is None, "a dead one: nothing")
+    lua.execute("""U.nameplate3.dead = false RXP.RXPFrame.activeSteps = {} RXP.SetStep(4) Later()""")
+    check(at("nameplate3") is None and at("nameplate4") == MOB, "the step over: its mob's sword goes, the objective's stays")
     lua.execute("""RXP.RXPFrame.activeSteps = { STEP } RXP.SetStep(3) Later()""")
 
+    # the tooltip read once per kind of mob (its NPC id), not per plate per look, until the quest log changes
+    lua.execute("""TIPS = 0 KEPT_TIP_GET = C_TooltipInfo.GetUnit
+        C_TooltipInfo.GetUnit = function(u)
+            if U[u] and type(U[u].guid) == "string" and U[u].guid:find("%-2000%-") then TIPS = TIPS + 1 end
+            return KEPT_TIP_GET(u)
+        end
+        U.nameplate4.guid = "Creature-0-1-2-3-2000-0001"
+        Plate("nameplate10", { name = "Rockjaw Trogg", enemy = true, objective = "todo", guid = "Creature-0-1-2-3-2000-0002" })""")
+    g.Fire("NAME_PLATE_UNIT_ADDED", "nameplate10")
+    YR.NpcMarkersMarkAll()
+    YR.NpcMarkersMarkAll()
+    check(at("nameplate10") == MOB and at("nameplate4") == MOB and g.TIPS == 1,
+          f"two of a kind, looked at three times: the game's tooltip read once ({g.TIPS})")
+    lua.execute("""U.nameplate4.objective, U.nameplate10.objective = "done", "done" Fire("QUEST_LOG_UPDATE") Later()""")
+    check(at("nameplate10") is None and at("nameplate4") is None and g.TIPS == 2,
+          f"the quest log changes (the objective done): read again, and the swords go ({g.TIPS})")
+    # in a fight the game may keep the line's "done" secret: no sword, and not kept - asked again (the review, 2026-10-21)
+    lua.execute("""U.nameplate4.objective, U.nameplate10.objective = "todo", "todo"
+        SECRET_DONE = true
+        local real = C_TooltipInfo.GetUnit
+        C_TooltipInfo.GetUnit = function(u) local d = real(u) if SECRET_DONE and d.lines[2] then d.lines[2].completed = SECRET end return d end
+        Fire("QUEST_LOG_UPDATE") Later()""")
+    check(at("nameplate4") is None, "the objective's state kept secret: no sword, and no error")
+    lua.execute("SECRET_DONE = false")
+    YR.NpcMarkersMarkAll()
+    check(at("nameplate4") == MOB, "the answer plain again: the sword, without waiting for the quest log to change")
+    # turned off, the quest log changes unheard; turned on again: read anew, not what was read before
+    db.npcMarkers = False
+    YR.ApplyParts()
+    lua.execute("""U.nameplate4.objective, U.nameplate10.objective = "done", "done" Fire("QUEST_LOG_UPDATE")""")
+    db.npcMarkers = True
+    YR.ApplyParts()
+    lua.execute("Later()")
+    check(at("nameplate4") is None, "off, an objective done meanwhile, on again: no sword left from before")
+    lua.execute("""U.nameplate4.objective = "todo" U.nameplate4.guid = nil PLATES.nameplate10 = nil U.nameplate10 = nil
+        Fire("NAME_PLATE_UNIT_REMOVED", "nameplate10") C_TooltipInfo.GetUnit = KEPT_TIP_GET Fire("QUEST_LOG_UPDATE") Later()""")
+    # Questie draws its own quest icons on plates: none of ours while it does
+    lua.execute("""Questie = { db = { profile = { nameplateEnabled = true } } }""")
+    YR.ApplyParts()
+    YR.NpcMarkersMarkAll()
+    check(at("nameplate4") is None, "Questie's nameplate icons on: none of ours (no two icons)")
+    lua.execute("""Questie.db.profile.nameplateEnabled = false""")
+    YR.NpcMarkersMarkAll()
+    check(at("nameplate4") == MOB, "Questie's off: ours back")
+    lua.execute("""Questie = nil""")
+
     # plates that come and go; another addon's plate; one with no health bar
-    g.Plate("nameplate7", lua.eval('{ name = "Talin Keeneye", guid = "Creature-0-1-2-3-714-0001" }'), "plater")
+    g.Plate("nameplate7", lua.eval('{ name = "Rockjaw Trogg", enemy = true, objective = "todo" }'), "plater")
     g.Fire("NAME_PLATE_UNIT_ADDED", "nameplate7")
     pt = g.NPCM_PT(g.PLATES.nameplate7)
-    check(at("nameplate7") == TALK and same(pt[2], g.PLATES.nameplate7.unitFrame.healthBar),
+    check(at("nameplate7") == MOB and same(pt[2], g.PLATES.nameplate7.unitFrame.healthBar),
           "a plate another addon draws (Plater, ElvUI): beside its own health bar")
-    g.Plate("nameplate8", lua.eval('{ name = "Talin Keeneye", guid = "Creature-0-1-2-3-714-0001" }'), "nobar")
+    g.Plate("nameplate8", lua.eval('{ name = "Rockjaw Trogg", enemy = true, objective = "todo" }'), "nobar")
     g.Fire("NAME_PLATE_UNIT_ADDED", "nameplate8")
     pt = g.NPCM_PT(g.PLATES.nameplate8)
     check(pt is not None and pt[1] == "BOTTOM" and same(pt[2], g.PLATES.nameplate8.UnitFrame.name),
@@ -183,37 +214,40 @@ def run():
     g.Fire("NAME_PLATE_UNIT_REMOVED", "nameplate8")
     check(at("nameplate8") is None, "a plate gone: its icon hidden")
 
-    # the friendly plates' setting: yours stands, a fight waits, off puts it back
-    g.C_CVar.SetCVar("nameplateShowFriendlyNpcs", "0")
-    check(db.npcMarkersWas is None and db.npcMarkersPlates is False,
-          "you turn friendly plates off yourself: yours stands (and the switch for it goes off)")
-    db.npcMarkersPlates = None
-    YR.ApplyParts()
-    check(g.CV.nameplateShowFriendlyNpcs == "1" and db.npcMarkersWas == "0", "turned on again: on, and written down")
-    g.Fire("PLAYER_LOGOUT")
-    check(g.CV.nameplateShowFriendlyNpcs == "0" and db.npcMarkersWas is None,
-          "logging out: put back before the game saves it")
-    g.Fire("PLAYER_ENTERING_WORLD")
-    check(g.CV.nameplateShowFriendlyNpcs == "1" and db.npcMarkersWas == "0", "and made again at the next login")
-    lua.execute("FIGHT = true")
+    # friendly plates an earlier version turned on (what they were written down): put back as this comes on
     db.npcMarkers = False
     YR.ApplyParts()
-    check(g.CV.nameplateShowFriendlyNpcs == "1" and at("nameplate1") is None,
-          "turned off in a fight: the icons go at once, the setting waits")
-    lua.execute("FIGHT = false")
-    g.Fire("PLAYER_REGEN_ENABLED")
-    check(g.CV.nameplateShowFriendlyNpcs == "0" and db.npcMarkersWas is None, "the fight over: put back as it was")
-    writes = g.CV_WRITES
-    g.Fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
-    g.Fire("PLAYER_ENTERING_WORLD")
-    check(at("nameplate1") is None and g.CV_WRITES == writes, "off: nothing listens, nothing is changed")
-    # a player who had friendly plates on: nothing written down, nothing put back
-    lua.execute('CV.nameplateShowFriendlyNpcs = "1"')
+    lua.execute('CV.nameplateShowFriendlyNpcs = "1" YippRouteDB.npcMarkersWas = "0"')
     db.npcMarkers = True
     YR.ApplyParts()
+    check(g.CV.nameplateShowFriendlyNpcs == "0" and db.npcMarkersWas is None,
+          "friendly plates an earlier version turned on: put back as they were")
+    # in a fight it waits for the fight's end
     db.npcMarkers = False
     YR.ApplyParts()
-    check(g.CV.nameplateShowFriendlyNpcs == "1" and db.npcMarkersWas is None, "friendly plates already on: left on")
+    lua.execute('CV.nameplateShowFriendlyNpcs = "1" YippRouteDB.npcMarkersWas = "0" FIGHT = true')
+    db.npcMarkers = True
+    YR.ApplyParts()
+    check(g.CV.nameplateShowFriendlyNpcs == "1" and db.npcMarkersWas == "0", "in a fight: it waits")
+    lua.execute("FIGHT = false")
+    g.Fire("PLAYER_REGEN_ENABLED")
+    check(g.CV.nameplateShowFriendlyNpcs == "0" and db.npcMarkersWas is None, "the fight over: put back")
+    # changed by you before it was put back: yours stands
+    lua.execute('YippRouteDB.npcMarkersWas = "0" FIGHT = true')
+    YR.ApplyParts()
+    lua.execute('FIGHT = false')
+    g.C_CVar.SetCVar("nameplateShowFriendlyNpcs", "1")
+    check(db.npcMarkersWas is None, "you set friendly plates yourself meanwhile: yours stands")
+    g.Fire("PLAYER_REGEN_ENABLED")
+    check(g.CV.nameplateShowFriendlyNpcs == "1", "and nothing is put back over it")
+
+    db.npcMarkers = False
+    YR.ApplyParts()
+    writes = g.CV_WRITES
+    check(at("nameplate4") is None, "turned off: the icons go")
+    g.Fire("NAME_PLATE_UNIT_ADDED", "nameplate4")
+    g.Fire("PLAYER_ENTERING_WORLD")
+    check(at("nameplate4") is None and g.CV_WRITES == writes, "off: nothing listens, nothing is changed")
     lua.execute("CreateFrame = KEPT_CREATE")
     return bad
 

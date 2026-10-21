@@ -8,6 +8,27 @@ function YR.Print(msg)
     print("|cffff9a40Headstart|r: " .. msg)
 end
 
+--- Something Headstart did that can taint Blizzard's action bars until the next reload - Character setup putting
+--- spells, items or macros on them, or changing which bars show or the Edit Mode layout the old way - written down
+--- with when (seconds, as BugGrabber keeps its errors) and on whom, in YippRouteDB.taintLog (the last 40). The
+--- owner met "Headstart tried to call the protected function MultiBarBottomLeftButton1:SetShown()" in a fight
+--- (2026-10-20), and nothing told what had come before it; with this the two times can be laid side by side. The
+--- same thing again within ten seconds is the line before, counted.
+function YR.TaintNoted(what)
+    if type(YippRouteDB) ~= "table" then return end
+    local log = type(YippRouteDB.taintLog) == "table" and YippRouteDB.taintLog or {}
+    YippRouteDB.taintLog = log
+    local now = time and time() or 0
+    local last = log[#log]
+    if type(last) == "table" and last.what == what and now - (last.at or 0) < 10 then
+        last.n, last.at = (last.n or 1) + 1, now
+        return
+    end
+    log[#log + 1] = { at = now, what = what, who = UnitName and UnitName("player") or nil,
+        fight = InCombatLockdown and InCombatLockdown() or nil }
+    while #log > 40 do table.remove(log, 1) end
+end
+
 -- Where the player is, as uiMapID and 0-100 map coordinates, or nil where the game won't say
 -- (instances, or a value Forever keeps secret: the arithmetic errors and pcall turns that into nil).
 local function ReadPosition()        -- one function, not a new one each time this is asked (every two seconds)
@@ -213,9 +234,19 @@ local OTHERS = {
     },
     whisperSound = { { "EllesmereUI", function() return Loaded("EllesmereUIChat") end } },
     lootFeed = { { "Naowh Forever", function() return Loaded("NaowhForever") end } },
-    -- (Naowh Forever's Glimmer is an addon of its own beside it; the other two do nothing else)
+    -- (Naowh Forever's Glimmer was an addon of its own beside it, and is a part of NaowhForever_QoL since its 1.1.13: there
+    -- it is asked whether it is on, through its own table - the review, 2026-10-21, found ours never saw it; the other two
+    -- do nothing else)
     glimmer = {
-        { "Naowh Forever", function() return Loaded("NaowhForever_Glimmer") end },
+        { "Naowh Forever", function()
+            if Loaded("NaowhForever_Glimmer") then return true end
+            if not Loaded("NaowhForever_QoL") then return false end
+            local ns = rawget(_G, "NaowhForever")
+            local g = type(ns) == "table" and rawget(ns, "Glimmer")
+            if type(g) ~= "table" or type(g.On) ~= "function" then return true end      -- (can't ask: taken as on)
+            local ok, on = pcall(g.On)
+            return ok and on == true
+        end },
         { "Forever Loot Sparkles", function() return Loaded("ForeverLootSparkles") end },
         { "Lueur", function() return Loaded("Lueur") end },
     },
@@ -237,7 +268,6 @@ function YR.OtherHas(key)
     others[key] = known
     return known or nil
 end
-YR.EllesmereHas = YR.OtherHas            -- its name while EllesmereUI was the only one looked for
 function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 
 -- Options that are off until you turn them on yourself: everything that spends gold, moves your
@@ -253,8 +283,10 @@ function YR.EllesmereForget() for k in pairs(others) do others[k] = nil end end
 local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelShot = true, trinketBar = true,
     groupBar = true, upgrades = true, talentMove = true, talentFadeSlider = true, xpbar = true,
     deathRecap = true, chatLog = true, lootFeed = true, questLFG = true, alts = true, glimmer = true, instanceTrack = true,
-    boatTimer = true,
+    boatTimer = true, questItems = true,
+    waypoint = true, waypointRXP = true,     -- (the world marker, Waypoint.lua)
     npcMarkers = true,                      -- (the nameplate markers, NpcMarkers.lua)
+    questTips = true,                       -- (quests on NPC tooltips, QuestTips.lua)
     paceWatch = true,                       -- (the level pace box under the guide, Pace.lua)
     questSkip = true,                       -- (Skip quest in RestedXP's step menu, QuestSkip.lua)
     bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
@@ -268,10 +300,16 @@ function YR.OptionDefault(key)
     return YR.OtherHas(key) == nil
 end
 
+-- Switches taken out of the window (the owner, 2026-10-21: "a lot of settings I'll never touch"; where an element
+-- stands is set in Arrange alone): what they are is their default, whatever an older version stored - a camp icon
+-- or a bar left unlocked has no switch left to lock it with. (Camp.lua is the same file as Campfire's and keeps its
+-- unlocked preview; here it is never reached.)
+local SETTLED = { campLocked = true, trinketBarLocked = true, groupBarLocked = true, flightFace = true }
+
 --- An option as you set it (or its default), whatever the main switch says: what the settings show.
 function YR.OptionSet(key)
     local v = YippRouteDB[key]
-    if v == nil then return YR.OptionDefault(key) end
+    if v == nil or SETTLED[key] then return YR.OptionDefault(key) end
     return v ~= false
 end
 
@@ -455,7 +493,7 @@ function YR.PutBackEverything()
     end
     YR.SetSetupOn(false)
     YR.SetQoLOn(false)
-    YR.Print("put back: quality of life and Character setup are off. The levelling routes stay (Levelling tab).")
+    YR.Print("put back: quality of life and Character setup are off. The levelling routes stay (the Routes tab).")
     if YR.RefreshWindow then YR:RefreshWindow() end
     return true
 end
@@ -647,6 +685,10 @@ SlashCmdList.HEADSTART = function(msg)
         YR.BoatsCommand(arg)
     elseif cmd == "putback" then
         YR.AskPutBack()
+    elseif cmd == "range" then
+        if YR.RangeReport then YR.RangeReport() end
+    elseif cmd == "way" then
+        YR.WaypointCommand(arg)
     elseif cmd == "perf" then
         -- what Headstart costs, by the game's own count (the code for it is in the window's addon)
         if YR.LoadWindow() then YR.Perf() end
@@ -654,7 +696,7 @@ SlashCmdList.HEADSTART = function(msg)
         -- your settings as a text, to take to another install (the live game, another computer)
         if YR.LoadWindow() and YR.TransferShow then YR.TransferShow(cmd ~= "transfer" and cmd or nil) end
     elseif cmd == "start" or cmd == "welcome" then
-        -- the welcome window: how much of Headstart you want (the code for it is in the window's addon)
+        -- the tour of Headstart's window (the code for it is in the window's addon)
         if YR.LoadWindow() then YR.WelcomeToggle() end
     elseif cmd == "menu" then
         YR.WindowMenu()
@@ -702,7 +744,7 @@ SlashCmdList.HEADSTART = function(msg)
     elseif cmd == "skip" or cmd == "unskip" then
         -- the quest of the step you're on skipped, or the last skip put back (QuestSkip.lua)
         if not YR.Option("questSkip") then
-            YR.Print("turn on Skip quest first: Settings, Levelling, Route settings.")
+            YR.Print("turn on Skip quest first: the Routes tab, Settings, Routes.")
         elseif cmd == "skip" then
             YR.QuestSkip()
         else
@@ -715,9 +757,7 @@ SlashCmdList.HEADSTART = function(msg)
         if not YR.BankIsOpen() then YR.Print("open the bank first.") end
     elseif cmd == "camp" then
         if arg == "lock" or arg == "unlock" then
-            YR.SetCampLocked(arg == "lock")
-            YR.Print(arg == "lock" and "the campfire icon is locked."
-                or "the campfire icon is unlocked - drag the preview where you want it, then /headstart camp lock.")
+            YR.Print("the campfire icon is moved in Arrange: /headstart move.")
         elseif arg == "always" then
             YR.SetCampAlways(not YR.Option("campAlways"))
             YR.Print("the resting campfire icon is " .. (YR.Option("campAlways") and "on." or "off."))
@@ -732,10 +772,10 @@ SlashCmdList.HEADSTART = function(msg)
         YR:LogStatus()
         YR.Print("/headstart - the window; /hs - Settings; /headstart scan (stop) - ask the server about every known quest;"
             .. " /headstart log on|off; /headstart splits on|off|reset; /headstart flight - a sample flight bar to move;"
-            .. " /headstart camp (unlock|lock|always|debug) - the campfire icon; /headstart bank - bank mats now; /headstart mail - mail them to your alt;"
+            .. " /headstart camp (unlock|lock|always|debug) - the campfire icon; /headstart bank - deposit at an open bank; /headstart mail - mail them to your alt;"
             .. " /headstart routes on|off - Headstart routes in RestedXP; /headstart inv - invite your target; /headstart leave - leave the group; /headstart plan - plan your bars;"
             .. " /headstart restock - buy what you keep at this vendor; /headstart trainer - what's new at the trainer;"
-            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart profile [name] - switch this character to another of the class's profiles; /headstart macro - the macro helper: your class's usual macros made by ticking boxes; /headstart start - the welcome window: pick how much of Headstart you want; /headstart transfer - your settings as a text, to move them to another install; /headstart putback - put back everything Headstart changed (asks first)")
+            .. " /headstart upgrades - look through your bags for better gear; /headstart death - what happened the last time you died; /headstart chat - the chat log; /headstart loot - the loot log; /headstart perf - what Headstart costs, measured by the game; /headstart alts - your other characters' bags, bank, gold and currencies (/headstart gold: just the gold); /headstart profile [name] - switch this character to another of the class's profiles; /headstart macro - the macro helper: your class's usual macros made by ticking boxes; /headstart start - the tour of Headstart's window; /headstart transfer - your settings as a text, to move them to another install; /headstart putback - put back everything Headstart changed (asks first); /headstart way 45 62 - a map pin there (/headstart way alone takes it away); /headstart way log - what the world marker followed and why; /headstart range - how far your target is, and how that was told")
     else
         YR:ToggleWindow()
     end

@@ -72,19 +72,14 @@ function PlaySound(id, channel) PLAYED[#PLAYED + 1] = { "kit", id, channel } ret
     YR.ApplyParts()            # as the settings window does after a change
     lua.execute("NOW = NOW + 3 Fire('CHAT_MSG_BN_WHISPER')")
     check(len(g.PLAYED) == 2, "Battle.net whispers turned off: not played")
+    # (the channel and a file of your own were settings until 2026-10-21: what is still saved of them changes nothing)
     g.YippRouteDB.whisperChannel = "SFX"
     lua.execute("NOW = NOW + 3 Fire('CHAT_MSG_WHISPER')")
-    check(last()[3] == "SFX", "another channel picked: played on it")
-    # a sound file of your own
-    lua.execute("FILES = {} function PlaySoundFile(f, ch) FILES[#FILES + 1] = f return f:find('whisper') ~= nil end")
+    check(last()[3] == "Master", "an old channel saved: played on Master all the same")
+    g.YippRouteDB.whisperChannel = None
     g.YippRouteDB.whisperFile = "AddOns/whisper.ogg"
-    check(YR.WhisperFile() == "Interface\\AddOns\\whisper.ogg" and "file" in keys() and YR.WhisperSoundName("file") == "Your own file",
-          f"a file of your own: written from Interface, slashes either way, and in the list ({YR.WhisperFile()})")
-    check(YR.PlayWhisperSound("file") is True and g.FILES[1] == "Interface\\AddOns\\whisper.ogg", "and played")
-    g.YippRouteDB.whisperFile = "Interface\\Sounds\\gone.ogg"
-    check(YR.WhisperFile() == "Interface\\Sounds\\gone.ogg" and YR.PlayWhisperSound("file") is False, "a file the game hasn't: said so, not an error")
+    check("file" not in keys() and YR.PlayWhisperSound("file") is False, "an old file of your own saved: not in the list, not played")
     g.YippRouteDB.whisperFile = None
-    check("file" not in keys() and YR.PlayWhisperSound("file") is False, "none written: not in the list")
     lua.execute("PlaySoundFile = nil")
     g.YippRouteDB.whisperSound = "kit:NOT_A_SOUND"
     YR.ApplyParts()            # as the settings window does after a change

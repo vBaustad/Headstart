@@ -125,7 +125,7 @@ end
 local picking = false      -- our own GetQuestReward call, so it isn't remembered as the player's choice
 
 local function Take(index)
-    YR.Print("reward: " .. (GetQuestItemLink("choice", index) or "?"))
+    -- (the game says what you received: "reward: ..." in chat said it twice - 2026-10-21)
     picking = true
     GetQuestReward(index)
     picking = false
@@ -141,7 +141,6 @@ local function HasGreen()
     end
     return false
 end
-YR.RewardHasGreen = HasGreen   -- for the tests
 
 local function Choose(tries)
     local n = GetNumQuestChoices()
@@ -164,17 +163,11 @@ local function Choose(tries)
         for i = 1, n do if items[i] == mine.item then return Take(i) end end
     end
     -- a green among the choices: yours
-    if db.greenStop and HasGreen() then
-        YR.Print("a green among this quest's rewards: pick the one you want.")
-        return
-    end
+    if db.greenStop and HasGreen() then return end         -- (the quest window stays for you: no line needed)
     -- a choice that isn't gear or food (a profession to learn, a profession bag, a pet): yours, unless you chose
     -- it by hand on this quest before (above)
     for i = 1, n do
-        if not kinds[i] then
-            YR.Print("this quest's rewards aren't gear: pick the one you want.")
-            return
-        end
+        if not kinds[i] then return end
     end
     -- 2. your priority list; the more valuable of two of the same kind
     for _, kind in ipairs(db.order) do

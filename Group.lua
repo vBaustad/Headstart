@@ -154,10 +154,8 @@ local function Heard(sender, msg)
     p.seen = time()
     if kind == "H" then
         p.version, p.role, p.guide, p.step = a, b, c, tonumber(d)
-        if a and Newer(a, Version()) and toldVersion ~= a then
-            toldVersion = a
-            YR.Print(("%s has Headstart %s; you have %s. Update when you can."):format(Ambiguate(sender, "short"), a, Version()))
-        end
+        -- (a party member's newer Headstart was said in chat: CurseForge says it better - 2026-10-21)
+        if a and Newer(a, Version()) then toldVersion = a end
     elseif kind == "S" then
         p.guide, p.step = a, tonumber(b)
     end

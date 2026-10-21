@@ -44,6 +44,7 @@ function F:SetText(t)
 end
 function F:SetStatusBarColor(r, g, b) rawset(self, "colour", { r, g, b }) end
 function F:GetWidth() return 200 end
+function F:GetStringWidth() local w = rawget(self, "words") return type(w) == "string" and #w * 7 or 0 end
 function F:GetLeft() return 0 end
 function F:GetTop() return 0 end
 function F:CreateTexture() return setmetatable({}, F) end
@@ -144,16 +145,18 @@ end
           "the Soft look: shaded, muted, only the name - and nothing but the look changed")
     check(YR.SwingPreset("slim") is True and d.h == 14 and list(d.mainColor.values())[0] == 0.72 and d.pos[1] == 100, "and Slim again")
     # one kind of bar: Blizzard's, restyled. Settings from when Headstart drew its own are moved over, once
-    check(d.style == "blizzard" and d.look == 6 and d.spark is True and d.border is False, "a new install: Blizzard's bars, with the front edge")
+    check(d.style == "blizzard" and d.look == 7 and d.spark is True and d.border is False, "a new install: Blizzard's bars, with the front edge")
     check(YR.SwingFrameNow() == "light" and d.rim is False and d.lineColor is not None and d.texture == "flat",
           "and one thin light line round a flat fill")
     check(YR.SwingFrame("bronze") is True and d.lineColor is None and YR.SwingFrameNow() == "bronze" and YR.SwingFrame("thin") is True
           and YR.SwingFrameNow() == "thin" and YR.SwingFrame("light") is True and YR.SwingFrameNow() == "light",
           "the frame picked: bronze, a thin dark line, and the light one back")
-    g.YippRouteDB.swing = lua.eval("{ on = true, style = 'own', look = 2, h = 30 }")
+    g.YippRouteDB.swing = lua.eval("{ on = true, style = 'own', look = 2, h = 30, lock = false, range = false }")
     moved = YR.SwingDB()
-    check(moved.style == "blizzard" and moved.look == 6 and moved.rimKind == "light" and moved.on is True and moved.h == 30,
+    check(moved.style == "blizzard" and moved.look == 7 and moved.rimKind == "light" and moved.on is True and moved.h == 30,
           "someone who had Headstart's own bars: on Blizzard's now, the rest as it was")
+    check(moved.lock is True and moved.range is True,
+          "bars left unlocked, out of range off: locked and shown, once (neither is on the page any more)")
     moved.style = "own"
     check(YR.SwingDB().style == "own", "moved once only (the next look at the settings leaves them be)")
     g.YippRouteDB.swing = d
@@ -216,6 +219,36 @@ end
     check(raw(off, "shown") is True and raw(off, "max") == 1.5, "an off-hand swing whose length is secret: the weapon's speed instead")
     lua.execute("Fire('PLAYER_SWING', 2.0, 2)")
     check(raw(ranged, "shown") is True, "a ranged swing: its bar shows while it runs")
+    # the ranged bar in the main hand's place: you don't swing and shoot at once (the owner, 2026-10-20)
+    was_show = YR.SwingDB().show
+    check(raw(ranged, "shown") is True and raw(main, "shown") is False,
+          "the ranged bar in the main hand's place, shooting: the ranged bar there, the main hand's away")
+    check(YR.OwnBarFrame("ranged") is None, "and Arrange gives it no place of its own")
+    lua.execute("Fire('PLAYER_SWING', 2.6, 0)")
+    check(raw(main, "shown") is True and raw(ranged, "shown") is False, "a melee swing: the main hand's bar back in that place")
+    lua.execute("Fire('PLAYER_SWING', 2.0, 2)")
+    check(raw(ranged, "shown") is True and raw(main, "shown") is False, "a shot begun after it: the ranged bar")
+    lua.execute("NOW = NOW + 5")
+    YR.SwingLayout()
+    check(raw(main, "shown") is True and raw(ranged, "shown") is False,
+          "the shot run out, not a hunter (the ranged bar shows only while it runs): the main hand's bar")
+    YR.SwingDB().lock = False
+    YR.SwingApply()
+    check(raw(main, "shown") is True and raw(ranged, "shown") is False, "unlocked, to be placed: the main hand's, for the two")
+    YR.SwingDB().lock = True
+    # faded between swings
+    YR.SwingDB().show = "fade"
+    YR.SwingApply()
+    check(raw(main, "shown") is True and abs(raw(main, "alpha") - 0.35) < 1e-9, "Faded between swings, none running: there, see-through")
+    lua.execute("Fire('PLAYER_SWING', 2.6, 0)")
+    check(raw(main, "alpha") == 1, "a swing: full")
+    lua.execute("NOW = NOW + 5")
+    raw(holder, "_OnUpdate")(holder, 0.016)
+    check(abs(raw(main, "alpha") - 0.35) < 1e-9, "run out: see-through again")
+    YR.SwingDB().show = was_show
+    YR.SwingApply()
+    check(raw(main, "alpha") == 1, "another Visible: full again")
+    lua.execute("Fire('PLAYER_SWING', 2.0, 2)")
     lua.execute("CALLBACKS['EditMode.Enter']()")
     check(raw(holder, "shown") is False and g.SwingTimerMainHandFrame.alpha == 0.8, "Edit Mode: Blizzard's bars as they were, ours away")
     lua.execute("CALLBACKS['EditMode.Exit']()")
@@ -226,8 +259,13 @@ end
     check(raw(holder, "shown") is False, "only while a swing runs, and none does: no bars")
     YR.SwingDB().lock = False
     YR.SwingApply()
-    check(raw(main, "shown") is True and raw(off, "shown") is True and raw(ranged, "shown") is True,
-          "unlocked: every bar shows, to place them")
+    check(raw(main, "shown") is True and raw(off, "shown") is True and raw(ranged, "shown") is False,
+          "unlocked: every bar shows, to place them - the ranged bar in the main hand's place, so that one")
+    # Arrange: the ranged bar stands in the main hand's place - placed with it, never by itself
+    lua.execute("function UnitRangedDamage() return 1.9 end")
+    check(YR.OwnBarFrame("ranged") is None and YR.OwnBarFrame("main") is not None,
+          "a bow or a wand: no ranged bar of its own to arrange - the main hand's place is its place")
+    lua.execute("function UnitRangedDamage() return 0 end")
     YR.SwingDB().lock = True
     g.YippRouteDB.qolOff = True
     YR.SwingApply()
@@ -294,8 +332,7 @@ end
     YR.SwingPalette("muted")
 
     # Headstart's own bars each stand by themselves: a place and a size of their own
-    lua.execute("""function F_points(f) return rawget(f, "pt") end
-        local mt = getmetatable(UIParent)
+    lua.execute("""local mt = getmetatable(UIParent)
         rawset(mt, "SetPoint", function(self, ...) rawset(self, "pt", { ... }) end)
         rawset(mt, "SetSize", function(self, w, h) rawset(self, "size", { w, h }) end)""")
     d = YR.SwingDB()
@@ -425,7 +462,7 @@ end
     check(rb is not None and raw(rb, "shown") is True and raw(raw(rb, "name"), "words") == "Out of range",
           "out of a fight, a target out of reach: the range bar says so")
     lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, true, true)")
-    check(raw(raw(rb, "name"), "words") == "In range", "within reach: it says that")
+    check(raw(raw(rb, "name"), "words") == "Melee range", "within reach of your swing: it says that")
     lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, false, false)")
     check(raw(rb, "shown") is False, "the game not checking the reach: nothing true to show, the bar is away")
     lua.execute("Fire('PLAYER_SWING_RANGE_UPDATE', 0, true, true) ALIVE = false Fire('PLAYER_TARGET_CHANGED')")
@@ -439,10 +476,130 @@ end
           f"the game not checking the swing, but the yards can be told: 10 - 20 yd, out of range ({raw(raw(rb, 'yards'), 'words')})")
     lua.execute("FAR = 3")
     raw(rb, "_OnUpdate")(rb, 0.3)
-    check(raw(raw(rb, "yards"), "words") == "< 5 yd" and raw(raw(rb, "name"), "words") == "In range", "come close: looked at again, within 5 and in range")
+    check(raw(raw(rb, "yards"), "words") == "< 5 yd" and raw(raw(rb, "name"), "words") == "Melee range", "come close: looked at again, within 5: melee range")
     lua.execute("FAR = 60")
     raw(rb, "_OnUpdate")(rb, 0.3)
     check(raw(raw(rb, "yards"), "words") == "> 40 yd", "beyond the longest reach: more than 40")
+    # the items answering nothing (one you don't carry, or in a fight): your own spells tell it - those that reach
+    # from you on, one for each reach (the owner, 2026-10-20: "still only Out of range, no yards")
+    # (500: a heal, 40 yards - it answers nothing for an enemy, and is no reach of yours at one: the review, 2026-10-20)
+    # (600: a melee ability, no yards in the game's data - in reach within 5; 700: a shout on yourself, no answer)
+    # (800, 801: two blessings at 30 yards, listed first - they answer nothing for an enemy and must not take 100's
+    # place; 900: a 100-yard spell that answers for an enemy but is no attack, as Mind Vision: the review, 2026-10-21)
+    YR.TrainerSpells = lua.eval("{ WARRIOR = { { 800 }, { 801 }, { 100 }, { 200 }, { 300 }, { 400 }, { 500 }, { 600 }, { 700 }, { 900 } } }")
+    lua.execute("""C_Item = { IsItemInRange = function() return nil end }
+        KNOWN_SP = { [100] = true, [200] = true, [300] = true, [500] = true, [600] = true, [700] = true, [800] = true, [801] = true, [900] = true }
+        function IsPlayerSpell(id) return KNOWN_SP[id] == true end
+        local INFO = { [100] = { 0, 30 }, [200] = { 0, 20 }, [300] = { 8, 25 }, [400] = { 0, 35 }, [500] = { 0, 40, true },
+            [600] = { 0, 0, false, 5 }, [700] = { 0, 0, true }, [800] = { 0, 30, true }, [801] = { 0, 30, true }, [900] = { 0, 100 } }
+        local FRIENDS = { [500] = true, [700] = true, [800] = true, [801] = true }
+        C_Spell = { GetSpellInfo = function(id) local i = INFO[id] return i and { minRange = i[1], maxRange = i[2] } end,
+            GetSpellName = function(id) return ({ [300] = "Charge" })[id] end,
+            IsSpellHelpful = function(id) return FRIENDS[id] == true end,
+            IsSpellHarmful = function(id) return not FRIENDS[id] and id ~= 900 end,
+            IsSpellInRange = function(id) local i = INFO[id] if not i or i[3] then return nil end return FAR >= i[1] and FAR <= (i[4] or i[2]) end }
+        FAR = 25""")
+    YR.SwingRangeSpellsForget()
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(raw(rb, "yards"), "words") == "20 - 25 yd",
+          f"no item answering, a target 25 yards off: your spells say 20 - 30, and Charge's 8 to 25 narrows it ({raw(raw(rb, 'yards'), 'words')})")
+    check(raw(raw(rb, "name"), "words") == "Charge range",
+          f"within Charge's 8 to 25: Charge range ({raw(raw(rb, 'name'), 'words')})")
+    lua.execute("FAR = 28")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(raw(rb, "name"), "words") == "In range",
+          f"past Charge, within your spells' longest reach (30): In range, a colour of its own ({raw(raw(rb, 'name'), 'words')})")
+    check(raw(raw(rb, "yards"), "words") == "20 - 30 yd",
+          f"the 30-yard attack is asked, not the two blessings listed before it ({raw(raw(rb, 'yards'), 'words')})")
+    lua.execute("FAR = 4")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(raw(rb, "name"), "words") == "Melee range" and raw(raw(rb, "yards"), "words") == "< 5 yd",
+          f"out of a fight, no item answering, at the mob: your melee ability says Melee range - not In range ({raw(raw(rb, 'name'), 'words')}, {raw(raw(rb, 'yards'), 'words')})")
+    _mel, _cast = list(raw(rb, "colour").values())[:3], None
+    lua.execute("FAR = 28")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    _cast = list(raw(rb, "colour").values())[:3]
+    check(_mel != _cast, f"Melee range and In range in colours of their own ({_mel} / {_cast})")
+    lua.execute("FAR = 6")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(raw(rb, "name"), "words") == "Dead zone" and raw(raw(rb, "yards"), "words") == "5 - 8 yd",
+          f"past melee but too near for Charge (6 yards): the dead zone, past your melee ability's reach and nearer than Charge's 8 ({raw(raw(rb, 'name'), 'words')}, {raw(raw(rb, 'yards'), 'words')})")
+    lua.execute("FAR = 25")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(rb, "narrow") is False and raw(raw(rb, "name"), "shown") is True, "wide enough: the words and the yards both")
+    lua.eval("rawset")(rb, "GetWidth", lua.eval("function() return 120 end"))
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(rb, "narrow") is True and raw(raw(rb, "name"), "shown") is False,
+          "a bar too narrow for the words and the yards: the yards alone (the colour says the rest)")
+    lua.execute("FAR = 45")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    lua.execute("""KEPT_ITEM_R = C_Item
+        C_Item = { IsItemInRange = function(id) if id == 4945 then return FAR <= 40 end return nil end }
+        FAR = 38""")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(raw(rb, "name"), "words") == "Out of range",
+          f"38 yards (an item says within 40): past every spell of yours that reaches an enemy - a 40-yard heal doesn't make it In range ({raw(raw(rb, 'name'), 'words')}, {raw(raw(rb, 'yards'), 'words')})")
+    lua.execute("C_Item = KEPT_ITEM_R FAR = 45")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    _red = list(raw(rb, "colour").values())[:3] if raw(rb, "colour") is not None else None
+    check(raw(raw(rb, "name"), "words") == "Out of range" and (_red is None or (_red[0] > 0.7 and _red[1] < 0.25)),
+          f"past every reach of yours: Out of range, in red ({raw(raw(rb, 'name'), 'words')}, {_red})")
+    lua.eval("rawset")(rb, "GetWidth", lua.eval("function() return 200 end"))
+    lua.execute("FAR = 25")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(raw(rb, "narrow") is False and raw(raw(rb, "name"), "shown") is True, "wide again: the words back")
+    # your target dies: nothing is said of it but the bar's own look sees it (the review, 2026-10-21: it stood over
+    # the corpse saying Melee range until you changed target)
+    _lock = d.lock
+    d.lock = True
+    lua.execute("Fire('PLAYER_TARGET_CHANGED')")
+    _before = raw(rb, "shown")
+    lua.execute("KEPT_DEAD = UnitIsDead function UnitIsDead(u) return u == 'target' end")
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    check(_before is True and raw(rb, "shown") is False, f"your target dies: the bar goes away at its next look ({_before}, {raw(rb, 'shown')})")
+    lua.execute("UnitIsDead = KEPT_DEAD Fire('PLAYER_TARGET_CHANGED')")
+    check(raw(rb, "shown") is True, "a living target again: back")
+    d.lock = _lock
+    # the yards as a text of their own, moved where you like
+    d.rangeText = True
+    YR.SwingApply()
+    rt = YR.OwnBarFrame("rangetext")
+    check(rt is not None and raw(rt, "shown") is True and raw(raw(rt, "text"), "words") == "20 - 25 yd",
+          "Range text on: the yards on their own")
+    check(lua.eval("HeadstartRangeText ~= nil"), "a frame of its own, that Arrange can move")
+    lua.execute("FAR = 60")
+    raw(rt, "_OnUpdate")(rt, 0.3)
+    check(raw(raw(rt, "text"), "words") == "30 - 100 yd", f"farther: looked at again - the 100-yard spell tells the yards, if not the reach ({raw(raw(rt, 'text'), 'words')})")
+    # one look serves both: the bar's, five times a second, puts the text's yards too - the text asks nothing itself
+    # while the bar shows; and how far your spells reach a target is asked once a target (the performance audit)
+    lua.eval("rawset")(rb, "IsVisible", lua.eval("function() return true end"))
+    lua.execute("""ASKED = 0 KEPT_ISR = C_Spell.IsSpellInRange
+        C_Spell.IsSpellInRange = function(...) ASKED = ASKED + 1 return KEPT_ISR(...) end
+        KEPT_GUID_R = UnitGUID function UnitGUID(u) if u == "target" then return "Creature-0-1-2-3-99-0001" end return KEPT_GUID_R and KEPT_GUID_R(u) end
+        FAR = 22""")
+    YR.SwingRangeSpellsForget()
+    raw(rt, "_OnUpdate")(rt, 0.3)
+    _own = g.ASKED
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    _first = g.ASKED - _own
+    raw(rb, "_OnUpdate")(rb, 0.3)
+    _second = g.ASKED - _own - _first
+    check(_own == 0 and raw(raw(rt, "text"), "words") == raw(raw(rb, "yards"), "words") == "20 - 25 yd" and 0 < _second < _first,
+          f"one look for the bar and the text, the text asking nothing itself; a target's reach asked once ({_own}, {_first} then {_second} questions)")
+    lua.execute("C_Spell.IsSpellInRange = KEPT_ISR UnitGUID = KEPT_GUID_R")
+    lua.eval("rawset")(rb, "IsVisible", None)
+    lua.execute("function UnitCanAttack() return false end Fire('PLAYER_TARGET_CHANGED')")
+    check(raw(rt, "shown") is False, "nothing you can attack targeted: away")
+    d.lock = False
+    YR.SwingApply()
+    check(raw(rt, "shown") is True and raw(raw(rt, "text"), "words") == "10 - 15 yd", "unlocked: shown with sample yards, to be placed")
+    d.lock = True
+    lua.execute("function UnitCanAttack() return true end")
+    d.rangeText = None
+    YR.SwingApply()
+    check(YR.OwnBarFrame("rangetext") is None and raw(rt, "shown") is False, "Range text off: away")
+    lua.execute("C_Spell = nil IsPlayerSpell = nil")
+    YR.TrainerSpells = None
     lua.execute("C_Item = nil")
     d.rangeBar = None
     YR.SwingApply()
@@ -457,7 +614,22 @@ end
         function UnitChannelInfo() if CHANNEL then return CHANNEL, nil, 136, NOW * 1000, (NOW + 3) * 1000 end end
         CAST_ALPHA = 1
         PlayerCastingBarFrame = { GetAlpha = function() return CAST_ALPHA end, SetAlpha = function(_, a) CAST_ALPHA = a end,
-            ApplyAlpha = function(self, a) self:SetAlpha(a) end }""")
+            ApplyAlpha = function(self, a) self:SetAlpha(a) end }
+        -- its fades: one on the bar itself (the hold-and-fade of a cast cut short), one on a part of it (the glow)
+        local function Alpha(from, to, target)
+            return { from = from, to = to, GetObjectType = function() return "Alpha" end, GetTarget = function() return target and target() end,
+                GetFromAlpha = function(s) return s.from end, GetToAlpha = function(s) return s.to end,
+                SetFromAlpha = function(s, v) s.from = v end, SetToAlpha = function(s, v) s.to = v end }
+        end
+        HOLD_FADE = Alpha(1, 0, function() return PlayerCastingBarFrame end)
+        GLOW_FADE = Alpha(0, 1, function() return GLOW_TEXTURE end)
+        GLOW_TEXTURE = {}
+        SIDE_ALPHA = 1
+        SIDE_WIDGET = { GetAlpha = function() return SIDE_ALPHA end, SetAlpha = function(_, a) SIDE_ALPHA = a end }
+        PlayerCastingBarFrame.additionalFadeWidgets = { [SIDE_WIDGET] = true }
+        function PlayerCastingBarFrame:GetAnimationGroups()
+            return { GetAnimations = function() return HOLD_FADE end }, { GetAnimations = function() return GLOW_FADE end }
+        end""")
     check(YR.OwnBarFrame("cast") is None, "the cast bar off: no bar")
     d.cast = True
     YR.ApplyParts()
@@ -466,6 +638,9 @@ end
     check(cb is not None and raw(cb, "shown") is False and g.CAST_ALPHA == 0, "turned on: nothing cast, nothing shown; Blizzard's see-through")
     lua.execute("PlayerCastingBarFrame:ApplyAlpha(1)")
     check(g.CAST_ALPHA == 0, "Blizzard lights its bar for a cast: ours goes back over it")
+    check(g.HOLD_FADE["from"] == 0 and g.HOLD_FADE["to"] == 0 and g.GLOW_FADE["from"] == 0 and g.GLOW_FADE["to"] == 1,
+          "and its own fade (a cast cut short holds it up and fades it) goes from nothing to nothing: not shown for a moment; its glow left as it is")
+    check(g.SIDE_ALPHA == 0, "and the parts Blizzard fades along with it, outside it, see-through too")
     lua.execute("CASTING = 'Hearthstone' Fire('UNIT_SPELLCAST_START', 'player')")
     check(raw(cb, "shown") is True and raw(raw(cb, "name"), "words") == "Hearthstone" and raw(cb, "max") == 2, "a cast begins: its name, two seconds long")
     lua.execute("NOW = NOW + 0.5")
@@ -485,19 +660,18 @@ end
     check(raw(cb, "shown") is False, "the channel ends: away")
     d.castHideBlizz = False
     YR.SwingApply()
-    check(g.CAST_ALPHA == 1, "asked to leave Blizzard's be: as it was")
+    check(g.CAST_ALPHA == 1 and g.HOLD_FADE["from"] == 1 and g.HOLD_FADE["to"] == 0 and g.SIDE_ALPHA == 1,
+          "asked to leave Blizzard's be: as it was, its fade and its other parts too")
     d.castHideBlizz, d.cast = None, None
     YR.ApplyParts()
     YR.SwingApply()
     check(YR.OwnBarFrame("cast") is None and raw(cb, "shown") is False, "turned off: away")
     lua.execute("PlayerCastingBarFrame = nil")
-    # the look is the swing timer's until one is picked for these bars; Blizzard's resource bar steps aside
-    check(same(YR.ResourceLook(), d) and YR.ResourceLookOwn() is False, "health, power and combo wear the swing timer's look")
-    YR.ResourceLookOwn(True)
-    own = YR.ResourceLook()
-    check(not same(own, d) and own.texture == d.texture and YR.ResourceLookOwn() is True, "a look of their own starts as the swing timer's")
-    YR.ResourceLookOwn(False)
-    check(same(YR.ResourceLook(), d), "and back")
+    # the look is the swing timer's (a look of their own was a setting until 2026-10-21: one still saved is not worn);
+    # Blizzard's resource bar steps aside
+    d.resOwn, d.res = True, lua.eval("{ texture = 'blizzard' }")
+    check(same(YR.ResourceLook(), d), "health, power and combo wear the swing timer's look, an old look of their own saved or not")
+    d.resOwn, d.res = None, None
     lua.execute("""PRD_ALPHA = 1
         PersonalResourceDisplayFrame = { GetAlpha = function() return PRD_ALPHA end, SetAlpha = function(_, a) PRD_ALPHA = a end,
             SetIsInEditMode = function(self, on) self.isInEditMode = on end }""")

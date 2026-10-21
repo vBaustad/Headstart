@@ -122,17 +122,18 @@ def run():
     lua.execute("""ChatFrame1:AddMessage("said while the window is open")""")
     check(YR.ChatLogCount() == 6, "a line said while it is open is kept too")
 
-    # only the newest are kept
+    # only the newest 1000 are kept (a number to set until 2026-10-21: one still saved changes nothing)
     g.YippRouteDB.chatLogMax = 200
     YR.ApplyParts()             # (the settings window says so itself when a setting changes)
-    lua.execute("""for i = 1, 400 do ChatFrame1:AddMessage("line " .. i) end""")
+    lua.execute("""for i = 1, 2000 do ChatFrame1:AddMessage("line " .. i) end""")
     n = YR.ChatLogCount()
-    check(200 <= n <= 240, f"past a fifth over the limit it is cut back to the limit ({n})")
+    check(1000 <= n <= 1200, f"past a fifth over the limit it is cut back to the limit ({n})")
     lua.execute("""Fire("PLAYER_LOGOUT")""")
-    check(YR.ChatLogCount() == 200 and YR.ChatLogLine(200)[3] == "line 400" and len(g.HeadstartChatLog.text) == 200,
-          "at logout exactly the newest so many are saved")
+    check(YR.ChatLogCount() == 1000 and YR.ChatLogLine(1000)[3] == "line 2000" and len(g.HeadstartChatLog.text) == 1000,
+          "at logout exactly the newest 1000 are saved")
+    g.YippRouteDB.chatLogMax = None
     shown, total = YR.ChatLogLines(0, "", 50)
-    check(len(shown) == 50 and total == 200 and shown[50][3] == "line 400", "the window takes the newest of what matches, and says how many there are")
+    check(len(shown) == 50 and total == 1000 and shown[50][3] == "line 2000", "the window takes the newest of what matches, and says how many there are")
 
     # the next session: what was kept is there, with a mark where the session began
     # (a new session has new chat windows: the first session's hooks are not on them)
@@ -145,12 +146,11 @@ def run():
     YR2.Style = lua.eval("STYLE")
     YR2.StartChatLog()
     YR2.partsReady = True
-    g.YippRouteDB.chatLogRestoreLines = 20
     YR2.ApplyParts()
     back = list(lua.eval("rawget(ChatFrame1, 'said')").values())
-    check(len(back) == 21 and back[19] == "line 400" and back[0] == "line 381" and back[20].startswith("---- earlier"),
-          f"the chat window gets its last lines back, oldest first, and a line where the old text ends ({len(back)})")
-    check(lua.eval("rawget(ChatFrame3, 'said')") is None and YR2.ChatLogCount() == 201,
+    check(len(back) == 101 and back[99] == "line 2000" and back[0] == "line 1901" and back[100].startswith("---- earlier"),
+          f"the chat window gets its last 100 lines back, oldest first, and a line where the old text ends ({len(back)})")
+    check(lua.eval("rawget(ChatFrame3, 'said')") is None and YR2.ChatLogCount() == 1001,
           "a window with nothing kept gets nothing, and what was put back isn't kept a second time")
     # Leatrix Plus puts chat back after a reload too: ours doesn't, or every line would be there twice
     lua.execute("""LeaPlusDB = { RestoreChatMessages = 'On' } C_AddOns = C_AddOns or {}
@@ -161,11 +161,11 @@ def run():
     lua.execute("LeaPlusDB = nil C_AddOns.IsAddOnLoaded = KEPT_LOADED")
     YR2.EllesmereForget()
     lua.execute("""ChatFrame1:AddMessage("hello again")""")
-    kinds = [YR2.ChatLogLine(i)[2] for i in (200, 201, 202)]
-    check(YR2.ChatLogCount() == 202 and kinds == [1, 0, 1], f"the next session: the old lines, a mark where it began, then the new ({kinds})")
+    kinds = [YR2.ChatLogLine(i)[2] for i in (1000, 1001, 1002)]
+    check(YR2.ChatLogCount() == 1002 and kinds == [1, 0, 1], f"the next session: the old lines, a mark where it began, then the new ({kinds})")
     YR2.ApplyParts()
     YR2.ChatLogApply()
-    check(YR2.ChatLogCount() == 202, "a setting changing later in the session is not a new session")
+    check(YR2.ChatLogCount() == 1002, "a setting changing later in the session is not a new session")
     YR2.ChatLogClear()
     check(YR2.ChatLogCount() == 0 and len(g.HeadstartChatLog.text) == 0, "Empty forgets every line")
 

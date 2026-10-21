@@ -10,17 +10,19 @@
 --
 --   Account options in YippRouteDB (Settings, QoL):
 --     restock          on unless turned off
---     restockCounts    [itemID] = how many to keep, for the class reagents; nil = the default
---     restockCustom    [itemID] = how many to keep, for items you added yourself
---     restockAmmoBy    [CLASS] = how much ammo (or throwing weapons) to keep; nil = the class default
---                      (hunter 1000; warrior and rogue 0 until set; 0 = none). restockAmmo: the old one, a hunter's
+--     restockCounts    [itemID] = how many to have, for the class reagents; nil = 0, none (the data's number is
+--                      only suggested on the settings row - the owner, 2026-10-21: "default should be 0 on everything";
+--                      it bought 40 Symbols of Kings and 2 of Divinity that nobody had asked for)
+--     restockCustom    [itemID] = how many to have, for items you added yourself
+--     restockAmmoBy    [CLASS] = how much ammo (or throwing weapons) to have; nil = 0 for every class (a hunter's
+--                      was 1000 until 2026-10-21). restockAmmo: the old one, a hunter's
 --     restockReserve   gold to keep: nothing is bought that would take you under it
 local ADDON, YR = ...
 
 -- The classes that shoot: a hunter lives on it, a warrior or rogue pulls with it.
 -- only a hunter lives on ammo: a warrior's or rogue's is theirs to ask for (it was 200 for both, bought
 -- at any vendor for a bow carried for its stats)
-local AMMO_DEFAULT = { HUNTER = 1000, WARRIOR = 0, ROGUE = 0 }
+local AMMO_DEFAULT = { HUNTER = 0, WARRIOR = 0, ROGUE = 0 }
 local AMMO_FOR = { [2] = 2, [18] = 2, [3] = 3 }   -- bow and crossbow take arrows, guns bullets
 local AMMO_CLASS = 6
 local THROWN = 16                                  -- a throwing weapon: the stack is the weapon itself
@@ -33,10 +35,11 @@ local function DB()
     return YippRouteDB
 end
 
---- How many of a class reagent to keep: what you set, else the default from the data.
+--- How many of a class reagent to have: what you set, else none. (`default`, the data's number, is no longer used:
+--- it is suggested on the settings row.)
 function YR.RestockCount(item, default)
     local v = DB().restockCounts[item]
-    if v == nil then return default or 0 end
+    if v == nil then return 0 end
     return v
 end
 

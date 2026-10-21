@@ -1,4 +1,5 @@
--- Flight timer: a bar from take-off to landing, with where from, where to and the time left.
+-- Flight timer: a card from take-off to landing - where to, where from, the time left and when you land, a ring
+-- that fills as you fly, and Land for the next stop on the way.
 -- The game doesn't say how long a flight takes, so each one is timed and remembered (account-wide, in
 -- YippRouteDB.flights["From>To"] = seconds). A flight not timed yet takes RestedXP's time for it (its
 -- Forever flight data, worked out in its own TakeTaxiNode hook, which runs before ours), else an
@@ -76,167 +77,31 @@ local function Place()
     end
 end
 
--- The bar: a small dark card. Top row: where from > where to on the left, the time left on the right in
--- blue. Under it a thin blue bar that fills from the left, with a lit knob where you are now. Bottom row:
--- a quiet line for what's going on (timing a first flight, estimated, landing) and, on a flight with
--- stops on the way, a Land button for the next one. The stops themselves aren't drawn: the game doesn't
--- say how long each leg takes (tried in game, 2026-10-01). On a first flight, with no time to go by, a
--- light runs along the bar.
--- 72 high: the knob (your face in its ring, 19 across, on the track at 38 down) ends at 48, and the
--- Land button's top is at 48 - at 66 the face lay over the button when the flight was nearly done
-local W, H = 320, 72
-local PAD = 12
-local TRACK_Y, THICK, KNOB = -38, 5, 13
-local FACE = 16            -- your portrait on the bar, where the knob is
-local BLUE, BLUE_DIM = { 0.40, 0.66, 1.00 }, { 0.18, 0.40, 0.80 }
-local TRACK = { 0.17, 0.19, 0.23, 1 }
-local SWEEP = 1.8                     -- seconds for the light to run the bar on a first flight
+-- The card (the owner, 2026-10-20: "it works very well, but it's very like Naowh Forever's - redesign it so it's
+-- less copy-paste, and bring in the land button and hide Blizzard's"). Where you are going first, in large
+-- letters, and where from under it; at the left a ring round your portrait (or your side's flight mount) that
+-- fills as the flight goes - the game's own cooldown sweep, which draws itself: nothing is moved each frame; at
+-- the right the time left and the clock time you land; and Land as a stub of its own at the card's right end,
+-- after a dotted line, as a ticket's (two lines of words and a button beside them were cramped). What's going
+-- on is said in short where the landing time stands (timing it, landing, next stop), and at length in the
+-- card's tooltip.
+--   Land: on a flight with stops on the way, the game's own "request stop" - the taxi lands at the next flight
+--   point (named on it, as near as the time gone tells). On a direct flight it is there but quiet: there is
+--   nothing to land at before the end. Blizzard's own Land button is see-through while this card shows.
+--   A first flight, with no time to go by: the ring breathes, and the time counts up.
+local W, H = 316, 54
+local PAD = 10
+local RING = 40                       -- the ring's size; the portrait inside it is RING - 10
+local STUB = 50                       -- Land, at the right end
+local ACCENT, ACCENT_DIM = { 0.96, 0.56, 0.20 }, { 0.48, 0.28, 0.10 }
+local GRYPHON, WYVERN = 132239, 132268   -- Ability_Mount_Gryphon_01, Ability_Mount_Wyvern_01 (in the Forever build)
 
-local function Round(x) return floor(x + 0.5) end
-
-local function Solid(layer, sub, color)
-    local t = frame:CreateTexture(nil, layer, nil, sub)
-    t:SetColorTexture(color[1], color[2], color[3], color[4] or 1)
-    return t
-end
-
-local function Circle(layer, sub, size, color)
-    local t = frame:CreateTexture(nil, layer, nil, sub)
+local function Circle(parent, layer, sub, size, color)
+    local t = parent:CreateTexture(nil, layer, nil, sub)
     t:SetSize(size, size)
     YR.Style.ArtTexture(t, "circle")
     t:SetVertexColor(color[1], color[2], color[3], color[4] or 1)
     return t
-end
-
--- The fill: a deeper blue at the start to the bright blue at its front (made once; no per-frame colours).
-local function Shade(tex)
-    tex:SetColorTexture(1, 1, 1, 1)
-    if tex.SetGradient and CreateColor then
-        tex:SetGradient("HORIZONTAL", CreateColor(BLUE_DIM[1], BLUE_DIM[2], BLUE_DIM[3], 1),
-            CreateColor(BLUE[1], BLUE[2], BLUE[3], 1))
-    else
-        tex:SetColorTexture(BLUE[1], BLUE[2], BLUE[3], 1)
-    end
-end
-
--- Whether the button can land you early: a flight with stops on the way, not already asked.
-local function CanStop()
-    return TaxiRequestEarlyLanding ~= nil and flight ~= nil and not flight.cut
-        and type(flight.stops) == "table" and #flight.stops > 0
-end
-
--- The game's own "request stop": the taxi lands at the next flight point on the way. Where that is
--- and when isn't known, so the bar counts up from then; a flight cut short is not the route's time,
--- so it is never learned (Landed).
-local function StopAtNext()
-    if not CanStop() then return end
-    TaxiRequestEarlyLanding()
-    flight.cut = true
-    if YippRouteDB.flightNow then YippRouteDB.flightNow.cut = true end
-    YR:RefreshFlight()
-end
-
-local function Build()
-    -- the bar in the accent of Headstart's windows (Style.lua), darker at its start
-    local accent = YR.Style and YR.Style.C and YR.Style.C.accent
-    if accent then
-        BLUE[1], BLUE[2], BLUE[3] = accent[1], accent[2], accent[3]
-        BLUE_DIM[1], BLUE_DIM[2], BLUE_DIM[3] = accent[1] * 0.5, accent[2] * 0.5, accent[3] * 0.5
-    end
-    local S = YR.Style
-    frame = CreateFrame("Frame", "HeadstartFlightFrame", UIParent)
-    frame:SetSize(W, H)
-    frame:SetFrameStrata("MEDIUM")
-    S.Fill(frame, { S.C.side[1], S.C.side[2], S.C.side[3], 0.92 })
-    S.Border(frame, S.C.lineHi)
-    frame.len = W - 2 * PAD
-    -- top row: from > to, and the time
-    frame.from = S.Text(frame, 13, S.C.sub)
-    frame.from:SetPoint("TOPLEFT", PAD, -11)
-    frame.from:SetWordWrap(false)
-    frame.arrow = S.Text(frame, 13, S.C.muted)
-    frame.arrow:SetPoint("LEFT", frame.from, "RIGHT", 6, 0)
-    frame.arrow:SetText(">")
-    frame.to = S.Text(frame, 13, S.C.text)
-    frame.to:SetPoint("LEFT", frame.arrow, "RIGHT", 6, 0)
-    frame.to:SetWordWrap(false)
-    frame.time = S.Text(frame, 17, BLUE)
-    frame.time:SetPoint("TOPRIGHT", -PAD, -8)
-    frame.time:SetJustifyH("RIGHT")
-    -- the bar, its fill, the knob (a soft glow under a bright dot), and the light of a first flight
-    frame.bar = Solid("BORDER", 0, TRACK)
-    frame.bar:SetHeight(THICK)
-    frame.bar:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
-    frame.bar:SetWidth(frame.len)
-    frame.fill = Solid("ARTWORK", 0, BLUE)
-    frame.fill:SetHeight(THICK)
-    frame.fill:SetPoint("LEFT", frame, "TOPLEFT", PAD, TRACK_Y)
-    Shade(frame.fill)
-    frame.glow = Circle("ARTWORK", 1, KNOB + 10, { BLUE[1], BLUE[2], BLUE[3], 0.35 })
-    frame.head = Circle("ARTWORK", 2, KNOB, { 0.92, 0.96, 1, 1 })
-    frame.core = Circle("ARTWORK", 3, KNOB - 6, BLUE)
-    -- or your face there: a round portrait in a light ring (Headstart, QoL, Journey)
-    frame.ring = Circle("ARTWORK", 2, FACE + 3, { 0.92, 0.96, 1, 1 })
-    frame.face = frame:CreateTexture(nil, "ARTWORK", nil, 4)
-    frame.face:SetSize(FACE, FACE)
-    frame.face:SetTexCoord(0.1, 0.9, 0.1, 0.9)
-    local mask = frame:CreateMaskTexture()
-    mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-    mask:SetAllPoints(frame.face)
-    frame.face:AddMaskTexture(mask)
-    frame:HookScript("OnShow", function() YR.FlightFace() end)
-    YR.FlightFace()
-    frame.knob = { frame.glow, frame.head, frame.core, frame.ring, frame.face }
-    frame.sweep = Solid("ARTWORK", 0, { BLUE[1], BLUE[2], BLUE[3], 0.6 })
-    frame.sweep:SetSize(36, THICK)
-    -- bottom row: what's going on, and Land
-    frame.note = S.Text(frame, 11, S.C.muted)
-    frame.note:SetPoint("BOTTOMLEFT", PAD, 8)
-    frame.note:SetJustifyH("LEFT")
-    frame.stop = CreateFrame("Button", nil, frame)
-    frame.stop:SetSize(46, 18)
-    frame.stop:SetPoint("BOTTOMRIGHT", -PAD + 2, 6)
-    local bg = S.Fill(frame.stop, S.C.field)
-    local line = S.Border(frame.stop, S.C.line)
-    frame.stop.text = S.Text(frame.stop, 11, S.C.sub)
-    frame.stop.text:SetPoint("CENTER")
-    frame.stop.text:SetText("Land")
-    frame.stop:SetScript("OnClick", StopAtNext)
-    frame.stop:SetScript("OnEnter", function(self)
-        line:Color(S.C.lineHi)
-        self.text:SetTextColor(unpack(S.C.text))
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Land at the next stop")
-        GameTooltip:AddLine("The next flight point on the way", 0.8, 0.8, 0.8)
-        GameTooltip:Show()
-    end)
-    frame.stop:SetScript("OnLeave", function(self)
-        line:Color(S.C.line)
-        self.text:SetTextColor(unpack(S.C.sub))
-        GameTooltip:Hide()
-    end)
-    frame.stop:Hide()
-    frame.markers = {}
-    frame:SetMovable(true)
-    frame:SetClampedToScreen(true)
-    frame:EnableMouse(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        YippRouteDB.flightPos = { floor(self:GetLeft() + 0.5), floor(self:GetTop() - UIParent:GetTop() + 0.5) }
-    end)
-    -- the fill moves every frame; the words change ten times a second
-    local tick = 0
-    frame:SetScript("OnUpdate", function(_, elapsed)
-        YR:AnimateFlight()
-        tick = tick + elapsed
-        if tick < 0.1 then return end
-        tick = 0
-        YR:RefreshFlight()
-    end)
-    Place()
-    frame:Hide()
 end
 
 -- How far along: 0 to 1, or nil while a first flight is being timed.
@@ -246,92 +111,305 @@ local function Progress()
     return math.min(1, (GetTime() - flight.started) / total)
 end
 
--- The knob's five pieces (frame.knob, made with the frame). Hidden, they're only hidden: not moved.
--- This runs for every pixel the knob moves: one piece is moved (the glow) and the other four ride on
--- it, and which of them show is set only when that changes.
-local function Knob(x, shown)
-    local face = shown and YR.Option("flightFace")
-    if shown then
-        if not frame.knobTied then
-            frame.knobTied = true
-            for _, t in ipairs(frame.knob) do
-                if t ~= frame.glow then
-                    t:ClearAllPoints()
-                    t:SetPoint("CENTER", frame.glow, "CENTER")
-                end
-            end
+-- The next flight point on the way, as near as the time gone tells (the stops are placed by their share of
+-- the route's length), or nil where none is left before the end.
+local function NextStop()
+    if not (flight and type(flight.stops) == "table") then return nil end
+    local p = Progress() or 0
+    for _, s in ipairs(flight.stops) do
+        if (s.at or 0) > p then return s.name end
+    end
+    return nil
+end
+
+-- Whether Land can land you early: a stop still ahead, not already asked.
+local function CanStop()
+    return TaxiRequestEarlyLanding ~= nil and flight ~= nil and not flight.cut and NextStop() ~= nil
+end
+
+-- The game's own "request stop": the taxi lands at the next flight point on the way. When isn't known, so
+-- the time counts up from then; a flight cut short is not the route's time, so it is never learned (Landed).
+local function StopAtNext()
+    if not CanStop() then return end
+    TaxiRequestEarlyLanding()
+    flight.cut = true
+    if YippRouteDB.flightNow then YippRouteDB.flightNow.cut = true end
+    YR:RefreshFlight()
+end
+
+-- Blizzard's own Land button (MainMenuBarVehicleLeaveButton, shown on a taxi): see-through while this card
+-- shows, as the card's Land does the same - and let through to the world where the game lets an addon (a frame
+-- that isn't protected). Only its look is touched: it is an Edit Mode frame, shown, hidden and placed by
+-- Blizzard's code alone. Put back as the card goes.
+local theirs = { hidden = false }
+local function TheirLand(hide)
+    local b = _G.MainMenuBarVehicleLeaveButton
+    if type(b) ~= "table" or type(b.SetAlpha) ~= "function" then return end
+    if hide then
+        if not theirs.hooked and b.HookScript then
+            theirs.hooked = true
+            b:HookScript("OnShow", function(self) if theirs.hidden then self:SetAlpha(0) end end)
         end
-        frame.glow:ClearAllPoints()
-        frame.glow:SetPoint("CENTER", frame, "TOPLEFT", PAD + x, TRACK_Y)
-    end
-    local look = shown and (face and 2 or 1) or 0
-    if frame.knobLook == look then return end
-    frame.knobLook = look
-    for _, t in ipairs(frame.knob) do
-        local isFace = t == frame.ring or t == frame.face
-        local isDot = t == frame.head or t == frame.core
-        t:SetShown(shown and not (isFace and not face) and not (isDot and face))
-    end
-end
-
---- Your portrait as it is now (it's taken when the bar shows, and when the setting changes).
-function YR.FlightFace()
-    if frame and frame.face and YR.Option("flightFace") and SetPortraitTexture then
-        SetPortraitTexture(frame.face, "player")
+        if theirs.hidden then return end
+        theirs.hidden, theirs.alpha = true, b:GetAlpha()
+        b:SetAlpha(0)
+        if b.EnableMouse and not (b.IsProtected and b:IsProtected()) then
+            theirs.mouse = true
+            if b.IsMouseEnabled then theirs.mouse = b:IsMouseEnabled() and true or false end
+            b:EnableMouse(false)
+        end
+    elseif theirs.hidden then
+        theirs.hidden = false
+        b:SetAlpha(theirs.alpha or 1)
+        if theirs.mouse ~= nil and b.EnableMouse then b:EnableMouse(theirs.mouse) end
+        theirs.mouse = nil
     end
 end
 
-function YR:AnimateFlight()
-    if not (frame and flight) then return end
-    if frame.laid ~= flight then frame.laid, frame.drawn = flight, nil end
-    local p = Progress()
-    local fillX = p and Round(p * frame.len)
-    -- the fill only moves a whole pixel a few times a second: the frames between draw nothing
-    if p and frame.drawn == fillX then return end
-    if p then
-        frame.fill:SetWidth(math.max(1, fillX))
-        frame.fill:SetShown(fillX >= 1)
-        Knob(fillX, true)
-        frame.sweep:Hide()
+-- What's going on, at length (the card's tooltip), or nil where it's just on its way.
+local function Status()
+    if not flight then return nil end
+    if flight.cut then return "Landing at the next stop: the time counts up from when you asked" end
+    local total = flight.total
+    if not (total and total > 0) then return "First flight here: timing it, for the next time" end
+    if GetTime() - flight.started > total then return "Landing" end
+    if flight.guess then return "About: estimated from the flight's length" end
+    return nil
+end
+
+local function CardTip(self)
+    if not flight then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:AddLine(Short(flight.from) .. " to " .. Short(flight.to))
+    local why = Status()
+    if why then GameTooltip:AddLine(why, 0.8, 0.8, 0.8, true) end
+    GameTooltip:AddLine("Drag to move", 0.55, 0.55, 0.55)
+    GameTooltip:Show()
+end
+
+-- Land as it stands: bright in the accent where it can land you, quiet where there's nothing to land at (or
+-- it's asked already) - and lit under the mouse either way, darker while pressed.
+local function StubPaint()
+    local b = frame.stop
+    local S = YR.Style
+    local can, cut = CanStop(), flight and flight.cut
+    local hover, down = b.hover == true, b.down == true
+    if can then
+        b.bg:SetVertexColor(ACCENT[1], ACCENT[2], ACCENT[3], down and 0.34 or hover and 0.22 or 0.08)
     else
-        -- a flight not timed yet: a light sweeps along the bar. This runs every frame, so the knob is
-        -- put away once and the light moved only when it's a whole pixel on.
-        local x = Round(((GetTime() - flight.started) % SWEEP) / SWEEP * (frame.len - 36))
-        if frame.drawn ~= false then
-            frame.fill:Hide()
-            Knob(0, false)
-            frame.sweep:Show()
-            frame.sweepAt = nil
-        end
-        if frame.sweepAt ~= x then
-            frame.sweepAt = x
-            frame.sweep:ClearAllPoints()
-            frame.sweep:SetPoint("LEFT", frame, "TOPLEFT", PAD + x, TRACK_Y)
-        end
+        b.bg:SetVertexColor(1, 1, 1, down and 0.10 or hover and 0.07 or 0.03)
     end
-    frame.drawn = fillX or false
+    local t = can and (hover and S.C.accentHi or ACCENT) or cut and ACCENT_DIM or (hover and S.C.sub or S.C.muted)
+    b.text:SetTextColor(t[1], t[2], t[3])
+    b.icon:SetVertexColor(t[1], t[2], t[3])
+    b.text:SetText(cut and "Landing" or "Land")
 end
 
-function YR:RefreshFlight()
+local function LandTip(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    local stop = NextStop()
+    if flight and flight.cut then
+        GameTooltip:AddLine("Landing at the next stop")
+    elseif CanStop() then
+        GameTooltip:AddLine("Land at " .. Short(stop))
+        GameTooltip:AddLine("The next flight point on the way", 0.8, 0.8, 0.8)
+    else
+        GameTooltip:AddLine("A direct flight")
+        GameTooltip:AddLine("Nothing to land at before " .. Short(flight and flight.to), 0.8, 0.8, 0.8, true)
+    end
+    GameTooltip:Show()
+end
+
+local function Build()
+    -- in the accent of Headstart's windows (Style.lua)
+    local S = YR.Style
+    local accent = S and S.C and S.C.accent
+    if accent then
+        ACCENT[1], ACCENT[2], ACCENT[3] = accent[1], accent[2], accent[3]
+        ACCENT_DIM[1], ACCENT_DIM[2], ACCENT_DIM[3] = accent[1] * 0.5, accent[2] * 0.5, accent[3] * 0.5
+    end
+    frame = CreateFrame("Frame", "HeadstartFlightFrame", UIParent)
+    frame:SetSize(W, H)
+    frame:SetFrameStrata("MEDIUM")
+    local fill = S.Rounded(frame, "BACKGROUND", "round")
+    fill:SetVertexColor(S.C.side[1], S.C.side[2], S.C.side[3], 0.94)
+    -- a thin line of the accent down the left edge: the card's mark
+    frame.edge = frame:CreateTexture(nil, "BORDER")
+    frame.edge:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.9)
+    frame.edge:SetPoint("TOPLEFT", 0, -8)
+    frame.edge:SetPoint("BOTTOMLEFT", 0, 8)
+    frame.edge:SetWidth(2)
+    -- the ring: the accent, and over it the game's cooldown sweep in the card's colour covering what is still
+    -- to fly - so the accent shows what is flown. In the middle, on a frame over the sweep, your portrait (or
+    -- your side's flight mount) in a dark round.
+    local cx = PAD + RING / 2 + 2
+    frame.ringBase = Circle(frame, "ARTWORK", 0, RING, ACCENT)
+    frame.ringBase:SetPoint("CENTER", frame, "LEFT", cx, 0)
+    -- (a first flight: the ring breathes - an animation the game runs, not ours)
+    frame.breath = frame.ringBase:CreateAnimationGroup()
+    frame.breath:SetLooping("BOUNCE")
+    local breathe = frame.breath:CreateAnimation("Alpha")
+    breathe:SetFromAlpha(0.25)
+    breathe:SetToAlpha(0.8)
+    breathe:SetDuration(0.9)
+    frame.sweep = CreateFrame("Cooldown", nil, frame)
+    frame.sweep:SetSize(RING, RING)
+    frame.sweep:SetPoint("CENTER", frame.ringBase, "CENTER")
+    if frame.sweep.SetSwipeTexture then frame.sweep:SetSwipeTexture(S.ART .. "circle") end
+    if frame.sweep.SetSwipeColor then frame.sweep:SetSwipeColor(S.C.side[1] * 0.6, S.C.side[2] * 0.6, S.C.side[3] * 0.6, 0.92) end
+    if frame.sweep.SetDrawEdge then frame.sweep:SetDrawEdge(false) end
+    if frame.sweep.SetDrawBling then frame.sweep:SetDrawBling(false) end
+    if frame.sweep.SetHideCountdownNumbers then frame.sweep:SetHideCountdownNumbers(true) end
+    frame.middle = CreateFrame("Frame", nil, frame)
+    frame.middle:SetAllPoints(frame.sweep)
+    frame.middle:SetFrameLevel(frame.sweep:GetFrameLevel() + 2)
+    frame.disc = Circle(frame.middle, "ARTWORK", 0, RING - 6, { S.C.side[1], S.C.side[2], S.C.side[3], 1 })
+    frame.disc:SetPoint("CENTER")
+    frame.face = frame.middle:CreateTexture(nil, "ARTWORK", nil, 2)
+    frame.face:SetSize(RING - 10, RING - 10)
+    frame.face:SetPoint("CENTER")
+    frame.face:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local mask = frame.middle:CreateMaskTexture()
+    mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    mask:SetAllPoints(frame.face)
+    frame.face:AddMaskTexture(mask)
+    frame:HookScript("OnShow", function() YR.FlightFace() end)
+    YR.FlightFace()
+    -- the words, two lines: where to, large, and the time left; where from (and by way of what), and the clock
+    -- time you land - or what's going on, in short
+    local x = PAD + RING + 12
+    local right = STUB + PAD            -- (from the card's right edge: Land and a gap)
+    local SIDE = W - x - right - 64     -- (the words' room: what the time leaves)
+    frame.to = S.Text(frame, 15, S.C.text)
+    frame.to:SetPoint("TOPLEFT", x, -10)
+    frame.to:SetWidth(SIDE)
+    frame.from = S.Text(frame, 11, S.C.sub)
+    frame.from:SetPoint("TOPLEFT", x, -31)
+    frame.from:SetWidth(SIDE)
+    frame.time = S.Text(frame, 17, ACCENT)
+    frame.time:SetPoint("TOPRIGHT", -right, -9)
+    frame.time:SetJustifyH("RIGHT")
+    frame.eta = S.Text(frame, 10, S.C.muted)
+    frame.eta:SetPoint("TOPRIGHT", -right, -32)
+    frame.eta:SetJustifyH("RIGHT")
+    -- Land: a stub at the right end, after a dotted line
+    for i = 0, 5 do
+        local dot = frame:CreateTexture(nil, "BORDER")
+        dot:SetColorTexture(1, 1, 1, 0.22)
+        dot:SetSize(1, 3)
+        dot:SetPoint("TOP", frame, "TOPRIGHT", -STUB, -8 - i * 7)
+    end
+    frame.stop = CreateFrame("Button", nil, frame)
+    frame.stop:SetPoint("TOPRIGHT", -3, -3)
+    frame.stop:SetPoint("BOTTOMRIGHT", -3, 3)
+    frame.stop:SetWidth(STUB - 6)
+    frame.stop.bg = S.Rounded(frame.stop, "BACKGROUND", "round")
+    frame.stop.icon = frame.stop:CreateTexture(nil, "ARTWORK")
+    frame.stop.icon:SetSize(14, 14)
+    frame.stop.icon:SetPoint("CENTER", 0, 7)
+    S.ArtTexture(frame.stop.icon, "down")
+    frame.stop.text = S.Text(frame.stop, 11, S.C.text)
+    frame.stop.text:SetPoint("CENTER", 0, -9)
+    frame.stop.text:SetJustifyH("CENTER")
+    frame.stop.text:SetText("Land")
+    frame.stop:SetScript("OnClick", StopAtNext)
+    frame.stop:SetScript("OnEnter", function(self)
+        self.hover = true
+        StubPaint()
+        LandTip(self)
+    end)
+    frame.stop:SetScript("OnLeave", function(self)
+        self.hover, self.down = false, false
+        StubPaint()
+        GameTooltip:Hide()
+    end)
+    frame.stop:SetScript("OnMouseDown", function(self) self.down = true StubPaint() end)
+    frame.stop:SetScript("OnMouseUp", function(self) self.down = false StubPaint() end)
+    frame:SetScript("OnEnter", CardTip)
+    frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    frame:SetMovable(true)
+    frame:SetClampedToScreen(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", frame.StartMoving)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        YippRouteDB.flightPos = { floor(self:GetLeft() + 0.5), floor(self:GetTop() - UIParent:GetTop() + 0.5) }
+    end)
+    -- the ring draws itself; the words change once a second, looked at ten times a second
+    local tick = 0
+    frame:SetScript("OnUpdate", function(_, elapsed)
+        tick = tick + elapsed
+        if tick < 0.1 then return end
+        tick = 0
+        YR:RefreshFlight()
+    end)
+    Place()
+    frame:Hide()
+end
+
+--- Your portrait in the ring, as it is now (taken when the card shows, and when the setting changes); with
+--- the portrait off, your side's flight mount.
+function YR.FlightFace()
+    if not (frame and frame.face) then return end
+    if YR.Option("flightFace") and SetPortraitTexture then
+        SetPortraitTexture(frame.face, "player")
+    else
+        frame.face:SetTexture(UnitFactionGroup and UnitFactionGroup("player") == "Horde" and WYVERN or GRYPHON)
+    end
+end
+
+-- The ring for the flight now: the sweep set once (the game draws it from then on), or breathing while there
+-- is no time to go by (a first flight, or a stop asked for).
+local function Ring()
+    local total = flight.total
+    local timed = total and total > 0 and not flight.cut
+    local key = timed and (flight.started .. ":" .. total) or "none"
+    if frame.ringFor == flight and frame.ringKey == key then return end
+    frame.ringFor, frame.ringKey = flight, key
+    if timed then
+        frame.ringBase:SetAlpha(1)
+        frame.breath:Stop()
+        frame.sweep:Show()
+        frame.sweep:SetCooldown(flight.started, total)
+    else
+        frame.sweep:Hide()
+        frame.breath:Play()
+    end
+end
+
+-- The clock time a flight lands, in the game clock's own way (24 hours unless it is set to 12).
+local function LandsAt(seconds)
+    if type(date) ~= "function" or type(time) ~= "function" then return "" end
+    local twelve = GetCVar and GetCVar("timeMgrUseMilitaryTime") == "0"
+    local at = time() + floor(seconds + 0.5)
+    return "lands " .. (twelve and date("%I:%M %p", at):gsub("^0", "") or date("%H:%M", at))
+end
+
+function YR:RefreshFlight(force)
     if not (frame and flight) then return end
     -- one bar is enough: RestedXP's (it shows a moment after take-off) goes while ours is up
     local rxpBar = type(RXP) == "table" and type(RXP.flightInfo) == "table" and RXP.flightInfo.flightBar
     if type(rxpBar) == "table" and rxpBar.IsShown and rxpBar:IsShown() then rxpBar:Hide() end
+    Ring()
     local gone = GetTime() - flight.started
     local total, guess, cut = flight.total, flight.guess, flight.cut
-    -- the names don't change during a flight: written and measured once for it (this runs ten times a second)
+    -- the names don't change during a flight: written once for it (this runs ten times a second)
     if frame.named ~= flight then
         frame.named = flight
-        frame.from:SetText(Short(flight.from))
         frame.to:SetText(Short(flight.to))
-        -- the two names share the row with the time: each gets what's left, cut with an ellipsis
-        local room = W - 2 * PAD - 70 - 24
-        frame.from:SetWidth(0)                       -- unconstrained, to measure it
-        local fromW = math.min(tonumber(frame.from:GetStringWidth()) or room / 2, room / 2)
-        frame.from:SetWidth(fromW)
-        frame.to:SetWidth(math.max(40, room - fromW))
+        local via = ""
+        if type(flight.stops) == "table" and #flight.stops > 0 then
+            via = "  ·  via " .. Short(flight.stops[1].name) .. (#flight.stops > 1 and (" +" .. (#flight.stops - 1)) or "")
+        end
+        frame.from:SetText("from " .. Short(flight.from) .. via)
     end
-    frame.stop:SetShown(CanStop())
+    -- Land: drawn again when whether it can land you changes
+    local can = CanStop()
+    if force or frame.stopCan ~= can or frame.stopCut ~= cut then
+        frame.stopCan, frame.stopCut = can, cut
+        StubPaint()
+    end
     -- the words change once a second: written only then (and when what they say about the flight does)
     local second = floor((total and total > 0 and not cut) and (total - gone) or gone)
     if frame.second == second and frame.secondOf == flight and frame.secondTotal == total and frame.secondCut == cut
@@ -341,25 +419,27 @@ function YR:RefreshFlight()
     frame.second, frame.secondOf, frame.secondTotal, frame.secondCut, frame.secondGuess = second, flight, total, cut, guess
     if total and total > 0 and not cut then
         local left = total - gone
-        frame.time:SetTextColor(BLUE[1], BLUE[2], BLUE[3])
+        frame.time:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3])
         if left >= 0 then
             frame.time:SetText((guess and "~" or "") .. Clock(left))
-            frame.note:SetText(guess and "about: estimated from the flight's length" or "")
+            frame.eta:SetText(LandsAt(left))
         else
             frame.time:SetText("+" .. Clock(-left))
-            frame.note:SetText("landing")
+            frame.eta:SetText("landing")
         end
     else
         frame.time:SetTextColor(unpack(YR.Style.C.sub))
         frame.time:SetText(Clock(gone))
-        frame.note:SetText(cut and "landing at the next stop" or "first flight here: timing it")
+        frame.eta:SetText(cut and "next stop" or "timing it")
     end
 end
 
 local function ShowBar(on)
     if on and not frame then Build() end
     if frame then frame:SetShown(on) end
-    if on then YR:RefreshFlight() end
+    -- Blizzard's Land button goes while the card shows for a flight (not for the sample)
+    TheirLand(on and flight ~= nil and flight.key ~= "")
+    if on then YR:RefreshFlight(true) end
 end
 
 -- ---------------------------------------------------------------------------

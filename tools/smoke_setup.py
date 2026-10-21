@@ -144,6 +144,7 @@ function RXP:LoadGuideTable(group, name) self.loaded = group .. "|" .. name end
 ''')
 YS = lua.table()
 lua.globals().HeadstartNS = YS            # the setup addon takes Headstart's table from this
+lua.execute("TAINTS = {} function HeadstartNS.TaintNoted(what) TAINTS[#TAINTS + 1] = what end")   # (Core.lua's taint log)
 for f in ("Style.lua", "Headstart_Setup/SpellLevels.lua", "Headstart_Setup/Setup.lua", "Headstart_Setup/Layouts.lua", "Headstart_Setup/SetupUI.lua"):
     chunk = lua.eval("function(c, n) return assert(loadstring(c, n)) end")(
         open(os.path.join(ROOT, f), encoding="utf-8").read(), f)
@@ -282,6 +283,48 @@ ok = (g.YippSetupCharDB.seen is None and g.YippSetupCharDB.uiApplied is not None
 print(("ok  " if ok else "FAIL"), f"Apply interface: noted, the character not marked done, the window still there for the bars (both offered before: {both})")
 bad += not ok
 w.Hide(w)
+# Set up new characters by themselves (the owner, 2026-10-20): the first login puts the bars and the interface on, no window
+def said(text):
+    return any(text in str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1))
+lua.execute("""KEPT_BAR_A, KEPT_MACROS_A = BAR, MACROS
+    BAR, MACROS, PRINTS = {}, {}, {}
+    YippSetupCharDB.seen, YippSetupCharDB.applied, YippSetupCharDB.uiApplied = nil, nil, nil
+    YippSetupDB.autoSetup = true""")
+events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
+ok = (not w.IsShown(w) and g.YippSetupCharDB.applied is not None and g.YippSetupCharDB.seen is not None
+      and g.YippSetupCharDB.uiApplied is not None and said("automatic setup") and said("and the interface"))
+print(("ok  " if ok else "FAIL"), "automatic setup: a new character's first login - bars and interface on, no window, chat says so")
+bad += not ok
+# no bars saved for the class: nothing put on, the window as before
+lua.execute("""BAR, MACROS, PRINTS = {}, {}, {}
+    YippSetupCharDB.seen, YippSetupCharDB.applied, YippSetupCharDB.uiApplied = nil, nil, nil
+    KEPT_PROFILE_A = YippSetupDB.classes.PALADIN.profile YippSetupDB.classes.PALADIN.profile = nil""")
+events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
+ok = w.IsShown(w) and g.YippSetupCharDB.applied is None and said("no bars saved for paladin")
+print(("ok  " if ok else "FAIL"), "automatic setup, no bars saved for the class: nothing put on, the window opens, chat says why")
+bad += not ok
+w.Hide(w)
+# no interface saved: the bars alone
+lua.execute("""YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE_A
+    BAR, MACROS, PRINTS = {}, {}, {}
+    YippSetupCharDB.seen, YippSetupCharDB.applied, YippSetupCharDB.uiApplied = nil, nil, nil
+    KEPT_UI_A = YippSetupDB.ui YippSetupDB.ui = nil""")
+events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
+ok = (not w.IsShown(w) and g.YippSetupCharDB.applied is not None and g.YippSetupCharDB.uiApplied is None
+      and said("No interface is saved yet"))
+print(("ok  " if ok else "FAIL"), "automatic setup, no interface saved: the bars alone, and chat says so")
+bad += not ok
+# begun in the login itself, under its loading screen (or the intro) - not by a timer seconds after it - and done there in
+# one go (the owner, 2026-10-21)
+lua.execute("""KEPT_AFTER_AUTO = C_Timer.After C_Timer.After = function() end
+    BAR, MACROS, PRINTS = {}, {}, {} IN_CINEMATIC = true
+    YippSetupCharDB.seen, YippSetupCharDB.applied, YippSetupCharDB.uiApplied = nil, nil, nil""")
+events._OnEvent(events, "PLAYER_ENTERING_WORLD", True, False)
+ok = g.YippSetupCharDB.applied is not None and g.YippSetupCharDB.seen is not None and not YS.Busy()
+lua.execute("C_Timer.After = KEPT_AFTER_AUTO IN_CINEMATIC = false")
+print(("ok  " if ok else "FAIL"), "automatic setup: begun in the login's own event and done under the intro in one go - no timer waited for")
+bad += not ok
+lua.execute("""YippSetupDB.ui = KEPT_UI_A YippSetupDB.autoSetup = nil BAR, MACROS = KEPT_BAR_A, KEPT_MACROS_A""")
 # A character where AutoFeed hasn't made its macro yet: AutoFeed is asked to make it (so it owns and
 # fills it), and it goes in its slot. Nothing is copied from the main.
 lua.execute(r'''MACROS = {}; AutoFeedCharDB = { owned = {} }''')
@@ -484,7 +527,95 @@ YS.ApplyUI(YS, g.YippSetupDB.ui)
 ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Northshire (Launch)"
 print(("ok  " if ok else "FAIL"), f"a Human starts on the Northshire route: {g.RXP.loaded}")
 bad += not ok
-lua.execute("RACE = 'Dwarf'")
+# Without Headstart's routes: RestedXP's own free starter for the race, not a blank RestedXP; a guide picked
+# for a race is the one; one picked that RestedXP hasn't loaded falls back to the default
+lua.execute('''KEPT_GET = RXP.GetGuideTable
+RXP.guides = {}
+for _, g in ipairs({ { "RestedXP Forever Guide (A)", "01-05 Coldridge Valley" }, { "RestedXP Forever Guide (A)", "01-06 Shadowglen" },
+    { "RestedXP Forever Guide (A)", "13-15 Westfall" }, { "RestedXP Forever Guide (H)", "01-06 Durotar" },
+    { "*RestedXP Forever Guide (A)", "01-10 Elwynn Forest Mage AoE" }, { "My Guides (A)", "01-06 Coldridge Fast" } }) do
+    RXP.guides[g[1]:gsub("^%*", "") .. "||" .. g[2]] = { group = g[1], name = g[2] }
+end
+function RXP.GetGuideTable(group, name) return RXP.guides[group .. "||" .. name] end
+RACE = "Dwarf" RXP.loaded = nil YippSetupDB.raceGuide = nil''')
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "RestedXP Forever Guide (A)|01-05 Coldridge Valley"
+print(("ok  " if ok else "FAIL"), f"no Headstart routes: a Dwarf starts on RestedXP's own starter, not a blank RestedXP ({g.RXP.loaded})")
+bad += not ok
+choices = lua.eval("(function() local t = {} for _, c in ipairs(YR_SETUP.StartGuideChoices('Dwarf')) do t[#t + 1] = c[1] end return table.concat(t, ' / ') end)()")
+ok = choices.split(" / ")[0] == "" and "My Guides (A)||01-06 Coldridge Fast" in choices \
+    and "Durotar" not in choices and "Westfall" not in choices and "RestedXP Forever Guide (A)||01-10 Elwynn Forest Mage AoE" in choices
+print(("ok  " if ok else "FAIL"), f"the choice: the default first, then every level 1 guide of its side ({choices})")
+bad += not ok
+YS.PickStartGuide("Dwarf", "My Guides (A)||01-06 Coldridge Fast")
+lua.execute("RXP.loaded = nil")
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "My Guides (A)|01-06 Coldridge Fast" and YS.StartGuideLabel("Dwarf") == "01-06 Coldridge Fast"
+print(("ok  " if ok else "FAIL"), f"picked for Dwarves: a new Dwarf starts on it ({g.RXP.loaded})")
+bad += not ok
+lua.execute("RXP.guides['My Guides (A)||01-06 Coldridge Fast'] = nil RXP.loaded = nil")
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "RestedXP Forever Guide (A)|01-05 Coldridge Valley" and YS.StartGuideLabel("Dwarf").startswith("Default:")
+print(("ok  " if ok else "FAIL"), f"the picked one not loaded (its addon gone): the default again ({g.RXP.loaded})")
+bad += not ok
+# a guide for some classes only (its header: "<< Alliance Rogue"), picked for the race: a character it isn't
+# for starts on the default, not on an empty guide; one it is for starts on it; the choice says for whom
+lua.execute('''RXP.guides["My Guides (A)||01-06 Coldridge Lean"] = { group = "My Guides (A)", name = "01-06 Coldridge Lean", enabledFor = "Alliance Rogue" }
+IS_ROGUE = false
+RXP.applies = function(tag) return not tag:find("Rogue") or IS_ROGUE end
+RXP.loaded = nil''')
+YS.PickStartGuide("Dwarf", "My Guides (A)||01-06 Coldridge Lean")
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "RestedXP Forever Guide (A)|01-05 Coldridge Valley"
+print(("ok  " if ok else "FAIL"), f"a Rogue's guide picked for Dwarves, on a Dwarf Paladin: the default, not an empty guide ({g.RXP.loaded})")
+bad += not ok
+lua.execute("IS_ROGUE = true RXP.loaded = nil")
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "My Guides (A)|01-06 Coldridge Lean"
+print(("ok  " if ok else "FAIL"), f"and on a Dwarf Rogue: the Rogue's guide ({g.RXP.loaded})")
+bad += not ok
+labels = lua.eval("(function() local t = {} for _, c in ipairs(YR_SETUP.StartGuideChoices('Dwarf')) do t[#t + 1] = c[2] end return table.concat(t, ' / ') end)()")
+ok = "01-06 Coldridge Lean  (Alliance Rogue only)" in labels
+print(("ok  " if ok else "FAIL"), f"the choice says the Rogue's guide is for Rogues ({labels[:120]})")
+bad += not ok
+# Headstart's openers, the Lean ones first: the first that is for the character (the owner, 2026-10-16)
+lua.execute('''for _, x in ipairs({ { "01-06 Shadowglen (Lean)", "Alliance Rogue" }, { "01-06 Shadowglen (Launch)", "Alliance" },
+    { "01-06 Northshire (Lean)", "Alliance" }, { "01-06 Northshire (Launch)", "Alliance" } }) do
+    RXP.guides["Headstart Launch (A)||" .. x[1]] = { group = "Headstart Launch (A)", name = x[1], enabledFor = x[2] }
+end
+RACE = "NightElf" IS_ROGUE = true RXP.loaded = nil''')
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Shadowglen (Lean)" and YS.StartGuideLabel("NightElf") == "Default: 01-06 Shadowglen (Lean)"
+print(("ok  " if ok else "FAIL"), f"a Night Elf Rogue: the Lean opener, and the choice's default names it ({g.RXP.loaded})")
+bad += not ok
+lua.execute("IS_ROGUE = false RXP.loaded = nil")
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Shadowglen (Launch)" and YS.StartGuideLabel("NightElf") == "Default: 01-06 Shadowglen (Launch)"
+print(("ok  " if ok else "FAIL"), f"a Night Elf Druid: the Launch opener (the Lean one is a Rogue's), not RestedXP's starter ({g.RXP.loaded})")
+bad += not ok
+first = lua.eval("YR_SETUP.StartGuideChoices('NightElf')[1][2]")
+ok = first == "Default: 01-06 Shadowglen (Launch)"
+print(("ok  " if ok else "FAIL"), f"and the choice's first line says so ({first})")
+bad += not ok
+lua.execute("RACE = 'Human' RXP.loaded = nil")
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Northshire (Lean)"
+print(("ok  " if ok else "FAIL"), f"a Human of any class: the Lean Northshire opener ({g.RXP.loaded})")
+bad += not ok
+YS.PickStartGuide("Human", "RestedXP Forever Guide (A)||01-10 Elwynn Forest Mage AoE")
+lua.execute("RXP.loaded = nil")
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "*RestedXP Forever Guide (A)|01-10 Elwynn Forest Mage AoE" or g.RXP.loaded == "RestedXP Forever Guide (A)|01-10 Elwynn Forest Mage AoE"
+print(("ok  " if ok else "FAIL"), f"one picked for the race still comes first ({g.RXP.loaded})")
+bad += not ok
+lua.execute("RXP.applies = nil RXP.GetGuideTable = KEPT_GET RXP.guides = nil YippSetupDB.raceGuide = nil RACE = 'Dwarf'")
+
+# Every action Character setup puts on the bars goes to Headstart's taint log (YR.TaintNoted, Core.lua)
+taints = lua.eval("TAINTS")
+said = [str(taints[i]) for i in range(1, len(taints) + 1)]
+check_ok = any("put an action on the bars" in t for t in said)
+print(("ok  " if check_ok else "FAIL"), f"what Character setup put on the action bars is told to the taint log ({len(said)} times)")
+bad += not check_ok
 
 # The Character setup options. Start each case from a clean new character.
 lua.execute('''
@@ -1427,7 +1558,8 @@ report(behind[1] is True and behind[2] == "Moray-Realm" and YS.FollowUI() is Fal
 w = g.YippSetupFrame
 w.Hide(w)
 events = g.FRAMES[2]
-lua.execute("AFTER_KEEP = {} local after = C_Timer.After C_Timer.After = function(t, fn) AFTER_KEEP[#AFTER_KEEP + 1] = fn end")
+# (the next frame - Character setup's job runner putting the interface on a step a frame - comes before what waits longer)
+lua.execute("AFTER_KEEP = {} local after = C_Timer.After C_Timer.After = function(t, fn) if t == 0 then return fn() end AFTER_KEEP[#AFTER_KEEP + 1] = fn end")
 YS.Toggle(YS)
 report(w.IsShown(w) and w.update.IsShown(w.update) and w.keep.IsShown(w.keep) and not w.both.IsShown(w.both)
        and not w.setup.IsShown(w.setup) and "Moray-Realm" in w.ui.GetText(w.ui) and "Main" in w.ui.GetText(w.ui),
@@ -1437,9 +1569,11 @@ report(lua.eval("YippSetupCharDB.iface.fresh") is True and YS.FollowUI() is Fals
        "just put on: nothing of this character's is saved until its screen has been looked at once after the reload")
 report(YS.UIBehind() is False and not w.IsShown(w) and lua.eval("YippSetupDB.ui == ELSE_UI") and lua.eval("YippSetupCharDB.iface.sig") is None,
        "Update: the changed interface is put on, this character has that save, and the saved one is untouched")
+lua.execute("SCANS = 0 KEPT_SCANUI = YR_SETUP.ScanUI YR_SETUP.ScanUI = function(...) SCANS = SCANS + 1 return KEPT_SCANUI(...) end")
 YS.UISettle()
-report(lua.eval("YippSetupCharDB.iface.sig") is not None and lua.eval("YippSetupCharDB.iface.fresh") is None and lua.eval("YippSetupDB.ui == ELSE_UI") and YS.FollowUI() is False,
-       "once it has settled, how the screen reads here is noted - and nothing is saved for that")
+report(lua.eval("YippSetupCharDB.iface.fresh") is None and g.SCANS == 0 and lua.eval("YippSetupDB.ui == ELSE_UI") and YS.FollowUI() is False,
+       "once it has settled, on a character that only uses the interface: nothing read (a hitch seconds into play, for nothing), nothing saved")
+lua.execute("YR_SETUP.ScanUI = KEPT_SCANUI")
 lua.execute("YippSetupDB.uiFrom, YippSetupDB.uiScanned = 'Moray-Realm', time()")
 YS.Toggle(YS)
 w.keep._OnClick(w.keep)
@@ -1555,14 +1689,14 @@ lua.execute("UnitLevel = OLD_LEVEL")
 # "Apply bars" on a new character (nothing asked there): the bars, and no interface - no chat, Edit Mode,
 # keys or game settings (the settings window's button put the interface on too, until 0.10.0-beta7)
 lua.execute("""Fresh(); YippSetupCharDB.applied = nil ASKED = nil
-    UI_PUT = 0 YS_REAL_APPLYUI = YR_SETUP.ApplyUI
-    YR_SETUP.ApplyUI = function(...) UI_PUT = UI_PUT + 1 return YS_REAL_APPLYUI(...) end""")
+    UI_PUT = 0 YS_REAL_UISTEPS = YR_SETUP.UISteps
+    YR_SETUP.UISteps = function(...) UI_PUT = UI_PUT + 1 return YS_REAL_UISTEPS(...) end""")
 ok = YS.Apply(YS, None, None, lua.eval("{ barsOnly = true }"))
 report(ok and g.ASKED is None and g.UI_PUT == 0, f"Apply bars on a new character: the bars on, the interface left alone ({g.UI_PUT})")
 lua.execute("Fresh(); YippSetupCharDB.applied = nil ASKED = nil UI_PUT = 0")
 YS.Apply(YS)
 report(g.UI_PUT == 1, f"(where plain Apply, the first login's Apply both, puts the interface on too: {g.UI_PUT})")
-lua.execute("YR_SETUP.ApplyUI = YS_REAL_APPLYUI")
+lua.execute("YR_SETUP.UISteps = YS_REAL_UISTEPS")
 # Character setup looked at on a character the first time (its page, the planner): its bars and macros kept
 # for good before anything can be moved or applied - Put back brings them back
 lua.execute("""Fresh(); YippSetupCharDB.first = nil YippSetupCharDB.backup = nil YippSetupCharDB.applied = nil
@@ -1615,7 +1749,7 @@ YS.Apply(YS, None, None, SURE)
 lua.execute("YippSetupCharDB.applied = YippSetupCharDB.applied or time() YippSetupCharDB.layoutName = nil")
 Switch("Solo")
 lua.execute("""local at = 121 while MACROS[at] do at = at + 1 end
-    MACROS[at] = { 'Zed', 1, '/zed' } BAR[100] = { kind = 'macro', id = at } ZED = at""")
+    MACROS[at] = { 'Zed', 1, '/cast Zed' } BAR[100] = { kind = 'macro', id = at } ZED = at""")
 Switch("Main")                                                              # Solo saved with the macro Zed on a button
 # (Zed gone, and no room to make it again: the game refuses a 31st macro, which this fake did not)
 lua.execute("""BAR[100] = nil MACROS[ZED] = nil
@@ -1656,6 +1790,7 @@ lua.execute("""
     function SaveBindings() SAVED_SETS = SAVED_SETS + 1 end
     function GetCurrentBindingSet() return 1 end
     function KEYS() local t = {} for _, b in ipairs(BINDS) do t[b[1]] = (b[2] or "-") .. "," .. (b[3] or "-") end return t end
+    function GetBindingAction(key) for _, b in ipairs(BINDS) do if b[2] == key or b[3] == key then return b[1] end end return "" end
 """)
 mine = YS.ScanKeys()
 report(mine is not None and mine.MOVEFORWARD[1] == "W" and mine.MOVEFORWARD[2] == "UP" and mine.JUMP[2] is False and mine.HEADER_MOVEMENT is None,
@@ -1673,6 +1808,17 @@ report(n == 4 and now.MOVEFORWARD == "E,-" and now.ACTIONBUTTON1 == "2,-" and no
 report(YS.ApplyKeys(main) == 0 and g.SAVED_SETS == 1, "applied again: nothing to change, nothing saved")
 was = g.YippSetupCharDB.uiBackup["keys"]
 report(was is not None and was.MOVEFORWARD[1] == "W" and was.TOGGLEBAG[1] == "B", "the keys as they were are kept for undo")
+# a frame at a time (a fight can come between two): no action of the job is ever left without a key - two keys
+# swapped go on together, though the frame allows one
+lua.execute("""KEPT_BINDS = BINDS
+    BINDS = { { "ACTIONBUTTON1", "1" }, { "ACTIONBUTTON2", "2" }, { "ACTIONBUTTON3", "3" } }
+    SWAP_JOB = YR_SETUP.KeysJob({ ACTIONBUTTON1 = { "2", false }, ACTIONBUTTON2 = { "1", false }, ACTIONBUTTON3 = { "3", false } })
+    SWAP_DONE = YR_SETUP.KeysStep(SWAP_JOB, 1)""")
+mid = g.KEYS()
+report(mid.ACTIONBUTTON1 != "-,-" and mid.ACTIONBUTTON2 != "-,-" and mid.ACTIONBUTTON1 == "2,-" and mid.ACTIONBUTTON2 == "1,-",
+       f"keys a frame at a time: two swapped keys go on in the same frame - neither action is left with none ({dict(mid.items())})")
+lua.execute("while not YR_SETUP.KeysStep(SWAP_JOB, 1) do end BINDS = KEPT_BINDS")
+report(lua.eval("SWAP_JOB.changed") == 2, "and the rest after it: two actions changed, the third already as it should be")
 YS.Undo(YS)
 now = g.KEYS()
 report(now.MOVEFORWARD == "W,UP" and now.ACTIONBUTTON1 == "1,-" and now.ACTIONBUTTON2 == "2,-" and now.TOGGLEBAG == "B,-",
@@ -1802,4 +1948,234 @@ report(now == {3: 635, 60: 20594} and now != bars_after and g.YippSetupCharDB.ap
 lua.execute("COMBAT = true")
 report(YS.PutBackEverything() is False, "in a fight: not done")
 lua.execute("COMBAT = false")
+
+# An apply goes on a little each frame (the owner, 2026-10-20: setting a new character up was "very laggy";
+# TurboFace's, which is smooth, puts a couple of buttons on a frame): Apply returns as it starts, no frame puts
+# on more than three buttons, a second Apply waits, a fight pauses it and its end carries on; once it is all on,
+# what was asked is told. The keys likewise, thirty a frame.
+lua.execute("""Fresh() YippSetupCharDB.applied = nil SAID_JOB = {}
+    local slots = YippSetupDB.classes.PALADIN.profile.slots
+    KEPT_SLOTS_JOB = {} for k, v in pairs(slots) do KEPT_SLOTS_JOB[k] = v end
+    for i = 13, 36 do slots[i] = { kind = 'spell', name = 'Holy Light', level = 1, down = true, id = 635, rank = 1 } end
+    KEPT_AFTER_JOB, KEPT_PRINT_JOB = C_Timer.After, YR_SETUP.Print
+    FRAMES_Q = {}
+    C_Timer.After = function(t, fn) if t < 1 then FRAMES_Q[#FRAMES_Q + 1] = fn else fn() end end      -- (a frame, or a moment: the next look)
+    function NextFrame() local q = FRAMES_Q FRAMES_Q = {} for _, fn in ipairs(q) do fn() end return #q end
+    function Buttons() local n = 0 for _ in pairs(BAR) do n = n + 1 end return n end
+    DONE_FULL = nil""")
+ok = YS.Apply(YS, None, None, lua.eval("{ sure = true, done = function(full) DONE_FULL = full or false end }"))
+counts, most, frames = [g.Buttons()], 0, 0
+report(ok[0] is True and YS.Busy() is True and counts[0] == 0 and g.DONE_FULL is None,
+       f"Apply returns as it starts: nothing on yet ({counts[0]} buttons), the rest in the frames after")
+report(YS.Apply(YS, None, None, SURE) is None, "a second Apply while it runs: waits (said in chat)")
+# while it runs nothing else changes the bars or saves them half put on (the review, 2026-10-20)
+_sw = lua.eval("{ YR_SETUP.LayoutSwitch('Anything') }")
+lua.execute("KEPT_UIB_JOB = YippSetupCharDB.uiBackup YippSetupCharDB.uiBackup = nil KEPT_BACKUP_JOB = YippSetupCharDB.backup")
+YS.ApplyInterface(YS)
+YS.Undo(YS)
+_put = YS.PutBackEverything()
+report(_sw[1] is False and "a moment" in str(_sw[2]) and lua.eval("YippSetupCharDB.uiBackup") is None
+       and lua.eval("YippSetupCharDB.backup == KEPT_BACKUP_JOB") and _put is False,
+       f"while it runs: a profile switch, Apply interface (no empty undo copy made), undo and Put back everything wait ({_sw[2]})")
+lua.execute("YippSetupCharDB.uiBackup = KEPT_UIB_JOB LATER_RAN = false")
+report(YS.Busy("test", lua.eval("function() LATER_RAN = true end")) is True and g.LATER_RAN is False,
+       "something put off until the apply is done (a spec's profile switch) waits")
+g.NextFrame()
+counts.append(g.Buttons())
+lua.execute("COMBAT = true")
+g.NextFrame()
+paused = lua.eval("#FRAMES_Q") == 0 and YS.Busy() is True
+report(paused, "a fight: it stops where it is, nothing more queued")
+lua.execute("COMBAT = false local f = FRAMES[#FRAMES] f._OnEvent(f, 'PLAYER_REGEN_ENABLED')")
+counts.append(g.Buttons())         # (the fight's end is a frame of its own: one step runs as it is heard)
+# something on the cursor (a drag of yours): the next step waits for the drop, and nothing is put on meanwhile
+lua.execute("HELD = true KEPT_CURSOR_JOB = GetCursorInfo function GetCursorInfo() if HELD then return 'item', 6948 end end")
+_before_held = g.Buttons()
+g.NextFrame()
+g.NextFrame()
+_held_kept = g.Buttons() == _before_held and YS.Busy() is True and lua.eval('#FRAMES_Q') == 1
+lua.execute("HELD = false GetCursorInfo = KEPT_CURSOR_JOB")
+report(_held_kept, "an item on the cursor: no button goes on until it is dropped (it would swap with what you hold), looked at again a moment on")
+while YS.Busy() and frames < 200:
+    frames += 1
+    if g.NextFrame() == 0:
+        break
+    counts.append(g.Buttons())
+steps = [b - a for a, b in zip(counts, counts[1:])]
+report(g.LATER_RAN is True, "and is done as it ends")
+report(not YS.Busy() and g.DONE_FULL is False and g.YippSetupCharDB.applied is not None and counts[-1] >= 20 and max(steps) <= 3,
+       f"the fight over, it carries on to the end: {counts[-1]} buttons over {len(counts)} frames, never more than {max(steps)} a frame, and told once on")
+# the keys, thirty a frame
+lua.execute("""KEYS_JOB_WANT = {}
+    for i = 1, 70 do KEYS_JOB_WANT["ACTIONBUTTON" .. i] = { "F" .. i, false } end
+    SET_COUNT = 0 local set = SetBinding
+    SetBinding = function(...) SET_COUNT = SET_COUNT + 1 return set(...) end
+    KEYS_JOB = YR_SETUP.KeysJob(KEYS_JOB_WANT)""")
+sets, rounds = [], 0
+while rounds < 20:
+    rounds += 1
+    before = g.SET_COUNT
+    done = YS.KeysStep(g.KEYS_JOB, 30)
+    sets.append(g.SET_COUNT - before)
+    if done:
+        break
+report(done and max(sets) <= 31 and lua.eval("KEYS_JOB.changed") == 70 and rounds >= 3,
+       f"keys: seventy put on, at most thirty a frame ({sets})")
+# Under the login's loading screen or the intro nothing is seen: the whole setup goes on in one go, not a few
+# buttons a frame (the owner, 2026-10-21: "it still lagged and took time ... start while the player is in the loading
+# screen?")
+lua.execute("""Fresh() YippSetupCharDB.applied = nil FRAMES_Q = {} IN_CINEMATIC = true DONE_FULL = nil""")
+ok = YS.Apply(YS, None, None, lua.eval("{ sure = true, done = function(full) DONE_FULL = full or false end }"))
+report(ok[0] is True and not YS.Busy() and g.Buttons() >= 20 and g.DONE_FULL is False,
+       f"the screen covered (the intro playing): the whole setup at once, {g.Buttons()} buttons, nothing left for the frames after")
+lua.execute("IN_CINEMATIC = false FRAMES_Q = {}")
+# A new character's own, begun at its login: what the game puts on of its own a moment in (chat windows, key
+# bindings, Edit Mode's layouts) is waited for - put on before, it was written over - and the intro plays on until
+# the setup is done, then ends (Cinematic.lua asks YR.HoldIntro), once.
+lua.execute("""KEPT_GETTIME_JOB = GetTime T_NOW = 100 function GetTime() return T_NOW end
+    LONG_Q = {}
+    C_Timer.After = function(t, fn) if t < 1 then FRAMES_Q[#FRAMES_Q + 1] = fn else LONG_Q[#LONG_Q + 1] = fn end end
+    local w = YR_SETUP.loginWatch
+    w._OnEvent(w, "LOADING_SCREEN_DISABLED")
+    KEPT_LAYOUTS_JOB = EditModeManagerFrame.layoutInfo EditModeManagerFrame.layoutInfo = nil
+    Fresh() YippSetupCharDB.applied = nil STOPPED = 0 DONE_FULL = nil""")
+ok = YS.Apply(YS, None, None, lua.eval("{ sure = true, login = true, done = function(full) DONE_FULL = full or false end }"))
+_held = lua.eval("HeadstartNS.HoldIntro(function() STOPPED = STOPPED + 1 end)")
+for _ in range(60):
+    if g.NextFrame() == 0:
+        break
+_waiting = YS.Busy() is True and g.Buttons() >= 20 and g.STOPPED == 0
+report(ok[0] is True and _held is True and _waiting,
+       f"at a login: the bars on, then it waits for the game's own Edit Mode, chat and keys - the intro held meanwhile ({g.Buttons()} buttons, stopped {g.STOPPED})")
+lua.execute("""EditModeManagerFrame.layoutInfo = KEPT_LAYOUTS_JOB
+    local w = YR_SETUP.loginWatch
+    w._OnEvent(w, "UPDATE_CHAT_WINDOWS") w._OnEvent(w, "UPDATE_BINDINGS")""")
+for _ in range(60):
+    if g.NextFrame() == 0:
+        break
+report(not YS.Busy() and g.DONE_FULL is False and g.STOPPED == 1,
+       f"the game's own put on: the rest goes on, and the intro ends as it is done ({g.STOPPED})")
+lua.execute("for _, fn in ipairs(LONG_Q) do fn() end")
+report(g.STOPPED == 1, "the intro's time limit after: not ended twice")
+lua.execute("PRINTS = {}")
+YS.Debug(YS)
+_t = g.YippSetupCharDB.lastSetup
+report(_t is not None and _t.steps > 5 and _t.frames >= 2 and _t.slowest is not None
+       and any("setup at its login" in str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1)),
+       "its timings kept for this character, and /ysetup debug says them")
+# no setup of the login's running: the intro is not held (ended at once, as before)
+lua.execute("STOPPED = 0")
+report(lua.eval("HeadstartNS.HoldIntro(function() STOPPED = STOPPED + 1 end)") is False and g.STOPPED == 0,
+       "no setup of the login's running: the intro is not held")
+lua.execute("GetTime = KEPT_GETTIME_JOB")
+# A new character's setup that needs a reload (chat windows made through Blizzard's own functions): not asked - everything
+# works without one, the player reloads when it suits (the owner, 2026-10-21); and none made by the addon, which the game
+# blocks (seen the same day: "tried to call the protected function 'reload()'"). The summary line says so.
+lua.execute("""RELOADS = 0 C_UI = C_UI or {} KEPT_RELOAD = C_UI.Reload C_UI.Reload = function() RELOADS = RELOADS + 1 end
+    KEPT_RELOADUI = ReloadUI ReloadUI = function() RELOADS = RELOADS + 1 end
+    KEPT_APPLYCHAT = YR_SETUP.ApplyChat YR_SETUP.ApplyChat = function() return "3 windows" end
+    StaticPopup_Show = function(w) POPUP = w end POPUP = nil
+    SCANBARS = 0 KEPT_SCANBARS = YR_SETUP.ScanBars YR_SETUP.ScanBars = function(...) SCANBARS = SCANBARS + 1 return KEPT_SCANBARS(...) end
+    Fresh() YippSetupCharDB.applied = nil IN_CINEMATIC = true PRINTS = {} SAID = {}""")
+YS.Apply(YS, None, None, lua.eval("{ sure = true, login = true }"))
+for _ in range(60):
+    if g.NextFrame() == 0:
+        break
+_t = g.YippSetupCharDB.lastSetup
+_said = any("/reload when it suits you" in str(v) for v in list(g.PRINTS.values()) + list(g.SAID.values()))
+report(not YS.Busy() and g.RELOADS == 0 and g.POPUP is None and _t is not None and _t.reload == "later" and _said,
+       f"at a login, a reload needed: not asked, none made, the summary line says so (reloads {g.RELOADS}, popup {g.POPUP})")
+YS.RememberNow()
+report(g.SCANBARS == 0, f"the bars just put on are what the next look compares with: nothing read again ({g.SCANBARS})")
+lua.execute("IN_CINEMATIC = false PRINTS = {}")
+YS.Debug(YS)
+report(any("left for you to make" in str(g.PRINTS[i]) and "ended at" in str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1)),
+       "/ysetup debug: when it ended, the loading screen, the game's chat and keys, and the reload")
+lua.execute("ReloadUI = KEPT_RELOADUI")
+# Fewer moves through the cursor (the owner, 2026-10-21: "very few buttons, though - aren't there ways to make this even
+# more efficient?"): a slot that already holds the very spell is left as it is, one the profile fills is dropped onto
+# (not emptied first), and only one that ends up empty is emptied - the bars as before.
+lua.execute("""Fresh() YippSetupCharDB.applied = nil IN_CINEMATIC = true SAID = {}
+    local slots = YippSetupDB.classes.PALADIN.profile.slots
+    FILL, OTHER = nil, nil
+    for i = 1, 120 do
+        local e = slots[i]
+        if e and e.kind == 'spell' and e.id == 635 and KNOWN[635] then
+            if not FILL then FILL = i elseif not OTHER then OTHER = i end
+        end
+    end
+    BAR[FILL] = { kind = 'spell', id = 635 }            -- already right
+    if OTHER then BAR[OTHER] = { kind = 'spell', id = 99999 } end      -- something else where the profile puts its own
+    EMPTY_SLOT = nil
+    for i = 120, 1, -1 do if not slots[i] then EMPTY_SLOT = i break end end
+    BAR[EMPTY_SLOT] = { kind = 'spell', id = 88888 }    -- where the profile puts nothing
+    PICKED = {} KEPT_PICKUP = PickupAction PickupAction = function(s) PICKED[s] = true return KEPT_PICKUP(s) end""")
+YS.Apply(YS, None, None, lua.eval("{ sure = true, login = true }"))
+for _ in range(60):
+    if g.NextFrame() == 0:
+        break
+_b = g.YippSetupCharDB.lastBars
+report(g.FILL is not None and g.PICKED[g.FILL] is None and g.BAR[g.FILL].id == 635
+       and (g.OTHER is None or (g.PICKED[g.OTHER] is None and g.BAR[g.OTHER].id == 635))
+       and g.PICKED[g.EMPTY_SLOT] is True and g.BAR[g.EMPTY_SLOT] is None and _b is not None and _b.kept >= 1,
+       f"fewer moves: the slot already right left as it is, one filled dropped onto, only the one left empty emptied"
+       f" (kept {_b and _b.kept}, moves {_b and _b.moves})")
+lua.execute("PickupAction = KEPT_PICKUP IN_CINEMATIC = false")
+# AutoFeed filling its macro (a bag change) no longer has every button read again a few seconds later; a macro of yours
+# edited in place still does (it reads as changed by its text) - the owner's new character's debug, 2026-10-21: the bars
+# were read again after the setup.
+lua.execute("""BARSCANS = 0 KEPT_SB = YR_SETUP.ScanBars YR_SETUP.ScanBars = function(...) BARSCANS = BARSCANS + 1 return KEPT_SB(...) end
+    YippSetupCharDB.applied = YippSetupCharDB.applied or 1 YippSetupCharDB.hold = nil
+    KEPT_REMEMBER = YippSetupDB.remember YippSetupDB.remember = nil
+    AutoFeedCharDB = AutoFeedCharDB or {}
+    FEED, MINE = 141, 142
+    MACROS[FEED] = { "AutoFeed", 134400, "#showtooltip" } MACROS[MINE] = { "Mine", 134400, "/say hi" }
+    AutoFeedCharDB.owned = { AutoFeed = true }
+    BAR[170] = { kind = "macro", id = FEED } BAR[171] = { kind = "macro", id = MINE }""")
+YS.BarsNoted()
+lua.execute("MACROS[FEED][3] = '#showtooltip /use item:4540'")
+events._OnEvent(events, "UPDATE_MACROS")
+YS.RememberNow()
+_feed = g.BARSCANS
+lua.execute("MACROS[MINE][3] = '/say hello'")
+events._OnEvent(events, "UPDATE_MACROS")
+YS.RememberNow()
+report(_feed == 0 and g.BARSCANS == 1, f"AutoFeed filling its macro: no reading every button ({_feed}); yours edited: read ({g.BARSCANS})")
+lua.execute("YR_SETUP.ScanBars = KEPT_SB BAR[170], BAR[171] = nil, nil MACROS[FEED], MACROS[MINE] = nil, nil YippSetupDB.remember = KEPT_REMEMBER")
+# A main's macro no class owns (an emote, /sit, /reload, /use of an item or a slot) is made as an account macro, once: the
+# next new character, of any class, finds it and makes none (the owner, 2026-10-21: "macros that aren't class specific
+# can be account macros"). One that casts, shows a spell by name, or commands a pet stays the character's own.
+_any = lua.eval("YR_SETUP.MacroAnyClass")
+_cases = {"/chicken": True, "/Reload": True, "#showtooltip\n/use item:4540": True, "/use 13": True,
+          "/cleartarget\n/targetenemyplayer": True, "#showtooltip Sap\n/cast Pick Pocket": False,
+          "/cast [stealth] Sap; Gouge": False, "/use Hearthstone": False, "/petattack": False, "/castsequence a, b": False}
+_wrong = [b for b, want in _cases.items() if bool(_any(b)) != want]
+report(not _wrong, f"which macros any class can use: emotes, /reload, an item or slot by number - not casts, shown spells, pets ({_wrong})")
+lua.execute("""Fresh() YippSetupCharDB.applied = nil
+    local slots = YippSetupDB.classes.PALADIN.profile.slots
+    KEPT_160, KEPT_161 = slots[160], slots[161]
+    slots[160] = { kind = 'macro', name = 'SIT', icon = 134400, body = '/sit' }
+    slots[161] = { kind = 'macro', name = 'Light', icon = 134400, body = '/cast Holy Light' }""")
+YS.Apply(YS, None, None, SURE)
+for _ in range(80):
+    if g.NextFrame() == 0:
+        break
+_sit, _light = g.BAR[160], g.BAR[161]
+report(_sit is not None and _sit.id <= 120 and _light is not None and _light.id >= 121,
+       f"a new character: /sit made as the account's ({_sit and _sit.id}), the class's macro as its own ({_light and _light.id})")
+lua.execute("""ACCOUNT_KEPT = {} for i = 1, 120 do ACCOUNT_KEPT[i] = MACROS[i] end
+    Fresh() YippSetupCharDB.applied = nil
+    for i, m in pairs(ACCOUNT_KEPT) do MACROS[i] = m end
+    ACCOUNT_BEFORE = 0 for i = 1, 120 do if MACROS[i] then ACCOUNT_BEFORE = ACCOUNT_BEFORE + 1 end end""")
+YS.Apply(YS, None, None, SURE)
+for _ in range(80):
+    if g.NextFrame() == 0:
+        break
+_after = lua.eval("(function() local n = 0 for i = 1, 120 do if MACROS[i] then n = n + 1 end end return n end)()")
+report(_after == g.ACCOUNT_BEFORE and g.BAR[160] is not None and g.BAR[160].id == _sit.id,
+       f"the next new character: the account's /sit found and put on, none made ({g.ACCOUNT_BEFORE} -> {_after})")
+lua.execute("""local slots = YippSetupDB.classes.PALADIN.profile.slots slots[160], slots[161] = KEPT_160, KEPT_161""")
+lua.execute("""C_UI.Reload = KEPT_RELOAD YR_SETUP.ApplyChat = KEPT_APPLYCHAT YR_SETUP.ScanBars = KEPT_SCANBARS POPUP = nil""")
+lua.execute("""C_Timer.After = KEPT_AFTER_JOB YR_SETUP.Print = KEPT_PRINT_JOB
+    YippSetupDB.classes.PALADIN.profile.slots = KEPT_SLOTS_JOB""")
 sys.exit(1 if bad else 0)

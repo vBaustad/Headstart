@@ -3,6 +3,8 @@
     python tools/render.py [page ...]      writes tools/render/<page>.html  (default: a handful of pages)
     python tools/render.py transfer transfer:export transfer:import      the Move settings window, shut and open
     python tools/render.py tour:1 tour:4                                  the tour, at its first and fourth hints
+    RENDER_FULL=1 python tools/render.py swing                             a scrolling page drawn whole, past the window
+    RENDER_OPEN=1 python tools/render.py journey                           every feature's settings opened
 
 The smoke test's fake game is used as far as the point where it opens the window; from there every frame,
 texture and text the addon makes is recorded (parent, size, anchors, colour, words) instead of thrown away.
@@ -227,6 +229,9 @@ def visible(o):
 
 
 def clip_of(o):
+    # RENDER_FULL=1: scrolling pages drawn whole, past the window's bottom - to see every card of a page at once
+    if os.environ.get("RENDER_FULL"):
+        return None
     while o is not None:
         if o.scrollOf is not None:
             return solve(o.scrollOf)
@@ -294,6 +299,15 @@ def draw(objs, title):
                     style += ["background:" + rgba(v, alpha), "border-radius:6px"]
                 elif name.startswith("dot"):
                     style += ["background:" + rgba(v, alpha), "border-radius:50%"]
+                elif name.startswith("shadow"):
+                    style += ["box-shadow:0 3px 12px rgba(0,0,0,%.2f)" % (0.6 * alpha), "background:transparent", "margin:16px",
+                              "width:%.1fpx" % max(0, r - l - 32), "height:%.1fpx" % max(0, t - b - 32)]
+                elif name.startswith("pill") or name.startswith("box_"):
+                    style += ["background:" + rgba(v, alpha), "border-radius:%s" % ("10px" if name.startswith("pill") else "4px")]
+                elif name.startswith("knob"):
+                    style += ["background:" + rgba(v, alpha), "border-radius:50%", "transform:scale(0.73)"]
+                elif name.startswith("tick"):
+                    style += ["color:" + rgba(v, alpha)]
                 elif "art/" in o.tex.replace("\\", "/").lower():
                     style += ["border:1px solid " + rgba(v, alpha), "border-radius:50%", "box-sizing:border-box"]
                 else:
@@ -322,6 +336,8 @@ def draw(objs, title):
     # the picture is the window: moved to the corner, the page as large as it
     box = solve(objs[draw.window]) if draw.window in objs else (0, 0, SCREEN_W, SCREEN_H)
     draw.size = (box[2] - box[0], box[3] - box[1])
+    if os.environ.get("RENDER_FULL"):
+        draw.size = (draw.size[0], 2600)
     return ("<!doctype html><meta charset=utf-8><title>%s</title><style>body{margin:0;background:#2b3a2e;width:%dpx;height:%dpx;"
             "position:relative;overflow:hidden;font-family:'Arial Narrow',Arial,sans-serif;font-stretch:condensed}"
             "#w{position:absolute;left:%.1fpx;top:%.1fpx}.t,.f{position:absolute}</style><div id=w>%s</div>"
@@ -343,6 +359,9 @@ def main(pages):
         sys.stdout = real_stdout
     lua, YR = env["lua"], env["YR"]
     lua.execute(RECORD)
+    # RENDER_OPEN=1: every card's settings open (the page as it is with each feature's settings to be seen)
+    if os.environ.get("RENDER_OPEN"):
+        lua.execute("YippRouteDB.cardsOpen = setmetatable({}, { __index = function() return true end })")
     lua.execute("UIParent.w, UIParent.h = %d, %d" % (SCREEN_W, SCREEN_H))
     out_dir = os.path.join(TOOLS, "render")
     os.makedirs(out_dir, exist_ok=True)

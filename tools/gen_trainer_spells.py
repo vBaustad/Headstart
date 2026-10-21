@@ -86,6 +86,23 @@ def main():
             level = min(level, prev[0])
         out[token][spell] = (level, name, rank, race)
 
+    # Skills a class trainer teaches that are not on a class's own lines: Dual Wield (a rogue at 10, a warrior or a
+    # hunter at 20), Plate Mail (a warrior or a paladin at 40) and Mail (a hunter or a shaman at 40) - the skill's own
+    # spell, at the level the client gives the class the skill (skillraceclassinfo.MinLevel: it has no spelllevels
+    # row, so the query above never sees it). The owner, 2026-10-21: "rogues can train Dual Wield, but it isn't in the
+    # train list" - and so auto-train left it, as not a class spell. (Polearms, the one other skill a class gets after
+    # level 1, is a weapon master's; a shaman's Dual Wield comes with a talent, at no level.)
+    for skill in (118, 293, 413):
+        learn = c.sql(f"""select cast(a.Spell as int), n.Name_lang, cast(a.ClassMask as bigint) from {s}.skilllineability a
+            join {s}.spellname n on n.ID = a.Spell where a.SkillLine = '{skill}' and a.AcquireMethod = '2'""").fetchall()
+        for mask, level in c.sql(f"""select cast(ClassMask as bigint), cast(MinLevel as int) from {s}.skillraceclassinfo
+                where SkillID = '{skill}' and cast(MinLevel as int) > 1""").fetchall():
+            for spell, name, cmask in learn:
+                for cid, token in CLASSES.items():
+                    bit = 1 << (cid - 1)
+                    if mask & bit and (cmask == 0 or cmask & bit):
+                        out.setdefault(token, {})[spell] = (level, name, 0, 0)
+
     # One rank can be two spells in the tables: the spell, and what it does when it goes off (Immolation
     # Trap 13795 / 13797, Lightning Shield 324 / 26364, Holy Nova's heal). The spell is the lower ID in
     # every pair. A rank that is a trait's (Holy Nova rank 1 comes with the talent point) has no trained

@@ -4,7 +4,8 @@
 -- you start with, that is nothing) or Never; and what you keep: "If I can afford it" spells are only
 -- bought while you'd keep a share of the money you came with and the sum you save (YR.TrainerKeep),
 -- and what they left is a button under the trainer's window; "Always" spells whenever the gold is
--- there. And a level: spells taught above it are left for you (upTo).
+-- there. And a level: spells taught above it are left for you (upTo). And the
+-- route's next buy: its price is kept back too (TrainerPlan).
 -- Defaults (data version 2, 2026-10-02): "If I can afford it" and half your money kept (a 2 silver
 -- reserve until 0.10.0-beta7), so a new character never trains itself down to nothing. A class's table from before keeps what it had -
 -- "Always" for every spell left alone, no reserve - because it was stored as "nothing chosen" and a
@@ -200,11 +201,24 @@ local function ClassSpells()
     return mine
 end
 
+-- The route's next buy (Shopping.lua, YR.NextRouteBuy: a weapon at a vendor ahead, not had yet): its price
+-- is kept back too by "If I can afford it" spells, with the sum saved on top, where that is more than they
+-- would leave you anyway. The owner, 2026-10-16: on a Night Elf Rogue in Dolanaar, Gouge was trained and then
+-- there was no money for the Stiletto. "Save for the route's next buy" (trainerRouteBuy), on unless turned
+-- off: it only keeps money back, it never buys.
+function YR.TrainerRouteBuyOn() return YippRouteDB.trainerRouteBuy ~= false end
+
 -- What to buy now, in order: [{ index, name, rank, cost }], what was left for want of gold, and the
--- names of what the trainer offers that is not one of your class's spells (never bought).
+-- names of what the trainer offers that is not one of your class's spells (never bought); and the route's
+-- buy money was kept for, when that is what left them.
 -- all: nothing kept (the trainer window's button: you asked for them)
 function YR.TrainerPlan(money, all)
     local upTo, keep = YR.TrainerUpTo(), all and 0 or YR.TrainerKeep(money)
+    local saving = not all and YR.TrainerRouteBuyOn() and YR.NextRouteBuy and YR.NextRouteBuy() or nil
+    if saving then
+        local floor = saving.price + YR.TrainerSave()
+        if floor > keep then keep = floor else saving = nil end
+    end
     local wants, other, above, class = {}, {}, {}, ClassSpells()
     for i = 1, GetNumTrainerServices() or 0 do
         local name, rank, category = Service(i)
@@ -253,7 +267,7 @@ function YR.TrainerPlan(money, all)
             short[#short + 1] = w
         end
     end
-    return buy, short, other, above
+    return buy, short, other, above, saving
 end
 
 local function Gold(c) return YR.Money(c) end
@@ -340,7 +354,7 @@ local function Train()
     if SetTrainerServiceTypeFilter and GetTrainerServiceTypeFilter and not GetTrainerServiceTypeFilter("available") then
         SetTrainerServiceTypeFilter("available", 1)
     end
-    local buy, short, other, above = YR.TrainerPlan(GetMoney())
+    local buy, short, other, above, saving = YR.TrainerPlan(GetMoney())
     local spent, names = Learn(buy)
     Bar(short)
     if #buy > 0 or #short > 0 or #above > 0 then
@@ -348,16 +362,19 @@ local function Train()
         if #short > 0 then
             local left = {}
             for _, w in ipairs(short) do left[#left + 1] = w.name end
-            msg = msg .. (" Left for the money you keep: %s (Learn them, under the trainer's window)."):format(table.concat(left, ", "))
+            if saving then
+                msg = msg .. (" Left for the %s your route buys next (%s): %s (Learn them, under the trainer's window).")
+                    :format(saving.name, Gold(saving.price), table.concat(left, ", "))
+            else
+                msg = msg .. (" Left for the money you keep: %s (Learn them, under the trainer's window)."):format(table.concat(left, ", "))
+            end
         end
         if #above > 0 then
             msg = msg .. (" Yours to buy (above level %d): %s."):format(YR.TrainerUpTo(), table.concat(above, ", "))
         end
         YR.Print(msg)
-    elseif #other > 0 then
-        -- a weapon master, a riding trainer: nothing here is bought by itself, and it is said why
-        YR.Print("nothing here is one of your class's spells, so nothing is learned by itself: that is yours to buy.")
     end
+    -- (at a weapon master or a riding trainer it said why nothing was bought: at every visit - 2026-10-21)
 end
 
 -- The trainer's window is listened for only while this is on. Coming on (the login, or the setting)

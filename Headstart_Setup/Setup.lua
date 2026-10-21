@@ -8,6 +8,12 @@
 local YR = _G.HeadstartNS
 YR.Setup = YR.Setup or {}
 local YS = YR.Setup
+-- Every action this file puts on the bars goes in Headstart's taint log (YR.TaintNoted, Core.lua): an addon's
+-- hand on the action bars is what can block them in a fight later.
+local function PlaceAction(slot)
+    if YR.TaintNoted then YR.TaintNoted("Character setup put an action on the bars") end
+    return _G.PlaceAction(slot)
+end
 local S = YR.Style
 
 -- A macro's text as the game gives it has a line break at its end that wasn't written: the two lines
@@ -59,7 +65,7 @@ local OPTION_DEFAULTS = {
     macros = true, autofeed = true, items = false,
     clearBars = true, clearMacros = true,
     settings = true, editMode = true, barVisibility = true, guide = true, noAutoPush = true,
-    swap = true, rankUp = true, popup = true, skipIntro = true, chat = true, camera = true, keys = true,
+    swap = true, popup = true, chat = true, camera = true, keys = true,
     graphics = true,
 }
 
@@ -358,6 +364,13 @@ local function Settle()
     local c = Char()
     if not (c and c.iface and c.iface.seen ~= nil and (c.iface.fresh or c.iface.sig == nil)) or InCombatLockdown() then return end
     if not YS.UIRecord(c.iface.name) then return end
+    -- Only the character the interface was saved on keeps a reading of its screen (YS.FollowUI: the one writer). On
+    -- any other the reading was never looked at, and taking it - every key binding, the Edit Mode layout as text,
+    -- the chat windows - was a hitch six seconds into a new character's first login.
+    if select(2, YS.UIRecord(c.iface.name)) ~= YS.PlayerKey() then
+        c.iface.fresh = nil
+        return
+    end
     local ok, ui = pcall(YS.ScanUI, YS)
     if not ok or type(ui) ~= "table" then return end
     if YS.KeepUnapplied then ui = YS.KeepUnapplied(ui, (YS.UIRecord(c.iface.name))) end
@@ -442,6 +455,7 @@ StaticPopupDialogs["YIPPSETUP_UI_REPLACE"] = {
 --- read. The character is on that interface from then on. Saving over one this character isn't on,
 --- or one saved elsewhere since, asks first (sure: asked and answered).
 function YS:SaveInterface(name, sure)
+    if YS.Busy() then YS.Print(YS.WAIT) return end      -- (keys and settings half put on: not what to save)
     name = CleanName(name)
     if name == "" then name = YS.UIName() end
     local c = Char()
@@ -474,6 +488,164 @@ end
 --- show and the camera, each as its switch on Character setup says. No action button and no macro is
 --- touched. The game settings it changes are kept for /ysetup undo; chat windows and the Edit Mode
 --- layout are not something an addon can put back.
+-- ---------------------------------------------------------------------------
+-- An apply's work, a little each frame (the owner, 2026-10-20: setting a new character up by itself was "very
+-- laggy"; TurboFace's setup, which is smooth, puts a couple of buttons on a frame). Every button put on, macro
+-- made, key set and game setting changed has the game tell every action button - and every bar addon - about it:
+-- all of it in one frame was the freeze. A job is a list of steps, each run in a frame of its own; a step that
+-- returns false (not done yet) runs again the next frame, so the buttons go on a few a frame. A fight pauses it
+-- (nothing goes on the bars in one) and it goes on as the fight ends.
+--   now: every step at once, in this frame (the planner's few buttons, a profile switch: their callers want the
+--   answer straight away).
+-- What would look at the bars while a job is half done - saving them into the profile, swapping a question mark
+-- for its spell - waits for it to end (YS.Busy, and `late` below).
+-- ---------------------------------------------------------------------------
+local CLEAR_BATCH, PLACE_BATCH = 12, 3     -- buttons a frame: emptied; put on (or macros made)
+local busy                  -- the job running, if one is
+local late = {}             -- [what] = true: put off while a job ran, done as it ends
+local resume                -- (a frame that hears the fight end)
+
+-- Under the login's loading screen, and under the intro, nothing is seen: there the steps go on in one go, a slice
+-- of SLICE milliseconds a frame, and the setup of a new character is done before the player can move (the owner,
+-- 2026-10-21: "it still lagged and took time ... start while the player is in the loading screen?"). After, a few
+-- buttons a frame as before. A step may also wait (it returns "wait"): at a login the game puts its own chat
+-- windows, key bindings and Edit Mode layouts on a moment in, over anything put on before them.
+local SLICE = 150
+local function Now() return GetTime and GetTime() or 0 end
+local Clock = debugprofilestop or function() return Now() * 1000 end
+local loading = IsLoggedIn ~= nil and not IsLoggedIn()         -- (loaded as the game logs in: its loading screen is up)
+local loadingSince, shownAt = Now(), nil
+local ready = {}                                                -- [what] = true once the game has put its own on
+local readyAt = {}                                              -- [what] = when (GetTime), for /ysetup debug
+local function Covered()
+    if loading and Now() - loadingSince < 60 then return true end      -- (a minute: never told it went)
+    return InCinematic ~= nil and InCinematic() and true or false
+end
+YS.Covered = Covered
+--- Whether the game has put its own on at this login ("chat": its chat windows; "keys": your key bindings; nil: what
+--- has no event to tell it, as Edit Mode's layouts in SetupUI.lua). Three seconds past the loading screen it is taken
+--- as so, told or not.
+function YS.Ready(what)
+    if what and ready[what] then return true end
+    if loading then return false end
+    return shownAt == nil or Now() - shownAt > 3
+end
+
+local function Run(job)
+    if job.running then job.again = true return end     -- (a timer that runs at once, as the tests' does: loops here, no deeper)
+    job.running = true
+    job.since = Clock()
+    job.frames = (job.frames or 0) + 1
+    repeat
+        job.again = false
+        if busy ~= job then break end
+        if not job.now and InCombatLockdown() then
+            if not job.paused then
+                job.paused = true
+                YS.Print("a fight: the rest of the setup goes on as it ends.")
+            end
+            resume = resume or CreateFrame("Frame")
+            resume:RegisterEvent("PLAYER_REGEN_ENABLED")
+            resume:SetScript("OnEvent", function(self) self:UnregisterAllEvents() if busy then Run(busy) end end)
+            break
+        end
+        job.paused = nil
+        -- something of yours on the cursor (a drag on the way): a button put on or taken off now would swap with it,
+        -- and what you held would land on the bars - the next step waits for the drop
+        if not job.now and GetCursorInfo and GetCursorInfo() then
+            C_Timer.After(0.25, function() Run(job) end)
+            break
+        end
+        local step = job.steps[job.i]
+        if not step then
+            busy = nil
+            -- the bars as just put on are what the next look compares with: a look a few seconds into play (the
+            -- buttons going on said "changed" sixty times) found nothing changed, and read nothing
+            if job.login and YS.BarsNoted then YS.BarsNoted() end
+            -- a new character's: how long it took, kept for /ysetup debug (numbers from the game, should it stutter) -
+            -- and when: from its start, its end, the loading screen going, and the game's own chat and keys coming
+            if job.login and type(YippSetupCharDB) == "table" then
+                local most, total = {}, 0
+                for i, ms in pairs(job.took or {}) do total = total + ms most[#most + 1] = { i, ms } end
+                table.sort(most, function(a, b) return a[2] > b[2] end)
+                local top = {}
+                for k = 1, math.min(5, #most) do top[k] = { step = most[k][1], ms = math.floor(most[k][2] + 0.5) } end
+                local function At(t) return t and math.floor((t - job.t0) * 10 + 0.5) / 10 or nil end
+                YippSetupCharDB.lastSetup = { ms = math.floor(total + 0.5), frames = job.frames, steps = #job.steps,
+                    covered = Covered(), loading = loading, slowest = top, endAt = At(Now()), screenAt = At(shownAt),
+                    chatAt = At(readyAt.chat), keysAt = At(readyAt.keys), waited = job.waited and math.floor(job.waited * 10 + 0.5) / 10,
+                    reload = job.login and YS.reloadDue and "later" or nil }
+                YS.reloadDue = nil
+            end
+            if job.whenDone then job.whenDone() end
+            if job.finish then job.finish() end
+            if late.upgrade then late.upgrade = nil YS:Upgrade() end
+            if late.remember then late.remember = nil if YS.RememberNow then YS.RememberNow() end end
+            for what, later in pairs(late) do
+                if type(later) == "function" then late[what] = nil later() end
+            end
+            break
+        end
+        local t0 = Clock()
+        local ok, done = pcall(step, job)
+        job.took = job.took or {}
+        job.took[job.i] = (job.took[job.i] or 0) + Clock() - t0
+        if not ok then
+            busy, job.running = nil, false
+            if job.whenDone then job.whenDone() end
+            YS.Print("setting up stopped on an error (/ysetup undo puts your bars back as they were).")
+            error(done, 0)
+        end
+        if done == "wait" then
+            job.waitFrom = job.waitFrom or Now()
+            C_Timer.After(0.1, function() Run(job) end)     -- (what it needs isn't there yet: looked at again shortly)
+        else
+            if job.waitFrom then
+                job.waited, job.waitFrom = (job.waited or 0) + Now() - job.waitFrom, nil
+            end
+            if done then job.i = job.i + 1 end
+            if job.now or (Covered() and Clock() - job.since < SLICE) then job.again = true
+            else C_Timer.After(0, function() Run(job) end) end
+        end
+    until not job.again
+    job.running = false
+end
+
+--- Starts a job: steps (functions taking the job; true when done), now (all of them in this frame), finish
+--- (called once the last is done), login (a new character's, set up as it logs in: the intro waits for it). False
+--- while another job runs.
+local function Start(steps, now, finish, login)
+    if busy then return false end
+    busy = { steps = steps, i = 1, now = now, finish = finish, login = login, t0 = Now() }
+    Run(busy)
+    return true
+end
+
+-- The intro as cover: Headstart's skip of a new character's intro (Cinematic.lua) asks here before it ends it. While
+-- the setup begun at the login still runs, the intro plays on - the interface is hidden under it, and the work goes
+-- in large slices - and it is ended as the setup ends: at most HOLD seconds on.
+local HOLD = 6
+function YR.HoldIntro(stop)
+    local job = busy
+    if not (job and job.login) then return false end
+    local once = false
+    local function Go() if not once then once = true stop() end end
+    job.whenDone = Go
+    C_Timer.After(HOLD, Go)
+    return true
+end
+--- A job is putting something on. what: "upgrade" or "remember" - put off until it ends; or any name with later,
+--- a function done as it ends (a spec's profile switch).
+function YS.Busy(what, later)
+    if busy and what then late[what] = later or true end
+    return busy ~= nil
+end
+
+-- (A setup that ends wanting a reload asks for it. Made by itself under the loading screen for an hour on 2026-10-21,
+-- the game blocked it: "AddOn 'Headstart_Setup' tried to call the protected function 'reload()'" - C_UI.Reload wants a
+-- click, though the client's API documentation marks it as nothing.)
+YS.WAIT = "still putting your setup on - a moment."
+
 function YS:ApplyInterface()
     if InCombatLockdown() then YS.Print("not in combat.") return end
     local ui = YS:SharedUI()
@@ -484,6 +656,8 @@ function YS:ApplyInterface()
     -- its own copy to undo, apart from the bars' (an older Set up's bars are not what this undoes).
     -- One copy for however many times it is applied: a new one each time recorded what the last apply
     -- had already made of things, and what you had before the first was gone.
+    -- (a job running: refused before anything is kept - an empty copy newer than the bars' took the next undo)
+    if busy then YS.Print("already putting a profile on: a moment.") return end
     local kept = YippSetupCharDB.uiBackup
     if type(kept) ~= "table" then
         kept = { at = time() }
@@ -492,8 +666,10 @@ function YS:ApplyInterface()
     kept.last = time()
     YS.KeepFirst()                  -- (this character as it was, if nothing of Headstart's was looked at here before)
     YS.UIApplied()
-    YS:ApplyUI(ui, YS:Options())
-    if YR.RefreshWindow then YR:RefreshWindow() end
+    -- a frame or more each: game settings, graphics and sound, the bars that show, Edit Mode, chat, your keys
+    Start(YS.UISteps(ui, YS:Options()), false, function()
+        if YR.RefreshWindow then YR:RefreshWindow() end
+    end)
     return true
 end
 
@@ -779,6 +955,7 @@ function YS:ScanBars()
 end
 
 function YS:Scan()
+    if busy then Print(YS.WAIT) return end          -- (half put on: not what the profile is)
     if YippSetupCharDB then YippSetupCharDB.hold = nil end          -- (said by hand: these bars are the profile)
     local n, kept = YS:ScanBars()
     -- the bars are this class's; the interface is the account's, and only the character it comes from
@@ -938,6 +1115,29 @@ function MacroFor(e)
 end
 YS.MacroFor = MacroFor      -- for tests
 
+-- A macro any character can use, whatever its class: it casts nothing by name, shows no spell and commands no pet - an
+-- emote, /sit, /reload, /target, /use of an item or a gear slot. Made as an account macro, once: every new character
+-- after, of any class, finds it there and makes none (the owner, 2026-10-21: "macros that aren't class specific can be
+-- account macros" - a new character made eleven, each a character's own copy). One that casts or shows by a name -
+-- which could be an item, but might be a spell - stays the character's own, as before.
+local CLASS_LINES = { "^/cast", "^/castsequence", "^/castrandom", "^/userandom", "^/pet", "^/cancelform", "^/cancelaura" }
+local function AnyClass(body)
+    if type(body) ~= "string" or body == "" then return false end
+    for line in (body .. "\n"):gmatch("([^\n]*)\n") do
+        local l = strtrim(line):lower()
+        for _, p in ipairs(CLASS_LINES) do if l:find(p) then return false end end
+        -- what /use and #showtooltip name, conditions taken off: nothing, an item by its ID, or a gear slot
+        local verb, what = l:match("^(/use)%s+(.*)$")
+        if not verb then verb, what = l:match("^(#show%a*)%s+(.*)$") end
+        if verb then
+            what = strtrim((what:gsub("%b[]", "")))
+            if not (what == "" or what:find("^item:%d+$") or what:find("^%d+$")) then return false end
+        end
+    end
+    return true
+end
+YS.MacroAnyClass = AnyClass   -- for tests
+
 --- The spell a macro entry stands for, as a layout's entry, when the macro is one Headstart made for
 --- a spell of your class (see ReadMacroSlot); nil for a macro of your own.
 function OwnSpellOf(e)
@@ -989,6 +1189,14 @@ local function PlaceSpell(slot, id)
     pickup(id)
     PlaceAction(slot)
     ClearCursor()
+end
+-- Whether a slot holds that very action already (kind and ID as the game says them): left as it is, no move through the
+-- cursor - each pick-up and drop shows and hides the empty-slot grid on every bar. (A macro by its index only: on some
+-- clients the game names the spell a macro shows instead, and then it is put on again, as before.)
+local function Holds(slot, kind, id)
+    if not HasAction(slot) then return false end
+    local k, i = GetActionInfo(slot)
+    return k == kind and i == id
 end
 
 -- A profession name can be several spells: its ranks, and Forever's hidden same-named ones (a purple-gem
@@ -1131,7 +1339,7 @@ end
 --- its buttons - the spell itself goes in where you know it, else the button is left empty for it -
 --- and is deleted. A macro of your own is never touched. Returns how many were deleted.
 function YS.TidyPlaceholders()
-    if InCombatLockdown() then return 0 end
+    if InCombatLockdown() or busy then return 0 end
     local o = YS:Options()
     local mode = YS.SpellButtons(o)
     local _, class = UnitClass("player")
@@ -1244,6 +1452,7 @@ function YS:MacrosNeeded(p, o, class)
             local body
             if e.kind == "macro" then
                 body = select(3, MacroFor(e))
+                if AnyClass(body) then body = nil end      -- (made as an account macro, not one of the character's)
             elseif e.kind == "spell" and not e.prof then
                 local mouseover = MOUSEOVER_SET()[REPLACE[e.name] or e.name]
                 -- (a talent's spell you haven't got waits as nothing: see the top of the file)
@@ -1414,10 +1623,17 @@ end
 --- in play): { [slot] = true } - nothing but these slots is touched: the bars aren't cleared, no macro
 --- of yours is deleted, the interface is left alone, and one of these slots with nothing saved for it
 --- is emptied. how: { sure = asked and answered, barsOnly = the bars and Headstart's own question
---- marks, but none of your macros deleted and no interface, chat or settings changed }.
+--- marks, but none of your macros deleted and no interface, chat or settings changed, done = called with
+--- full once it is all on }.
+---   Put on a few buttons a frame (the job runner, above YS:ApplyInterface): returns true as it starts - with
+---   only, all of it at once, and full (the name of a macro there was no room for) with it.
 function YS:Apply(force, only, how)
     if InCombatLockdown() then
         Print("can't change action bars in combat.")
+        return
+    end
+    if busy then
+        Print("already putting a profile on: a moment.")
         return
     end
     how = how or {}
@@ -1470,25 +1686,53 @@ function YS:Apply(force, only, how)
     -- leaves the interface alone - Bars only, after Apply interface - must not throw that copy away:
     -- it is what /ysetup undo was promised to put back)
     if not only and not how.barsOnly then YippSetupCharDB.uiBackup = nil end
-    if o.clearBars and not only then ClearBars() end
     -- which slots hold a spell we put there: a slot you empty yourself afterwards is left empty
     local placedSet = only and YippSetupCharDB.placed or {}
     YippSetupCharDB.placed = placedSet
     local autofeed = AutoFeedNames()
     local again = YippSetupCharDB.applied ~= nil
-    local removed = 0
     -- A plan made on this very character is put on a character that has macros of its own: only the
     -- question-mark macros Headstart made go, never yours. (A layout from another character is for a
     -- new one, whose first Set up clears the character's macros to make room.)
     local own = p.planned == true and type(p.from) == "string" and p.from:sub(1, #PlayerKey()) == PlayerKey()
+    local levels = YS.SPELL_LEVELS[class] or {}
+    -- s: the apply as it goes, each step taking it up where the last frame left it. macros: MacroIndex(), read
+    -- again after each macro made.
+    local s = { clear = 1, slot = 1, removed = 0, made = 0, placed = 0, askedAutoFeed = 0, moves = 0, kept = 0,
+        msMoves = 0, msMacros = 0, msFeed = 0 }
+    local steps = {}
+    -- the bars emptied, CLEAR_BATCH buttons a frame - but not a slot the profile fills: dropped onto, what is there goes by
+    -- itself (it was emptied, then filled - two moves through the cursor for one). One it means to fill and can't (a
+    -- spell not learned yet, the macro list full) is emptied as it gets there, below.
+    if o.clearBars and not only then
+        steps[#steps + 1] = function()
+            local n = 0
+            while s.clear <= MAX_SLOT and n < CLEAR_BATCH do
+                local e = p.slots[s.clear]
+                if HasAction(s.clear) and not (e and Wanted(e, levels, autofeed, o)) then
+                    PickupAction(s.clear)
+                    ClearCursor()
+                    n, s.moves = n + 1, s.moves + 1
+                end
+                s.clear = s.clear + 1
+            end
+            return s.clear > MAX_SLOT
+        end
+    end
     -- (with `only`, the question marks stay too: the ones on the slots left alone are still in use)
     if o.clearMacros and not only then
-        removed = (again or own or how.barsOnly) and ClearPlaceholders() or ClearCharacterMacros(AutoFeedOwned())
+        steps[#steps + 1] = function()
+            s.removed = (again or own or how.barsOnly) and ClearPlaceholders() or ClearCharacterMacros(AutoFeedOwned())
+            return true
+        end
     end
-    local levels = YS.SPELL_LEVELS[class] or {}
-    local made, placed, full, noAutoFeed, askedAutoFeed = 0, 0, nil, nil, 0
-    local macros      -- MacroIndex(), read again after each macro made
-    for slot = 1, MAX_SLOT do
+    -- each slot, PLACE_BATCH buttons put on (or macros made) a frame
+    steps[#steps + 1] = function()
+      local n = 0
+      s.macros = nil            -- (read again each frame: a macro made or deleted in between moves the indexes)
+      while s.slot <= MAX_SLOT and n < PLACE_BATCH do
+        local slot = s.slot
+        s.slot = slot + 1
         local e = p.slots[slot]
         if not Wanted(e, levels, autofeed, o) then e = nil end
         if only and not only[slot] then
@@ -1496,20 +1740,31 @@ function YS:Apply(force, only, how)
         elseif only and HasAction(slot) then
             PickupAction(slot)      -- one of them: what was there goes, then what's saved (if anything) goes in
             ClearCursor()
+            n = n + 1
         end
         if not only or only[slot] then placedSet[slot] = nil end
-        local idx
+        local idx, put
         local spellID = e and (levels[e.name] or YS.RACIALS[e.name] or e.prof or e.general) and RealSpell(e)
         if spellID then
-            PlaceSpell(slot, spellID)
-            placedSet[slot] = true
-            placed = placed + 1
+            if Holds(slot, "spell", spellID) then s.kept = s.kept + 1
+            else
+                local t0 = Clock()
+                PlaceSpell(slot, spellID)
+                n, s.moves, s.msMoves = n + 1, s.moves + 1, s.msMoves + Clock() - t0
+            end
+            placedSet[slot], put = true, true
+            s.placed = s.placed + 1
         elseif e and e.kind == "item" then
-            local pickup = (C_Item and C_Item.PickupItem) or PickupItem
-            pickup(e.id)
-            PlaceAction(slot)
-            ClearCursor()
-            placed = placed + 1
+            if Holds(slot, "item", e.id) then s.kept = s.kept + 1
+            else
+                local t0 = Clock()
+                local pickup = (C_Item and C_Item.PickupItem) or PickupItem
+                pickup(e.id)
+                PlaceAction(slot)
+                ClearCursor()
+                n, s.moves, s.msMoves = n + 1, s.moves + 1, s.msMoves + Clock() - t0
+            end
+            s.placed, put = s.placed + 1, true
         elseif e and e.kind == "macro" and autofeed[e.name] then
             -- AutoFeed's macros are never copied: a copy is a macro AutoFeed doesn't own, so it would
             -- never fill it. One AutoFeed already made is placed; otherwise AutoFeed is asked to make it.
@@ -1517,11 +1772,13 @@ function YS:Apply(force, only, how)
             if not (own and own > 0) then
                 local create = AutoFeedMaker()
                 local ok, res = false, nil
+                local t0 = Clock()
                 if create then ok, res = pcall(create, e.name) end
+                s.msFeed = s.msFeed + Clock() - t0
                 own = ok and res or nil
-                if own then askedAutoFeed, macros = askedAutoFeed + 1, nil end
+                if own then s.askedAutoFeed, s.macros = s.askedAutoFeed + 1, nil end
             end
-            if own and own > 0 then idx = own else noAutoFeed = e.name end
+            if own and own > 0 then idx = own else s.noAutoFeed = e.name end
         -- a layout saved by an older version can still hold items and non-class spells
         -- a spell's macro: in the two macro modes, and always for a mouseover spell (that IS a macro)
         elseif e and (e.kind == "macro" or (e.kind == "spell" and not e.prof
@@ -1530,70 +1787,113 @@ function YS:Apply(force, only, how)
                 -- (a talent's spell you haven't got waits as nothing: see the top of the file)
                 and (not Talent(e.name) or KnownSpellID(REPLACE[e.name] or e.name)))) then
             local name, icon, body = MacroFor(e)
-            macros = macros or MacroIndex()
-            idx = macros[body]
+            s.macros = s.macros or MacroIndex()
+            idx = s.macros[body]
             if not idx then
-                local ok, res = pcall(CreateMacro, name, icon, body, true)   -- per-character
+                local t0 = Clock()
+                local ok, res = false, nil
+                if e.kind == "macro" and AnyClass(body) then
+                    ok, res = pcall(CreateMacro, name, icon, body, false)      -- the account's (full: below)
+                    if ok and res then s.account = (s.account or 0) + 1 end
+                end
+                if not (ok and res) then ok, res = pcall(CreateMacro, name, icon, body, true) end   -- per-character
+                s.msMacros = s.msMacros + Clock() - t0
                 if ok and res then
-                    idx, made = res, made + 1
-                    macros = nil      -- character macros are kept sorted: their indexes just moved
+                    idx, s.made, n = res, s.made + 1, n + 1
+                    s.macros = nil      -- character macros are kept sorted: their indexes just moved
                 else
-                    full = name
+                    s.full = name
+                    s.slot = MAX_SLOT + 1
+                    -- (what the profile meant to fill from here on was left to be dropped onto, not emptied: emptied now)
+                    if o.clearBars and not only then
+                        for rest = slot, MAX_SLOT do
+                            if HasAction(rest) then PickupAction(rest) ClearCursor() s.moves = s.moves + 1 end
+                        end
+                    end
                     break
                 end
             end
         end
         if idx then
-            PickupMacro(idx)
-            PlaceAction(slot)
+            if Holds(slot, "macro", idx) then s.kept = s.kept + 1
+            else
+                local t0 = Clock()
+                PickupMacro(idx)
+                PlaceAction(slot)
+                ClearCursor()
+                n, s.moves, s.msMoves = n + 1, s.moves + 1, s.msMoves + Clock() - t0
+            end
+            s.placed, put = s.placed + 1, true
+        end
+        -- meant to be filled and it couldn't be (not emptied above): emptied now, as every slot was before
+        if not put and not only and o.clearBars and HasAction(slot) then
+            PickupAction(slot)
             ClearCursor()
-            placed = placed + 1
+            n, s.moves = n + 1, s.moves + 1
+        end
+      end
+      return s.slot > MAX_SLOT
+    end
+    steps[#steps + 1] = function()
+        local full = s.full
+        YippSetupCharDB.applied = p.scanned
+        if not only then YS.ChoicesApplied() end
+        -- the layout as it went on, kept for this character: spells learned later go by it, whatever
+        -- another character of the class saves afterwards
+        YippSetupCharDB.layout = Copy(p.slots)
+        Print(("placed %d buttons from %s (%d new macros%s, %d %s removed).")
+            :format(s.placed, p.from, s.made, (s.account or 0) > 0 and (", " .. s.account .. " of them the account's, for every character") or "",
+                s.removed, again and "unused question-mark macros" or "old character macros"))
+        if full then
+            Print(("stopped at '%s': your character macro slots are full (%d)."):format(full, Constants.MacroConsts.MAX_CHARACTER_MACROS))
+        end
+        if s.askedAutoFeed > 0 then
+            Print(("AutoFeed made %d of its macros for this character; it keeps them filled."):format(s.askedAutoFeed))
+        end
+        if s.noAutoFeed then
+            Print(AutoFeedMaker()
+                and ("AutoFeed couldn't make '%s' (macro slots full, or another macro has that name), so that slot is empty."):format(s.noAutoFeed)
+                or ("'%s' is AutoFeed's macro and AutoFeed isn't loaded, so that slot is empty."):format(s.noAutoFeed))
+        end
+        -- The planner's apply and "Bars only" stop here: no game setting, Edit Mode, chat window, camera
+        -- or RestedXP guide is touched on a character in play.
+        -- Blizzard's own placing of new spells is stopped by every apply, the bars-only ones too: it stayed
+        -- on until the next login there, and each spell trained in that first session was placed twice.
+        if o.noAutoPush and not NoAutoPush() and not (only or how.barsOnly) then
+            Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
+        end
+        YippSetupCharDB.hold = nil
+        if full then YS.Hold("the macro list was full, so not every button is on") end
+        -- (for /ysetup debug: what a new character's bars took)
+        if how.login then
+            local function Ms(v) return math.floor(v + 0.5) end
+            YippSetupCharDB.lastBars = { placed = s.placed, kept = s.kept, moves = s.moves, made = s.made, account = s.account,
+                msMoves = Ms(s.msMoves), msMacros = Ms(s.msMacros), msFeed = Ms(s.msFeed) }
+        end
+        if not (only or how.barsOnly) then YS.UIApplied() end
+        return true
+    end
+    -- then the interface, a frame or more each part (SetupUI.lua, YS.UISteps)
+    if not (only or how.barsOnly) then
+        for _, step in ipairs(YS.UISteps(YS:SharedUI(), o, how.login)) do steps[#steps + 1] = step end
+        steps[#steps + 1] = function()
+            -- the copy kept for good was taken before the interface went on: the game settings and keys that
+            -- changed are part of what "as it was before Headstart" means (undo first put back none of them)
+            local c = YippSetupCharDB
+            if type(c.first) == "table" and type(c.backup) == "table" and c.first.at == c.backup.at then
+                if c.first.cvars == nil and c.backup.cvars then c.first.cvars = Copy(c.backup.cvars) end
+                if c.first.keys == nil and c.backup.keys then c.first.keys = Copy(c.backup.keys) end
+            end
+            return true
         end
     end
-    YippSetupCharDB.applied = p.scanned
-    if not only then YS.ChoicesApplied() end
-    -- the layout as it went on, kept for this character: spells learned later go by it, whatever
-    -- another character of the class saves afterwards
-    YippSetupCharDB.layout = Copy(p.slots)
-    Print(("placed %d buttons from %s (%d new macros, %d %s removed).")
-        :format(placed, p.from, made, removed, again and "unused question-mark macros" or "old character macros"))
-    if full then
-        Print(("stopped at '%s': your character macro slots are full (%d)."):format(full, Constants.MacroConsts.MAX_CHARACTER_MACROS))
-    end
-    if askedAutoFeed > 0 then
-        Print(("AutoFeed made %d of its macros for this character; it keeps them filled."):format(askedAutoFeed))
-    end
-    if noAutoFeed then
-        Print(AutoFeedMaker()
-            and ("AutoFeed couldn't make '%s' (macro slots full, or another macro has that name), so that slot is empty."):format(noAutoFeed)
-            or ("'%s' is AutoFeed's macro and AutoFeed isn't loaded, so that slot is empty."):format(noAutoFeed))
-    end
-    -- The planner's apply and "Bars only" stop here: no game setting, Edit Mode, chat window, camera
-    -- or RestedXP guide is touched on a character in play.
-    -- Blizzard's own placing of new spells is stopped by every apply, the bars-only ones too: it stayed
-    -- on until the next login there, and each spell trained in that first session was placed twice.
-    if o.noAutoPush and not NoAutoPush() and not (only or how.barsOnly) then
-        Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
-    end
-    YippSetupCharDB.hold = nil
-    if full then YS.Hold("the macro list was full, so not every button is on") end
-    -- Headstart's window says where this character stands ("Not on this character yet"): told now, as
-    -- the bars went on - not only when Apply was pressed, which was before its question was answered
-    if only or how.barsOnly then
+    -- Headstart's window says where this character stands ("Not on this character yet"): told as the bars
+    -- are on - not only when Apply was pressed, which was before its question was answered
+    Start(steps, only ~= nil, function()
         if YR.RefreshWindow then YR:RefreshWindow() end
-        return true, full
-    end
-    YS.UIApplied()
-    YS:ApplyUI(YS:SharedUI(), o)
-    -- the copy kept for good was taken before the interface went on: the game settings and keys that
-    -- changed are part of what "as it was before Headstart" means (undo first put back none of them)
-    local c = YippSetupCharDB
-    if type(c.first) == "table" and type(c.backup) == "table" and c.first.at == c.backup.at then
-        if c.first.cvars == nil and c.backup.cvars then c.first.cvars = Copy(c.backup.cvars) end
-        if c.first.keys == nil and c.backup.keys then c.first.keys = Copy(c.backup.keys) end
-    end
-    if YR.RefreshWindow then YR:RefreshWindow() end
-    return true, full
+        if how.done then how.done(s.full) end
+    end, how.login)
+    return true, s.full
 end
 
 --- /ysetup undo: the bars and this character's macros as they were before the last change Headstart
@@ -1619,6 +1919,7 @@ YS.PutBackCVars = PutBack
 
 function YS:Undo(first, bars)
     if InCombatLockdown() then Print("can't change action bars in combat.") return end
+    if busy then Print(YS.WAIT) return end          -- (the job would go on putting buttons over what comes back)
     -- "Apply interface" was the last thing done: that alone is undone, and the bars stay as they are
     -- (bars: the bars are what is asked for - a switch of profile taking itself back)
     local uiOnly = not first and not bars and YippSetupCharDB.uiBackup
@@ -1734,6 +2035,7 @@ end
 --- false where it couldn't (a fight; the macros to make again don't fit): then nothing was changed.
 function YS.PutBackEverything()
     if InCombatLockdown() then Print("can't put things back in a fight.") return false end
+    if busy then Print(YS.WAIT) return false end
     local c = YippSetupCharDB
     local first = type(c) == "table" and c.first
     -- (an apply, the planner, a switch of profile: each kept an undo step, or left the character set up)
@@ -1776,6 +2078,7 @@ end
 -- Only on a character that was set up, and never in combat (it waits for combat to end).
 local waiting = false
 function YS:Upgrade()
+    if YS.Busy("upgrade") then return end           -- (a job putting bars on: once it is done)
     local o = YS:Options()
     if not (YippSetupCharDB.applied and o.swap) then return end
     -- the layout as it went on this character (kept since; before that, the class's saved layout)
@@ -2038,18 +2341,76 @@ function YS:Toggle()
     if window:IsShown() then window:Hide() else window:Show() self:Refresh() end
 end
 
+-- Automatic setup (YippSetupDB.autoSetup - off until turned on: it changes a character's bars, macros and
+-- interface unasked): a new character's first login puts the class's saved bars and the saved interface on by
+-- itself, as Apply both does, without the window (the owner, 2026-10-20: "a setting for automatic quick setup -
+-- everything set up at once on a new character without pressing Apply; small checks that the layout and the class
+-- profile exist"). First, and instead:
+--   no bars saved for this class: nothing put on - the window opens, as without this (to plan bars, or put the
+--   interface on alone);
+--   no interface saved: the bars alone, and chat says so;
+--   a fight: once it is over;
+--   one that would take something off (more than a new character's own buttons, a macro of its own): asked first,
+--   as Apply asks.
+-- No reload is asked at the end: everything works without one, and the player reloads when it suits them (the game
+-- blocks one an addon makes by itself). The summary line says so.
+local function AutoSetup(login)
+    login = login == true
+    local _, class = UnitClass("player")
+    local p = YS:Profile()
+    if not p then
+        Print(("automatic setup: no bars saved for %s yet - Plan bars here, or Save bars on a %s you have."):format(
+            tostring(class):lower(), tostring(class):lower()))
+        YS:Toggle()
+        return
+    end
+    if InCombatLockdown() then
+        C_Timer.After(5, AutoSetup)
+        return
+    end
+    local ui = YS:SharedUI()
+    local from = p.planned and "your plan" or tostring(p.from or "your main")
+    if not ui then
+        if YS:Apply(nil, nil, { barsOnly = true, login = login, done = function()
+            Print(("automatic setup: the %s bars and macros from %s put on. No interface is saved yet - Save interface on"
+                .. " your main to bring its keys, Edit Mode and settings too."):format(tostring(class):lower(), from))
+        end }) then
+            YippSetupCharDB.seen = CharacterID() or true
+        end
+        return
+    end
+    if YS:Apply(nil, nil, { login = login, done = function()
+        Print(("automatic setup: the %s bars and macros from %s, and the interface %s, put on."):format(
+            tostring(class):lower(), from, tostring(YS.UIName())))
+    end }) then
+        YippSetupCharDB.seen = CharacterID() or true
+        YippSetupCharDB.uiApplied = CharacterID() or true
+    end
+end
+YS.AutoSetup = AutoSetup
+
 -- A new character logs in to the intro cinematic, which hides UIParent: wait until it's over.
 -- "Seen" is kept per character GUID: a deleted character's saved variables survive, so a new
 -- character with the same name would otherwise inherit it.
-local function FirstTimeHere()
+-- What a new character is due: "auto" (set up by itself), "window" (the window offered), or nil.
+local function Due()
     local id = CharacterID()
-    if not id or YippSetupCharDB.seen == id or (window and window:IsShown()) or not YS:Options().popup then return end
+    if not id or YippSetupCharDB.seen == id or (window and window:IsShown()) then return nil end
     -- for a new character: one already in play isn't offered a layout over its own (it's in Settings)
-    if (UnitLevel("player") or 1) > NEW_LEVEL then return end
+    if (UnitLevel("player") or 1) > NEW_LEVEL then return nil end
+    if YippSetupDB.autoSetup == true and YippSetupCharDB.applied == nil then return "auto" end
+    return YS:Options().popup and "window" or nil
+end
+local function FirstTimeHere()
+    local due = Due()
+    if not due then return end
+    local auto = due == "auto"
     if InCinematic() or not UIParent:IsShown() then
         C_Timer.After(2, FirstTimeHere)
         return
     end
+    -- (a second after the intro: not in the same moment as the game and every addon finishing their login)
+    if auto then return C_Timer.After(1, AutoSetup) end
     YS:Toggle()
 end
 
@@ -2071,15 +2432,17 @@ end
 YS.UICatchUp = ChangedElsewhere
 
 -- The intro cinematic (or movie) a new character logs in to: cancelled at once while level 1, when
--- Headstart's Skip cinematics is on (Cinematic.lua). It can start before we load, so the first login
+-- Headstart's Skip intro cinematic is on (Cinematic.lua). It can start before we load, so the first login
 -- checks for one running too. (It had a switch of its own, skipIntro, beside that one: turning Skip
 -- cinematics off left this one skipping the opening flight. That option is no longer read.)
 local function SkipIntro()
     if UnitLevel("player") > 1 or not YippSetupDB then return end
     if YR.SkipsCinematics and not YR.SkipsCinematics() then return end
     if InCinematic and InCinematic() then
-        -- (the game's own function: seen to end the opening flight, 2026-10-13. Blizzard's frame code is not called from here.)
-        if StopCinematic then StopCinematic() end
+        -- (the game's own function: seen to end the opening flight, 2026-10-13. Blizzard's frame code is not called
+        -- from here.) Through Headstart's Skip intro cinematic, which waits for the login's loading screen to be gone:
+        -- ended under it, the world loaded again behind a second one.
+        if YR.SkipCinematicSoon then YR.SkipCinematicSoon() elseif StopCinematic then StopCinematic() end
     end
     if MovieFrame and MovieFrame:IsShown() then
         MovieFrame:StopMovie()
@@ -2119,6 +2482,33 @@ end
 function YS:Debug()
     local _, class = UnitClass("player")
     local p, o = YS:Profile(), YS:Options()
+    local t = YippSetupCharDB and YippSetupCharDB.lastSetup
+    if type(t) == "table" then
+        local slow = {}
+        for _, e in ipairs(t.slowest or {}) do slow[#slow + 1] = ("step %d %d ms"):format(e.step or 0, e.ms or 0) end
+        Print(("debug: this character's setup at its login: %d ms of work over %d frames, %d steps; ended %s. Slowest: %s."):format(
+            t.ms or 0, t.frames or 0, t.steps or 0, t.loading and "under the loading screen" or (t.covered and "under the intro"
+            or "in view"), #slow > 0 and table.concat(slow, ", ") or "-"))
+        local b = YippSetupCharDB.lastBars
+        if type(b) == "table" then
+            Print(("debug: the bars: %d buttons on, %d of them already right (left as they were); %d moves through the cursor"
+                .. " (%d ms); %d macros made, %d of them the account's (%d ms), AutoFeed's (%d ms)."):format(b.placed or 0,
+                b.kept or 0, b.moves or 0, b.msMoves or 0, b.made or 0, b.account or 0, b.msMacros or 0, b.msFeed or 0))
+        end
+        local r = YippSetupCharDB.lastRead
+        if type(r) == "table" then
+            Print(("debug: the bars were read again %.1f s into this login (%d ms) - to keep the profile up to date."):format(
+                r.at or 0, r.ms or 0))
+        end
+        -- when, in seconds from its start (a minus: before it began)
+        local function S(v) return v and ("%.1f s"):format(v) or "-" end
+        if t.endAt then
+            Print(("debug: ended at %s; the loading screen went at %s; the game's chat windows came at %s, its keys at %s;"
+                .. " waited %s for them; reload: %s."):format(S(t.endAt), t.screenAt and S(t.screenAt) or "after it",
+                S(t.chatAt), S(t.keysAt), S(t.waited or 0), t.reload == "later" and "left for you to make when it suits"
+                or t.reload and tostring(t.reload) or "none needed"))
+        end
+    end
     local levels, autofeed = YS.SPELL_LEVELS[class] or {}, AutoFeedNames()
     Print(("debug: %s level %d. Buttons are made up to level %d. Options: buttons %s, clear bars %s, clear macros %s, class spells %s."):format(
         tostring(class), UnitLevel("player") or 0, (UnitLevel("player") or 1) + Ahead(o), YS.SpellButtons(o), tostring(o.clearBars),
@@ -2168,6 +2558,16 @@ f:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")       -- the other of your two sp
 f:RegisterEvent("ACTIONBAR_SLOT_CHANGED")            -- a button changed: the profile remembers (below)
 f:RegisterEvent("PLAYER_LEAVING_WORLD")              -- logging out: the account's interface follows (YS.FollowUI)
 f:RegisterEvent("UPDATE_MACROS")                     -- a macro edited: what a button holds reads the same, and isn't
+-- what the game has put on of its own at this login (the steps that wait for it: YS.Ready, above)
+local watch = CreateFrame("Frame")
+for _, e in ipairs({ "LOADING_SCREEN_DISABLED", "UPDATE_CHAT_WINDOWS", "UPDATE_BINDINGS" }) do watch:RegisterEvent(e) end
+watch:SetScript("OnEvent", function(self, event)
+    self:UnregisterEvent(event)
+    if event == "LOADING_SCREEN_DISABLED" then loading, shownAt = false, Now()
+    elseif event == "UPDATE_CHAT_WINDOWS" then ready.chat, readyAt.chat = true, Now()
+    else ready.keys, readyAt.keys = true, Now() end
+end)
+YS.loginWatch = watch           -- (for the tests)
 
 -- A profile is your bars as you have them, not as they once were saved: a spell you drag somewhere
 -- else while levelling, a potion you put on a button, is in the profile a few seconds later - so it
@@ -2183,15 +2583,28 @@ function YS.Remembers() return not (YippSetupDB and YippSetupDB.remember == fals
 -- and the bars are read - every button, with its spell's and its macro's details - only when that is
 -- no longer so for one of them. The first look has nothing to compare with, and reads.
 local held, heldAny = {}, false
-local function ButtonsChanged()
+local ButtonsChanged
+--- The bars as they are now noted as seen (a setup just put them on): the next look reads them only if they change.
+function YS.BarsNoted() if ButtonsChanged then ButtonsChanged() end end
+function ButtonsChanged()
     local changed = not heldAny
     heldAny = true
     for slot = 1, MAX_SLOT do
         local kind, id
         if HasAction(slot) then kind, id = GetActionInfo(slot) end
         -- a macro by its name: the number the game gives for one is on some clients the spell it shows
-        -- now, which changes with your target (a macro edited in place: UPDATE_MACROS, below)
-        if kind == "macro" then id = GetActionText(slot) end
+        -- now, which changes with your target - and by its text, so a macro edited in place reads as changed. Not
+        -- the text of one of AutoFeed's: AutoFeed fills those as your bags change, and each fill had every button
+        -- read again a few seconds later (UPDATE_MACROS forgot them all) - the first, seconds into a new character.
+        if kind == "macro" then
+            local name = GetActionText(slot)
+            id = name
+            if name and not AutoFeedOwned()[name] then
+                local index = GetMacroIndexByName and GetMacroIndexByName(name)
+                local body = index and index > 0 and select(3, GetMacroInfo(index))
+                if body then id = name .. "\n" .. body end
+            end
+        end
         local now = kind and (tostring(kind) .. ":" .. tostring(id)) or false
         if held[slot] ~= now then
             held[slot] = now
@@ -2204,6 +2617,7 @@ end
 function YS.BarsStale() heldAny = false end
 local function Remember()
     rememberSoon = false
+    if YS.Busy("remember") then return end          -- (a job putting bars on: once it is done)
     if not (YippSetupCharDB and YippSetupCharDB.applied and YS.Remembers() and YS:Profile()) then return end
     if YippSetupCharDB.hold then return end             -- (YS.Hold)
     if InCombatLockdown() then
@@ -2212,7 +2626,12 @@ local function Remember()
     end
     if GetCursorInfo and GetCursorInfo() then return end        -- mid-drag: the drop changes a button again
     if not ButtonsChanged() then return end
+    local t0 = Clock()
     YS:ScanBars()
+    if not YS.readNoted and type(YippSetupCharDB) == "table" then
+        YS.readNoted = true
+        YippSetupCharDB.lastRead = { at = math.floor((Now() - loadingSince) * 10 + 0.5) / 10, ms = math.floor(Clock() - t0 + 0.5) }
+    end
     YippSetupCharDB.layout = Copy(YS:Profile().slots)           -- where spells learned later go, too
 end
 YS.RememberNow = Remember
@@ -2247,8 +2666,11 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
             end
             c.guid = id
         end
-        if YS.earlyLater and UnitLevel("player") == 1 and YS.EarlyBars then YippSetupCharDB.earlyBars = YS.EarlyBars() end
+        if YS.earlyLater and UnitLevel("player") == 1 and YS.EarlyBars then YS.EarlyBars() end
         YS.earlyLater = nil
+        -- set up by itself: now, under the login's loading screen (FirstTimeHere began it a few seconds after the
+        -- intro, by when the player was moving and saw it go on)
+        if Due() == "auto" and not InCombatLockdown() then AutoSetup(true) end
         SkipIntro()
         YS.ClassUINoted()
         C_Timer.After(0.5, FirstZoom)
@@ -2262,8 +2684,7 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
     elseif event == "ACTIONBAR_SLOT_CHANGED" then
         RememberSoon()
     elseif event == "UPDATE_MACROS" then
-        YS.BarsStale()
-        RememberSoon()
+        RememberSoon()          -- (a macro edited in place reads as changed by its text: ButtonsChanged)
     elseif event == "PLAYER_LEAVING_WORLD" then
         YS.FollowUI()
     elseif event == "SPELLS_CHANGED" or (event == "PLAYER_REGEN_ENABLED" and waiting) then
@@ -2343,7 +2764,7 @@ function YS.Start(fresh)
     -- not read as "new" on a character's first login with Headstart - it is looked at again at the login)
     local level = UnitLevel("player") or 0
     if fresh and level == 1 and YS.EarlyBars then
-        YippSetupCharDB.earlyBars = YS.EarlyBars()
+        YS.EarlyBars()
     elseif fresh and level == 0 then
         YS.earlyLater = true
     end

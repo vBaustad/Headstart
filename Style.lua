@@ -28,6 +28,25 @@ S.C = {
     sub     = { 0.75, 0.72, 0.68, 1 },
     muted   = { 0.54, 0.51, 0.48, 1 },
     green   = { 0.45, 0.82, 0.50, 1 },
+    -- a switch that is on, and a button that is the page's one thing to do: bone, not the accent (the owner,
+    -- 2026-10-21: "too much orange"). The accent says where you are: the tab, the page.
+    on      = { 0.82, 0.77, 0.68, 1 },
+    swOn    = { 0.83, 0.50, 0.24, 1 },          -- a switch that is on: the accent toned a little into the card (Theme)
+    swKnob  = { 0.98, 0.97, 0.94, 1 },
+    swOff   = { 0.227, 0.208, 0.184, 1 },
+    swOffHi = { 0.275, 0.251, 0.227, 1 },
+    knobOff = { 0.604, 0.569, 0.518, 1 },
+    knobOffHi = { 0.698, 0.663, 0.608, 1 },
+    boxLine = { 0.373, 0.341, 0.302, 1 },       -- a checkbox not ticked: its edge
+    boxLineHi = { 0.541, 0.506, 0.455, 1 },
+    boxOn   = { 0.902, 0.867, 0.804, 1 },       -- ticked: light, a dark tick (no accent: a page of options stays quiet)
+    tickInk = { 0.10, 0.09, 0.075, 1 },
+    well    = { 0.104, 0.095, 0.086, 1 },       -- a feature's settings, under it: a shade under the card
+    onHi    = { 0.92, 0.88, 0.80, 1 },
+    onInk   = { 0.10, 0.09, 0.075, 1 },
+    offTrack = { 0.20, 0.19, 0.165, 1 },
+    offKnob = { 0.55, 0.52, 0.47, 1 },
+    raised  = { 0.150, 0.135, 0.115, 1 },
     danger  = { 1.00, 0.45, 0.42, 1 },
     gold    = { 1.00, 0.82, 0.36, 1 },
 }
@@ -76,6 +95,9 @@ function S.Theme(key)
     Into(S.C.accentD, r, g, b, 0.16)
     Into(S.C.accentHi, r + (1 - r) * 0.22, g + (1 - g) * 0.22, b + (1 - b) * 0.22, 1)
     Into(S.C.accentLo, r * 0.86, g * 0.86, b * 0.86, 1)
+    local card = S.C.card
+    Into(S.C.swOn, r * 0.86 + card[1] * 0.14, g * 0.86 + card[2] * 0.14, b * 0.86 + card[3] * 0.14, 1)
+    Into(S.C.well, card[1] * 0.82, card[2] * 0.82, card[3] * 0.82, 1)
     -- a dark accent (a shaman's blue, a death knight's red) is written on in white
     local light = 0.30 * r + 0.59 * g + 0.11 * b
     if light < 0.5 then Into(S.C.onAccent, 1, 1, 1, 1) else Into(S.C.onAccent, 0.10, 0.07, 0.04, 1) end
@@ -96,6 +118,17 @@ function S.Fill(frame, color, layer, sub)
     return t
 end
 
+--- A line one screen pixel thick, whatever the UI scale: axis "h" sets its height, "v" its width. (A line of one point
+--- is 1.2 pixels at 2560 x 1440 and the game's own scale, and was drawn one pixel here and two there - the owner,
+--- 2026-10-21: "think of the 1080 players too"; under one pixel to a point, as at 1080 with a small UI, it could
+--- vanish.) Where the game can't say how large a pixel is: one point.
+function S.Hair(tex, axis)
+    local ppu = S.PixelsPerPoint and S.PixelsPerPoint(tex)
+    local size = ppu and 1 / ppu or 1
+    if axis == "v" then tex:SetWidth(size) else tex:SetHeight(size) end
+    return tex
+end
+
 -- A one-pixel border from four textures; returns them so a focus state can recolour them.
 function S.Border(frame, color)
     local edges = {}
@@ -103,9 +136,9 @@ function S.Border(frame, color)
         local t = frame:CreateTexture(nil, "BORDER")
         Set(t, color or S.C.line)
         if side == "TOP" or side == "BOTTOM" then
-            t:SetPoint(side .. "LEFT") t:SetPoint(side .. "RIGHT") t:SetHeight(1)
+            t:SetPoint(side .. "LEFT") t:SetPoint(side .. "RIGHT") S.Hair(t, "h")
         else
-            t:SetPoint("TOP" .. side) t:SetPoint("BOTTOM" .. side) t:SetWidth(1)
+            t:SetPoint("TOP" .. side) t:SetPoint("BOTTOM" .. side) S.Hair(t, "v")
         end
         edges[#edges + 1] = t
     end
@@ -148,11 +181,37 @@ local function Rounded(frame, layer, name, sublevel)
 end
 S.Rounded = Rounded
 
+--- A texture drawn where it falls, not snapped to the screen's pixel grid: a small shape scaled down from a larger
+--- texture stays round and sharp (snapped, the switch and its knob were soft and uneven: the owner, 2026-10-21, "feels
+--- so low resolution" - Naowh Forever draws its own so).
+function S.Smooth(tex)
+    if tex.SetTexelSnappingBias then tex:SetTexelSnappingBias(0) end
+    if tex.SetSnapToPixelGrid then tex:SetSnapToPixelGrid(false) end
+    return tex
+end
+
+--- A soft shadow under a panel (art/shadow.tga, sliced in nine), spread out round it and dropped a little: what lifts
+--- a window, a menu or the settings list off what is behind it. alpha: how dark (0.55).
+function S.Shadow(frame, spread, drop, alpha)
+    spread, drop = spread or 16, drop or 3
+    local t = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
+    t:SetPoint("TOPLEFT", -spread, spread - drop)
+    t:SetPoint("BOTTOMRIGHT", spread, -spread - drop)
+    t:SetTexture(S.ART .. "shadow")
+    if t.SetTextureSliceMargins then
+        t:SetTextureSliceMargins(24, 24, 24, 24)
+        if t.SetTextureSliceMode and Enum and Enum.UITextureSliceMode then t:SetTextureSliceMode(Enum.UITextureSliceMode.Stretched) end
+    end
+    t:SetVertexColor(0, 0, 0, alpha or 0.55)
+    S.Smooth(t)
+    return t
+end
+
 -- Colours per kind and state: { fill, outline or false, text }
 local LOOK = {
-    primary = { normal = { S.C.accent, false, S.C.onAccent },
-                hover  = { S.C.accentHi, false, S.C.onAccent },
-                down   = { S.C.accentLo, false, S.C.onAccent } },
+    primary = { normal = { { 1, 1, 1, 0.09 }, { 1, 1, 1, 0.20 }, S.C.text },
+                hover  = { { 1, 1, 1, 0.14 }, { 1, 1, 1, 0.30 }, S.C.text },
+                down   = { { 1, 1, 1, 0.06 }, { 1, 1, 1, 0.24 }, S.C.text } },
     quiet   = { normal = { { 1, 1, 1, 0.06 }, { 1, 1, 1, 0.14 }, S.C.text },
                 hover  = { { 1, 1, 1, 0.10 }, { 1, 1, 1, 0.24 }, S.C.text },
                 down   = { { 1, 1, 1, 0.04 }, { 1, 1, 1, 0.20 }, S.C.text } },
@@ -239,6 +298,12 @@ function S.IconButton(parent, icon, onClick, tip, color, size)
     return b
 end
 
+--- A small window's close button: a clear cross (art/x, bolder than the title bar's "close"), light at rest and white
+--- under the mouse (the owner, 2026-10-21, of the trainer window's: "make the X better").
+function S.CloseX(parent, onClick, tip)
+    return S.IconButton(parent, "x", onClick, tip, S.C.sub, 22)
+end
+
 function S.Tip(owner, text)
     GameTooltip:SetOwner(owner, "ANCHOR_TOP")
     GameTooltip:SetText(text, 1, 1, 1, 1, true)
@@ -296,7 +361,6 @@ function S.HideInfo()
     end
 end
 
-function S.IsPinned(owner) return pinned and pinned.owner == owner end
 
 function S.Unpin()
     pinned = nil
@@ -322,8 +386,8 @@ function S.Toggle(parent, label, get, set, note)
     end
     function b:Refresh()
         local on = get()
-        Set(track, on and S.C.accent or { 1, 1, 1, 0.14 })
-        if on then Set(knob, S.C.onAccent) else knob:SetColorTexture(1, 1, 1, 1) end
+        Set(track, on and S.C.on or S.C.offTrack)
+        Set(knob, on and S.C.onInk or S.C.offKnob)
         knob:ClearAllPoints()
         knob:SetPoint("LEFT", track, "LEFT", on and 18 or 2, 0)
     end
@@ -394,6 +458,7 @@ function S.OpenMenu(anchor, options, onPick, width, side)
         catcher:SetScript("OnHide", function(self) self:UnregisterEvent("PLAYER_REGEN_DISABLED") end)
         catcher:SetScript("OnEvent", CloseMenu)
         menu = CreateFrame("Frame", "HeadstartDropMenu", UIParent)
+        S.Shadow(menu, 14, 4, 0.6)
         menu:SetFrameStrata("TOOLTIP")
         menu:SetClampedToScreen(true)
         -- Three ways out besides picking something: the button again (above), Esc, and a click anywhere
@@ -424,7 +489,7 @@ function S.OpenMenu(anchor, options, onPick, width, side)
                     item.value = o[1]
                     item.label:SetText(o[2])
                     item.label:SetTextColor(unpack(o[3] or S.C.text))
-                    local extra = self.side
+                    local extra = rawget(self, "side")
                     local has = extra and (not extra.shows or extra.shows(o[1])) and true or false
                     item.label:SetPoint("RIGHT", has and -28 or -8, 0)
                     local button = rawget(item, "side")
@@ -670,10 +735,11 @@ function S.Window(name, w, h, title)
     f:SetClampedToScreen(true)
     S.Fill(f, S.C.window)
     S.Border(f, S.C.lineHi)
+    S.Shadow(f, 24, 6, 0.7)
     local head = CreateFrame("Frame", nil, f)
     head:SetPoint("TOPLEFT") head:SetPoint("TOPRIGHT") head:SetHeight(48)
     local rule = head:CreateTexture(nil, "BORDER")
-    rule:SetPoint("BOTTOMLEFT") rule:SetPoint("BOTTOMRIGHT") rule:SetHeight(1)
+    rule:SetPoint("BOTTOMLEFT") rule:SetPoint("BOTTOMRIGHT") S.Hair(rule, "h")
     Set(rule, S.C.line)
     local mark = head:CreateTexture(nil, "ARTWORK")
     mark:SetSize(4, 20)
@@ -702,24 +768,169 @@ function S.Window(name, w, h, title)
     return f
 end
 
--- A switch on its own (for rows where the label sits elsewhere).
+-- Pixel-exact controls (art/px_*.tga, tools/make_controls.py: the layout of each strip is the same there). A small
+-- round shape scaled down from a larger texture falls between screen pixels and reads soft - at 2560 x 1440 and a
+-- UI scale of 0.64 a point is 1.2 pixels, the switch 48 x 24 pixels drawn from 128 x 64, its knob 19.2 (the owner,
+-- 2026-10-21: "feels so low resolution ... is it my video settings?"). So each is drawn again at every size in
+-- pixels it is likely to be, and shown one texel to one pixel at a size in points that is whole pixels.
+local PX_GAP = 2
+local PX = {    -- { file, canvas width, canvas height, smallest, largest, width per pixel of height }
+    pill = { "px_pill", 128, 1024, 16, 40, 2 },
+    knob = { "px_knob", 64, 1024, 10, 36, 1 },
+    boxLine = { "px_box_line", 64, 1024, 14, 36, 1 },
+    boxFill = { "px_box_fill", 64, 1024, 14, 36, 1 },
+    tick = { "px_tick", 64, 1024, 14, 36, 1 },
+}
+--- How many screen pixels one point of a region is (nil where the game can't say).
+function S.PixelsPerPoint(region)
+    local px = _G.PixelUtil
+    local f = type(px) == "table" and px.GetPixelToUIUnitFactor and px.GetPixelToUIUnitFactor()
+    local s = region and region.GetEffectiveScale and region:GetEffectiveScale()
+    if type(f) ~= "number" or f <= 0 or type(s) ~= "number" or s <= 0 then return nil end
+    return s / f
+end
+--- A texture set to one size, in pixels, of a pixel-exact strip. False where the strip has no such size.
+local function PixelExact(tex, kind, size)
+    local a = PX[kind]
+    if not (a and size and size >= a[4] and size <= a[5]) then return false end
+    local y = 0
+    for k = a[4], size - 1 do y = y + k + PX_GAP end
+    tex:SetTexture(S.ART .. a[1])
+    tex:SetTexCoord(0, size * a[6] / a[2], y / a[3], (y + size) / a[3])
+    if tex.SetSnapToPixelGrid then tex:SetSnapToPixelGrid(true) end         -- (one texel on one pixel)
+    return true
+end
+
+-- A switch: a feature on or off - only a feature has one (its options have checkboxes). A pill of 40 x 20 and a round
+-- knob 2 in from its ends, each drawn pixel-exact (above), or where the strips have no such size from the large
+-- textures, smooth (art/pill, art/knob: tools/make_controls.py);
+-- the knob slides across as it is clicked, and the track takes the accent, toned a little. Off: a dark track and a
+-- grey knob, a little lighter under the mouse. (The owner, 2026-10-21, after three that were not good enough: "A,
+-- refined".)
+local SLIDE = 0.12
+local function Mix(a, b, p, out)
+    for i = 1, 4 do out[i] = (a[i] or 1) + ((b[i] or 1) - (a[i] or 1)) * p end
+    return out
+end
 function S.Switch(parent, get, set)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(34, 18)
+    b:SetSize(40, 20)
+    b:SetHitRectInsets(-4, -4, -4, -4)             -- (a little more to hit than to see)
     local track = b:CreateTexture(nil, "ARTWORK")
     track:SetAllPoints()
     local knob = b:CreateTexture(nil, "OVERLAY")
-    knob:SetSize(14, 14)
-    function b:Refresh()
-        local on = get()
-        Set(track, on and S.C.accent or { 1, 1, 1, 0.14 })
-        if on then Set(knob, S.C.onAccent) else knob:SetColorTexture(1, 1, 1, 1) end
-        knob:ClearAllPoints()
-        knob:SetPoint("LEFT", on and 18 or 2, 0)
+    local p, target, sliding, over = 0, 0, false, false
+    local col = {}
+    local ppu, width, inset, kn = false, 40, 2, 16     -- (as last laid out: pixels to a point; its sizes, in points)
+    -- Its size in whole pixels (20 points, rounded), the knob 2 points in, rounded too, each drawn from its own size
+    -- of the pixel-exact strips; no strip that size (a very large UI): the large textures, drawn smooth.
+    local function Lay()
+        local now = S.PixelsPerPoint(b)
+        if now == ppu then return end
+        ppu = now
+        local hpx = now and math.floor(20 * now + 0.5)
+        local ipx = now and math.max(2, math.floor(2 * now + 0.5))
+        if hpx and PixelExact(track, "pill", hpx) and PixelExact(knob, "knob", hpx - 2 * ipx) then
+            width, inset, kn = 2 * hpx / now, ipx / now, (hpx - 2 * ipx) / now
+            b:SetSize(width, hpx / now)
+        else
+            width, inset, kn = 40, 2, 16
+            b:SetSize(40, 20)
+            track:SetTexture(S.ART .. "pill")
+            track:SetTexCoord(0, 1, 0, 1)
+            S.Smooth(track)
+            knob:SetTexture(S.ART .. "knob")
+            knob:SetTexCoord(0, 1, 0, 1)
+            S.Smooth(knob)
+        end
+        knob:SetSize(kn, kn)
     end
-    b:SetScript("OnClick", function() set(not get()) b:Refresh() S.Changed() end)
+    local function Paint()
+        track:SetVertexColor(unpack(Mix(over and S.C.swOffHi or S.C.swOff, S.C.swOn, p, col)))
+        knob:SetVertexColor(unpack(Mix(over and S.C.knobOffHi or S.C.knobOff, S.C.swKnob, p, col)))
+        knob:ClearAllPoints()
+        knob:SetPoint("LEFT", b, "LEFT", inset + (width - 2 * inset - kn) * p, 0)
+    end
+    local function Slide(self, elapsed)
+        local step = (tonumber(elapsed) or SLIDE) / SLIDE
+        if target > p then p = math.min(target, p + step) else p = math.max(target, p - step) end
+        Paint()
+        if p == target then
+            sliding = false
+            self:SetScript("OnUpdate", nil)         -- (still again: nothing runs while it rests)
+        end
+    end
+    function b:Refresh()
+        Lay()
+        target = get() and 1 or 0
+        if sliding then return end                  -- (on its way there)
+        p = target
+        Paint()
+    end
+    b:SetScript("OnShow", function() Lay() Paint() end)     -- (the UI scale may have changed while it was away)
+    b:SetScript("OnClick", function(self)
+        set(not get())
+        target = get() and 1 or 0
+        sliding = true
+        self:SetScript("OnUpdate", Slide)
+        S.Changed()
+    end)
+    b:SetScript("OnEnter", function() over = true Paint() end)
+    b:SetScript("OnLeave", function() over = false Paint() end)
     b:Refresh()
     b.getValue, b.setValue = get, set          -- (what a settings row reads a default from, and resets with)
+    return b
+end
+
+-- A checkbox: an option of a feature. 18 x 18, pixel-exact (above): not ticked an edge only (lighter under the mouse), ticked light with a
+-- dark tick - no accent, so a page of options stays quiet (art/box_line, box_fill, tick). Its whole row ticks it too
+-- (Editor.lua). The same calls as a switch.
+function S.Check(parent, get, set)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(18, 18)
+    local line = b:CreateTexture(nil, "ARTWORK")
+    line:SetAllPoints()
+    local fill = b:CreateTexture(nil, "ARTWORK", nil, 1)
+    fill:SetAllPoints()
+    local tick = b:CreateTexture(nil, "OVERLAY")
+    tick:SetAllPoints()
+    local over = false
+    local ppu = false
+    -- 18 points in whole pixels, from the pixel-exact strips (as the switch: S.Switch); else the large textures, smooth
+    local function Lay()
+        local now = S.PixelsPerPoint(b)
+        if now == ppu then return end
+        ppu = now
+        local px = now and math.floor(18 * now + 0.5)
+        if px and PixelExact(line, "boxLine", px) and PixelExact(fill, "boxFill", px) and PixelExact(tick, "tick", px) then
+            b:SetSize(px / now, px / now)
+        else
+            b:SetSize(18, 18)
+            for tex, name in pairs({ [line] = "box_line", [fill] = "box_fill", [tick] = "tick" }) do
+                tex:SetTexture(S.ART .. name)
+                tex:SetTexCoord(0, 1, 0, 1)
+                S.Smooth(tex)
+            end
+        end
+    end
+    function b:Refresh()
+        Lay()
+        local on = get() and true or false
+        fill:SetShown(on)
+        tick:SetShown(on)
+        line:SetShown(not on)
+        fill:SetVertexColor(unpack(S.C.boxOn))
+        tick:SetVertexColor(unpack(S.C.tickInk))
+        line:SetVertexColor(unpack(over and S.C.boxLineHi or S.C.boxLine))
+    end
+    function b:Hover(on) over = on and true or false self:Refresh() end
+    b.isCheck = true
+    b:SetScript("OnShow", function(self) self:Refresh() end)          -- (the UI scale may have changed while it was away)
+    b:SetScript("OnClick", function(self) set(not get()) self:Refresh() S.Changed() end)
+    b:SetScript("OnEnter", function(self) self:Hover(true) end)
+    b:SetScript("OnLeave", function(self) self:Hover(false) end)
+    b:Refresh()
+    b.getValue, b.setValue = get, set
     return b
 end
 

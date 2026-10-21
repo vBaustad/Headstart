@@ -55,8 +55,9 @@ function GetTime() return NOW end
         print(("ok  " if ok else "FAIL"), what)
         bad += not ok
 
+    # what it says: mid-screen alone since 2026-10-21 (the same line in chat too was the one nobody read)
     def said():
-        return [str(g.PRINTS[i]) for i in range(1, len(g.PRINTS) + 1)]
+        return [str(g.NOTICES[i]) for i in range(1, len(g.NOTICES) + 1)]
 
     bars, stones = YR.CampingNeed(1)
     check((bars, stones) == (19, 5), f"from 1 to 20: 19 bars and 5 stones: {(bars, stones)}")
@@ -75,27 +76,27 @@ function GetTime() return NOW end
     lua.execute("Fire('BAG_UPDATE_DELAYED')")
     check(len(said()) == 0, "10 ore at skill 5 (needs 15 bars): nothing said")
     lua.execute("BAGS[2840] = 5; Fire('BAG_UPDATE_DELAYED')")
-    check(len(said()) == 1 and "Blacksmithing 20" in said()[0] and len(g.NOTICES) == 1,
-          f"10 ore + 5 bars + 5 stones: told, in chat and on screen: {said()}")
+    check(len(said()) == 1 and "Blacksmithing 20" in said()[0] and len(g.PRINTS) == 0,
+          f"10 ore + 5 bars + 5 stones: told, on screen and not in chat: {said()}")
     lua.execute("Fire('BAG_UPDATE_DELAYED')")
     check(len(said()) == 1, "told once")
     lua.execute("SUBZONE = 'Kharanos'; Fire('ZONE_CHANGED')")
     check(len(said()) == 1, "coming into Kharanos right after: not again (no spam walking about Kharanos)")
     lua.execute("NOW = NOW + 121; SUBZONE = 'Kharanos'; Fire('ZONE_CHANGED')")
     check(len(said()) == 2, "told again coming into Kharanos two minutes on")
-    lua.execute("NOW = NOW + 121; PRINTS = {}; SUBZONE = 'Thelsamar'; Fire('ZONE_CHANGED')")
+    lua.execute("NOW = NOW + 121; PRINTS = {}; NOTICES = {}; SUBZONE = 'Thelsamar'; Fire('ZONE_CHANGED')")
     check(len(said()) == 1 and "by the inn" in said()[0] and "Tognus Flintfire in Kharanos" in said()[0],
           f"in Thelsamar: the forge there, the hand-in in Kharanos: {said()}")
     lua.execute("SUBZONE = 'Kharanos'")
-    lua.execute("SKILLS = {}; PRINTS = {}; BAGS[2840] = 10")      # untrained: from 1, 19 bars
+    lua.execute("SKILLS = {}; PRINTS = {}; NOTICES = {}; BAGS[2840] = 10")      # untrained: from 1, 19 bars
     check("train Blacksmithing" in YR.CampingNow()[1][2], "not trained yet: says to train it first")
-    lua.execute("ONQUEST[96044] = false; ONQUEST[96046] = true; COMPLETE[96046] = true; PRINTS = {}; Fire('QUEST_LOG_UPDATE')")
+    lua.execute("ONQUEST[96044] = false; ONQUEST[96046] = true; COMPLETE[96046] = true; PRINTS = {}; NOTICES = {}; Fire('QUEST_LOG_UPDATE')")
     check(any("Yarr Hammerstone" in x for x in said()), f"Mining done: told where to hand it in: {said()}")
     # the quest log says "not complete" for a moment mid-update, then complete again: not said again
-    lua.execute("PRINTS = {}; SUBZONE = 'Coldridge Pass'; COMPLETE[96046] = false; Fire('QUEST_LOG_UPDATE');"
+    lua.execute("PRINTS = {}; NOTICES = {}; SUBZONE = 'Coldridge Pass'; COMPLETE[96046] = false; Fire('QUEST_LOG_UPDATE');"
                 " COMPLETE[96046] = true; Fire('BAG_UPDATE_DELAYED'); Fire('BAG_UPDATE_DELAYED')")
     check(len(said()) == 0, f"a moment's 'not complete' and every loot after: said once, not again: {said()}")
-    lua.execute("YippRouteDB.campReminder = false; PRINTS = {}; SUBZONE = 'Kharanos'; Fire('ZONE_CHANGED')")
+    lua.execute("YippRouteDB.campReminder = false; PRINTS = {}; NOTICES = {}; SUBZONE = 'Kharanos'; Fire('ZONE_CHANGED')")
     check(len(said()) == 0, "turned off: nothing")
     check(not listening("BAG_UPDATE_DELAYED"), "and not listening any more")
     return bad

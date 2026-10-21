@@ -64,7 +64,11 @@ interface on.
                          edit-mode-cache-account.txt). The game may prefer what its servers hold over
                          these: Character setup's Apply both is the way that does not depend on that.
   --addons               Also links Headstart's folders into the live client's Interface/AddOns, as
-                         they are linked in the beta's (directory junctions to the source).
+                         they are linked in the beta's (directory junctions to the source). Not in a client
+                         the CurseForge app looks after: it takes a link whose files are a release's for its
+                         own install, and its Update or Remove would go through the link into the source
+                         (seen 2026-10-21 in _forever_, with every addon of ours that was at its release).
+                         There, install Headstart from CurseForge as players do.
 
 The game must not be running: it writes its saved files when it closes, over whatever was put there.
 (--another-client-is-running: the WoW that is open is not the one being copied into.)

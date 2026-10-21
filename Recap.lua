@@ -14,7 +14,7 @@
 --   that happened to you, each a bar as long as the hit was hard (the hardest in large gold letters);
 --   then what you took this fight by spell.
 --   Account options (YippRouteDB; Headstart, QoL, Reminders): deathRecap (off until turned on),
---   deathRows (8), deathChat (off). Per character: YippSetupCharDB.lastDeath, .deaths.
+--   deathChat (off). Per character: YippSetupCharDB.lastDeath, .deaths.
 local ADDON, YR = ...
 
 local RING = 24
@@ -42,7 +42,7 @@ local HEAL, MUTED, GOLD, RED = { 0.4, 0.85, 0.55 }, { 0.5, 0.53, 0.58 }, { 1, 0.
 local issecret = issecretvalue               -- asked several times a hit
 local function Secret(v) return issecret ~= nil and issecret(v) end
 local function CharDB() return _G.YippSetupCharDB end
-local function Rows() return math.max(3, math.min(12, tonumber(YippRouteDB.deathRows) or 8)) end
+local function Rows() return 8 end
 
 function YR.RecapOn() return YR.Option("deathRecap") end
 
@@ -92,7 +92,6 @@ local function OnHit(unit, action, flag, amount, school)
         Push(action, 0, flag, school)
     end
 end
-YR.RecapHit = OnHit          -- for the tests
 
 -- ---------------------------------------------------------------------------
 -- After the fight: who and what, from the game's own numbers
@@ -613,24 +612,6 @@ function YR.RecapApply()
         f:UnregisterAllEvents()
         if panel then panel:Hide() end
     end
-end
-
---- A made-up death, to see the panel (Settings).
-function YR.RecapSample()
-    return YR.RecapShow({ at = time(), zone = GetZoneText and GetZoneText() or nil, hidden = 0, taken = 1284, lasted = 9, hits = {
-        { ago = 8.4, kind = "hit", amount = 96, school = 1 },
-        { ago = 6.9, kind = "DODGE", amount = 0 },
-        { ago = 5.6, kind = "hit", amount = 131, school = 8 },
-        { ago = 4.1, kind = "heal", amount = 210 },
-        { ago = 2.8, kind = "hit", amount = 612, crit = "crit", school = 1 },
-        { ago = 1.5, kind = "hit", amount = 164, school = 32 },
-        { ago = 0.0, kind = "hit", amount = 281, crit = "crit", school = 1 },
-    }, spells = {
-        { spell = "Ambush", who = "Stabby", total = 612, overkill = 0, deadly = false },
-        { spell = "Backstab", who = "Stabby", total = 377, overkill = 74, deadly = true },
-        { spell = "Shadow Bolt", who = "Felwick", total = 164, overkill = 0, deadly = false },
-        { spell = "Lightning Bolt", who = "Zapp", total = 131, overkill = 0, deadly = false },
-    } })
 end
 
 --- /headstart death debug: what the game's own recap and meter hold for the last death, by field

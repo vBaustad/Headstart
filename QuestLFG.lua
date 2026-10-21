@@ -177,9 +177,7 @@ local function AddReply(who, text, t, kind)
     table.insert(replies, 1, { who = who, text = text, quest = t.title, id = t.id, kind = kind, at = now })
     while #replies > KEEP do replies[#replies] = nil end
     if not (win and win:IsShown()) then unseen = unseen + 1 end
-    Badge()
-    YR.Print(kind == "other" and ("%s is looking for a group for %s too. /headstart lfg"):format(Short(who), t.title)
-        or ("%s answered about %s. /headstart lfg"):format(Short(who), t.title))
+    Badge()                     -- (the eye's count says it: the chat line too was one nobody read - 2026-10-21)
     if Draw then Draw() end
 end
 

@@ -259,7 +259,6 @@ local function Extras(frame)
     return extra
 end
 
-function YR.RXPSkinParts() return extra end       -- for the tests
 
 local function ShowExtras(on)
     if not extra then return end

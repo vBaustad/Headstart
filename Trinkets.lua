@@ -75,7 +75,6 @@ local function CharDB()
 end
 YR.TrinketDB = CharDB
 
-local function IDOf(link) return link and tonumber(tostring(link):match("item:(%d+)")) end
 local function Worn(slot) return GetInventoryItemID("player", slot) end
 
 -- An item is a trinket or it isn't, for good: asked once per item.

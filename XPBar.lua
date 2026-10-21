@@ -4,8 +4,8 @@
 --   quests' part, so it shows where it reaches past them (the words say how much there is). Ticks every tenth (or none), a spark at the front. Your XP is coloured as Blizzard's bar
 --   colours it: purple with no rested XP, blue while you have some - each one colour, or a gradient
 --   from one colour to another along your XP ("gradient").
---   Size, place, colours, texture, ticks and font are settings; it's dragged where you want it while
---   unlocked. Blizzard's bar is made invisible and click-through while ours shows (only hidden from
+--   Colours, texture and font are settings; where it stands and how large is set in Arrange (/hs move).
+--   Blizzard's bar is made invisible and click-through while ours shows (only hidden from
 --   view: it's an Edit Mode frame, and moving or hiding it from an addon would taint Edit Mode).
 --   The words: three texts on the bar (left, middle, right), three over it (left0, center0, right0,
 --   shown while "over" is on) and three under it (left2, center2, right2, shown while "under" is on),
@@ -438,12 +438,6 @@ local function FillColour(db, isRested)
 end
 
 -- The bar itself: shown or not, your XP, the quests' part, the rested part.
--- A sample for the settings page: the bar drawn as it would be with no rested XP, with rested XP, or
--- with rested XP and quests done - so its colours can be set without waiting for the real thing. Only
--- the bar's parts; the texts keep saying what is true. { your XP, rested, quests done } as parts of a level.
-local SAMPLES = { plain = { 0.42, 0, 0 }, rested = { 0.42, 0.34, 0 }, quests = { 0.42, 0.34, 0.16 } }
-local sample, sampleName
-
 local function Paint()
     if not bar then return end
     local db = YR.XPBarDB()
@@ -454,10 +448,6 @@ local function Paint()
     if not show then return end
     local xp, max = UnitXP("player"), UnitXPMax("player")
     local rested = GetXPExhaustion and GetXPExhaustion() or 0
-    if sample then
-        if max <= 0 then max = 1000 end
-        xp, rested = max * sample[1], max * sample[2]
-    end
     local w = db.w
     local p = max > 0 and xp / max or 0
     bar.fill:SetWidth(math.max(1, w * p))
@@ -467,7 +457,7 @@ local function Paint()
         fillRested = isRested
         FillColour(db, isRested)
     end
-    local qxp = sample and max * sample[3] or QuestsDone()
+    local qxp = QuestsDone()
     local questW = max > 0 and math.min(w - w * p, w * qxp / max) or 0
     bar.quest:SetWidth(math.max(1, questW))
     bar.quest:SetShown(questW >= 1)
@@ -492,16 +482,6 @@ local function Paint()
     Words()
 end
 YR.XPBarPaint = Paint
-
---- Draw the bar as a sample ("plain", "rested", "quests"), or as it really is again (nil). Returns the
---- sample showing now.
-function YR.XPBarSample(which)
-    sample, sampleName = SAMPLES[which], SAMPLES[which] and which or nil
-    fillRested = nil
-    Paint()
-    return sampleName
-end
-function YR.XPBarSampleNow() return sampleName end
 
 -- The look: what only a setting changes.
 local function Look()
@@ -549,8 +529,7 @@ local function Build()
     bar:SetClampedToScreen(true)
     bar:SetMovable(true)
     bar:EnableMouse(true)
-    bar:RegisterForDrag("LeftButton")
-    bar:SetScript("OnDragStart", function(self) if not YR.XPBarDB().lock then self:StartMoving() end end)
+    -- (moved in Arrange, which ends a move by this: where it stands is kept)
     bar:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         YR.XPBarDB().pos = { math.floor(self:GetLeft() + 0.5), math.floor(self:GetTop() - UIParent:GetTop() + 0.5) }
@@ -628,7 +607,6 @@ local function Build()
         GameTooltip:AddDoubleLine("Played, this level", v.levelplayed, 0.8, 0.8, 0.8, 1, 1, 1)
         GameTooltip:AddDoubleLine("Played, in all", v.played, 0.8, 0.8, 0.8, 1, 1, 1)
         GameTooltip:AddDoubleLine("This session", v.session, 0.8, 0.8, 0.8, 1, 1, 1)
-        if not YR.XPBarDB().lock then GameTooltip:AddLine("Unlocked: drag it where you want it", 0.4, 0.8, 1) end
         GameTooltip:Show()
     end)
     bar:SetScript("OnLeave", function() GameTooltip:Hide() Words() end)

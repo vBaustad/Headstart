@@ -54,9 +54,9 @@ def run():
     lua.execute("HeadstartNS.ShowSettingsTab = function() end")      # (the window's own: not loaded here)
     lua.execute("getmetatable(UIParent).HookScript = function(self, _, fn) self.hook = fn end")     # (kept, to press below)
     steps = YR.TourSteps()
-    check(len(steps) == 9 and steps[1].next == "Show me around" and steps[9].next == "Done"
+    check(len(steps) == 10 and steps[1].next == "Show me around" and steps[10].next == "Done"
           and all(st.title and st.text for st in steps.values()) and all(st.at for i, st in steps.items() if i > 1),
-          f"nine hints: a welcome, then each pointing at a part of the window ({len(steps)})")
+          f"ten hints: a welcome, then each pointing at a part of the window ({len(steps)})")
     before = {k: db[k] for k in ("autoTrain", "restock", "bankAuto", "lootFeed", "chatLog", "flightTimer", "camp", "setupOn", "routes")}
     db.welcome, db.welcomeSeen = True, None
     check(YR.WelcomeShow() is True and g.HeadstartTour is not None and not g.HeadstartTour.hidden and db.welcomeSeen is True,
@@ -65,10 +65,10 @@ def run():
     check(w.title.text == "Welcome to Headstart" and w.back.hidden and not w.skip.hidden and w.next.text.text == "Show me around",
           "the first hint: the welcome, Show me around, Skip, no Back")
     lua.execute("local b = HeadstartTour.next b.fn(b)")
-    check(w.title.text == "Find any setting" and w.count.text == "2 of 9" and not w.back.hidden, "Next: the second hint")
+    check(w.title.text == "Find any setting" and w.count.text == "2 of 10" and not w.back.hidden, "Next: the second hint")
     lua.execute("local b = HeadstartTour.back b.fn(b)")
     check(w.title.text == "Welcome to Headstart", "Back: the first again")
-    lua.execute("local b = HeadstartTour.next for i = 1, 8 do b.fn(b) end")
+    lua.execute("local b = HeadstartTour.next for i = 1, 9 do b.fn(b) end")
     check(w.title.text == "Quality of life" and w.next.text.text == "Done" and w.skip.hidden, "the last hint: Done, no Skip")
     lua.execute("local b = HeadstartTour.next b.fn(b)")
     check(w.hidden and db.welcome is None, "Done: the tour goes, a new install's welcome looked at")

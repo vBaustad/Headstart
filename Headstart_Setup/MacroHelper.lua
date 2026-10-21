@@ -1,7 +1,7 @@
 -- Macro helper: the macros every class ends up wanting, made by ticking what the button should do.
 --   Pick a spell of your class and what its button should do besides casting it:
---     Pressing again doesn't turn it off   "/cast !Stealth": Stealth, a form, Auto Shot, a wand's Shoot -
---                                           spammed, it stays on
+--     Pressing again doesn't turn it off   "/cast !Cat Form": a form, an aspect, a wand's Shoot - spammed,
+--                                           it stays on. Stealth and Prowl: "/cast [nostealth] Stealth"
 --     Under the mouse first                "[@mouseover,help,nodead][]": the friend (or enemy) the mouse is
 --                                           over, else your target
 --     Alt casts it on yourself             "[mod:alt,@player]"
@@ -27,6 +27,12 @@ local FORMS = { DRUID = true, SHAMAN = true, PRIEST = true }
 
 local function Class() return (select(2, UnitClass("player"))) end
 
+-- Stealth and Prowl stay on by their own condition, not by "!": "/cast !Stealth" pressed again took
+-- Stealth off in Forever (the owner, 2026-10-16: "#showtooltip Stealth, /cast [nostealth] Stealth - that is
+-- how the spam stealth macro must be, not !Stealth"). The others keep "!" (forms, aspects, Shoot: not seen
+-- to fail).
+local BY_CONDITION = { Stealth = "nostealth", Prowl = "nostealth" }
+
 --- Whether this class has a spell by that name on this client (the planner's data).
 local function Has(spell, class)
     class = class or Class()
@@ -51,7 +57,13 @@ function YS.MacroBuild(spell, o, class)
     if o.self then where = where .. "[mod:alt,@player]" end
     if o.mouse == "help" or o.mouse == "harm" then where = where .. ("[@mouseover,%s,nodead]"):format(o.mouse) end
     if where ~= "" then where = where .. "[] " end
-    lines[#lines + 1] = cast .. where .. (o.keep and "!" or "") .. spell
+    local cond = o.keep and BY_CONDITION[spell]
+    if cond and where == "" then
+        where = "[" .. cond .. "] "
+    elseif cond then
+        where = (where:gsub("%[(.-)%]", function(inner) return "[" .. (inner ~= "" and (inner .. ",") or "") .. cond .. "]" end))
+    end
+    lines[#lines + 1] = cast .. where .. ((o.keep and not cond) and "!" or "") .. spell
     return table.concat(lines, "\n")
 end
 
@@ -290,6 +302,8 @@ end
 function YS.MacroLine(spell, o)
     o = o or {}
     local when = o.when and o.when ~= "" and o.when or nil
+    local cond = o.keep and BY_CONDITION[spell]
+    if cond and not (when and when:find(cond, 1, true)) then when = when and (when .. "," .. cond) or cond end
     local function Box(...)
         local parts = {}
         if when then parts[1] = when end
@@ -309,7 +323,7 @@ function YS.MacroLine(spell, o)
     elseif when or o.altself then
         where = where .. Box()
     end
-    return "/cast " .. (where ~= "" and (where .. " ") or "") .. (o.keep and "!" or "") .. spell
+    return "/cast " .. (where ~= "" and (where .. " ") or "") .. ((o.keep and not cond) and "!" or "") .. spell
 end
 
 --- A line under the text there is.
@@ -510,7 +524,6 @@ function YS.MacroForget(name, class)
     local lib = Library(class)
     for i = #lib, 1, -1 do if lib[i].name == name then table.remove(lib, i) end end
 end
-function YS.MacroLibrary(class) return Library(class) end
 
 -- Sharing. Your macros for a class as text anyone can read, paste in a chat or a forum post, and take in
 -- again: a first line that says what it is and for which class, then each macro as "== its name" over
