@@ -5276,7 +5276,7 @@ local function HomeCard(parent, f, w)
 end
 
 -- What is new in this version: the same cards, first on the page, until you hide them.
-local NEWS_FOR = "0.10.0-beta8"
+local NEWS_FOR = "0.10.0"
 local NEWS = { ["World marker"] = true, ["Quest item buttons"] = true, ["Quest mob markers"] = true, ["Quests on NPC tooltips"] = true }
 function YR.HomeNews() return NEWS_FOR, NEWS end
 

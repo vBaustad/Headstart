@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.10.0-beta8
+## 0.10.0
 
 - **Skip quest (new; Routes, Settings; off until you turn it on).** Right-click a step in RestedXP's guide and pick **Skip quest**: every step of that quest is skipped at once - the pick-up, the kill or loot step, the hand-in, and the "Go to" steps that lead to them - for the quest a launch crowd makes hopeless (one spawn with a queue, its items looted bare). A step that also serves another quest keeps going; only the skipped quest's lines in it count as done. The quest is not abandoned, and RestedXP won't take or hand it in for you meanwhile. One line in chat says what went ("Skipped Darkness in the Glade: 4 steps."). Right-click a skipped step for **Undo skip**, or `/headstart unskip` for the last one; `/headstart skip` skips the quest of the step you're on. Skips are kept per character and guide, through a /reload.
 - **Talent builds (new; Bars & windows page).** A levelling build for each of the nine classes, made on Forever's own talent trees (read from the game's data - Forever changed many talents): its three trees with every talent's points, and what to take at each level under them. Pick any class to look at. **Follow on this character**, and the talent points notice says which talent the build takes next - "2 talent points to spend - next: Deflection 2/5" - and its tooltip the next ones; it reads your own talents from the game, so a point taken out of order still counts. The builds are Headstart's own suggestions, not tested to 60 on every class.
