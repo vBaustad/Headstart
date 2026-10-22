@@ -27,6 +27,11 @@ local CLASS_QUEST = 12          -- (an item's kind: Quest)
 -- enhancements 6, bandages 7 or draughts 13 (what you eat or keep on your bars anyway), and no other kind: a
 -- recipe (9), gear (2, 4) and the rest have a "Use:" of their own.
 local TO_USE = { [0] = true, [4] = true, [8] = true, [14] = true }
+-- Of those, these get a button wherever they came from - the reward window seen or not: a Bogling Root, a Sprouted Frond
+-- and a Severed Voodoo Claw had none on a character that got them before this listened, or with it off (the owner,
+-- 2026-10-22, back in the beta: "root, frond and claw"). A scroll only as a quest's reward: they come from vendors and
+-- drops too, many of them.
+local ANY_TIME = { [0] = true, [8] = true, [14] = true }
 local bar
 local buttons = {}
 local pending = false           -- laid out again as the fight ends
@@ -93,7 +98,7 @@ function YR.QuestItemsWanted()
                     local info = C_Container.GetContainerItemQuestInfo and C_Container.GetContainerItemQuestInfo(bag, slot)
                     isQuest = (type(info) == "table" and info.isQuestItem == true) or classID == CLASS_QUEST
                 end
-                local reward = db.questUse[id] and classID == 0 and TO_USE[subID]
+                local reward = classID == 0 and TO_USE[subID] and (ANY_TIME[subID] or db.questUse[id])
                 if isQuest or reward then
                     out[#out + 1] = id
                     if #out >= MAX then return out end
@@ -102,6 +107,39 @@ function YR.QuestItemsWanted()
         end
     end
     return out
+end
+
+--- /headstart questitems: every item in your bags with a use, and why it has a button or not (the owner, 2026-10-22,
+--- back in the beta: "the quest bar's items didn't work, I think" - and nothing could say why from outside the game).
+function YR.QuestItemsDebug()
+    local db = CharDB()
+    local quest = YippRouteDB.questItemsQuest == true
+    local bars = OnBars()
+    YR.Print(("quest item buttons: %s; quest items too: %s; %d quest rewards known on this character."):format(
+        On() and "on" or "off (QoL, Journey page)", quest and "on" or "off", (function() local n = 0 for _ in pairs(db.questUse) do n = n + 1 end return n end)()))
+    local seen, shown = {}, 0
+    for bag = 0, NUM_BAG_SLOTS or 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
+            local id = C_Container.GetContainerItemID(bag, slot)
+            if id and not seen[id] and HasUse(id) then
+                seen[id] = true
+                local name = C_Item.GetItemNameByID and C_Item.GetItemNameByID(id) or ("item " .. id)
+                local _, _, _, _, _, classID, subID = C_Item.GetItemInfoInstant(id)
+                local info = C_Container.GetContainerItemQuestInfo and C_Container.GetContainerItemQuestInfo(bag, slot)
+                local isQuest = (type(info) == "table" and info.isQuestItem == true) or classID == CLASS_QUEST
+                local why
+                if db.questUseHidden[id] then why = "taken off with Shift+right-click (Show them again, on the settings page)"
+                elseif bars[id] then why = "on your action bars already"
+                elseif isQuest then why = quest and "shown (a quest item)" or "a quest item - shown only with Quest items too on"
+                elseif not (classID == 0 and TO_USE[subID]) then why = ("not a thing to use (kind %s, sort %s: food, a potion, a recipe...)"):format(tostring(classID), tostring(subID))
+                elseif not (ANY_TIME[subID] or db.questUse[id]) then why = "a scroll that wasn't a quest's reward here"
+                else why = "shown" end
+                if why:find("^shown") then shown = shown + 1 end
+                YR.Print(("  %s: %s"):format(tostring(name), why))
+            end
+        end
+    end
+    if next(seen) == nil then YR.Print("  no item in your bags has a use.") end
 end
 
 -- The reward window: what it offers is written down (only what you take reaches your bags).
@@ -186,16 +224,34 @@ local function Button(i)
     b:RegisterForClicks("AnyUp")
     b:SetAttribute("useOnKeyDown", false)          -- (it hears the release: see the trinket buttons)
     b:RegisterForDrag("LeftButton")
-    S.Border(b, S.C.lineHi)
+    -- Soft, not sharp: the icon's corners rounded and a dark rim under it, no bright line round it; the count large,
+    -- outlined, over the cooldown's shade (the owner, 2026-10-22: "the boxes are a bit sharp, and the number in the corner
+    -- hard to see").
+    b.rim = b:CreateTexture(nil, "BACKGROUND")
+    b.rim:SetTexture(S.ART .. "iconmask")
+    b.rim:SetVertexColor(0, 0, 0, 0.75)
+    b.rim:SetPoint("TOPLEFT", -1, 1)
+    b.rim:SetPoint("BOTTOMRIGHT", 1, -1)
     b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetPoint("TOPLEFT", 1, -1)
-    b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    b.icon:SetAllPoints()
     b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    if b.CreateMaskTexture and b.icon.AddMaskTexture then
+        local mask = b:CreateMaskTexture()
+        mask:SetTexture(S.ART .. "iconmask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        mask:SetAllPoints(b.icon)
+        b.icon:AddMaskTexture(mask)
+    end
     b.cd = CreateFrame("Cooldown", nil, b, "CooldownFrameTemplate")
     b.cd:SetAllPoints(b.icon)
-    b.count = S.Text(b, 12, S.C.text)
-    b.count:SetPoint("BOTTOMRIGHT", -3, 3)
+    local top = CreateFrame("Frame", nil, b)
+    top:SetAllPoints()
+    top:SetFrameLevel((b.cd:GetFrameLevel() or b:GetFrameLevel()) + 1)
+    b.count = top:CreateFontString(nil, "OVERLAY")
+    b.count:SetFont(S.FONT, 13, "OUTLINE")
+    b.count:SetTextColor(1, 1, 1)
+    b.count:SetShadowColor(0, 0, 0, 1)
     b.count:SetShadowOffset(1, -1)
+    b.count:SetPoint("BOTTOMRIGHT", -2, 2)
     -- Shift+right-click: off the bar for this character (out of a fight it goes at once)
     b:SetScript("PostClick", function(self, which)
         if which == "RightButton" and IsShiftKeyDown() and self.id then

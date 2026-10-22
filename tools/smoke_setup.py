@@ -2175,6 +2175,48 @@ _after = lua.eval("(function() local n = 0 for i = 1, 120 do if MACROS[i] then n
 report(_after == g.ACCOUNT_BEFORE and g.BAR[160] is not None and g.BAR[160].id == _sit.id,
        f"the next new character: the account's /sit found and put on, none made ({g.ACCOUNT_BEFORE} -> {_after})")
 lua.execute("""local slots = YippSetupDB.classes.PALADIN.profile.slots slots[160], slots[161] = KEPT_160, KEPT_161""")
+# Macros made first, the buttons after (the owner, 2026-10-22: "my macros were placed wrong" - chicken and laugh on each
+# other's buttons on a new rogue). As the game does it: a new account macro is sorted into the list by name, moving the
+# numbers of those after it, and a button holds a number. Made between the buttons, a button put on earlier came to
+# show another macro; made first, every button gets the number its macro keeps.
+lua.execute("""Fresh() YippSetupCharDB.applied = nil
+    KEPT_CREATE_SORT = CreateMacro
+    MACROS[1] = { "RXPTargeting", 1, "/target x" } MACROS[2] = { "tar", 1, "/tar y" }
+    CreateMacro = function(n, icon, body, perChar)
+        if perChar then return KEPT_CREATE_SORT(n, icon, body, perChar) end
+        local list = {}
+        for i = 1, 120 do if MACROS[i] then list[#list + 1] = MACROS[i] end MACROS[i] = nil end
+        local mine = { n, icon, body }
+        list[#list + 1] = mine
+        table.sort(list, function(a, b) return a[1]:lower() < b[1]:lower() end)
+        local at
+        for i, m in ipairs(list) do MACROS[i] = m if m == mine then at = i end end
+        return at
+    end
+    local slots = YippSetupDB.classes.PALADIN.profile.slots
+    KEPT_SORT_SLOTS = {} for _, k in ipairs({ 34, 35, 36, 46, 47 }) do KEPT_SORT_SLOTS[k] = slots[k] end
+    slots[34] = { kind = 'macro', name = ' chicken', icon = 1, body = '/chicken' }
+    slots[35] = { kind = 'macro', name = 'thank', icon = 1, body = '/thank' }
+    slots[36] = { kind = 'macro', name = 'RELOAD', icon = 1, body = '/reload' }
+    slots[46] = { kind = 'macro', name = 'laugh', icon = 1, body = '/lol' }
+    slots[47] = { kind = 'macro', name = 'SIT', icon = 1, body = '/sit' }""")
+YS.Apply(YS, None, None, SURE)
+for _ in range(80):
+    if g.NextFrame() == 0:
+        break
+_on = lua.eval("""(function()
+    local out = {}
+    for _, k in ipairs({ 34, 35, 36, 46, 47 }) do
+        local b = BAR[k]
+        out[#out + 1] = k .. "=" .. tostring(b and b.kind == "macro" and MACROS[b.id] and MACROS[b.id][1])
+    end
+    return table.concat(out, ", ")
+end)()""")
+report(_on == "34= chicken, 35=thank, 36=RELOAD, 46=laugh, 47=SIT",
+       f"account macros sorted as they are made: every button shows its own macro ({_on})")
+lua.execute("""CreateMacro = KEPT_CREATE_SORT
+    local slots = YippSetupDB.classes.PALADIN.profile.slots
+    for k, v in pairs(KEPT_SORT_SLOTS) do slots[k] = v end for _, k in ipairs({ 34, 35, 36, 46, 47 }) do slots[k] = KEPT_SORT_SLOTS[k] end""")
 lua.execute("""C_UI.Reload = KEPT_RELOAD YR_SETUP.ApplyChat = KEPT_APPLYCHAT YR_SETUP.ScanBars = KEPT_SCANBARS POPUP = nil""")
 lua.execute("""C_Timer.After = KEPT_AFTER_JOB YR_SETUP.Print = KEPT_PRINT_JOB
     YippSetupDB.classes.PALADIN.profile.slots = KEPT_SLOTS_JOB""")

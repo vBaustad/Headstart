@@ -428,8 +428,8 @@ def run():
     # thin: the heading and the icons, as wide as they are, no line of level and price (the owner, 2026-10-21: "make it
     # thinner. no need for price etc and make the X better")
     _w, _h = lua.eval("function(f) return rawget(f, '_w'), rawget(f, '_h') end")(pop)
-    check(_w == 220 and _h <= 76 and lua.eval("function(f) return rawget(f, 'line') end")(pop) is None,
-          f"thin: {_w} x {_h}, no line under the icons")
+    check(_w is not None and 200 <= _w <= 260 and _h <= 50 and lua.eval("function(f) return rawget(f, 'line') end")(pop) is None,
+          f"one row - heading, icons, x - as low as an icon (the owner, 2026-10-22: 'mostly the height'): {_w} x {_h}, no line")
     lua.execute("KNOWN[7294] = true")
     g.Fire("SPELLS_CHANGED")
     check(shown() == ["Righteous Fury"], f"a spell trained: it goes from the window ({shown()})")

@@ -45,18 +45,18 @@ def run():
         LATER = {}
         C_Timer.After = function(_, fn) LATER[#LATER + 1] = fn end
         function Later() local l = LATER LATER = {} for _, fn in ipairs(l) do fn() end end
-        QI_BAG = { 5205, 2589, 5185, 117, 6328 }  -- (and Tough Jerky: food, and a recipe: rewards too)
+        QI_BAG = { 5205, 2589, 5185, 117, 6328, 1180 }  -- (and Tough Jerky: food, and a recipe: rewards too; a scroll)
         C_Container = C_Container or {}
-        C_Container.GetContainerNumSlots = function(bag) return bag == 0 and 5 or 0 end
+        C_Container.GetContainerNumSlots = function(bag) return bag == 0 and 6 or 0 end
         C_Container.GetContainerItemID = function(bag, slot) return bag == 0 and QI_BAG[slot] or nil end
         C_Container.GetContainerItemQuestInfo = function(bag, slot) return { isQuestItem = bag == 0 and QI_BAG[slot] == 5185 } end
         C_Container.GetItemCooldown = function() return 0, 0, 1 end
         C_Item = C_Item or {}
         KEPT_INSTANT = C_Item.GetItemInfoInstant
-        local SUB = { [5205] = 8, [117] = 5 }      -- Sprouted Frond: Other; Tough Jerky: Food & Drink
+        local SUB = { [5205] = 8, [117] = 5, [1180] = 4 }      -- Sprouted Frond: Other; Tough Jerky: Food & Drink; a scroll
         local CLASS = { [5185] = 12, [6328] = 9 }  -- the quest item; the recipe (Recipe: Kaldorei Spider Kabob)
         C_Item.GetItemInfoInstant = function(id) return id, "", "", "", 0, CLASS[id] or 0, SUB[id] or 0 end
-        C_Item.GetItemSpell = function(id) if id == 5205 or id == 5185 or id == 117 or id == 6328 then return "Use", 1 end end
+        C_Item.GetItemSpell = function(id) if id == 5205 or id == 5185 or id == 117 or id == 6328 or id == 1180 then return "Use", 1 end end
         C_Item.GetItemCount = function(id) return id == 5205 and 3 or 1 end
         C_Item.GetItemIconByID = function() return 1 end
         ACTIONS = {}
@@ -84,13 +84,16 @@ def run():
     db.questItems = True
     YR.ApplyParts()
     wanted = YR.QuestItemsWanted()
-    check(len(wanted) == 0 and g.HeadstartQuestItemBar is None,
-          "on, no reward known yet: nothing - quest items only with their switch (the owner, 2026-10-20)")
+    # a thing to use has a button wherever it came from - no reward window seen (the owner, 2026-10-22: "root, frond and
+    # claw" had none on a character that got them before this listened); a scroll only as a quest's reward
+    w = [wanted[i] for i in range(1, len(wanted) + 1)]
+    check(w == [5205],
+          f"on, no reward known yet: the Sprouted Frond (a thing to use) all the same; quest items only with their switch, no food, no unknown scroll ({w})")
     db.questItemsQuest = True
     YR.QuestItemsLayout()
-    check(g.HeadstartQuestItemBar is not None and ids() == [5185], f"Quest items too on: the quest item with a use gets a button ({ids()})")
+    check(g.HeadstartQuestItemBar is not None and ids() == [5205, 5185], f"Quest items too on: the quest item with a use gets a button too ({ids()})")
     b = g.HeadstartQuestItem1
-    check(b.GetAttribute(b, "type1") == "item" and b.GetAttribute(b, "item1") == "item:5185",
+    check(b.GetAttribute(b, "type1") == "item" and b.GetAttribute(b, "item1") == "item:5205",
           "the button uses the item, as from your bags (a secure item button)")
     g.Fire("QUEST_COMPLETE")
     YR.QuestItemsLayout()
@@ -145,6 +148,12 @@ def run():
     db.questItems = False
     YR.ApplyParts()
     check(g.QI_HIDDEN(g.HeadstartQuestItemBar), "turned off: the buttons go")
+    # /headstart questitems: every usable item in the bags, and why it has a button or not (the owner, 2026-10-22)
+    lua.execute("""QI_SAID = {} KEPT_QI_PRINT = HeadstartNS.Print HeadstartNS.Print = function(t) QI_SAID[#QI_SAID + 1] = t end
+        HeadstartNS.QuestItemsDebug() HeadstartNS.Print = KEPT_QI_PRINT""")
+    said = [str(g.QI_SAID[i]) for i in range(1, len(g.QI_SAID) + 1)]
+    check(len(said) >= 2 and said[0].startswith("quest item buttons: off") and all(":" in l for l in said[1:]),
+          f"/headstart questitems: the switch, then each usable item and why ({said[:3]})")
     lua.execute("C_Item.GetItemInfoInstant = KEPT_INSTANT")
     return bad
 

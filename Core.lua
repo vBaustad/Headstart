@@ -717,6 +717,8 @@ SlashCmdList.HEADSTART = function(msg)
         YR.UseGearSet(arg)
     elseif cmd == "move" or cmd == "arrange" then
         YR.ArrangeToggle()
+    elseif cmd == "questitems" or cmd == "qi" then
+        if YR.QuestItemsDebug then YR.QuestItemsDebug() end
     elseif cmd == "journey" then
         if arg == "toast" then
             YR.JourneyToast(UnitLevel("player") or 20)

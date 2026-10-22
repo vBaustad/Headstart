@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1
+
+- **Level splits: compare with one run you pick.** Compare with: One run I pick, and the run to compare with is chosen from every timed run (name, class, highest level and its time) - on launch day your stress test run, not the faster beta runs that came along with the settings.
+- **Fixed: a new character's macros could land on each other's buttons.** Macros any class can use (an emote, /sit, /reload) are made as account macros since 0.10.0, and each new one moves the others in the game's sorted list: made between the buttons, two of them could swap places (seen with /chicken and /laugh on a new rogue). Character setup now makes every macro first and puts the buttons on after. If a character set up with 0.10.0 has two swapped, swap them back once - its class's profile follows.
+- **Quest item buttons: things to use get a button wherever they came from.** A Bogling Root, a Sprouted Frond or a Severed Voodoo Claw had none when the quest's reward window was answered before Headstart could read it (an addon that turns quests in for you, or Quest rewards itself). Now an item of the sorts that are things to use - Other, Explosives, Devices - gets its button without that; a scroll still only as a quest's reward. `/headstart questitems` says, item by item, why it has a button or not. The buttons are softer - rounded corners, a dark rim - and how many you carry is larger and outlined, over a cooldown's shade.
+- **The x on the small windows is quieter** (New at your trainer, Better gear): a little smaller, grey until the mouse is on it. New at your trainer is one low row - its heading, the spells' icons, the x - not a box with the icons under the heading.
+
 ## 0.10.0
 
 - **Skip quest (new; Routes, Settings; off until you turn it on).** Right-click a step in RestedXP's guide and pick **Skip quest**: every step of that quest is skipped at once - the pick-up, the kill or loot step, the hand-in, and the "Go to" steps that lead to them - for the quest a launch crowd makes hopeless (one spawn with a queue, its items looted bare). A step that also serves another quest keeps going; only the skipped quest's lines in it count as done. The quest is not abandoned, and RestedXP won't take or hand it in for you meanwhile. One line in chat says what went ("Skipped Darkness in the Glade: 4 steps."). Right-click a skipped step for **Undo skip**, or `/headstart unskip` for the last one; `/headstart skip` skips the quest of the step you're on. Skips are kept per character and guide, through a /reload.

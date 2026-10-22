@@ -128,7 +128,10 @@ end
 --   Thin: the heading and the icons, as wide as they are (the owner, 2026-10-21: "make it thinner. no need for price
 --   etc and make the X better" - a line under them said the level and what it would cost, "prices not known yet").
 -- ---------------------------------------------------------------------------
-local POP_ICON, POP_GAP, POP_ROW, POP_PAD, POP_MIN = 34, 6, 7, 12, 220
+-- One row: the heading, the icons after it, the x at the end - as low as an icon (a heading over the icons made it twice
+-- that: the owner, 2026-10-22, "the box is too big" and then "it's mostly the height"). More than POP_ROW icons go on in
+-- rows under the first, from where the icons begin.
+local POP_ICON, POP_GAP, POP_ROW, POP_PAD = 30, 5, 7, 8
 local pop, popList, popSample, popWaiting = nil, {}, false, false
 
 local function PopPlace()
@@ -153,13 +156,13 @@ local function PopBuild()
     S.Border(pop, S.C.lineHi)
     S.Shadow(pop, 14, 4, 0.6)
     pop.head = S.Text(pop, 11, S.C.muted)
-    pop.head:SetPoint("TOPLEFT", POP_PAD, -10)
+    pop.head:SetPoint("LEFT", pop, "TOPLEFT", POP_PAD, -(POP_PAD + POP_ICON / 2))
     pop.head:SetText("NEW AT YOUR TRAINER")
     local close = S.CloseX(pop, function()
         if popSample then return end
         pop:Hide()
     end, "Put away until your next level")
-    close:SetPoint("TOPRIGHT", -5, -5)
+    close:SetPoint("RIGHT", pop, "TOPRIGHT", -4, -(POP_PAD + POP_ICON / 2))
     pop.icons = {}
     -- while it is up: a spell trained goes from it, and it waits out a fight
     pop:SetScript("OnEvent", function(_, event)
@@ -213,6 +216,9 @@ function PopRefresh(show)
         pop:Hide()
         return
     end
+    local headW = pop.head:GetStringWidth()
+    if type(headW) ~= "number" then headW = 130 end
+    local left = POP_PAD + headW + 10            -- (the icons begin after the heading)
     for i, m in ipairs(list) do
         local b = PopIcon(i)
         b.m = m
@@ -220,13 +226,12 @@ function PopRefresh(show)
         b.tex:SetTexture(tex or 134400)
         b.rank:SetText(m.rank > 0 and m.rank or "")
         b:ClearAllPoints()
-        b:SetPoint("TOPLEFT", POP_PAD + ((i - 1) % POP_ROW) * (POP_ICON + POP_GAP), -30 - math.floor((i - 1) / POP_ROW) * (POP_ICON + POP_GAP))
+        b:SetPoint("TOPLEFT", left + ((i - 1) % POP_ROW) * (POP_ICON + POP_GAP), -POP_PAD - math.floor((i - 1) / POP_ROW) * (POP_ICON + POP_GAP))
         b:Show()
     end
     for i = #list + 1, #pop.icons do pop.icons[i]:Hide() end
     local rows, cols = math.ceil(#list / POP_ROW), math.min(#list, POP_ROW)
-    pop:SetSize(math.max(POP_MIN, POP_PAD * 2 + cols * (POP_ICON + POP_GAP) - POP_GAP),
-        30 + rows * (POP_ICON + POP_GAP) - POP_GAP + POP_PAD)
+    pop:SetSize(left + cols * (POP_ICON + POP_GAP) - POP_GAP + 30, POP_PAD * 2 + rows * (POP_ICON + POP_GAP) - POP_GAP)
     if show and not pop:IsShown() then pop:Show() end
     if pop:IsShown() and not popSample then pop:RegisterEvent("SPELLS_CHANGED") end
 end

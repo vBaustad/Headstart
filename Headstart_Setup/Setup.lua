@@ -1698,7 +1698,7 @@ function YS:Apply(force, only, how)
     local levels = YS.SPELL_LEVELS[class] or {}
     -- s: the apply as it goes, each step taking it up where the last frame left it. macros: MacroIndex(), read
     -- again after each macro made.
-    local s = { clear = 1, slot = 1, removed = 0, made = 0, placed = 0, askedAutoFeed = 0, moves = 0, kept = 0,
+    local s = { clear = 1, mk = 1, slot = 1, removed = 0, made = 0, placed = 0, askedAutoFeed = 0, moves = 0, kept = 0,
         msMoves = 0, msMacros = 0, msFeed = 0 }
     local steps = {}
     -- the bars emptied, CLEAR_BATCH buttons a frame - but not a slot the profile fills: dropped onto, what is there goes by
@@ -1726,35 +1726,101 @@ function YS:Apply(force, only, how)
             return true
         end
     end
-    -- each slot, PLACE_BATCH buttons put on (or macros made) a frame
+    -- What a slot's entry goes on as: "spell", the spell; "item"; "feed" (AutoFeed's macro, by its name); "macro", its
+    -- name, icon and text; nil for nothing.
+    local function GoesOnAs(e)
+        if not e then return nil end
+        local spellID = (levels[e.name] or YS.RACIALS[e.name] or e.prof or e.general) and RealSpell(e)
+        if spellID then return "spell", spellID end
+        if e.kind == "item" then return "item" end
+        if e.kind == "macro" and autofeed[e.name] then return "feed" end
+        -- a layout saved by an older version can still hold items and non-class spells
+        -- a spell's macro: in the two macro modes, and always for a mouseover spell (that IS a macro)
+        if e.kind == "macro" or (e.kind == "spell" and not e.prof
+                and (YS.SpellButtons(o) ~= "spells" or MOUSEOVER_SET()[REPLACE[e.name] or e.name])
+                and (levels[e.name] or YS.RACIALS[e.name] or e.general)
+                -- (a talent's spell you haven't got waits as nothing: see the top of the file)
+                and (not Talent(e.name) or KnownSpellID(REPLACE[e.name] or e.name))) then
+            return "macro", MacroFor(e)
+        end
+        return nil
+    end
+    local function Entry(slot)
+        if only and not only[slot] then return nil end
+        local e = p.slots[slot]
+        return Wanted(e, levels, autofeed, o) and e or nil
+    end
+    -- The macros first, every one the layout needs that isn't there yet, PLACE_BATCH a frame - the buttons after, with no
+    -- macro made between them. Each new macro is sorted into the game's list and moves the numbers of those after it:
+    -- made between the buttons, two of the main's macros made as the account's went on each other's buttons (the owner,
+    -- 2026-10-22: "my macros were placed wrong" - chicken and laugh, on a new rogue). Stops at the first the list has no
+    -- room for: what is there goes on, the rest stay empty, and it is said.
     steps[#steps + 1] = function()
       local n = 0
-      s.macros = nil            -- (read again each frame: a macro made or deleted in between moves the indexes)
+      while s.mk <= MAX_SLOT and n < PLACE_BATCH and not s.full do
+        local slot = s.mk
+        s.mk = slot + 1
+        local how, name, icon, body = GoesOnAs(Entry(slot))
+        if how == "feed" then
+            -- AutoFeed's macros are never copied: a copy is a macro AutoFeed doesn't own, so it would never fill it.
+            -- One AutoFeed already made is used; otherwise AutoFeed is asked to make it.
+            local own = AutoFeedOwned()[p.slots[slot].name] and GetMacroIndexByName(p.slots[slot].name)
+            if not (own and own > 0) then
+                local create = AutoFeedMaker()
+                local ok, res = false, nil
+                local t0 = Clock()
+                if create then ok, res = pcall(create, p.slots[slot].name) end
+                s.msFeed = s.msFeed + Clock() - t0
+                if ok and res then s.askedAutoFeed, n, s.macros = s.askedAutoFeed + 1, n + 1, nil end
+            end
+        elseif how == "macro" then
+            s.macros = s.macros or MacroIndex()
+            if not s.macros[body] then
+                local t0 = Clock()
+                local ok, res = false, nil
+                if p.slots[slot].kind == "macro" and AnyClass(body) then
+                    ok, res = pcall(CreateMacro, name, icon, body, false)      -- the account's (full: below)
+                    if ok and res then s.account = (s.account or 0) + 1 end
+                end
+                if not (ok and res) then ok, res = pcall(CreateMacro, name, icon, body, true) end   -- per-character
+                s.msMacros = s.msMacros + Clock() - t0
+                if ok and res then
+                    s.made, n = s.made + 1, n + 1
+                    s.macros = nil      -- macros are kept sorted: their numbers just moved
+                else
+                    s.full = name
+                end
+            end
+        end
+      end
+      return s.mk > MAX_SLOT or s.full ~= nil
+    end
+    -- each slot, PLACE_BATCH buttons put on a frame
+    steps[#steps + 1] = function()
+      local n = 0
+      s.macros = nil            -- (read again each frame: a macro made or deleted in between moves the numbers)
       while s.slot <= MAX_SLOT and n < PLACE_BATCH do
         local slot = s.slot
         s.slot = slot + 1
-        local e = p.slots[slot]
-        if not Wanted(e, levels, autofeed, o) then e = nil end
-        if only and not only[slot] then
-            e = nil                 -- not one of the slots to touch: left exactly as it is
-        elseif only and HasAction(slot) then
+        local e = Entry(slot)
+        if only and only[slot] and HasAction(slot) then
             PickupAction(slot)      -- one of them: what was there goes, then what's saved (if anything) goes in
             ClearCursor()
             n = n + 1
         end
         if not only or only[slot] then placedSet[slot] = nil end
+        local how, a1, _, body = GoesOnAs(e)
         local idx, put
-        local spellID = e and (levels[e.name] or YS.RACIALS[e.name] or e.prof or e.general) and RealSpell(e)
-        if spellID then
-            if Holds(slot, "spell", spellID) then s.kept = s.kept + 1
+        if how == "spell" then
+            if Holds(slot, "spell", a1) then s.kept = s.kept + 1
             else
                 local t0 = Clock()
-                PlaceSpell(slot, spellID)
+                PlaceSpell(slot, a1)
                 n, s.moves, s.msMoves = n + 1, s.moves + 1, s.msMoves + Clock() - t0
             end
             placedSet[slot], put = true, true
             s.placed = s.placed + 1
-        elseif e and e.kind == "item" then
+        elseif how == "item" then
             if Holds(slot, "item", e.id) then s.kept = s.kept + 1
             else
                 local t0 = Clock()
@@ -1765,54 +1831,12 @@ function YS:Apply(force, only, how)
                 n, s.moves, s.msMoves = n + 1, s.moves + 1, s.msMoves + Clock() - t0
             end
             s.placed, put = s.placed + 1, true
-        elseif e and e.kind == "macro" and autofeed[e.name] then
-            -- AutoFeed's macros are never copied: a copy is a macro AutoFeed doesn't own, so it would
-            -- never fill it. One AutoFeed already made is placed; otherwise AutoFeed is asked to make it.
+        elseif how == "feed" then
             local own = AutoFeedOwned()[e.name] and GetMacroIndexByName(e.name)
-            if not (own and own > 0) then
-                local create = AutoFeedMaker()
-                local ok, res = false, nil
-                local t0 = Clock()
-                if create then ok, res = pcall(create, e.name) end
-                s.msFeed = s.msFeed + Clock() - t0
-                own = ok and res or nil
-                if own then s.askedAutoFeed, s.macros = s.askedAutoFeed + 1, nil end
-            end
             if own and own > 0 then idx = own else s.noAutoFeed = e.name end
-        -- a layout saved by an older version can still hold items and non-class spells
-        -- a spell's macro: in the two macro modes, and always for a mouseover spell (that IS a macro)
-        elseif e and (e.kind == "macro" or (e.kind == "spell" and not e.prof
-                and (YS.SpellButtons(o) ~= "spells" or MOUSEOVER_SET()[REPLACE[e.name] or e.name])
-                and (levels[e.name] or YS.RACIALS[e.name] or e.general)
-                -- (a talent's spell you haven't got waits as nothing: see the top of the file)
-                and (not Talent(e.name) or KnownSpellID(REPLACE[e.name] or e.name)))) then
-            local name, icon, body = MacroFor(e)
+        elseif how == "macro" then
             s.macros = s.macros or MacroIndex()
-            idx = s.macros[body]
-            if not idx then
-                local t0 = Clock()
-                local ok, res = false, nil
-                if e.kind == "macro" and AnyClass(body) then
-                    ok, res = pcall(CreateMacro, name, icon, body, false)      -- the account's (full: below)
-                    if ok and res then s.account = (s.account or 0) + 1 end
-                end
-                if not (ok and res) then ok, res = pcall(CreateMacro, name, icon, body, true) end   -- per-character
-                s.msMacros = s.msMacros + Clock() - t0
-                if ok and res then
-                    idx, s.made, n = res, s.made + 1, n + 1
-                    s.macros = nil      -- character macros are kept sorted: their indexes just moved
-                else
-                    s.full = name
-                    s.slot = MAX_SLOT + 1
-                    -- (what the profile meant to fill from here on was left to be dropped onto, not emptied: emptied now)
-                    if o.clearBars and not only then
-                        for rest = slot, MAX_SLOT do
-                            if HasAction(rest) then PickupAction(rest) ClearCursor() s.moves = s.moves + 1 end
-                        end
-                    end
-                    break
-                end
-            end
+            idx = s.macros[body]        -- (made above, or there already; none: the list was full)
         end
         if idx then
             if Holds(slot, "macro", idx) then s.kept = s.kept + 1

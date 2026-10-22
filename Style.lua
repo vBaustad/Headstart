@@ -298,10 +298,11 @@ function S.IconButton(parent, icon, onClick, tip, color, size)
     return b
 end
 
---- A small window's close button: a clear cross (art/x, bolder than the title bar's "close"), light at rest and white
---- under the mouse (the owner, 2026-10-21, of the trainer window's: "make the X better").
+--- A small window's close button: a clear cross (art/x, bolder than the title bar's "close"), quiet at rest and white
+--- under the mouse (the owner, 2026-10-21, of the trainer window's: "make the X better" - a speck before; then, at 14
+--- and light: "a bit much", 2026-10-22 - 12, the muted grey).
 function S.CloseX(parent, onClick, tip)
-    return S.IconButton(parent, "x", onClick, tip, S.C.sub, 22)
+    return S.IconButton(parent, "x", onClick, tip, S.C.muted, 20)
 end
 
 function S.Tip(owner, text)
