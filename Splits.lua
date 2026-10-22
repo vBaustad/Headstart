@@ -209,6 +209,9 @@ end
 local function Counts(k, r)
     local by = YippRouteDB.splitsCompare
     if not by or by == "any" then return true end
+    -- one run picked by hand: on launch day the stress test's run, not the faster beta runs that came
+    -- along when the settings were copied over (the user, 2026-10-22)
+    if by == "pin" then return k == YippRouteDB.splitsPin end
     local _, myClass = UnitClass("player")
     local myRace = rec and rec.race or select(2, UnitRace("player"))
     if r.class ~= (rec and rec.class or myClass) then return false end
@@ -256,6 +259,28 @@ function YR.SplitsBestRuns()
         end
     end
     for _, name in pairs(who) do out[name] = true end
+    local pinned = YippRouteDB.splitsPin and Runs()[YippRouteDB.splitsPin]
+    if pinned and pinned.name then out[pinned.name] = true end      -- the run picked to compare with
+    return out
+end
+
+--- The timed runs to pick one from ("Compare with: One run I pick"): { key, label }, highest level
+--- first. The label tells two characters of one name apart (a beta run and the same name on live).
+function YR.SplitsRunList()
+    local out = {}
+    for k, r in pairs(Runs()) do
+        local top, at = 0, 0
+        for lvl, t in pairs(type(r.levels) == "table" and r.levels or {}) do
+            if lvl > top then top, at = lvl, t end
+        end
+        if top > 1 and k ~= key then
+            local name = (r.name or "?"):gsub("%-.*", "")
+            local class = r.class and LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[r.class] or r.class or "?"
+            out[#out + 1] = { k, ("%s, %s: level %d at %d:%02d"):format(name, class, top, floor(at / 3600), floor(at % 3600 / 60)),
+                top = top, at = at }
+        end
+    end
+    table.sort(out, function(a, b) if a.top ~= b.top then return a.top > b.top end return a.at < b.at end)
     return out
 end
 

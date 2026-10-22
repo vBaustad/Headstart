@@ -2250,7 +2250,7 @@ local function BuildRouteSettings(page)
     Row("XP per hour", S.Check(c, function() return st().rate end, Style("rate")))
     Row("Time to ding", S.Check(c, function() return st().ding end, Style("ding")))
     local COMPARE = { { "any", "Any run" }, { "class", "Same class" }, { "race", "Same class and race" },
-        { "route", "Same class and start route" } }
+        { "route", "Same class and start route" }, { "pin", "One run I pick" } }
     local compare
     compare = S.Dropdown(c, 190, COMPARE, function(v)
         YippRouteDB.splitsCompare = v ~= "any" and v or nil
@@ -2262,6 +2262,28 @@ local function BuildRouteSettings(page)
     end
     Row("Compare with", compare, "Which of your runs the comparison columns use: any run, only your class, your class and race,"
         .. " or your class on the same start route (a Lean opener against Lean runs). Dwarf and Gnome count as one, since they share a start.")
+    do      -- (a block of its own: this function is at Lua's 200-locals limit)
+        local runPick = S.Dropdown(c, 240, function()
+            local out = {}
+            for _, r in ipairs(YR.SplitsRunList and YR.SplitsRunList() or {}) do out[#out + 1] = { r[1], r[2] } end
+            if #out == 0 then out[1] = { false, "No timed runs", S.C.muted } end
+            return out
+        end, function(k)
+            if not k then return end
+            YippRouteDB.splitsPin, YippRouteDB.splitsCompare = k, "pin"
+            compare:Refresh()
+            YR:ApplySplitsStyle()
+        end)
+        function runPick:Refresh()
+            local pin = YippRouteDB.splitsPin
+            for _, r in ipairs(YR.SplitsRunList and YR.SplitsRunList() or {}) do
+                if r[1] == pin then return self:SetValue(r[2]) end
+            end
+            self:SetValue("Pick a run...")
+        end
+        Row("The run to compare with", runPick, "For One run I pick: your splits against that run alone, say the stress"
+            .. " test's run on launch day. Picking one turns it on")
+    end
     Row("Level column", S.Check(c, function() return st().levelCol end, Style("levelCol")),
         "Shows how long each level took.")
     Row("Total column", S.Check(c, function() return st().totalCol end, Style("totalCol")),

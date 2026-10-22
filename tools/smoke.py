@@ -686,6 +686,17 @@ g.YippRouteDB.splitsCompare = "route"
 check(YR.SplitsFastest().levels[5] == 1500,
       "class and start route: a Lean run and an older one the routes addon names; not the Launch run, not another class")
 lua.execute("RXP, UnitLevel, HeadstartRunRoutes = KEPT_RXP, KEPT_LEVEL, nil")
+# One run I pick: that run alone, though faster ones of the same class are there (the stress test's run
+# on launch day, against the beta runs copied along); the list names it and the pick keeps its log
+g.YippRouteDB.splitsCompare, g.YippRouteDB.splitsPin = "pin", "lean"
+check(YR.SplitsFastest().levels[5] == 1600, "one run picked: that run's times, not the faster ones")
+run_list = YR.SplitsRunList()
+labels = [run_list[i][2] for i in range(1, len(run_list) + 1)]
+check(any("Lean" in l and "level 5" in l for l in labels) and len(labels) == 4, f"the runs to pick from: {labels}")
+check(YR.SplitsBestRuns()["Lean-Realm"], "the picked run's log is kept like a fastest run's")
+g.YippRouteDB.splitsPin = "gone"
+check(YR.SplitsFastest() is None, "a picked run that is gone: nothing to compare with, no error")
+g.YippRouteDB.splitsPin = None
 g.YippRouteDB.splitsCompare = None
 check(YR.SplitsStartInLog is not None, "the start route can be read from this character's own log (a run past 6)")
 lua.execute("YippRouteDB.splits.runs = SAVED_RUNS")
