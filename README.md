@@ -2,7 +2,7 @@
 
 Quality of life, levelling tools and one-click character setup for **WoW: Forever**, in one addon. A new character gets your action bars, macros, key bindings and interface in one click; your trainer, vendors, bank and mailbox can be handled for you by rules you set; and the screen gets the bars and notes you ask for and nothing else.
 
-**Nothing acts for you until you turn it on.** Installing Headstart does not touch your action bars, macros, key bindings, Edit Mode layout, chat windows or game settings, and it buys, moves, accepts and picks nothing. A short tour shows you around its window and turns nothing on; everything that spends gold, moves items or answers for you starts off, and says what it does before you switch it on. The one thing it does unasked is skip a cinematic, which on a new character is the opening flight over its zone: it says so in chat, and Skip intro cinematic is a switch (hold Shift as you enter the world to watch).
+**Nothing acts for you until you turn it on.** Installing Headstart does not touch your action bars, macros, key bindings, Edit Mode layout, chat windows or game settings, and it buys, moves, accepts and picks nothing. Its first login shows a small card - set up this character, show me around, or later - and turns nothing on; everything that spends gold, moves items or answers for you starts off, and says what it does before you switch it on. The one thing it does unasked is skip a cinematic, which on a new character is the opening flight over its zone: it says so in chat, and Skip intro cinematic is a switch (hold Shift as you enter the world to watch).
 
 **And you can always go back.** **Put back everything** (General page, or `/headstart putback`) asks first, then puts your bars, macros, key bindings, game settings, Edit Mode layout and chat windows back as they were before Headstart first changed them, and turns its quality-of-life features and Character setup off.
 
@@ -10,8 +10,8 @@ Headstart does not come with levelling routes: you make your own from your runs,
 
 ## Getting started
 
-- `/headstart` (or the minimap button) opens the window. It has four tabs: **QoL**, **Interface**, **Levelling** and **Character setup**. `/hs` goes straight to the settings.
-- The first time, a short **tour** over the window: a hint at a time points at where things are - the search, All features, the Automation group (everything that spends gold, moves items or answers for you), General, the Interface tab, Character setup. It turns nothing on. Skip it whenever you like; the Tour button or `/headstart start` brings it back.
+- `/headstart` (or the minimap button) opens the window. It has four tabs: **QoL**, **Interface**, **Routes** and **Character setup**. `/hs` goes straight to the settings.
+- The first login shows a small card, not the whole window: **Set up this character** turns Character setup on and opens it (plan this class's bars, or save a character's bars, keys and interface for the others), **Show me around** opens the window with a short **tour** - a hint at a time points at where things are: the search, All features, the Automation group (everything that spends gold, moves items or answers for you), General, the Interface tab, Character setup - and **Later** closes it. None of it turns anything on. The Tour button or `/headstart start` brings the tour back.
 - The settings can be searched, and every feature is one card with its switch in its head; a feature made of several choices keeps them while it is off. On All features the groups fold away.
 
 ## New characters and your interface
@@ -58,20 +58,20 @@ Hold Shift as you open a trainer, vendor, bank or mailbox to do it yourself that
 - **Chat log** to search and copy from, past sessions included, a whisper sound of your own, and fewer buttons beside chat.
 - **Arrange** (`/hs move`): every bar, button and icon of Headstart's on a grid, moved by dragging, the arrow keys or typed numbers - the one place where they are placed and sized.
 - Looks for the game's damage meter and for RestedXP's window; the bag bar and micro menu hidden or on mouseover; the talent window movable and see-through.
+- **Edit Mode outlines:** in the game's Edit Mode each element is a clean dark block instead of the large blue sheet - a thin edge in Headstart's colour and its name in the middle, white under the mouse, and on the one you picked where it stands, in pixels from the middle of the screen, as you drag it - so you see what you place and what it lines up with.
 - **Skip intro cinematic:** a new character's opening flight ended as it starts; every other cinematic plays. On unless you turn it off.
 
 ## Journey
 
 Your character's road, counted quietly as you play: how far you travelled and how, where the hours went, gold earned and spent, your best find, the zones you saw, the enemies you met most, and how long each level took. At level 20, 30, 40, 50 and 60 a chapter is written and a small note offers to show it: a book in the game's own look, a page at a time, each chapter set against the one before. `/hs journey`.
 
-## Levelling by a route (needs RestedXP Guides)
+## Levelling (the Routes tab; with RestedXP Guides)
 
-- **Your own routes.** Play with Record runs on, then save the run as a route, played in RestedXP under My routes. All routes lists them by level; Share passes one on as text, and Import a route takes one someone gave you.
-- **Route editor.** Every step can be changed in game: drag steps around, add, merge, duplicate or delete them, or edit the raw text.
+- **Run log.** Position, quests, kills, deaths, vendors and money of each run, in order on This run: to see where the time went, or to hand to someone (or an AI) to look over afterwards.
 - **Level splits.** Time per level and in total against your best run, XP an hour and time to level.
 - **Level pace.** A small box under the RestedXP guide: time to level at your pace, what grinding here pays, and one line when a step costs more than grinding would (it never skips anything for you).
-- **Run log.** Position, quests, kills, deaths, vendors and money of each run, to see where the time went.
-- **Next route.** Where the Routes tab opens: which route to take now and at which step - also for a character that levelled by hand - with your talent build and this run beside it, and the next routes under it.
+- **Skip quest.** Right-click a step in RestedXP's guide: every step of that quest skipped at once (off until you turn it on).
+- **Release at death skips.** On a guide step that says to die and come back at the Spirit Healer, your spirit is released at once and the resurrection accepted (off until you turn it on).
 - **Keep what the route needs.** Items a route quest still needs say so on their tooltip, and selling one warns you.
 
 ## Taking your settings to another install

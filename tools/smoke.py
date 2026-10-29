@@ -613,7 +613,8 @@ n = YR.PruneLogs(30)
 g.CLOCK -= 40 * 86400
 check(g.YippRouteDB.runs["Gone-Realm"] is None and g.YippRouteDB.runs["Tester-Realm"] is not None,
       f"30 days: the old logs go ({n}), never this character's")
-# old logs that are still used are kept: a fastest run's, and one a route of your own was saved from
+# old logs that are still used are kept: a fastest run's (a route of your own saved from one kept it too, until
+# Save as route was taken out, 2026-10-29: such a log now goes like any other)
 lua.execute('''KEEP_SPLITS, KEEP_MINE, KEEP_DAYS = YippRouteDB.splits, YippRouteDB.myRoutes, YippRouteDB.logKeepDays
     YippRouteDB.runs["Fast-Realm"] = { started = 10, ev = {}, track = {} }
     YippRouteDB.runs["Slow-Realm"] = { started = 10, ev = {}, track = {} }
@@ -626,13 +627,9 @@ lua.execute('''KEEP_SPLITS, KEEP_MINE, KEEP_DAYS = YippRouteDB.splits, YippRoute
 check(YR.LogKeepDays() == 30, "never set: logs go after 30 days unplayed")
 g.CLOCK += 40 * 86400
 n = YR.PruneLogs(YR.LogKeepDays())
-check(n == 1 and g.YippRouteDB.runs["Slow-Realm"] is None, f"an old log nothing uses goes ({n})")
+check(n == 2 and g.YippRouteDB.runs["Slow-Realm"] is None and g.YippRouteDB.runs["Source-Realm"] is None,
+      f"the old logs nothing uses go ({n}), a route once saved from one with them (Save as route is gone)")
 check(g.YippRouteDB.runs["Fast-Realm"] is not None, "the fastest run's log is kept, however old")
-check(g.YippRouteDB.runs["Source-Realm"] is not None, "and the log a route of your own was saved from")
-lua.execute('''YippRouteDB.runs["Slow-Realm"] = { started = 10, ev = {}, track = {} }
-    YippRouteDB.myRoutes = { dwarfgnome = { parts = {} } }''')
-check(YR.PruneLogs(30) == 1 and g.YippRouteDB.runs["Slow-Realm"] is not None and g.YippRouteDB.runs["Source-Realm"] is None,
-      "a route saved before its source was kept: every log of that race stays, the others go")
 g.YippRouteDB.logKeepDays = 0
 check(YR.LogKeepDays() == 0 and YR.PruneLogs(YR.LogKeepDays()) == 0, "0 days set: never deleted")
 g.CLOCK -= 40 * 86400
@@ -795,16 +792,14 @@ tail = [run.ev[i] for i in range(1, len(run.ev) + 1)][-3:]
 check(tail[0][2] == "buy" and tail[0].item == 2901, f"bought item logged: {tail[0][2]} {tail[0].item}")
 check(tail[2][2] == "learn" and tail[2].spell == 2575, "Mining learned at the trainer logged, the level-up spell not")
 
-# The route editor: recorded actions become guide steps (the delivery quest's instant "complete" is no step)
+# This run: what was done, one line each (the delivery quest's instant "complete" is not one)
 acts = YR.RunActions(YR)
 labels = [acts[i].label for i in range(1, len(acts) + 1)]
 check("Took Dwarven Outfitters" in labels and "Bought Mining Pick" in labels and "Learned Mining" in labels,
       f"this run's actions: {labels}")
-steps_ = {acts[i].label: acts[i].step for i in range(1, len(acts) + 1)}
-check(".accept 179 >>Accept Dwarven Outfitters" in steps_["Took Dwarven Outfitters"]
-      and ".goto 1426,29.93,71.20" in steps_["Took Dwarven Outfitters"], "taking a quest becomes an accept step with its place")
-check(".collect 2901,1" in steps_["Bought Mining Pick"] and ".train 2575" in steps_["Learned Mining"], "buy and learn steps")
-# the window builds, and a recorded step can be put into the open route
+check(all(acts[i].step is None for i in range(1, len(acts) + 1)),
+      "and no route step written for them (Add to route went with the route editor, 2026-10-29)")
+# the window builds
 lua.execute("""SEEN_ICONS = {}
 local F = getmetatable(CreateFrame())
 local set = F.SetText
@@ -814,10 +809,6 @@ F.SetText = function(self, t)
 end""")
 YR.ToggleWindow(YR)
 check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is False, "the window opens")
-header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
-before = len(steps)
-YR.InsertStep(YR, steps_["Bought Mining Pick"])
-YR.ToggleWindow(YR, "share")
 # import: a route with our Coldridge name replaces the player's; any other name is kept as an extra
 own = YR.GuideText(YR, "coldridge").replace("Talin Keeneye", "Talin Keeneye (edited)")
 done = YR.ImportGuide(YR, own)
@@ -1152,28 +1143,25 @@ YR.ShowSettingsTab(YR, "route")
 check(YR.WindowTab() == "levelling", f"Route settings is on the Levelling tab: {YR.WindowTab()}")
 YR.ToggleWindow(YR, "run")
 check(YR.WindowTab() == "levelling", "This run is on the Levelling tab")
-YR.ToggleWindow(YR, "where")              # Next route builds and fills from the real routes
-check(YR.WindowTab() == "levelling", "Next route is on the Levelling tab, and fills without an error")
-# The Levelling tab made over (the owner, 2026-10-21: "the levelling tab is very confusing for new users"): a menu of
-# four pages and Settings at its foot; every page builds and fills; the editor and Share light All routes in the menu.
-for _key in ("where", "library", "run", "route", "routes", "share"):
+# The Levelling tab: Next route and All routes (here, with the routes installed), This run, and Settings at its foot.
+# Building routes went on 2026-10-29 - the editor, Save as route, Share, Import - and the two route pages came back the
+# same day, shown only with a routes addon (the owner: "hent dem tilbake bare med rutene installert").
+for _key in ("where", "library", "run", "route"):
     YR.ToggleWindow(YR, _key)
     check(YR.WindowTab() == "levelling" and YR.WindowPage() == _key, f"{_key}: on the Levelling tab, built and filled ({YR.WindowPage()})")
 _menu = {k: YR.TourTarget(f"levelling:{k}") for k in ("where", "library", "run", "route")}
-check(all(_menu.values()) and _menu["route"].text.text == "Settings" and _menu["where"].text.text == "Next route"
-      and YR.TourTarget("levelling:builds") is None, "the menu: Next route, All routes, This run, and Settings (Talents is QoL's)")
+check(all(_menu.values()) and _menu["where"].text.text == "Next route" and _menu["library"].text.text == "All routes"
+      and _menu["run"].text.text == "This run" and _menu["route"].text.text == "Settings" and YR.TourTarget("levelling:builds") is None,
+      "the menu, with the routes installed: Next route, All routes, This run, and Settings (Talents is QoL's)")
 check(YR.TourTarget("levelling").text.text == "Routes" and [t.title for t in YR.TourSteps().values() if t.at == "levelling"] == ["Routes"],
       "the tab is called Routes (Levelling until 2026-10-21), on the tab and in the tour")
-YR.ToggleWindow(YR, "routes")
-_lit = _menu["library"].selected is True and _menu["where"].selected is False
-YR.ToggleWindow(YR, "share")
-check(_lit and _menu["library"].selected is True, "the editor and Share light All routes in the menu")
-# Next route: the one to take, and at most three after it (all of them overran the window: the rest are on All routes)
+check(YR.InsertStep is None and YR.ShareOpen is None and YR.AskSaveRunAsRoute is None, "nothing of building routes is left to call")
+# Next route: the one to take, and at most three after it
 YR.ToggleWindow(YR, "where")
 _w = YR.WherePageShown()
 check(_w.best is not None and 1 <= _w.after <= 3 and _w.load in ("Load in RestedXP", "In RestedXP now"),
       f"Next route: {_w.best} to take, and the next {_w.after}")
-# All routes: this character's, or every race's; the one to take marked; Edit opens it in the editor
+# All routes: this character's, or every race's; the one to take marked; Load, and no Edit
 g.YippRouteDB.allRoutes = None
 YR.ToggleWindow(YR, "library")
 _mine = list(YR.LibraryShown().values())
@@ -1187,7 +1175,6 @@ check("coldridge" in _keys and "northshire" not in _keys and len(_every) > len(_
       f"All routes: this character's ({len(_mine)}), every race's ({len(_every)})")
 check(any(r.key == _w.best and r.state in ("Take this one", "In RestedXP", "Your version", "Update waiting") for r in _mine),
       f"the route to take is marked on All routes ({[(r.key, r.state) for r in _mine][:3]})")
-_edit = g.FindButton("Edit") if hasattr(g, "FindButton") and g.FindButton else None
 lua.execute("""
 function FindButton(label)
     for _, f in ipairs(FRAMES) do
@@ -1195,9 +1182,8 @@ function FindButton(label)
         if type(t) == "table" and rawget(t, "text") == label then return f end
     end
 end""")
-_edit = g.FindButton("Edit")
-_edit.fn(_edit)
-check(YR.WindowPage() == "routes", "Edit on a route opens the editor")
+check(g.FindButton("Edit") is None and g.FindButton("See the steps") is None and g.FindButton("Import a route...") is None
+      and g.FindButton("Load") is not None, "All routes and Next route: Load, and no Edit, See the steps or Import")
 # with the routes off: their pages are the switch that turns them on; Talents is everyone's
 _was_routes = g.YippRouteDB.routes
 g.YippRouteDB.routes = False
@@ -1752,6 +1738,22 @@ lua.execute("local b = HeadstartTour.next for i = 1, 9 do b.fn(b) end")
 check(g.HeadstartTour.title.text == "Quality of life" and YR.WindowTab() == "qol", "the tour runs through in the window, on the QoL tab")
 lua.execute("local b = HeadstartTour.next b.fn(b)")
 check(g.HeadstartTour.hidden, "and is gone at Done")
+# The first login's card (Welcome.lua; Core.lua puts it up), against the real window: Show me around opens it on
+# All features with the tour; Set up this character turns Character setup on and opens its tab.
+_kept_welcome = (g.YippRouteDB.welcome, g.YippRouteDB.welcomeSeen, g.YippRouteDB.setupOn)
+lua.execute("YippRouteDB.welcome, YippRouteDB.welcomeSeen = true, nil HeadstartWindow:Hide()")
+YR.WelcomeCard()
+lua.execute("local b = HeadstartWelcomeCard.tour b.fn(b)")
+check(g.HeadstartWelcomeCard.hidden and not g.HeadstartTour.hidden and YR.WindowShowing("home") and g.YippRouteDB.welcomeSeen,
+      "the first login's card: Show me around - the window on All features, with the tour")
+lua.execute("local b = HeadstartTour.skip b.fn(b) HeadstartWindow:Hide()")
+lua.execute("YippRouteDB.welcome, YippRouteDB.welcomeSeen = true, nil")
+YR.WelcomeCard()
+lua.execute("local b = HeadstartWelcomeCard.setup b.fn(b)")
+check(g.HeadstartWelcomeCard.hidden and g.YippRouteDB.setupOn is True and YR.WindowPage() == "setup"
+      and not g.HeadstartWindow.hidden and g.YippRouteDB.welcomeSeen,
+      f"and Set up this character - Character setup on, its tab open ({YR.WindowPage()})")
+g.YippRouteDB.welcome, g.YippRouteDB.welcomeSeen, g.YippRouteDB.setupOn = _kept_welcome
 # the news on the first page names cards that exist; the XP bar's samples; the accents
 news_missing = lua.eval("""(function()
     local YR = HeadstartNS
@@ -2026,30 +2028,6 @@ check(list(g.DBI.calls.values())[-1] == "hide" and g.DBI.db.hide is True and g.Y
 lua.execute("LibStub = KEPT_STUB YippRouteDB.minimap, YippRouteDB.minimapAngle = nil, nil")
 YR.ShowMinimapButton, YR.BuildMinimapButton = _show, _build
 
-# The step model: every step of both shipped routes reads into lines and writes back to the same text
-# (spacing aside); the templates make steps; editing a line's argument changes only that argument.
-for key in ("coldridge", "dunmorogh", "northshire", "shadowglen"):
-    header, steps = YR.SplitSteps(YR.GuideText(YR, key))
-    changed = []
-    for i in range(1, len(steps) + 1):
-        again = YR.WriteStep(YR.ParseStep(steps[i]))
-        norm = lambda t: [l.strip() for l in t.splitlines() if l.strip()]
-        if norm(again) != norm(steps[i]):
-            changed.append(i)
-    check(not changed, f"{key}: every step reads and writes back unchanged (differs: {changed[:5]})")
-st = YR.ParseStep("step << Paladin\n    #optional\n    .goto 1426,22.3,72.5,45\n    >>Kill boars\n    .complete 183,1 --x12")
-check(st.head == "<< Paladin" and st.lines[1].tag == "optional" and st.lines[2].cmd == "goto"
-      and st.lines[3].text == "Kill boars" and st.lines[4].note.strip() == "--x12", "a step's parts: head, tag, command, text, note")
-YR.SetArg(st.lines[2], 2, "30.5")
-check(st.lines[2].args == "1426,30.5,72.5,45", f"changing X keeps the rest: {st.lines[2].args}")
-info = YR.StepInfo(YR.ParseStep("step\n    .goto 1426,22.3,72.5\n    .accept 183 >>Accept The Boar Hunter"))
-check(info.kind == "accept" and "The Boar Hunter" in info.text, f"step info: {info.kind} {info.text}")
-temps = YR.StepTemplates()
-kinds = [temps[i][1] for i in range(1, len(temps) + 1)]
-check("xp" in kinds and "gold" in kinds and "quest" in kinds, f"templates: {kinds}")
-xp_step = [YR.WriteStep(temps[i][3]) for i in range(1, len(temps) + 1) if temps[i][1] == "xp"][0]
-lvl = g.UnitLevel() + 1
-check(f".xp {lvl} >>Grind to level {lvl}" in xp_step and ".goto 1426,29.93,71.20" in xp_step, f"farm XP step here: {xp_step!r}")
 # the split settings: size, lines and position
 YR.ShowSplits(YR, True)
 lua.execute("YR_ST = nil")
@@ -2075,21 +2053,12 @@ check(sf.rows[1][2].hidden is True and sf.rows[1][3].hidden is False, "the level
 stl.clock, stl.levelCol, stl.size, stl.rate = "full", True, 14, True
 run_rec.elapsed = old_elapsed
 YR.ApplySplitsStyle(YR)
-# The sidebar lists this character's routes: a Dwarf Paladin's, not Northshire's or the Hunters'
-mine = YR.MyRoutes()
-check(mine["coldridge"] and mine["dunmorogh"] and mine["12_14_loch_modan_dwarf_gnome"]
-      and not mine["northshire"] and not mine["shadowglen"] and not mine["11_13_loch_modan_hunter"],
-      f"my routes: {sorted(k for k in mine.keys())}")
 # /hs opens Settings, and closes the window when Settings is already showing
-YR.ToggleWindow(YR, "routes")
+YR.ToggleWindow(YR, "run")
 g.SlashCmdList.HEADSTARTSETTINGS("")
 check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is False, "/hs opens Settings")
 g.SlashCmdList.HEADSTARTSETTINGS("")
 check(g.HeadstartWindow.hidden is True, "/hs again closes it")
-YR.ToggleWindow(YR, "routes")
-check(True, "the routes page with the step inspector builds and fills")
-
-# Delete step: find the button by its label, click it, and the open route has one step fewer
 lua.execute('''
 function FindButton(label)
     for _, f in ipairs(FRAMES) do
@@ -2098,26 +2067,6 @@ function FindButton(label)
     end
 end
 ''')
-YR.ToggleWindow(YR, "routes")
-count_text = None
-btn = g.FindButton("Delete step")
-check(btn is not None, "the Delete step button exists")
-before = g.HeadstartWindow and None
-lua.execute("DEL_BEFORE = nil")
-header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
-n_before = len(steps)
-if btn is not None:
-    undo = g.FindButton("Undo changes")
-    undo.fn(undo)                        # start from the saved route
-    btn.fn(btn)
-    YR.RefreshWindow(YR)
-    lua.execute('''
-    local b = FindButton("Save")
-    b.fn(b)
-    ''')
-    header, steps = YR.SplitSteps(YR.GuideText(YR, "coldridge"))
-    check(len(steps) == n_before - 1, f"Delete step, then Save: {n_before} -> {len(steps)} steps")
-    YR.RevertGuide(YR, "coldridge")
 
 # This run: clicking a quest action shows its details, with its Wowhead link to copy
 YR.ToggleWindow(YR, "run")
@@ -2384,8 +2333,6 @@ import smoke_stepkeeper
 bad += smoke_stepkeeper.run()
 import smoke_questskip
 bad += smoke_questskip.run()
-import smoke_myroutes
-bad += smoke_myroutes.run()
 import smoke_trinkets
 bad += smoke_trinkets.run()
 import smoke_instances
@@ -2406,6 +2353,8 @@ import smoke_swing
 bad += smoke_swing.run()
 import smoke_barhide
 bad += smoke_barhide.run()
+import smoke_editmode
+bad += smoke_editmode.run()
 import smoke_skipquests
 bad += smoke_skipquests.run()
 import smoke_wherenext

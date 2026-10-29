@@ -184,7 +184,8 @@ end
 -- routes under it. (It was "Where next?": the one to take over a list of every other route, which ran out of the
 -- window - the owner, 2026-10-21: "where next's other routes extend the window".)
 --   api: the window's parts (Editor.lua): head(page), panel(frame, shadow, colour), light(parent), clock(seconds),
---   steps(key) (the route open in the editor), width and top (the page's, and where under its heading it begins).
+--   width and top (the page's, and where under its heading it begins). (Its "See the steps" opened the route editor,
+--   taken out 2026-10-29; the page itself shows only with a routes addon installed - Editor.lua's PAGES.)
 -- ---------------------------------------------------------------------------
 local ui = {}
 local AFTER, AFTER_ROW, HERO_H, ALONG_W = 3, 40, 206, 236
@@ -245,10 +246,6 @@ function YR.BuildWherePage(page, api)
     ui.progress:SetPoint("TOPLEFT", 20, -116)
     ui.load = S.Button(hero, "Load in RestedXP", function() if ui.best then Load(ui.best) end end, "primary", 150)
     ui.load:SetPoint("BOTTOMLEFT", 20, 18)
-    ui.steps = S.Button(hero, "See the steps", function() if ui.best then api.steps(ui.best.key) end end, "ghost", 110)
-    ui.steps:SetTextColour(S.C.sub)
-    ui.steps:SetPoint("LEFT", ui.load, "RIGHT", 6, 0)
-    ui.steps.tip = "Open it in the route editor"
 
     -- what goes along the way: your talent build, your trainer, this run - each a click from its page
     local along = CreateFrame("Frame", nil, page)
@@ -354,7 +351,7 @@ function YR.RefreshWherePage()
     -- the one to take
     ui.name:ClearAllPoints()
     ui.chip:SetShown(best ~= nil)
-    for _, part in ipairs({ ui.track, ui.progress, ui.load, ui.steps }) do part:SetShown(best ~= nil) end
+    for _, part in ipairs({ ui.track, ui.progress, ui.load }) do part:SetShown(best ~= nil) end
     if best then
         local range, zone = Parts(best.name)
         ui.cap:SetText("TAKE THIS ONE")

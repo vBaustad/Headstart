@@ -1,4 +1,4 @@
--- Every class's talent tree in WoW: Forever, from the game's own data (build 1.60.1.70425; the trait system):
+-- Every class's talent tree in WoW: Forever, from the game's own data (build 1.60.1.70630; the trait system):
 -- [class ID] = { tree = its trait tree, tabs = its three tabs, nodes = { [node ID] = { spell, ranks, tab (1-3),
 -- row (1-7), column (1-4), the node it needs at full rank or nil } }. Made by tools/talents_gen.py - not edited by hand.
 local _, YR = ...
@@ -362,15 +362,14 @@ YR.TalentTrees = {
         [105781] = { 11129, 1, 2, 7, 2, 105784 },   -- Combustion
         [105780] = { 11189, 2, 3, 1, 1 },   -- Frost Warding
         [105779] = { 11070, 5, 3, 1, 2 },   -- Improved Frostbolt
-        [105778] = { 29438, 5, 3, 1, 3 },   -- Elemental Precision
+        [105778] = { 29438, 3, 3, 1, 3 },   -- Elemental Precision
         [105777] = { 11207, 5, 3, 2, 1 },   -- Ice Shards
-        [105776] = { 11175, 3, 3, 2, 2 },   -- Permafrost
+        [105774] = { 11071, 3, 3, 2, 2 },   -- Frostbite
         [105775] = { 11165, 2, 3, 2, 3 },   -- Improved Frost Nova
-        [105774] = { 11071, 3, 3, 2, 4 },   -- Frostbite
-        [105773] = { 11151, 3, 3, 3, 1 },   -- Piercing Ice
-        [105772] = { 11160, 3, 3, 3, 2 },   -- Frost Channeling
+        [105776] = { 11175, 3, 3, 2, 4 },   -- Permafrost
+        [105772] = { 11160, 3, 3, 3, 1 },   -- Frost Channeling
+        [105771] = { 11185, 3, 3, 3, 2 },   -- Improved Blizzard
         [105767] = { 1312002, 1, 3, 3, 3 },   -- Ice Lance
-        [105771] = { 11185, 3, 3, 3, 4 },   -- Improved Blizzard
         [105770] = { 16757, 2, 3, 4, 1 },   -- Arctic Reach
         [105769] = { 11958, 1, 3, 4, 2 },   -- Ice Block
         [105768] = { 11170, 3, 3, 4, 4 },   -- Shatter

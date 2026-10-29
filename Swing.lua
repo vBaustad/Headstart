@@ -820,6 +820,16 @@ function Dress()
                     k.color[1], k.color[2], k.color[3], k.color[4] = r, g, b, a      -- no new table: this can come often
                     if k.on then Tint(f, k) end
                 end)
+                -- Blizzard sets its background's and frame's alpha again as each swing starts and ends (live 70532;
+                -- before only on going out of reach and back): what we took away goes again after it, the frame
+                -- only while yours is off (on, it dims out of reach as Blizzard has it)
+                if type(f.ApplyRangePresentation) == "function" then
+                    hooksecurefunc(f, "ApplyRangePresentation", function()
+                        if not k.on then return end
+                        if k.bg then f.Background:SetAlpha(0) end
+                        if k.border and not YR.SwingDB().border then f.Border:SetAlpha(0) end
+                    end)
+                end
             end
             if on then
                 k.on = true

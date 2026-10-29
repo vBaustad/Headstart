@@ -1,7 +1,7 @@
 """Generate Data/Boats.lua (for Boats.lua): every boat and zeppelin's timetable, from rounds measured in the game.
 
-    python tools/gen_boats.py [SavedVariables/Headstart.lua ...]   (default: every account under the beta's WTF, and
-                                                                    the saved files backed up beside it)
+    python tools/gen_boats.py [SavedVariables/Headstart.lua ...]   (default: every account under the live client's
+                                                                    WTF, and the beta's saved files kept in forever-data)
 
 The rounds are the owner's, timed with /headstart boats (YippRouteDB.boatTimes): a transport ridden from leaving
 a dock to leaving it again. Each route's timetable is worked out by Boats.lua's own YR.BoatTimetable (run here
@@ -26,9 +26,11 @@ import lupa.lua51 as lua51
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "Data", "Boats.lua")
-WTF = r"S:\Blizzard\World of Warcraft\_classic_beta_\WTF\Account\*\SavedVariables\Headstart.lua"
-# the saved files moved out for a fresh-install test (2026-10-15): the rounds measured before are in them
-BACKUPS = r"S:\Blizzard\World of Warcraft\_classic_beta_\HeadstartBackup_*\WTF\Account\*\SavedVariables\Headstart.lua"
+WTF = r"S:\Blizzard\World of Warcraft\_forever_\WTF\Account\*\SavedVariables\Headstart.lua"
+# the beta was uninstalled 2026-10-26: its saved files at the end, and the ones moved out for a fresh-install test
+# (2026-10-15), are kept in forever-data - the rounds measured in the beta are in them
+BACKUPS = [r"S:\forever-data\backup\wtf\classic_beta_2026-10-26\Account\*\SavedVariables\Headstart.lua",
+           r"S:\forever-data\backup\classic_beta_2026-10-26_extras\HeadstartFreshTest_2026-10-15\WTF\Account\*\SavedVariables\Headstart.lua"]
 DB = r"S:\forever-data\db\forever.duckdb"
 
 
@@ -61,7 +63,7 @@ def course(paths, docks):
 
 
 def main():
-    paths = sys.argv[1:] or sorted(glob.glob(WTF)) + sorted(glob.glob(BACKUPS))
+    paths = sys.argv[1:] or sorted(glob.glob(WTF)) + [p for b in BACKUPS for p in sorted(glob.glob(b))]
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
     lua.execute("""
         local F = {} F.__index = F

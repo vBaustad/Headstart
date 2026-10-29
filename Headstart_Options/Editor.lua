@@ -1,14 +1,10 @@
 -- The Headstart window. Opened from the minimap button or /yroute. Four tabs at the top - QoL, Interface,
 -- Levelling and Character setup - each with its own menu down the left:
 --
---   Levelling  Next route (where it opens: the route to take, and the next ones), All routes, Talents, This run,
---              and Settings at the foot of the menu (the owner, 2026-10-21: "the levelling tab is very confusing
---              for new users" - the route list in the menu, the routes switch at its top). A route opens in the
---              editor from All routes (Edit) or Next route (See the steps): the steps on the left; the selected
---              step in full on the right, where every line of it can be changed, added or removed: places (with
---              "Here"), quests, targets, levels to farm to, gold to farm, classes that see it. Save hands it to
---              RestedXP. This run: what this character did; "Add to route" makes any of it a step of the open
---              route. Import a route and Share are at the foot of All routes.
+--   Levelling  Next route and All routes (with a routes addon installed: Headstart_Routes), This run (what this
+--              character did, in order: the log), and Settings at the foot of the menu. Building routes - the route
+--              editor, Save as route, Add to route, Share and Import a route - was taken out on 2026-10-29 (the owner:
+--              "jeg bruker den ikke"); the routes are written as text, outside the game.
 --   QoL        the settings pages for what Headstart does for you (Find a setting at the top), Instances among them.
 --   Interface  the settings pages for what it puts on your screen and does to Blizzard's: the same menu, its
 --              own pages (CATEGORIES: each page's tab).
@@ -29,7 +25,6 @@ local PW, PH = W - SIDE, H - HEAD          -- a Levelling page: what is left bes
 local CW, CH = W - NAV_W, PH - TITLE_H
 local LIST_W, ROW = 370, 24
 local win, pages, current
-local edit = { key = nil, header = nil, steps = nil, parsed = {}, dirty = false, sel = nil, line = nil, filter = "" }
 local ui = {}
 -- What the tour (Welcome.lua) points at, by name: parts of this window, kept as they are made.
 local tourAt = {}
@@ -47,83 +42,10 @@ StaticPopupDialogs["HEADSTART_DELETE_LOG"] = {
     hideOnEscape = true,
 }
 
--- Going back to the shipped route throws the player's edits away: ask first.
-StaticPopupDialogs["HEADSTART_REVERT"] = {
-    text = "Headstart: discard your edits to %s and use the original route?",
-    button1 = "Use the shipped route",
-    button2 = "Cancel",
-    OnAccept = function(_, key) YR:RevertRoute(key) end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-}
-
 local CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 local CLASS_NAME = { WARRIOR = "Warrior", PALADIN = "Paladin", HUNTER = "Hunter", ROGUE = "Rogue", PRIEST = "Priest",
     SHAMAN = "Shaman", MAGE = "Mage", WARLOCK = "Warlock", DRUID = "Druid" }
-local CLASS_TEX = "Interface\\Glues\\CharacterCreate\\UI-CharacterCreate-Classes"
 local ZEBRA = S.C.stripe
-
--- ---------------------------------------------------------------------------
--- The route being edited
--- ---------------------------------------------------------------------------
-local function Parsed(i)
-    local p = edit.parsed[i]
-    if not p then p = YR.ParseStep(edit.steps[i]) edit.parsed[i] = p end
-    return p
-end
-
--- The selected step was changed in the inspector: write it back to text.
-local function Commit()
-    if not edit.sel then return end
-    edit.steps[edit.sel] = YR.WriteStep(Parsed(edit.sel))
-    edit.dirty = true
-end
-
-local function Open(key)
-    edit.key = key
-    edit.header, edit.steps = YR.SplitSteps(YR:GuideText(key))
-    edit.parsed, edit.dirty, edit.line = {}, false, nil
-    edit.sel = #edit.steps > 0 and 1 or nil
-end
-
-local function Reparse() edit.parsed = {} end
-
-local function Visible()
-    local out = {}
-    local f = edit.filter:lower()
-    for i = 1, #edit.steps do
-        if f == "" or edit.steps[i]:lower():find(f, 1, true) then out[#out + 1] = i end
-    end
-    return out
-end
-
-local function Insert(at, text)
-    table.insert(edit.steps, at, text)
-    Reparse()
-    edit.sel, edit.line, edit.dirty = at, nil, true
-end
-
-function YR:InsertStep(text)
-    if not edit.steps then return end
-    Insert((edit.sel or #edit.steps) + 1, text)
-    YR:RefreshWindow()
-end
-
-local function Move(from, to)
-    if not (from and to) or from == to or to < 1 or to > #edit.steps then return end
-    local s = table.remove(edit.steps, from)
-    table.insert(edit.steps, to, s)
-    Reparse()
-    edit.sel, edit.dirty = to, true
-    YR:RefreshWindow()
-end
-
-local function Template(kind)
-    for _, t in ipairs(YR.StepTemplates()) do
-        if t[1] == kind then return YR.WriteStep(t[3]) end
-    end
-end
 
 -- ---------------------------------------------------------------------------
 -- A scrolling list of fixed rows. build(row) makes a row's parts once; fill(row, index) fills it. quiet: the row
@@ -198,648 +120,9 @@ local function List(parent, width, count, rowH, fill, total, build, quiet)
 end
 
 -- ---------------------------------------------------------------------------
--- Routes: the step list, and the buttons under it
--- ---------------------------------------------------------------------------
-local function DeleteStep(i)
-    if not (i and edit.steps[i]) then return end
-    table.remove(edit.steps, i)
-    Reparse()
-    if edit.sel and edit.sel >= i then edit.sel = edit.sel > 1 and edit.sel - 1 or (#edit.steps > 0 and 1 or nil) end
-    edit.dirty, edit.line = true, nil
-    YR:RefreshWindow()
-end
-
-local function QuestMenu(anchor, onPick)
-    local list = {}
-    for i = 1, C_QuestLog.GetNumQuestLogEntries() do
-        local info = C_QuestLog.GetInfo(i)
-        if info and not info.isHeader and info.questID then
-            local done = C_QuestLog.IsComplete(info.questID)
-            list[#list + 1] = { info.questID, (done and "|cff66dd88Done|r  " or "") .. info.title }
-        end
-    end
-    if #list == 0 then list[1] = { 0, "Your quest log is empty", S.C.muted } end
-    S.OpenMenu(anchor, list, function(q) if q ~= 0 then onPick(q) end end, 280)
-end
-
-local function BuildStepList(page)
-    local search = S.Input(page, { width = 260, placeholder = "Search steps", onChange = function(t)
-        edit.filter = t
-        ui.steps.offset = 0
-        YR:RefreshWindow()
-    end })
-    search:SetPoint("TOPLEFT", 16, -14)
-    ui.count = S.Text(page, 12, S.C.muted)
-    ui.count:SetPoint("LEFT", search, "RIGHT", 12, 0)
-
-    local rows = math.floor((PH - 48 - 106 - 60) / ROW)
-    local visible = {}
-    local dragFrom
-    local marker = page:CreateTexture(nil, "OVERLAY")
-    marker:SetSize(LIST_W - 8, 2)
-    S.Set(marker, S.C.accent)
-    marker:Hide()
-
-    ui.steps = List(page, LIST_W, rows, ROW, function(r, i)
-        local index = visible[i]
-        r.index = index
-        local info = YR.StepInfo(Parsed(index))
-        r.num:SetText(index)
-        r.icon:SetTexture(info.icon)
-        r.label:SetText(info.text)
-        r.cls:SetText(info.classes or "")
-        -- the text runs to the edge unless there are classes to show there
-        r.label:ClearAllPoints()
-        r.label:SetPoint("LEFT", 68, 0)
-        r.label:SetPoint("RIGHT", info.classes and -104 or -30, 0)
-        r:Select(edit.sel == index)
-    end, function() visible = Visible() return #visible end, function(r)
-        local grip = r:Tool("grip", nil, "Drag to move")
-        grip:SetPoint("LEFT", 0, 0)
-        grip:EnableMouse(false)
-        r.num = S.Text(r, 11, S.C.muted)
-        r.num:SetPoint("LEFT", 16, 0)
-        r.num:SetWidth(24)
-        r.num:SetJustifyH("RIGHT")
-        r.icon = r:CreateTexture(nil, "ARTWORK")
-        r.icon:SetSize(16, 16)
-        r.icon:SetPoint("LEFT", 46, 0)
-        r.label = S.Text(r, 13)
-        r.cls = S.Text(r, 11, { 0.55, 0.62, 0.72, 1 })
-        r.cls:SetPoint("RIGHT", -28, 0)
-        local del = r:Tool("close", function() DeleteStep(r.index) end, "Delete this step (Undo changes brings it back)", S.C.danger)
-        del:SetPoint("RIGHT", -3, 0)
-        r.cls:SetWidth(72)
-        r.cls:SetJustifyH("RIGHT")
-        r:RegisterForDrag("LeftButton")
-        r:SetScript("OnClick", function(self) edit.sel, edit.line = self.index, nil YR:RefreshWindow() end)
-        r:SetScript("OnDragStart", function(self)
-            dragFrom = self.index
-            page:SetScript("OnUpdate", function()
-                for _, o in ipairs(ui.steps.rows) do
-                    if o:IsShown() and o:IsMouseOver() then
-                        marker:ClearAllPoints()
-                        marker:SetPoint("BOTTOMLEFT", o, "TOPLEFT", 0, 0)
-                        marker:Show()
-                        return
-                    end
-                end
-            end)
-        end)
-        r:SetScript("OnDragStop", function()
-            page:SetScript("OnUpdate", nil)
-            marker:Hide()
-            for _, o in ipairs(ui.steps.rows) do
-                if o:IsShown() and o:IsMouseOver() then Move(dragFrom, o.index) break end
-            end
-            dragFrom = nil
-        end)
-    end)
-    ui.steps:SetPoint("TOPLEFT", 16, -48)
-    local frame = CreateFrame("Frame", nil, page)
-    frame:SetPoint("TOPLEFT", ui.steps, -1, 1)
-    frame:SetPoint("BOTTOMRIGHT", ui.steps, 1, -1)
-    S.Fill(frame, S.C.field)
-    frame:SetFrameLevel(math.max(0, ui.steps:GetFrameLevel() - 1))
-    S.Border(frame)
-
-    local function AfterSel() return (edit.sel or #edit.steps) + 1 end
-    local buttons = {
-        { "New step", function(self)
-            local list = {}
-            for _, t in ipairs(YR.StepTemplates()) do list[#list + 1] = { t[1], t[2] } end
-            S.OpenMenu(self, list, function(v)
-                Insert(AfterSel(), Template(v))
-                ui.steps:ShowIndex(edit.sel)
-                YR:RefreshWindow()
-            end, 200)
-        end, "A new step after the selected one, filled in with where you stand and what you target" },
-        { "Quick add quest", function(self)
-            QuestMenu(self, function(q)
-                local map, x, y = YR.Position()
-                local done = C_QuestLog.IsComplete(q)
-                local title = C_QuestLog.GetTitleForQuestID(q) or ("quest " .. q)
-                local ok, npc = pcall(UnitName, "target")
-                local step = { head = "", lines = {} }
-                if map then step.lines[1] = { k = "cmd", cmd = "goto", args = ("%d,%.2f,%.2f"):format(map, x, y) } end
-                step.lines[#step.lines + 1] = { k = "cmd", cmd = done and "turnin" or "accept", args = tostring(q),
-                    text = (done and "Turn in " or "Accept ") .. title }
-                if ok and npc then step.lines[#step.lines + 1] = { k = "cmd", cmd = "target", args = npc } end
-                Insert(AfterSel(), YR.WriteStep(step))
-                YR:RefreshWindow()
-            end)
-        end, "A step for a quest in your log, here: accept it, or turn it in if it's done" },
-        { "Delete step", function() DeleteStep(edit.sel) end, "Delete the selected step (Undo changes brings it back)" },
-        { "Move up", function() if edit.sel then Move(edit.sel, edit.sel - 1) end end },
-        { "Move down", function() if edit.sel then Move(edit.sel, edit.sel + 1) end end },
-        { "Merge up", function()
-            if not edit.sel or edit.sel < 2 then return end
-            local into, from = Parsed(edit.sel - 1), Parsed(edit.sel)
-            for _, l in ipairs(from.lines) do into.lines[#into.lines + 1] = l end
-            edit.steps[edit.sel - 1] = YR.WriteStep(into)
-            table.remove(edit.steps, edit.sel)
-            Reparse()
-            edit.sel, edit.dirty = edit.sel - 1, true
-            YR:RefreshWindow()
-        end, "Put this step's lines into the step above it" },
-        { "Duplicate", function() if edit.sel then Insert(edit.sel + 1, edit.steps[edit.sel]) YR:RefreshWindow() end end },
-        { "Farm XP here", function() Insert(AfterSel(), Template("xp")) YR:RefreshWindow() end,
-          "A step: grind here until the next level. Change the level on the right" },
-        { "Farm gold here", function() Insert(AfterSel(), Template("gold")) YR:RefreshWindow() end,
-          "A step: farm here until you have an amount of money. Change it on the right" },
-    }
-    local bw = (LIST_W - 12) / 3
-    for i, b in ipairs(buttons) do
-        local btn = S.Button(page, b[1], b[2], nil, bw)
-        btn.tip = b[3]
-        local col, row = (i - 1) % 3, math.floor((i - 1) / 3)
-        btn:SetPoint("TOPLEFT", ui.steps, "BOTTOMLEFT", col * (bw + 6), -10 - row * 32)
-    end
-end
-
--- ---------------------------------------------------------------------------
--- Routes: the inspector - the selected step, line by line
--- ---------------------------------------------------------------------------
-local LINE_ICON = { ["goto"] = YR.STEP_ICON.travel, accept = YR.STEP_ICON.accept, turnin = YR.STEP_ICON.turnin,
-    complete = YR.STEP_ICON.kill, mob = YR.STEP_ICON.kill, xp = YR.STEP_ICON.xp, money = YR.STEP_ICON.gold,
-    train = YR.STEP_ICON.train, collect = YR.STEP_ICON.buy, hs = YR.STEP_ICON.hearth, home = YR.STEP_ICON.hearth,
-    deathskip = YR.STEP_ICON.death }
-local DIM = "|cff8899aa"
-
-local function LineLabel(l)
-    if l.k == "tag" then return DIM .. "#" .. l.tag .. (l.val and (" " .. l.val) or "") .. "|r" end
-    if l.k == "say" then return (l.pre == "+" and DIM .. "Reminder|r  " or DIM .. "Text|r  ") .. YR.Plain(l.text) end
-    if l.k == "raw" then return DIM .. (l.raw or "") .. "|r" end
-    local c = YR.COMMAND_BY_NAME[l.cmd]
-    local what = c and c.label or ("." .. l.cmd)
-    local args = (l.args or "") ~= "" and ("  " .. DIM .. l.args .. "|r") or ""
-    if l.cmd == "goto" then args = "  " .. DIM .. (YR.PlaceText(YR.Args(l)) or l.args) .. "|r" end
-    return what .. args .. (l.text and ("  " .. YR.Plain(l.text)) or "")
-end
-
-local function AddChoices()
-    local list = {}
-    for _, c in ipairs(YR.COMMANDS) do list[#list + 1] = { "cmd:" .. c.cmd, c.label } end
-    list[#list + 1] = { "say:>>", "Instruction text" }
-    list[#list + 1] = { "say:+", "Reminder text" }
-    for _, t in ipairs(YR.TAGS) do list[#list + 1] = { "tag:" .. t.tag, t.label, S.C.sub } end
-    return list
-end
-
-local function NewLine(choice)
-    local kind, what = choice:match("^(%a+):(.*)$")
-    if kind == "say" then return { k = "say", pre = what, text = "" } end
-    if kind == "tag" then return { k = "tag", tag = what, val = (what == "completewith") and "next" or nil } end
-    local l = { k = "cmd", cmd = what, args = "" }
-    local map, x, y = YR.Position()
-    local ok, target = pcall(UnitName, "target")
-    if what == "goto" and map then l.args = ("%d,%.2f,%.2f"):format(map, x, y) end
-    if (what == "target" or what == "mob") and ok and target then l.args = target end
-    if what == "xp" then l.args = tostring(UnitLevel("player") + 1) l.text = "Grind to level " .. l.args end
-    if what == "money" then l.args = ">0.10" l.text = "Farm until you have 10s" end
-    return l
-end
-
-local function SelLine()
-    return edit.sel and edit.line and Parsed(edit.sel).lines[edit.line]
-end
-
-local function BuildInspector(page)
-    local X = 16 + LIST_W + 16
-    local CW = PW - X - 16
-    local card = CreateFrame("Frame", nil, page)
-    card:SetPoint("TOPLEFT", X, -14)
-    card:SetPoint("BOTTOMRIGHT", -16, 58)
-    S.Fill(card, S.C.card)
-    S.Border(card)
-    ui.card = card
-    local body = CreateFrame("Frame", nil, card)
-    body:SetAllPoints()
-    ui.body = body
-
-    ui.stepIcon = body:CreateTexture(nil, "ARTWORK")
-    ui.stepIcon:SetSize(22, 22)
-    ui.stepIcon:SetPoint("TOPLEFT", 14, -12)
-    ui.stepTitle = S.Text(body, 18)
-    ui.stepTitle:SetPoint("LEFT", ui.stepIcon, "RIGHT", 8, 0)
-    ui.where = S.Text(body, 12, S.C.sub)
-    ui.where:SetPoint("TOPLEFT", 14, -40)
-    ui.empty = S.Text(card, 13, S.C.muted)
-    ui.empty:SetPoint("CENTER")
-    ui.empty:SetText("Pick a step on the left, or make one with New step.")
-
-    -- who sees it
-    local shows = S.Text(body, 12, S.C.muted)
-    shows:SetPoint("TOPLEFT", 14, -68)
-    shows:SetText("Shows for")
-    ui.chips = {}
-    local cx = 76
-    ui.everyone = S.Chip(body, "Everyone", function()
-        Parsed(edit.sel).head = ""
-        Commit() YR:RefreshWindow()
-    end)
-    ui.everyone:SetPoint("TOPLEFT", cx, -64)
-    cx = cx + ui.everyone:GetWidth() + 4
-    for _, class in ipairs(CLASSES) do
-        local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
-        local chip = S.Chip(body, "", function()
-            local p = Parsed(edit.sel)
-            local list, found = {}, nil
-            for token in ((p.head:match("<<%s*(.+)$") or "") .. "/"):gmatch("([^/%s]+)[/%s]*") do list[#list + 1] = token end
-            for i, t in ipairs(list) do if t == CLASS_NAME[class] then found = i end end
-            if found then table.remove(list, found) else list[#list + 1] = CLASS_NAME[class] end
-            p.head = #list > 0 and ("<< " .. table.concat(list, "/")) or ""
-            Commit() YR:RefreshWindow()
-        end, CLASS_TEX, coords)
-        chip:SetWidth(23)
-        chip:SetPoint("TOPLEFT", cx, -64)
-        chip:SetScript("OnEnter", function(self) S.Tip(self, CLASS_NAME[class] .. " (click to add or remove)") end)
-        chip:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        chip.class = class
-        ui.chips[#ui.chips + 1] = chip
-        cx = cx + 26
-    end
-    ui.head = S.Input(body, { width = CW - 28, placeholder = "Or type who sees it, e.g. << Dwarf Paladin  or  << !Warrior", onCommit = function(t)
-        if not edit.sel then return end
-        local head = t:gsub("^%s*step%s*", "")
-        if head ~= "" and not head:find("^<<") then head = "<< " .. head end
-        Parsed(edit.sel).head = head
-        Commit() YR:RefreshWindow()
-    end })
-    ui.head:SetPoint("TOPLEFT", 14, -94)
-
-    -- a step's tags: checkboxes, their names ticking them too (they were switches: a switch is a feature's alone)
-    local function TagCheck(label, tag, x)
-        local box = S.Check(body, function() return edit.sel and YR.HasTag(Parsed(edit.sel), tag) ~= nil end,
-            function(on) YR.SetTag(Parsed(edit.sel), tag, on, tag == "completewith" and "next" or nil) Commit() YR:RefreshWindow() end)
-        box:SetPoint("TOPLEFT", x, -130)
-        local name = CreateFrame("Button", nil, body)
-        name.text = S.Text(name, 13, S.C.sub)
-        name.text:SetPoint("LEFT")
-        name.text:SetText(label)
-        name:SetSize(name.text:GetStringWidth() + 4, 20)
-        name:SetPoint("LEFT", box, "RIGHT", 8, 0)
-        name:SetScript("OnClick", function() box:Click() end)
-        return box
-    end
-    ui.optional = TagCheck("Optional", "optional", 14)
-    ui.sticky = TagCheck("Sticky", "sticky", 120)
-    ui.together = TagCheck("Ends with the next step", "completewith", 210)
-
-    -- the step's lines
-    local actions = S.Text(body, 11, S.C.muted)
-    actions:SetPoint("TOPLEFT", 14, -164)
-    actions:SetText("ACTIONS")
-    ui.lines = List(body, CW - 28, 5, 24, function(r, i)
-        local l = Parsed(edit.sel).lines[i]
-        r.i = i
-        r.icon:SetTexture(l.k == "cmd" and LINE_ICON[l.cmd] or (l.k == "say" and YR.STEP_ICON.note) or nil)
-        r.label:SetText(LineLabel(l))
-        r:Select(edit.line == i)
-    end, function() return edit.sel and #Parsed(edit.sel).lines or 0 end, function(r)
-        r.icon = r:CreateTexture(nil, "ARTWORK")
-        r.icon:SetSize(14, 14)
-        r.icon:SetPoint("LEFT", 8, 0)
-        r.label = S.Text(r, 13)
-        r.label:SetPoint("LEFT", 28, 0)
-        r.label:SetPoint("RIGHT", -72, 0)
-        r:SetScript("OnClick", function(self) edit.line = self.i YR:RefreshWindow() end)
-        local function Swap(d)
-            local lines = Parsed(edit.sel).lines
-            local a, b = r.i, r.i + d
-            if b < 1 or b > #lines then return end
-            lines[a], lines[b] = lines[b], lines[a]
-            edit.line = b
-            Commit() YR:RefreshWindow()
-        end
-        local up = r:Tool("up", function() Swap(-1) end, "Move up")
-        up:SetPoint("RIGHT", -46, 0)
-        local down = r:Tool("down", function() Swap(1) end, "Move down")
-        down:SetPoint("RIGHT", -24, 0)
-        local x = r:Tool("close", function()
-            table.remove(Parsed(edit.sel).lines, r.i)
-            edit.line = nil
-            Commit() YR:RefreshWindow()
-        end, "Remove this action", S.C.danger)
-        x:SetPoint("RIGHT", -2, 0)
-    end)
-    ui.lines:SetPoint("TOPLEFT", 14, -180)
-    local lf = CreateFrame("Frame", nil, body)
-    lf:SetPoint("TOPLEFT", ui.lines, -1, 1)
-    lf:SetPoint("BOTTOMRIGHT", ui.lines, 1, -1)
-    S.Border(lf)
-
-    -- the selected action, field by field
-    local ed = CreateFrame("Frame", nil, body)
-    ed:SetPoint("TOPLEFT", ui.lines, "BOTTOMLEFT", 0, -12)
-    ed:SetSize(CW - 28, 150)
-    S.Fill(ed, S.C.field)
-    S.Border(ed)
-    ui.lineEd = ed
-    ed.what = S.Text(ed, 13, S.C.sub)
-    ed.what:SetPoint("TOPLEFT", 10, -11)
-    ed.cmd = S.Dropdown(ed, 200, function()
-        local list = {}
-        for _, c in ipairs(YR.COMMANDS) do list[#list + 1] = { c.cmd, c.label } end
-        return list
-    end, function(cmd)
-        local l = SelLine()
-        if l and l.k == "cmd" then l.cmd = cmd Commit() YR:RefreshWindow() end
-    end)
-    ed.cmd:SetPoint("TOPRIGHT", -10, -6)
-    ed.fields = {}
-    for i = 1, 4 do
-        local label = S.Text(ed, 11, S.C.muted)
-        local input = S.Input(ed, { width = 90, onCommit = function(t)
-            local l = SelLine()
-            if not l then return end
-            if l.k == "cmd" then
-                if ed.single then l.args = t else YR.SetArg(l, i, t) end
-            elseif l.k == "tag" then
-                l.val = t ~= "" and t or nil
-            end
-            Commit() YR:RefreshWindow()
-        end })
-        ed.fields[i] = { label = label, input = input }
-    end
-    ed.textLabel = S.Text(ed, 11, S.C.muted)
-    ed.textLabel:SetPoint("BOTTOMLEFT", 10, 58)
-    ed.text = S.TextArea(ed, CW - 48, 44, { placeholder = "What the guide says for this action", onCommit = function(t)
-        local l = SelLine()
-        if not l then return end
-        if l.k == "say" then l.text = t elseif l.k == "cmd" then l.text = t ~= "" and t or nil end
-        Commit() YR:RefreshWindow()
-    end })
-    ed.text:SetPoint("BOTTOMLEFT", 10, 10)
-    ed.here = S.Button(ed, "Here", function()
-        local l = SelLine()
-        local map, x, y = YR.Position()
-        if l and map then
-            local rest = YR.Args(l)
-            l.args = ("%d,%.2f,%.2f"):format(map, x, y) .. (rest[4] and ("," .. table.concat(rest, ",", 4)) or "")
-            Commit() YR:RefreshWindow()
-        end
-    end, nil, 60)
-    ed.here.tip = "Put this point exactly where you are standing"
-    ed.target = S.Button(ed, "My target", function()
-        local l = SelLine()
-        local ok, name = pcall(UnitName, "target")
-        if l and ok and name then l.args = name Commit() YR:RefreshWindow() end
-    end, nil, 84)
-    ed.target.tip = "Use the name of what you have targeted"
-    ed.quest = S.Button(ed, "From my log", function(self)
-        QuestMenu(self, function(q)
-            local l = SelLine()
-            if not l then return end
-            YR.SetArg(l, 1, tostring(q))
-            local title = C_QuestLog.GetTitleForQuestID(q)
-            if title and l.cmd ~= "complete" then l.text = (l.cmd == "turnin" and "Turn in " or "Accept ") .. title end
-            Commit() YR:RefreshWindow()
-        end)
-    end, nil, 96)
-    ed.quest.tip = "Pick the quest from your quest log"
-
-    -- add an action: on the line of the actions' heading, at the right (under the box it ran out of the card)
-    ui.add = S.Dropdown(body, 160, AddChoices, function(choice)
-        if not edit.sel then return end
-        local lines = Parsed(edit.sel).lines
-        local at = (edit.line or #lines) + 1
-        table.insert(lines, at, NewLine(choice))
-        edit.line = at
-        Commit() YR:RefreshWindow()
-    end)
-    ui.add:SetValue("+  Add action")
-    ui.add.label:SetTextColor(unpack(S.C.sub))
-    ui.add:SetHeight(22)
-    ui.add:SetPoint("BOTTOMRIGHT", ui.lines, "TOPRIGHT", 0, 4)
-    ui.add:HookScript("OnEnter", function(self) S.Tip(self, "New places are where you stand; kill and talk use your target.") end)
-    ui.add:HookScript("OnLeave", function() GameTooltip:Hide() end)
-    -- the box under the actions down to the card's foot
-    ed:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -14, 12)
-
-    ui.raw = S.Button(body, "Edit as text", function() YR:EditRawStep() end, "ghost", 100)
-    ui.raw:SetPoint("TOPRIGHT", -8, -9)
-    ui.raw.tip = "The whole step as RestedXP text, for anything the fields don't cover"
-    ui.raw:SetTextColour(S.C.sub)
-end
-
--- The step as RestedXP text in a box over the inspector; Apply puts it back.
-function YR:EditRawStep()
-    if not edit.sel then return end
-    if not ui.rawFrame then
-        local f = CreateFrame("Frame", nil, ui.card)
-        f:SetAllPoints()
-        f:SetFrameLevel(ui.card:GetFrameLevel() + 30)
-        f:EnableMouse(true)
-        S.Fill(f, S.C.card)
-        S.Border(f, S.C.accent)
-        local t = S.Text(f, 15)
-        t:SetPoint("TOPLEFT", 14, -12)
-        t:SetText("Step as RestedXP text")
-        local w, h = ui.card:GetWidth() - 28, ui.card:GetHeight() - 96
-        local area = S.ScrollArea(f, w, h)
-        area:SetPoint("TOPLEFT", 14, -40)
-        S.Fill(area, S.C.field)
-        local box = CreateFrame("EditBox", nil, area)
-        box:SetMultiLine(true)
-        box:SetAutoFocus(false)
-        box:SetFont(S.FONT, 13, "")
-        box:SetTextColor(unpack(S.C.text))
-        box:SetWidth(w - 12)
-        box:SetTextInsets(8, 8, 8, 8)
-        box:SetScript("OnEscapePressed", box.ClearFocus)
-        area:SetScrollChild(box)
-        area:SetScript("OnMouseDown", function() box:SetFocus() end)
-        local apply = S.Button(f, "Apply", function()
-            edit.steps[edit.sel] = (box:GetText():gsub("%s+$", ""))
-            edit.parsed[edit.sel], edit.line, edit.dirty = nil, nil, true
-            f:Hide() YR:RefreshWindow()
-        end, "primary", 90)
-        apply:SetPoint("BOTTOMLEFT", 14, 12)
-        local cancel = S.Button(f, "Cancel", function() f:Hide() end, nil, 90)
-        cancel:SetPoint("LEFT", apply, "RIGHT", 8, 0)
-        ui.rawBox, ui.rawFrame = box, f
-    end
-    ui.rawBox:SetText(edit.steps[edit.sel])
-    ui.rawFrame:Show()
-    ui.rawBox:SetFocus()
-end
-
-local function RefreshInspector()
-    local has = edit.sel ~= nil and edit.steps[edit.sel] ~= nil
-    ui.body:SetShown(has)
-    ui.empty:SetShown(not has)
-    if ui.rawFrame and not has then ui.rawFrame:Hide() end
-    if not has then return end
-    local p = Parsed(edit.sel)
-    local info = YR.StepInfo(p)
-    ui.stepIcon:SetTexture(info.icon)
-    ui.stepTitle:SetText(("Step %d"):format(edit.sel))
-    ui.where:SetText(info.where and ("Location  " .. (YR.PlaceText(info.where) or "?")) or "No location")
-    local head = p.head:match("<<%s*(.+)$") or ""
-    ui.everyone:SetOn(head == "")
-    for _, chip in ipairs(ui.chips) do
-        local on = false
-        for token in (head .. "/"):gmatch("([^/%s]+)[/%s]*") do if token == CLASS_NAME[chip.class] then on = true end end
-        chip:SetOn(on)
-    end
-    if not ui.head:HasFocus() then ui.head:SetValue(p.head) end
-    ui.optional:Refresh() ui.sticky:Refresh() ui.together:Refresh()
-    if edit.line and not p.lines[edit.line] then edit.line = nil end
-    ui.lines:ShowIndex(edit.line)
-    ui.lines:Refresh()
-
-    local ed, l = ui.lineEd, SelLine()
-    for _, f in ipairs(ed.fields) do f.label:Hide() f.input:Hide() end
-    ed.cmd:Hide() ed.here:Hide() ed.target:Hide() ed.quest:Hide()
-    ed.text:Show() ed.textLabel:Show()
-    ed.textLabel:SetText("Guide text")
-    if not l then
-        ed.what:SetText("Click an action above to change it, or add one below.")
-        ed.text:Hide() ed.textLabel:Hide()
-        return
-    end
-    -- the text area takes whatever room is left under the fields, down to the bottom of the box
-    local function TextFrom(top)
-        ed.textLabel:ClearAllPoints()
-        ed.textLabel:SetPoint("TOPLEFT", 10, top)
-        ed.text:ClearAllPoints()
-        ed.text:SetPoint("TOPLEFT", 10, top - 14)
-        ed.text:SetPoint("BOTTOMRIGHT", -10, 10)
-    end
-    local function Field(i, name, x, w, value)
-        local f = ed.fields[i]
-        f.label:Show() f.input:Show()
-        f.label:SetText(name)
-        f.label:ClearAllPoints() f.label:SetPoint("TOPLEFT", x, -38)
-        f.input:SetWidth(w)
-        f.input:ClearAllPoints() f.input:SetPoint("TOPLEFT", x, -52)
-        if not f.input:HasFocus() then f.input:SetValue(value) end
-    end
-    if l.k == "cmd" then
-        local c = YR.COMMAND_BY_NAME[l.cmd]
-        ed.what:SetText("Action")
-        ed.cmd:Show()
-        ed.cmd:SetValue(c and c.label or ("." .. l.cmd))
-        local names = c and c.fields or { "Arguments" }
-        ed.single = not c
-        local args = YR.Args(l)
-        local x, w = 10, (l.cmd == "goto") and 70 or (#names <= 1 and 200 or 120)
-        for i, name in ipairs(names) do
-            Field(i, name, x, w, ed.single and (l.args or "") or args[i])
-            x = x + w + 8
-        end
-        local extra = l.cmd == "goto" and ed.here or ((l.cmd == "target" or l.cmd == "mob") and ed.target)
-            or ((l.cmd == "accept" or l.cmd == "turnin" or l.cmd == "complete") and ed.quest)
-        if extra then
-            extra:Show()
-            extra:ClearAllPoints()
-            extra:SetPoint("TOPLEFT", x, -52)
-        end
-        TextFrom(#names > 0 and -86 or -38)
-        if not ed.text:HasFocus() then ed.text:SetValue(l.text or "") end
-    elseif l.k == "say" then
-        ed.what:SetText(l.pre == "+" and "Reminder text" or "Instruction text")
-        ed.textLabel:SetText("Text")
-        TextFrom(-38)
-        if not ed.text:HasFocus() then ed.text:SetValue(l.text) end
-    elseif l.k == "tag" then
-        ed.what:SetText("Tag  #" .. l.tag)
-        ed.text:Hide() ed.textLabel:Hide()
-        ed.single = false
-        Field(1, "Value", 10, 220, l.val)
-    else
-        ed.what:SetText("A line Headstart doesn't know: use Edit as text.")
-        ed.text:Hide() ed.textLabel:Hide()
-    end
-end
-
-function YR:RevertRoute(key)
-    YR:RevertGuide(key)
-    if edit.key == key then Open(key) end
-    YR:RefreshWindow()
-    StaticPopup_Show("HEADSTART_RELOAD")
-end
-
-local function BuildRoutes(page)
-    BuildStepList(page)
-    BuildInspector(page)
-    local save = S.Button(page, "Save", function()
-        if not edit.key then return end
-        YR:SaveCustom(edit.key, edit.header, edit.steps)
-        if YR.RouteProgressForget then YR.RouteProgressForget() end
-        edit.dirty = false
-        YR:RefreshWindow()
-        StaticPopup_Show("HEADSTART_RELOAD")
-    end, "primary", 110)
-    save:SetPoint("BOTTOMLEFT", 16, 16)
-    save.tip = "Keep this as your version of the route (RestedXP gets it after a reload)"
-    local undo = S.Button(page, "Undo changes", function() Open(edit.key) YR:RefreshWindow() end, nil, 120)
-    undo:SetPoint("LEFT", save, "RIGHT", 8, 0)
-    undo.tip = "Back to your last saved version"
-    local revert = S.Button(page, "Back to the shipped route", function()
-        if not YR:IsCustom(edit.key) then return end
-        StaticPopup_Show("HEADSTART_REVERT", YR.GuideName(edit.key), nil, edit.key)
-    end, nil, 190)
-    revert:SetPoint("LEFT", undo, "RIGHT", 8, 0)
-    ui.state = S.Text(page, 12, S.C.muted)
-    ui.state:SetPoint("LEFT", revert, "RIGHT", 16, 0)
-
-    -- A newer Headstart shipped a different version of this route than the one the edits started
-    -- from: take it with the edits kept, or keep the route as it is. Right after taking it, undo.
-    local function Merged(clashes)
-        Open(edit.key)
-        YR:RefreshWindow()
-        YR.Print(clashes and clashes > 0
-            and ("update taken. In %d place(s) we changed a step you had changed too: yours was kept."):format(clashes)
-            or "update taken, with all your edits kept.")
-        StaticPopup_Show("HEADSTART_RELOAD")
-    end
-    ui.take = S.Button(page, "Take the update", function() Merged(YR:MergeUpdate(edit.key)) end, "primary", 140)
-    ui.take:SetPoint("LEFT", revert, "RIGHT", 16, 0)
-    ui.take.tip = "This version of Headstart ships a newer route. Take it, with your own edits applied on top"
-    ui.keep = S.Button(page, "Keep mine", function()
-        YR:KeepMine(edit.key)
-        YR:RefreshWindow()
-    end, "ghost", 96)
-    ui.keep:SetPoint("LEFT", ui.take, "RIGHT", 6, 0)
-    ui.keep.tip = "Stay on your route as it is and stop offering this update"
-    ui.undoMerge = S.Button(page, "Undo the update", function()
-        YR:UndoMerge(edit.key)
-        Open(edit.key)
-        YR:RefreshWindow()
-        StaticPopup_Show("HEADSTART_RELOAD")
-    end, nil, 140)
-    ui.undoMerge:SetPoint("LEFT", revert, "RIGHT", 16, 0)
-    ui.undoMerge.tip = "Back to your route as it was before you took the update"
-    local export = S.Button(page, "Share...", function() YR:ShareOpen() end, nil, 90)
-    export:SetPoint("BOTTOMRIGHT", -16, 16)
-    export.tip = "This route as text, to send to someone"
-end
-
-local function RefreshRoutes()
-    if not edit.key then return end
-    win.subtitle:SetText(YR.GuideName(edit.key))
-    ui.count:SetText(("%d steps"):format(#edit.steps))
-    local update = YR:HasUpdate(edit.key)
-    local undoable = not update and YR:CanUndoMerge(edit.key)
-    ui.take:SetShown(update)
-    ui.keep:SetShown(update)
-    ui.take:SetEnabled(not edit.dirty)
-    ui.take.tip = edit.dirty and "Save or undo your changes first"
-        or "This version of Headstart ships a newer route. Take it, with your own edits applied on top"
-    ui.undoMerge:SetShown(undoable and not edit.dirty)
-    ui.state:SetShown(not update and not (undoable and not edit.dirty))
-    ui.state:SetText(edit.dirty and "|cffffd24aUnsaved changes|r" or (YR:IsCustom(edit.key) and "Your version" or "As shipped"))
-    ui.steps:ShowIndex(edit.sel)
-    ui.steps:Refresh()
-    RefreshInspector()
-end
-
--- ---------------------------------------------------------------------------
 -- A Levelling page's heading, as a QoL page's (PageHead): its icon, its name and what it is for, over a rule. A page
--- under another (the editor, Share: under All routes) has the way back before its name. head.right is where a page
--- puts what it shows at the top right (the middle of its right edge).
+-- under another has the way back before its name. head.right is where a page puts what it shows at the top right (the
+-- middle of its right edge).
 -- ---------------------------------------------------------------------------
 local function LevelHead(page)
     local h = {}
@@ -973,9 +256,10 @@ end
 -- This run
 -- ---------------------------------------------------------------------------
 local run = {}
-local ACTION_ICON = { accept = YR.STEP_ICON.accept, turnin = YR.STEP_ICON.turnin, complete = YR.STEP_ICON.kill,
-    buy = YR.STEP_ICON.buy, learn = YR.STEP_ICON.train, hearth = YR.STEP_ICON.hearth, death = YR.STEP_ICON.death,
-    level = YR.STEP_ICON.xp }
+local ACTION_ICON = { accept = "Interface\\GossipFrame\\AvailableQuestIcon", turnin = "Interface\\GossipFrame\\ActiveQuestIcon",
+    complete = "Interface\\Icons\\INV_Sword_04", buy = "Interface\\Icons\\INV_Misc_Bag_08",
+    learn = "Interface\\Icons\\INV_Misc_Book_11", hearth = "Interface\\Icons\\INV_Misc_Rune_01",
+    death = "Interface\\Icons\\Ability_Rogue_FeignDeath", level = "Interface\\Icons\\INV_Misc_PocketWatch_01" }
 
 -- The details of one logged action, for the panel beside the list: for a quest its whole story
 -- (taken, done, handed in: when, where, from whom, what it gave), else what the log knows.
@@ -1076,7 +360,7 @@ end
 
 local function BuildRun(page)
     run.head = LevelHead(page)
-    run.head:Set({ icon = 134376, title = "This run", desc = "What this character did, in order. Save it as a route of your own.",
+    run.head:Set({ icon = 134376, title = "This run", desc = "What this character did, in order: every quest, level, death and stop, to look back on.",
         right = 190 })
     run.state = StateLight(page)
     run.state:SetPoint("RIGHT", run.head.right, "RIGHT", 0, 0)
@@ -1131,16 +415,6 @@ local function BuildRun(page)
         r.label = S.Text(r, 13, S.C.sub)
         r.label:SetPoint("LEFT", 74, 0)
         r.label:SetPoint("RIGHT", -118, 0)
-        -- (on the row under the mouse and the one picked only: on every row it was a column of orange)
-        local add = S.Button(r, "+  Add to route", function() if r.action.step then YR:InsertStep(r.action.step) end end,
-            "ghost", 112)
-        add:SetPoint("RIGHT", -2, 0)
-        add:SetHeight(24)
-        add:SetTextColour(S.C.sub)
-        add.tip = "Put this in the open route as a step, after the selected step"
-        add:Hide()
-        add:HookScript("OnLeave", function() if not r.selected and not r:IsMouseOver() then r:Tools(false) end end)
-        r.tools[#r.tools + 1] = add
         r:SetScript("OnClick", function(self)
             run.sel = self.index
             run.list:Refresh()
@@ -1163,12 +437,8 @@ local function BuildRun(page)
     run.link:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
     run.linkLabel = S.Text(panel, 12, S.C.muted)
     run.linkLabel:SetPoint("BOTTOMLEFT", run.link, "TOPLEFT", 0, 6)
-    run.where = S.Text(panel, 12, S.C.muted)
-    run.where:SetPoint("BOTTOMLEFT", 16, 70)
-    run.where:SetWidth(DETAIL_W - 32)
-    run.where:SetWordWrap(true)
 
-    -- the foot: whether this run is one to beat, and making it a route
+    -- the foot: whether this run is one to beat
     run.counts = S.Check(page, function() return YR:RunCounts() end, function(on) YR:SetRunCounts(on) end)
     run.counts:SetPoint("BOTTOMLEFT", 18, 21)
     local beat = CreateFrame("Button", nil, page)
@@ -1181,17 +451,6 @@ local function BuildRun(page)
     local beatNote = S.Text(page, 12, S.C.muted)
     beatNote:SetPoint("LEFT", beat, "RIGHT", 8, 0)
     beatNote:SetText("other characters' splits compare against it")
-    -- This character's whole run as a route of its own (MyRoutes.lua): every stop a step, to reorder and
-    -- edit in Routes and to play in RestedXP. Saving again replaces it.
-    run.save = S.Button(page, "Save as route", function() YR.AskSaveRunAsRoute() end, "primary", 120)
-    run.save:SetPoint("BOTTOMRIGHT", -24, 16)
-    run.save.tip = "Your run as your own route: every quest stop, trainer, vendor, flight, death skip and grind"
-        .. " a step, in the order you played. Edit and reorder it under All routes; RestedXP lists it under My routes."
-        .. " Saving again replaces it. Our routes stay as they are"
-    run.delete = S.Button(page, "Delete my route...", function() YR.AskDeleteMyRoutes() end, "ghost", 130)
-    run.delete:SetTextColour(S.C.sub)
-    run.delete:SetPoint("RIGHT", run.save, "LEFT", -6, 0)
-    run.delete.tip = "Delete the route you saved for this race (asks first). Your run log stays, so you can save it again"
 end
 
 local function RefreshRun()
@@ -1204,8 +463,6 @@ local function RefreshRun()
         run.madeOf, run.madeAt = ev, ev and #ev or 0
         run.actions = YR:RunActions()
     end
-    run.where:SetText(edit.key and ("Add to route puts it in %s, after step %s."):format(YR.GuideName(edit.key), edit.sel or "-")
-        or "Open a route under All routes to add to it.")
     -- follow the newest actions, but don't jump away from where you were reading
     if run.seen ~= #run.actions then
         run.seen = #run.actions
@@ -1224,79 +481,6 @@ local function RefreshRun()
     if not on then run.state:Set("Not recording")
     elseif stopped then run.state:Set("Stopped")
     else run.state:Set("Recording" .. (type(played) == "number" and ("  ·  " .. Clock(played)) or ""), S.C.green) end
-end
-
--- ---------------------------------------------------------------------------
--- Share: a route as text, to send (Share, from All routes or the editor), or one pasted in (Import a route).
--- Under All routes: its heading leads back there.
--- ---------------------------------------------------------------------------
-local share = { mode = "import" }
-
-function YR:ExportOpen()
-    if not (edit.key and share.box) then return end
-    share.box:SetText(YR.JoinSteps(edit.header, edit.steps))
-    share.box:SetFocus()
-    share.box:HighlightText()
-    share.hint:SetText("Selected: press Ctrl+C to copy.")
-end
-
---- Share the route open in the editor ("export"), or paste one in ("import").
-function YR:ShareOpen(mode)
-    share.mode = mode or "export"
-    YR:ToggleWindow("share")
-    if share.mode == "export" then
-        YR:ExportOpen()
-    elseif share.box then
-        share.box:SetText("")
-        share.hint:SetText("")
-        share.box:SetFocus()
-    end
-end
-
-local function BuildShare(page)
-    share.head = LevelHead(page)
-    local top = -(TITLE_H + 12)
-    local area = S.ScrollArea(page, PW - 40, PH - TITLE_H - 12 - 58)
-    area:SetPoint("TOPLEFT", 16, top)
-    S.Fill(area, S.C.field)
-    S.Border(area)
-    local box = CreateFrame("EditBox", nil, area)
-    box:SetMultiLine(true)
-    box:SetAutoFocus(false)
-    box:SetFont(S.FONT, 12, "")
-    box:SetTextColor(unpack(S.C.text))
-    box:SetWidth(PW - 56)
-    box:SetTextInsets(10, 10, 10, 10)
-    box:SetScript("OnEscapePressed", box.ClearFocus)
-    area:SetScrollChild(box)
-    area:SetScript("OnMouseDown", function() box:SetFocus() end)
-    share.box = box
-    share.hint = S.Text(page, 12, S.C.muted)
-    share.hint:SetPoint("BOTTOMLEFT", 18, 24)
-    share.hint:SetPoint("RIGHT", page, "RIGHT", -230, 0)
-    share.go = S.Button(page, "Import", function()
-        if share.mode == "export" then YR:ExportOpen() return end
-        local done, why = YR:ImportGuide(box:GetText())
-        share.hint:SetText(done and ("|cff66dd88Imported:|r " .. done .. ". Reload to use it.") or ("|cffff7070Not imported:|r " .. why))
-        if done then
-            if edit.key then Open(edit.key) end
-            StaticPopup_Show("HEADSTART_RELOAD")
-        end
-    end, "primary", 110)
-    share.go:SetPoint("BOTTOMRIGHT", -24, 16)
-    local clear = S.Button(page, "Clear", function() box:SetText("") share.hint:SetText("") end, "ghost", 70)
-    clear:SetTextColour(S.C.sub)
-    clear:SetPoint("RIGHT", share.go, "LEFT", -6, 0)
-end
-
-local function RefreshShare()
-    win.subtitle:SetText("")
-    local export = share.mode == "export"
-    share.head:Set({ icon = 237381, back = { "All routes", function() YR:ToggleWindow("library") end },
-        title = export and ("Share " .. (edit.key and YR.GuideName(edit.key) or "a route")) or "Import a route",
-        desc = export and "Copy this text and send it: whoever pastes it under Import a route has the route."
-            or "Paste a route someone shared with you, then Import. You can open it and change it like your own." })
-    share.go:SetLabel(export and "Select all" or "Import")
 end
 
 -- ---------------------------------------------------------------------------
@@ -2202,7 +1386,7 @@ local function BuildRouteSettings(page)
         .. " current step.")
 
     -- (the logs take room whether anything is recorded or not: their rows work with the switch off - free)
-    Section("Record runs", "Every character's run kept, for This run and routes of your own.", { icon = 134328, free = true,
+    Section("Record runs", "Every character's run kept, for This run and to look back on.", { icon = 134328, free = true,
         find = "record runs log logs delete", master = { Opt("logging"), SetOpt("logging", function(on) YR:SetLogging(on) end) } })
     local function Ago(t)
         local d = math.floor((time() - t) / 86400)
@@ -2219,7 +1403,7 @@ local function BuildRouteSettings(page)
             kb >= 1024 and ("%.1f MB"):format(kb / 1024) or (kb .. " KB")))
     end
     Row("On this account", total, "Each character's quests, levels, deaths and position samples, for This run,"
-        .. " the level splits and the route analysis. All of them load on every character, so old ones are worth deleting")
+        .. " the level splits and to analyse afterwards. All of them load on every character, so old ones are worth deleting")
     local pick = S.Dropdown(c, 240, function()
         local out = {}
         for _, l in ipairs(YR.LogSummary()) do
@@ -2235,8 +1419,8 @@ local function BuildRouteSettings(page)
     Row("Delete logs not played for (days)", S.Stepper(c, YR.LogKeepDays,
         function(v) YippRouteDB.logKeepDays = math.max(0, v) end, 0, 365, 5, 110),
         "At login, the logs of characters you haven't played for this many days are deleted. Never this"
-        .. " character's, a fastest run's (one the level splits compare with) or one a route of yours was"
-        .. " saved from. 30 unless you set another number; 0 keeps them all")
+        .. " character's or a fastest run's (one the level splits compare with). 30 unless you set another"
+        .. " number; 0 keeps them all")
     local scan = S.Button(c, "Delete", function()
         if YR.DeleteScan() then YR.Print("deleted the quest scan.") end
         YR:RefreshWindow()
@@ -2839,29 +2023,35 @@ local function BuildSetup(page)
         .. " A chat tab the saved interface doesn't have is closed, and chat windows can't be put back by undo.")
     Row("Camera distance", Sw("camera"), "Zooms out as far as on the character you copied from. Also applied once to a new character after"
         .. " the intro.")
-    Row("RestedXP guide for a new character", Sw("guide"), "A new character (level 5 or below) starts on the RestedXP guide set for"
-        .. " its race below. Not set: Headstart's opener for the race where the routes are installed, or else RestedXP's"
-        .. " own starter for the race.")
-    -- which guide, race by race, for the account (the race shown first is this character's)
-    local guideRace = select(2, UnitRace("player")) or "Human"
-    local guidePick
-    local racePick = S.Dropdown(L.c, 160, YS.GUIDE_RACES, function(r) guideRace = r if guidePick then guidePick:Refresh() end end)
-    function racePick:Refresh() for _, x in ipairs(YS.GUIDE_RACES) do if x[1] == guideRace then self:SetValue(x[2]) end end end
-    Row("Race", racePick, "The race whose starting guide is shown and set below. Each race has its own, for every character on the"
-        .. " account.")
-    guidePick = S.Dropdown(L.c, 300, function() return YS.StartGuideChoices(guideRace) end, function(v)
-        YS.PickStartGuide(guideRace, v)
-        guidePick:Refresh()
-    end)
-    function guidePick:Refresh() self:SetValue(YS.StartGuideLabel(guideRace)) end
-    Row("New characters of that race start on", guidePick, "For every new character of the race above. Every guide RestedXP has"
-        .. " loaded that begins at level 1; one for some classes only says so, and a character it isn't for starts on the"
-        .. " default instead. Default: Headstart's opener for the race where the routes are installed (the first one that"
-        .. " is for the character - the default shown is the one this character would get), or else RestedXP's own starter.")
-    Row("RestedXP window positions", S.Check(L.c, function() return o().rxpFrames ~= false end,
-        function(on) o().rxpFrames = on Recount() end),
-        "Places RestedXP's guide window, arrow, and item and target buttons where they were on the"
-        .. " character the interface was saved on.")
+    -- which levelling guide addon is loaded (YS.GuideAddon): RestedXP's guides are started from here, Polestar picks its own
+    Row("Levelling guide: " .. (YS.GuideAddon() or "none found"), Sw("guide"), YS.GuideAddon() == "Polestar"
+        and "Found Polestar: it opens with a guide for the race, class, level and zone by itself, so there is nothing to start."
+        or YS.GuideAddon() == "RestedXP" and ("Found RestedXP: a new character (level 5 or below) starts on the guide set for its"
+        .. " race below. Not set: Headstart's opener for the race where the routes are installed, or else RestedXP's own"
+        .. " starter for the race.")
+        or "Neither RestedXP nor Polestar is loaded. With RestedXP a new character starts on the guide set for its race; Polestar picks its own.")
+    -- which guide, race by race, for the account (the race shown first is this character's): RestedXP's alone
+    if YS.GuideAddon() ~= "Polestar" then
+        local guideRace = select(2, UnitRace("player")) or "Human"
+        local guidePick
+        local racePick = S.Dropdown(L.c, 160, YS.GUIDE_RACES, function(r) guideRace = r if guidePick then guidePick:Refresh() end end)
+        function racePick:Refresh() for _, x in ipairs(YS.GUIDE_RACES) do if x[1] == guideRace then self:SetValue(x[2]) end end end
+        Row("Race", racePick, "The race whose starting guide is shown and set below. Each race has its own, for every character on the"
+            .. " account.")
+        guidePick = S.Dropdown(L.c, 300, function() return YS.StartGuideChoices(guideRace) end, function(v)
+            YS.PickStartGuide(guideRace, v)
+            guidePick:Refresh()
+        end)
+        function guidePick:Refresh() self:SetValue(YS.StartGuideLabel(guideRace)) end
+        Row("New characters of that race start on", guidePick, "For every new character of the race above. Every guide RestedXP has"
+            .. " loaded that begins at level 1; one for some classes only says so, and a character it isn't for starts on the"
+            .. " default instead. Default: Headstart's opener for the race where the routes are installed (the first one that"
+            .. " is for the character - the default shown is the one this character would get), or else RestedXP's own starter.")
+        Row("RestedXP window positions", S.Check(L.c, function() return o().rxpFrames ~= false end,
+            function(on) o().rxpFrames = on Recount() end),
+            "Places RestedXP's guide window, arrow, and item and target buttons where they were on the"
+            .. " character the interface was saved on.")
+    end
 
     -- ------------------------------------------------------------------ New characters
     Page("new")
@@ -4019,7 +3209,7 @@ local function TrinketPreview(c)
     end
     fly:Hide()
     f.fly = fly
-    local function Open(b)
+    local function OpenFly(b)
         local look = YR.TrinketLook()
         if fly:IsShown() and fly.owner == b then fly:Hide() return end
         fly.owner = b
@@ -4050,7 +3240,7 @@ local function TrinketPreview(c)
         b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         b:SetScript("OnEnter", function(self)
             local look = YR.TrinketLook()
-            if look.hover and not (fly:IsShown() and fly.owner == self) then Open(self) end
+            if look.hover and not (fly:IsShown() and fly.owner == self) then OpenFly(self) end
             if not look.tips then return end
             GameTooltip:SetOwner(self, look.dir == "up" and "ANCHOR_BOTTOM" or "ANCHOR_TOP")
             if GetInventoryItemID("player", slot) then GameTooltip:SetInventoryItem("player", slot)
@@ -4064,7 +3254,7 @@ local function TrinketPreview(c)
             local look = YR.TrinketLook()
             local lists = (which == "LeftButton") == (look.left == "list")
             if lists then
-                Open(self)
+                OpenFly(self)
             else
                 -- used: its cooldown starts, as it would
                 self.used = GetTime()
@@ -4886,6 +4076,17 @@ local BuildSkins = QoLPage("skins", function(L, c, Section, Row, Opt)
                 YR:RefreshWindow()
             end, nil, 90))
         end
+        -- (EditModeLook.lua; the owner, 2026-10-29: "de svære blå overlays ... umulig å se hvor du plasserer ting")
+        Section("Edit Mode outlines", "clean blocks, not blue sheets", { find = "edit mode overlay highlight layout move",
+            icon = 134442, master = { Opt("editModeOutline"), function(on)
+                YippRouteDB.editModeOutline = on
+                YR.EditModeLookApply()
+            end } })
+        Row("About the outlines", S.Text(c, 12, S.C.muted),
+            "In the game's Edit Mode each element is a clean dark block instead of the large blue sheet: a thin edge in"
+            .. " Headstart's colour and its name small in the middle. The edge turns white under the mouse; the one you"
+            .. " picked has a full-colour edge and says where it stands, in pixels from the middle of the screen, as you"
+            .. " drag it. Off: Blizzard's sheets.")
 end)
 
 -- Chat: Blizzard's buttons beside the chat (BarHide.lua), and the whisper sound (Whisper.lua).
@@ -5226,6 +4427,8 @@ local function HomeFeatures()
                 MASTER.dmgSkin[1], MASTER.dmgSkin[2]),
             F(134939, "RestedXP skin", "Another look for RestedXP's window.", "skins", "RestedXP skin",
                 MASTER.rxpSkin[1], MASTER.rxpSkin[2]),
+            F(134442, "Edit Mode outlines", "Clean blocks in Edit Mode, not blue sheets.", "skins", "Edit Mode outlines",
+                Toggle("editModeOutline", function() YR.EditModeLookApply() end)),
         },
         { "Character setup", setup },
     }
@@ -5991,7 +5194,7 @@ end
 do
 -- ---------------------------------------------------------------------------
 -- All routes: every route of this character's race and class (or every race's), by level, each with how far you are
--- in it and what it is to you; load it in RestedXP, or open it in the editor. Import and Share at its foot. (They were
+-- in it and what it is to you; load it in RestedXP. Shown only with a routes addon installed (PAGES). (They were
 -- a list folded by level in the menu beside the pages: the owner, 2026-10-21, "the sidebar is confusing".)
 -- ---------------------------------------------------------------------------
 local lib = { rows = {}, heads = {} }
@@ -6032,20 +5235,15 @@ local function LibraryRow(c, w)
     r.quests:SetPoint("LEFT", w - 340, 0)
     r.state = StateLight(r)
     r.state:SetPoint("LEFT", w - 236, 0)
-    r.edit = S.Button(r, "Edit", function() Open(r.key) YR:ToggleWindow("routes") end, "ghost", 44)
-    r.edit:SetHeight(26)
-    r.edit:SetTextColour(S.C.sub)
-    r.edit:SetPoint("RIGHT", -8, 0)
-    r.edit.tip = "Open it in the route editor: its steps, to change"
     r.load = S.Button(r, "Load", function() if r.first then LoadRoute(r.key, r.first) end end, nil, 56)
     r.load:SetHeight(26)
-    r.load:SetPoint("RIGHT", r.edit, "LEFT", -6, 0)
+    r.load:SetPoint("RIGHT", -8, 0)
     r.load.tip = "Load it in RestedXP, at the first step you haven't done"
     -- lit under the mouse, over its buttons too
     local function Leave() if not r:IsMouseOver() then r.hl:Hide() end end
     r:SetScript("OnEnter", function() r.hl:Show() end)
     r:SetScript("OnLeave", Leave)
-    for _, b in ipairs({ r.edit, r.load }) do
+    for _, b in ipairs({ r.load }) do
         b:HookScript("OnEnter", function() r.hl:Show() end)
         b:HookScript("OnLeave", Leave)
     end
@@ -6088,18 +5286,7 @@ function BuildLibrary(page)
     lib.none:SetWidth(PW - 140)
     lib.none:SetWordWrap(true)
     lib.none:SetJustifyH("CENTER")
-    lib.none:SetText("No routes yet. Play with This run recording and Save as route, or import a route someone shared.")
-    -- the foot: making routes of your own, and moving them between players
-    local hint = S.Text(page, 12, S.C.muted)
-    hint:SetPoint("BOTTOMLEFT", 18, 24)
-    hint:SetText("Your own: play with This run recording, then Save as route.")
-    lib.share = S.Button(page, "Share...", function() YR:ShareOpen("export") end, nil, 120)
-    lib.share:SetPoint("BOTTOMRIGHT", -24, 16)
-    lib.share.tip = "The route open in the editor as text, to send to someone"
-    local import = S.Button(page, "Import a route...", function() YR:ShareOpen("import") end, "ghost", 130)
-    import:SetTextColour(S.C.sub)
-    import:SetPoint("RIGHT", lib.share, "LEFT", -6, 0)
-    import.tip = "Paste a route someone shared with you"
+    lib.none:SetText("No routes for this character. Every race lists them all.")
 end
 
 function RefreshLibrary()
@@ -6111,8 +5298,7 @@ function RefreshLibrary()
     local all = YippRouteDB.allRoutes or not next(mine)
     local list = {}
     for _, g in ipairs(YR.shipped or {}) do
-        -- (the one open in the editor always: you are working on it)
-        if all or mine[g.key] or g.key == edit.key then
+        if all or mine[g.key] then
             local range, short, qual, from = RouteParts(g.key)
             list[#list + 1] = { key = g.key, range = range, short = short, qual = qual, from = from }
         end
@@ -6171,10 +5357,6 @@ function RefreshLibrary()
     lib.area.content:SetHeight(math.max(10, -y + 4))
     if lib.area.UpdateBar then lib.area:UpdateBar() end
     lib.none:SetShown(#list == 0)
-    local short = edit.key and select(2, RouteParts(edit.key))
-    lib.share:SetLabel(short and ("Share " .. short .. "...") or "Share...")
-    lib.share:SetWidth(math.floor(lib.share.text:GetStringWidth() + 32))
-    lib.share:SetEnabled(edit.key ~= nil)
 end
 --- For the tests: All routes' rows as shown - { key, name, quests, state, load (it can be loaded) }.
 function YR.LibraryShown()
@@ -6489,9 +5671,9 @@ local routesOff
 local routesWere                -- the routes switch as it was when the window was made (a change takes a reload)
 local function BuildRoutesOff(page)
     routesOff = OffCard(page, { icon = "Interface\\Icons\\INV_Misc_Map_01", title = "Routes",
-        text = "Records your runs and saves them as your own RestedXP routes. Includes a route editor, level"
-            .. " splits, and help keeping and buying the items a route needs.\n\nWhile off, none of it runs and"
-            .. " nothing is shown. Account-wide. Takes a /reload.",
+        text = "Records your runs (This run, and the level splits), and helps with a RestedXP guide: skip a quest,"
+            .. " release at a death skip, the level pace box, and keeping and buying the items a route needs.\n\nWhile"
+            .. " off, none of it runs and nothing is shown. Account-wide. Takes a /reload.",
         get = function() return YR.RoutesOn() end, set = YR.SetRoutesOn,
         state = function() return YR.RoutesOn() and "On - reload to load the routes" or "Off" end,
         reload = function() return YR.RoutesOn() ~= routesWere end })
@@ -6542,23 +5724,23 @@ end
 -- The window: four tabs at the top - QoL, Interface, Levelling, Character setup - each with its own menu down the left
 -- ---------------------------------------------------------------------------
 -- tab: which top tab a page is under ("settings" is QoL's and Interface's, as the page showing on it is: TabOf).
--- nav: in Levelling's menu (true: top down; "foot": at its foot); under: the menu's page it belongs to (the editor and
--- Share: All routes'); routes: the routes' own - while they are off, the page that switches them on in its place.
+-- nav: in Levelling's menu (true: top down; "foot": at its foot); under: the menu's page it belongs to; routes: the
+-- routes' own - while they are off, the page that switches them on in its place; installed: only with a routes addon
+-- installed (YR.shipped) - without one, not in the menu, and This run in its place.
 local PAGES = {
-    { key = "where", tab = "levelling", nav = true, routes = true, label = "Next route", icon = 132181,
+    -- Next route and All routes: the routes' own, shown only with a routes addon installed (installed: the owner,
+    -- 2026-10-29, "hent dem tilbake bare med rutene installert") - without one they have nothing to show
+    { key = "where", tab = "levelling", nav = true, routes = true, installed = true, label = "Next route", icon = 132181,
       build = function(page)
-          YR.BuildWherePage(page, { head = LevelHead, panel = Panel, light = StateLight, clock = Clock, width = PW, top = TITLE_H,
-              steps = function(key) Open(key) YR:ToggleWindow("routes") end })
+          YR.BuildWherePage(page, { head = LevelHead, panel = Panel, light = StateLight, clock = Clock, width = PW, top = TITLE_H })
       end, refresh = function() win.subtitle:SetText("") YR.RefreshWherePage() end },
-    { key = "library", tab = "levelling", nav = true, routes = true, label = "All routes", icon = 237381,
+    { key = "library", tab = "levelling", nav = true, routes = true, installed = true, label = "All routes", icon = 237381,
       build = BuildLibrary, refresh = RefreshLibrary },
     { key = "run", tab = "levelling", nav = true, routes = true, label = "This run", icon = 134376, build = BuildRun, refresh = RefreshRun },
     -- (the menu says Settings: under the Levelling tab it can be no other's - the owner, 2026-10-15; the page's
     -- heading still says Route settings)
     { key = "route", tab = "levelling", nav = "foot", routes = true, label = "Settings", icon = 134063, build = BuildRoutePage,
       refresh = RefreshRoutePage },
-    { key = "routes", tab = "levelling", under = "library", routes = true, build = BuildRoutes, refresh = RefreshRoutes },
-    { key = "share", tab = "levelling", under = "library", routes = true, build = BuildShare, refresh = RefreshShare },
     { key = "routesoff", tab = "levelling", build = BuildRoutesOff, refresh = function() win.subtitle:SetText("") routesOff:Refresh() end },
     { key = "settings", tab = "qol", build = BuildSettings, refresh = RefreshSettings },
     { key = "setup", tab = "setup", build = BuildSetupPage, refresh = RefreshSetupPage },
@@ -6584,6 +5766,8 @@ local function Show(key)
         key = "settings"
     end
     local p = PAGE_BY[key]
+    -- Next route and All routes without a routes addon: This run in their place
+    if p.installed and #(YR.shipped or {}) == 0 then key, p = "run", PAGE_BY.run end
     local navKey = p.under or key       -- lit in the menu: the page, or the one it is under
     if p.tab == "levelling" and key ~= "routesoff" then lastLevelling = key end
     -- the routes' own pages, with the routes off: the page that switches them on (Talents is everyone's)
@@ -6596,7 +5780,7 @@ local function Show(key)
     ui.sideS:SetShown(tab == "setup")
     for name, b in pairs(ui.topTabs) do b:Select(name == tab) end
     for _, q in ipairs(PAGES) do
-        -- a page is made the first time it is shown (the route editor and QoL with the window)
+        -- a page is made the first time it is shown (QoL with the window)
         if q.key == key and not q.built then
             q.built = true
             q.build(pages[q.key])
@@ -6742,7 +5926,7 @@ local function Build()
     local track
     local function Tab(go) return function() if settings.ClearSearch then settings.ClearSearch() end go() end end
     ui.topTabs, track = TopTabs(win.title:GetParent(),
-        Tab(function() Show(lastLevelling or "where") end),
+        Tab(function() Show(lastLevelling or (#(YR.shipped or {}) > 0 and "where" or "run")) end),
         Tab(function() Show(settings.lastOn and settings.lastOn.qol or "home") end), Tab(function() Show("setup") end),
         Tab(function() Show(settings.lastOn and settings.lastOn.interface or "xpbar") end))
     win.subtitle:SetPoint("RIGHT", track, "LEFT", -16, 0)
@@ -6775,12 +5959,11 @@ local function Build()
     -- with icons, which read as more settings (the owner, 2026-10-20: "a bit confusing that all of these are settings").
     -- It is said in the page's own corner now, where every page says whose its settings are: SETUP_PAGE's scope.)
     pages = {}
-    -- Levelling's menu: its four pages top down, and Settings at its foot (the routes' switch is that page's first
-    -- row). The routes are on All routes: the menu was the switch, the pages and a list of routes folded by level
-    -- (the owner, 2026-10-21: "the sidebar is confusing, with so much in it").
+    -- Levelling's menu: Next route and All routes (with a routes addon installed), This run, and Settings at its foot
+    -- (the routes' switch is that page's first row).
     local y = -12
     for _, p in ipairs(PAGES) do
-        if p.nav then
+        if p.nav and not (p.installed and #(YR.shipped or {}) == 0) then
             p.button = NavButton(side, p.label, p.icon)
             p.button:SetScript("OnClick", function() Show(p.key) end)
             if p.nav == "foot" then
@@ -6803,9 +5986,8 @@ local function Build()
         page:SetPoint("TOPLEFT", p.tab == "levelling" and SIDE or NAV_W, -HEAD)
         page:SetPoint("BOTTOMRIGHT")
         pages[p.key] = page
-        -- the route editor (a route is opened in it below) and QoL (its menu) with the window; Where
-        -- next, This run, Share and Route settings the first time each is shown
-        if p.key == "routes" or p.key == "settings" then
+        -- QoL (its menu) with the window; This run and Route settings the first time each is shown
+        if p.key == "settings" then
             p.built = true
             p.build(page)
         end
@@ -6814,21 +5996,6 @@ local function Build()
     version:SetPoint("RIGHT", win.close, "LEFT", -12, 0)
     local meta = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("Headstart", "Version")
     version:SetText(meta and ("v" .. meta) or "")
-    -- open on the route this character is on: the one RestedXP has loaded if it's ours, else the
-    -- starting route for its race, else the first
-    local key = YR.shipped[1] and YR.shipped[1].key
-    local current = type(RXP) == "table" and type(RXP.currentGuide) == "table" and RXP.currentGuide.name
-    local _, race = UnitRace("player")
-    local byRace = ({ Human = "northshire", NightElf = "shadowglen", Dwarf = "coldridge", Gnome = "coldridge" })[race]
-    for _, g in ipairs(YR.shipped) do
-        if g.key == byRace then key = g.key end
-    end
-    -- RestedXP pads the level range ("01-05 Coldridge Valley"): compare without leading zeros
-    local function Plain(s) return (s:gsub("%f[%d]0+(%d)", "%1")) end
-    for _, g in ipairs(YR.shipped) do
-        if type(current) == "string" and Plain(current) == Plain(YR.GuideName(g.key)) then key = g.key end
-    end
-    if key then Open(key) end
 end
 
 function YR:RefreshWindow()

@@ -1,5 +1,6 @@
 """Smoke test of Headstart as it is published: with no routes addon beside it. The window opens on every
-page, Where next? and the route list have nothing to show and say so, and nothing errors.
+page, with the routes on and off, and nothing errors - the names of the route planning's pages too (Next route,
+All routes, the editor, Share: taken out 2026-10-29), which open another page.
 
     python tools/smoke_noroutes.py      (exit code 1 on any failure)
 
@@ -40,12 +41,16 @@ def run():
         g.YippRouteDB = lua.table(routes=routes)
         g.Fire("ADDON_LOADED", "Headstart")
         check(len(YR.shipped) == 0, f"routes {'on' if routes else 'off'}: no routes addon, nothing shipped")
-        for page in ("routes", "where", "run", "share", "route", "settings", "instances"):
+        for page in ("run", "route", "settings", "instances", "where", "library", "routes", "share"):
             YR.ToggleWindow(YR, page)
         check(g.HeadstartWindow is not None and g.HeadstartWindow.hidden is False,
-              "every page of the window opens with no routes")
+              "every page of the window opens with no routes, and the old pages' names open one")
+        # Next route and All routes: only with a routes addon - without one, not in the menu, and This run in their place
+        YR.ToggleWindow(YR, "where")
+        want = "run" if routes else "routesoff"
+        check(YR.WindowPage() == want and YR.TourTarget("levelling:where") is None and YR.TourTarget("levelling:library") is None,
+              f"routes {'on' if routes else 'off'}, none installed: Next route and All routes not in the menu, {want} in their place ({YR.WindowPage()})")
         YR.ToggleWindow(YR)
-    check(len(YR.WhereNext(20)) == 0, "Where next? has nothing to recommend")
     return bad
 
 

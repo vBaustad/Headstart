@@ -1,8 +1,8 @@
 ## Interface: 16001
 ## Title: Headstart
-## Notes: Quality of life and levelling tools for WoW: Forever: camps, bags, vendors, an XP bar, your runs recorded and saved as your own RestedXP routes, a route editor, level splits, and new characters set up from your main.
+## Notes: Quality of life and levelling tools for WoW: Forever: camps, bags, vendors, an XP bar, your runs recorded, level splits, and new characters set up from your main.
 ## Author: vBaustad
-## Version: 0.10.1
+## Version: 0.11.0
 ## X-License: CC BY-NC-SA 4.0
 ## X-Website: https://github.com/vBaustad/Headstart
 ## X-Curse-Project-ID: 1719292
@@ -28,7 +28,6 @@ CampingReminder.lua
 MailStep.lua
 StepKeeper.lua
 QuestSkip.lua
-MyRoutes.lua
 Flight.lua
 Boats.lua
 Data\Boats.lua
@@ -61,6 +60,7 @@ DamageSkin.lua
 Movers.lua
 TalentFade.lua
 BarHide.lua
+EditModeLook.lua
 Cinematic.lua
 Glimmer.lua
 ChatLog.lua
@@ -82,5 +82,4 @@ Options.lua
 Guides.lua
 Group.lua
 Style.lua
-Step.lua
 WhereNext.lua

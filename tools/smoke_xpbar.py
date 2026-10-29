@@ -249,13 +249,13 @@ function print() end
     YR.Latch(True)
     db = g.YippRouteDB
     check(db.welcome is True and db.restock is None and not YR.Option("restock") and not YR.Option("bankAuto")
-          and not YR.XPBarOn() and not YR.Option("logging"),
-          "a new install: quiet (no restock, no banking, no XP bar, no run log), and Get started is shown")
+          and not YR.XPBarOn() and not YR.Option("logging") and not YR.Option("craftRemind"),
+          "a new install: quiet (no restock, no banking, no XP bar, no run log, no craftable items line), and Get started is shown")
     # nothing that acts for you or stands on one of Blizzard's windows, also once the routes are turned on
     db.routes = True
     acting = [k for k in ("bankButton", "mailButton", "deathSkipRelease", "skipQuests", "groupShare", "groupAccept", "autoTrain", "restock",
                           "bankAuto", "levelShot") if YR.Option(k)]
-    check(acting == [] and db.pickRewards is None and db.quiet == 4,
+    check(acting == [] and db.pickRewards is None and db.quiet == 5,
           f"a new install with the routes turned on: still nothing that acts for you, and no button of ours on the bank or the mailbox ({acting})")
     db.routes = None
     lua.execute("YippRouteDB = { runs = {} }")
@@ -263,13 +263,16 @@ function print() end
     db = g.YippRouteDB
     # what depends on another addon waits for the login: the addons that sort after Headstart are not in
     # yet as it loads, and each of these was written down as on whatever they did
-    check(db.restock is None and db.bankButton is None and db.xpbar.on is None and db.quiet == 4 and db.setupOn is True,
+    check(db.restock is None and db.bankButton is None and db.xpbar.on is None and db.craftRemind is None and db.quiet == 5
+          and db.setupOn is True,
           "as Headstart loads: what another addon may have is not answered yet (the rest of the latch is)")
     YR.LatchOthers()
     check(db.welcome is None and db.restock is True and db.bankAuto is True and db.trinketBar is True
           and db.acceptInvites == "friends" and db.acceptFrom == "friends" and db.xpbar.on is True and db.showSplits is True,
           "an account that had Headstart: each option never touched is written down as it was (on)")
     check(db.instanceTrack is True, "an account that had Headstart keeps its instance tracker on (it starts off on a new install)")
+    check(db.craftRemind is True and YR.Option("craftRemind"),
+          "and its craftable items line on (it starts off on a new install)")
     check(db.bankButton is True and db.mailButton is True and db.deathSkipRelease is True and db.skipQuests is True and db.groupShare is True
           and db.groupAccept is True and db.pickRewards is True,
           "and so are the ones that came to start off later: the bank and mail buttons, the routes' automation, reward picking")
@@ -278,8 +281,24 @@ function print() end
     YR.Latch(False)
     YR.LatchOthers()
     db = g.YippRouteDB
-    check(db.quiet == 4 and db.bankButton is True and db.mailButton is False and db.pickRewards is True and db.restock is None,
+    check(db.quiet == 5 and db.bankButton is True and db.mailButton is False and db.pickRewards is True and db.restock is None,
           "an account from the version before: the newer ones kept on, a choice of its own left alone, nothing older written again")
+    # an account at quiet 4 (Headstart 0.10): only Craftable items is written down - on, or as it chose
+    lua.execute("YippRouteDB = { runs = {}, quiet = 4 }")
+    YR.Latch(False)
+    YR.LatchOthers()
+    db = g.YippRouteDB
+    check(db.quiet == 5 and db.craftRemind is True and db.instanceTrack is None and db.bankButton is None,
+          "an account from 0.10: its craftable items line kept on, nothing older written again")
+    lua.execute("YippRouteDB = { runs = {}, quiet = 4, craftRemind = false }")
+    YR.Latch(False)
+    YR.LatchOthers()
+    check(g.YippRouteDB.craftRemind is False, "one that had turned it off keeps it off")
+    lua.execute("YippRouteDB = { runs = {}, quiet = 5 }")
+    YR.Latch(False)
+    YR.LatchOthers()
+    check(g.YippRouteDB.craftRemind is None and not YR.Option("craftRemind"),
+          "a file already at 5 (a new install, or YippYapp-oppsett's Classic as new): nothing written, the line off")
     # another addon that loads after Headstart does one of them: seen at the login, and ours is left off
     g.HEADSTART_T = YR
     lua.execute("""YippRouteDB = { runs = {}, quiet = 2 }

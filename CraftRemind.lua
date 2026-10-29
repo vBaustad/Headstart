@@ -7,7 +7,7 @@
 --   * Told once per kind; again after you've had some and run out.
 -- The recipes come from the game's data (Data/Consumables.lua); a recipe counts as known when the
 -- game says you know its spell.
--- Account options (YippRouteDB, Settings, QoL): craftRemind (on unless turned off), craftStones,
+-- Account options (YippRouteDB, Settings, QoL): craftRemind (off until you turn it on), craftStones,
 -- craftOils, craftBandages (each on unless turned off), craftBelow (remind under this many; default 1).
 local ADDON, YR = ...
 

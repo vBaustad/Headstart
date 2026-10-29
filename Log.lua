@@ -399,15 +399,14 @@ function YR.LogKeepDays()
 end
 
 --- Delete the logs of characters not played for this many days. Returns how many. Never deleted: this
---- character's, a fastest run's (one that holds the best time to some level in the splits) and a run
---- a route of your own was saved from. Those are the ones still used: to beat, and to save again.
+--- character's and a fastest run's (one that holds the best time to some level in the splits): the one
+--- played, and the ones to beat.
 function YR.PruneLogs(days)
     if not (days and days > 0) then return 0 end
     local cut, me, n = time() - days * 86400, YR.CharKey(), 0
     local best = YR.SplitsBestRuns and YR.SplitsBestRuns() or {}
     for key, r in pairs(YippRouteDB.runs or {}) do
-        if key ~= me and type(r) == "table" and LastActive(r) < cut and not best[key]
-                and not (YR.MyRouteFrom and YR.MyRouteFrom(key)) then
+        if key ~= me and type(r) == "table" and LastActive(r) < cut and not best[key] then
             YippRouteDB.runs[key] = nil
             n = n + 1
         end

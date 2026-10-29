@@ -1,15 +1,13 @@
 -- The routes Headstart knows, and each player's own edits of them.
 --
 -- Headstart itself comes without routes. They come from a routes addon beside it (it queues its guides
--- in the global HeadstartRoutes before Headstart loads; taken in below), from a run saved as a route
--- (MyRoutes.lua) and from Share's import. Each is handed to YR:ShipGuide as text.
--- At login, RegisterGuides gives RestedXP either the player's edited version (saved by the route
--- editor in YippRouteDB.custom) or, if they never edited it, the shipped one. RestedXP reads guides
--- added after it has loaded straight away (RXPGuides.RegisterGuide), so nothing is written to disk:
--- an edit reaches RestedXP on the next /reload.
+-- in the global HeadstartRoutes before Headstart loads; taken in below), handed to YR:ShipGuide as text.
+-- At login, RegisterGuides gives RestedXP either the player's edited version (YippRouteDB.custom: the
+-- route editor saved them until it was taken out, 2026-10-29) or, if they never edited it, the shipped one.
+-- RestedXP reads guides added after it has loaded straight away (RXPGuides.RegisterGuide), so nothing
+-- is written to disk.
 --
--- A guide is plain RestedXP text: a header, then steps that each start with a line "step". The
--- editor works on that split: the header is kept as it is, the steps can be moved, removed or added.
+-- A guide is plain RestedXP text: a header, then steps that each start with a line "step".
 local _, YR = ...
 
 YR.shipped = {}          -- { { key, text } } in load order
@@ -160,7 +158,6 @@ function YR.RxpRewardGuard()
 end
 
 function YR:RegisterGuides()
-    if YR.ShipMyRoutes then YR.ShipMyRoutes() end       -- routes saved from a run (MyRoutes.lua), like ours
     if not YR.RoutesOn() then return end
     YR.RxpIcons()
     YR.RxpPinsOnTop()
@@ -357,10 +354,6 @@ function YR:RoutesFor(race)
             end
             if on then for key in pairs(own) do set[key] = true end end
         end
-    end
-    -- and your own routes, saved from a run
-    for _, g in ipairs(YR.shipped) do
-        if YR.MyRouteFor and YR.MyRouteFor(g.key, race) then set[g.key] = true end   -- this race's
     end
     return set
 end
@@ -620,45 +613,6 @@ end
 local STEP_KINDS = { accept = true, complete = true, turnin = true, buy = true, learn = true,
     hearth = true, death = true, level = true }
 
-local function Goto(e)
-    if not e[6] or e[6] == 0 then return "" end
-    return ("\n    .goto %d,%.2f,%.2f"):format(e[6], e[7], e[8])
-end
-
-local function Talk(npc)
-    return npc and ("\n    >>Talk to |cRXP_FRIENDLY_%s|r"):format(npc) or ""
-end
-
-local function Target(npc)
-    return npc and ("\n    .target %s"):format(npc) or ""
-end
-
--- The RestedXP step for one recorded action. titles/objectives come from the accept of that quest.
-function YR.ActionStep(e, titles, objectives)
-    local kind, q = e[2], e[3]
-    local title = titles[q] or e.title or ("quest " .. q)
-    if kind == "accept" then
-        return "step" .. Goto(e) .. Talk(e.npc) .. ("\n    .accept %d >>Accept %s"):format(q, title) .. Target(e.npc)
-    elseif kind == "turnin" then
-        return "step" .. Goto(e) .. Talk(e.npc) .. ("\n    .turnin %d >>Turn in %s"):format(q, title) .. Target(e.npc)
-    elseif kind == "complete" then
-        local lines = {}
-        for i = 1, math.max(1, objectives[q] or 1) do lines[#lines + 1] = ("\n    .complete %d,%d"):format(q, i) end
-        return "step" .. Goto(e) .. ("\n    >>Finish %s"):format(title) .. table.concat(lines)
-    elseif kind == "buy" then
-        return "step" .. Goto(e) .. Talk(e.npc) .. ("\n    >>Buy %s"):format(e.name or ("item " .. e.item))
-            .. ("\n    .collect %d,%d"):format(e.item, e.count or 1) .. Target(e.npc)
-    elseif kind == "learn" then
-        return "step" .. Goto(e) .. ("\n    .train %d >>Train %s"):format(e.spell, e.name or ("spell " .. e.spell))
-    elseif kind == "hearth" then
-        return "step\n    .hs >>Hearth"
-    elseif kind == "death" then
-        return "step" .. Goto(e) .. "\n    .deathskip >>Die and respawn at the Spirit Healer"
-    elseif kind == "level" then
-        return ("step\n    .xp %d >>Reach level %d"):format(e.to or e[4], e.to or e[4])
-    end
-end
-
 -- One line for the list of what this character did.
 local LABEL = { accept = "Took", complete = "Finished", turnin = "Handed in", buy = "Bought", learn = "Learned",
     hearth = "Hearthed", death = "Died", level = "Reached level" }
@@ -672,18 +626,18 @@ function YR.ActionLabel(e, titles)
     return ("%s %s"):format(LABEL[kind], titles[e[3]] or e.title or e[3])
 end
 
--- This character's actions, oldest first: { { e = event, label = text, step = guide step } }
+-- This character's actions, oldest first: { { e = event, label = text } }
 function YR:RunActions()
     local r = YippRouteDB.runs and YippRouteDB.runs[YR.CharKey()]
-    local out, titles, objectives, touched = {}, {}, {}, {}
+    local out, titles, touched = {}, {}, {}
     for _, e in ipairs(r and r.ev or {}) do
-        if e[2] == "accept" then titles[e[3]] = e.title; objectives[e[3]] = e.obj end
+        if e[2] == "accept" then titles[e[3]] = e.title end
         -- a delivery quest is "complete" the moment it is taken, and the log can note it again at the
         -- turn-in: a completion within a few seconds of taking or handing in the quest is no step
         local noise = e[2] == "complete" and touched[e[3]] and e[1] - touched[e[3]] <= 3
         if e[2] == "accept" or e[2] == "turnin" then touched[e[3]] = e[1] end
         if STEP_KINDS[e[2]] and not noise then
-            out[#out + 1] = { e = e, label = YR.ActionLabel(e, titles), step = YR.ActionStep(e, titles, objectives) }
+            out[#out + 1] = { e = e, label = YR.ActionLabel(e, titles) }
         end
     end
     return out

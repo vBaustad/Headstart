@@ -37,8 +37,8 @@ local STEPS = {
       text = "Save your bars and interface on the character you play, plan bars from the ones you have, and put"
           .. " them on your other characters. A character's own bars are kept the first time you open it there." },
     { at = "levelling", side = "below", title = "Routes",
-      text = "Which route to take now, every route by level, and your runs recorded as routes of your own, played back in"
-          .. " RestedXP. Off until you turn it on there." },
+      text = "Your runs recorded (This run, and the level splits), and help with a RestedXP guide: skip a quest, release"
+          .. " at a death skip, the level pace. Off until you turn it on there." },
     { at = "arrange", side = "above", title = "Arrange",
       text = "Move Headstart's bars and windows on your screen. Also /hs move." },
     { page = "home", at = "qol", side = "belowright", title = "Quality of life", next = "Done",
@@ -206,4 +206,75 @@ end
 function YR.WelcomeToggle()
     if tour and tour:IsShown() then Finish() return false end
     return YR.WelcomeShow()
+end
+
+-- ---------------------------------------------------------------------------
+-- The first login of a new install: a small card, not the whole window and the tour (the owner, 2026-10-29: "vi ikke
+-- lar headstart åpne fullt når du logger inn for første gang. vi vil jo at de skal få den 'apply interface/
+-- actionbars' typ"). What comes first on a new character is its bars, keys and interface: the card says nothing has
+-- been changed and offers that, or the tour, or later. A button is an answer at once; its X and Escape only once it
+-- has stood a few seconds (Core.lua, WelcomeFirst: the Escape that ends a new character's opening flight closes
+-- every window, this one unseen).
+-- An install made with YippYapp-oppsett gets it only with Classic and without Mango's settings: Headstart as new, and
+-- the character's bars and keys from the tool already put on at its login (Headstart_Setup, AutoSetup). The card then
+-- says so, and offers the tour or later. (With Mango's settings there is no "welcome" in the saved file.)
+-- ---------------------------------------------------------------------------
+local card
+local FIRST = "Nothing that acts for you is on, and nothing on your bars has changed. Start with this character's bars,"
+    .. " keys and interface - from a plan, or from a character you already have."
+local DONE = "This character's bars and keys are on, from your setup. Everything else Headstart does is off until you"
+    .. " turn it on: have a look around, or do it later."
+-- whether Character setup has put this character's bars on (it notes when: YippSetupCharDB.applied)
+local function SetUp()
+    local c = _G.YippSetupCharDB            -- (Headstart's per-character saved table, from its TOC)
+    return type(c) == "table" and c.applied ~= nil
+end
+
+local function Answered()
+    Seen()
+    YippRouteDB.welcome = nil
+    if card then card:Hide() end
+end
+
+local function BuildCard()
+    local S = YR.Style
+    card = S.Window("HeadstartWelcomeCard", 520, 172, "Headstart is installed")
+    card:ClearAllPoints()
+    card:SetPoint("CENTER", 0, 140)
+    card.text = S.Text(card, 13, S.C.sub)
+    card.text:SetPoint("TOPLEFT", 20, -64)
+    card.text:SetWidth(480)
+    card.text:SetWordWrap(true)
+    card.text:SetJustifyH("LEFT")
+    card.text:SetSpacing(3)
+    card.setup = S.Button(card, "Set up this character", function()
+        Answered()
+        if InCombatLockdown() then YR.Print("not in a fight: Character setup opens when you ask again (/headstart).") return end
+        YR.SetSetupOn(true)
+        YR:ToggleWindow("setup")
+    end, "primary", 170)
+    card.setup:SetPoint("BOTTOMLEFT", 16, 16)
+    card.setup.tip = "Turns Character setup on and opens it: plan this class's bars, or save the bars, keys and"
+        .. " interface of a character you like and put them on others"
+    card.tour = S.Button(card, "Show me around", function()
+        Answered()
+        YR.WelcomeShow()
+    end, nil, 130)
+    card.tour.tip = "Headstart's window, with hints over it: where everything is"
+    card.later = S.Button(card, "Later", Answered, "ghost", 80)
+    card.later:SetPoint("BOTTOMRIGHT", -16, 16)
+    card.later.tip = "/headstart or the minimap button open it any time"
+end
+
+--- The card a new install's first login gets (Core.lua, YR.WelcomeFirst).
+function YR.WelcomeCard()
+    if not card then BuildCard() end
+    -- set up already: it says so, and Set up this character goes (Show me around takes its place)
+    local done = SetUp()
+    card.text:SetText(done and DONE or FIRST)
+    card.setup:SetShown(not done)
+    card.tour:ClearAllPoints()
+    if done then card.tour:SetPoint("BOTTOMLEFT", 16, 16) else card.tour:SetPoint("LEFT", card.setup, "RIGHT", 8, 0) end
+    card:Show()
+    return true
 end

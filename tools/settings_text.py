@@ -3,7 +3,7 @@
     python tools/settings_text.py [saved file] [text to write]
 
 The saved file is WTF/Account/<your account>/SavedVariables/Headstart.lua in a client's folder (the
-beta's, unless another is named). The text is the same one "Move settings" (/headstart transfer) writes
+live client's, unless another is named; the beta's last one is kept in forever-data/backup/wtf). The text is the same one "Move settings" (/headstart transfer) writes
 with Export, and is read back by its Import on any install: the live game, another computer.
 
 For when the install the settings are in can no longer be logged into - the beta is closed a week
@@ -22,15 +22,15 @@ import sys
 import lupa.lua51 as lua51
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BETA = "S:/Blizzard/World of Warcraft/_classic_beta_/WTF/Account/*/SavedVariables/Headstart.lua"
+LIVE = "S:/Blizzard/World of Warcraft/_forever_/WTF/Account/*/SavedVariables/Headstart.lua"
 
 
 def main(args):
     source = args[0] if args else None
     if not source:
-        found = sorted(glob.glob(BETA), key=os.path.getmtime)
+        found = sorted(glob.glob(LIVE), key=os.path.getmtime)
         if not found:
-            print("no saved file found at", BETA, "- name one.")
+            print("no saved file found at", LIVE, "- name one.")
             return 1
         source = found[-1]
     target = args[1] if len(args) > 1 else os.path.join(os.path.dirname(os.path.abspath(source)), "headstart-settings.txt")

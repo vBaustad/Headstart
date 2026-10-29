@@ -289,6 +289,8 @@ local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelSho
     questTips = true,                       -- (quests on NPC tooltips, QuestTips.lua)
     paceWatch = true,                       -- (the level pace box under the guide, Pace.lua)
     questSkip = true,                       -- (Skip quest in RestedXP's step menu, QuestSkip.lua)
+    editModeOutline = true,                 -- (outlines for Edit Mode's sheets, EditModeLook.lua)
+    craftRemind = true,                     -- (the craftable items line in chat, CraftRemind.lua)
     bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
 YR.STARTS_OFF = STARTS_OFF
 
@@ -417,7 +419,7 @@ function YR.CharKey()
     return made
 end
 
--- The window (the settings and the route editor) is an addon of its own, Headstart_Options: load on
+-- The window (its settings) is an addon of its own, Headstart_Options: load on
 -- demand, so its two hundred kilobytes of code are read the first time the window is asked for and
 -- not at every login. The list of quest IDs /headstart scan asks about is in it too. An addon of its
 -- own has a table of its own: ours is handed over as HeadstartNS. Until it's loaded these stand in
@@ -519,8 +521,10 @@ end
 function YR:ToggleWindow(page) if YR.LoadWindow() then YR:ToggleWindow(page) end end
 function YR:ToggleSettings() if YR.LoadWindow() then YR:ToggleSettings() end end
 function YR:ShowSettingsTab(key) if YR.LoadWindow() then YR:ShowSettingsTab(key) end end
---- A new install is shown around once: the tour (hints over Headstart's window), a few seconds after
---- the first login and not in a fight (the next login, then). Welcome.lua, in the window's addon.
+--- A new install is greeted once: a small card (Welcome.lua, in the window's addon) a few seconds after the
+--- first login and not in a fight (the next login, then) - set up this character, show me around (the tour over
+--- Headstart's window), or later. It was the window and its tour until 2026-10-29: "vi ikke lar headstart åpne
+--- fullt når du logger inn for første gang" (the owner).
 --- It is put up when the screen is really there, and counts as seen only once it has stayed up for a
 --- few seconds or been answered. (A new character's first login plays its flight over the zone with
 --- the interface hidden: the window was put up under it, the Escape that ended the flight closed it
@@ -530,14 +534,21 @@ function YR:ShowSettingsTab(key) if YR.LoadWindow() then YR:ShowSettingsTab(key)
 --- What Headstart says by itself at a login (the reminders: trainer, talents, repairs, crafts) waits on
 --- that login until the welcome is answered or closed: the first thing on a new install is the question
 --- of what to turn on, not four lines from things nobody turned on yet (YR.AfterWelcome).
-local welcomeLive, welcomeLooking, afterWelcome, welcomeHooked = false, false, nil, false
+local welcomeLive, welcomeLooking, afterWelcome, welcomeHooked = false, false, nil, {}
+-- the welcome's that is up: the card, or the tour it opened
+local function WelcomeUp()
+    for _, name in ipairs({ "HeadstartWelcomeCard", "HeadstartTour" }) do
+        local f = _G[name]
+        if f and f:IsVisible() then return f end
+    end
+end
 local function WelcomeDone()
     if not welcomeLive or welcomeLooking then return end
-    local win = _G.HeadstartTour
-    if win and win:IsVisible() then
+    local win = WelcomeUp()
+    if win then
         -- still up (seen, not yet answered): when it goes
-        if not welcomeHooked then
-            welcomeHooked = true
+        if not welcomeHooked[win] then
+            welcomeHooked[win] = true
             win:HookScript("OnHide", function() C_Timer.After(0, WelcomeDone) end)
         end
         return
@@ -568,7 +579,7 @@ function YR.WelcomeFirst()
     local function Look()
         if db.welcomeSeen then return Stop() end
         looks = looks + 1
-        local win = _G.HeadstartTour
+        local win = _G.HeadstartWelcomeCard
         local showing = win and win:IsVisible() or false
         if showing then
             up = up + 1
@@ -581,8 +592,8 @@ function YR.WelcomeFirst()
             local there = UIParent:IsVisible() and not (InCinematic and InCinematic()) and not InCombatLockdown()
             if there and shows < 2 then
                 shows = shows + 1
-                if YR.LoadWindow() and YR.WelcomeShow then
-                    YR.WelcomeShow(true)
+                if YR.LoadWindow() and YR.WelcomeCard then
+                    YR.WelcomeCard()
                     showing = true
                 else
                     shows = 2           -- the window's addon isn't there (said once, in chat): not asked for again
@@ -812,8 +823,12 @@ end
 function YR.Latch(fresh)
     local db = YippRouteDB
     local was = tonumber(db.quiet) or 0
+    if was >= 5 then return end
+    db.quiet = 5
+    -- 5: Craftable items became something you turn on (the owner, 2026-10-30). An account that had Headstart
+    -- keeps it as it was (on, unless another addon did it).
+    if not fresh and db.craftRemind == nil then latchLater[#latchLater + 1] = "craftRemind" end
     if was >= 4 then return end
-    db.quiet = 4
     -- 4: the instance tracker became something you turn on (the owner, 2026-10-14). An account that had
     -- Headstart keeps it as it was (on, unless another addon did it).
     if not fresh and db.instanceTrack == nil then latchLater[#latchLater + 1] = "instanceTrack" end
@@ -933,6 +948,7 @@ f:SetScript("OnEvent", function(_, event, name)
     Start(YR.StartTalentFade)
     Start(YR.StartBarHide)
     Start(YR.StartPowerFlash)
+    Start(YR.StartEditModeLook)
     Start(YR.StartSwing)
     Start(YR.StartJourney)
     Start(YR.StartRecap)

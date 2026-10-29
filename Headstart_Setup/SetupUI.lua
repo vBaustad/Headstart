@@ -746,9 +746,20 @@ local function CheckLater(layout, want)
     C_Timer.After(1.5, Check)
 end
 
+--- The levelling guide addon in use: "RestedXP" (its guides are started from here, Headstart's routes run in it),
+--- "Polestar" (it opens with a guide for the race, class, level and zone by itself, so there is nothing to start), or
+--- nil. Both loaded: RestedXP, the one this can start a guide in.
+function YS.GuideAddon()
+    local rxp = RXP
+    if rxp and rxp.LoadGuideTable and rxp.GetGuideTable then return "RestedXP" end
+    if FirstLoaded({ "Polestar" }) then return "Polestar" end
+end
+
 local function ApplyGuide()
     local rxp = RXP
-    if not (rxp and rxp.LoadGuideTable and rxp.GetGuideTable) then return "RestedXP not loaded" end
+    if YS.GuideAddon() ~= "RestedXP" then
+        return YS.GuideAddon() == "Polestar" and "Polestar (it picks the guide itself)" or "no guide addon loaded (RestedXP or Polestar)"
+    end
     -- the opener is a level 1 route: a character past it keeps the guide it is on
     if (UnitLevel("player") or 1) > 5 then return "left as it is (not a new character)" end
     local _, race = UnitRace("player")
@@ -758,7 +769,7 @@ local function ApplyGuide()
     end
     local ok = pcall(rxp.LoadGuideTable, rxp, group, name)
     if not ok then return "RestedXP refused the guide" end
-    return "'" .. name .. "'" .. (skipped and (" (the one picked for the race, '" .. skipped .. "', isn't for this class)") or "")
+    return "RestedXP '" .. name .. "'" .. (skipped and (" (the one picked for the race, '" .. skipped .. "', isn't for this class)") or "")
 end
 
 --- A character's screen about to be saved into its interface: the parts Apply never put on this
@@ -843,7 +854,7 @@ function YS.UISteps(ui, o, login)
     o = o or YS:Options()
     if not ui then
         return { function()
-            YS.Print(("RestedXP guide: %s. No Edit Mode layout, bars or settings saved yet: log in on your main once.")
+            YS.Print(("Levelling guide: %s. No Edit Mode layout, bars or settings saved yet: log in on your main once.")
                 :format(o.guide and ApplyGuide() or "off"))
             return true
         end }
@@ -982,7 +993,7 @@ function YS.UISteps(ui, o, login)
         -- suits them (the owner, 2026-10-21, a new character set up in the stress test: "you don't need to do the
         -- reload, everything works, and I take a reload when it suits me"). Said at the end of this line, not a line more.
         local later = u.taint and login and " A /reload when it suits you finishes it (until then a bar can be blocked in a fight)." or ""
-        YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. Key bindings: %s. Graphics and sound: %s. RestedXP guide: %s. RestedXP windows: %s.%s")
+        YS.Print(("Edit Mode: %s. Blizzard action bars: %s. Chat: %s. Game settings changed: %d. Key bindings: %s. Graphics and sound: %s. Levelling guide: %s. RestedXP windows: %s.%s")
             :format(u.layout, barText, u.chat, u.set, u.keys, machineText, u.guide, o.rxpFrames ~= false and YS.ApplyRXP(ui.rxp) or "off", later))
         if YS.UIStale(ui) then
             -- what an older save lacks, by the version it was saved with (the list above UI_VERSION)

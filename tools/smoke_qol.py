@@ -630,6 +630,10 @@ def run():
     YR.partsReady = True             # the login: what is wanted comes on
     YR.ApplyParts()
     YR.CheckCrafts()
+    check(prints() == [] and not YR.Option("craftRemind"), "a new install: off until you turn it on - nothing said")
+    g.YippRouteDB.craftRemind = True     # turned on, as a player does
+    YR.ApplyParts()
+    YR.CheckCrafts()
     said = prints()
     check(len(said) == 1 and "make 3 Item2863" in said[0] and "no sharpening stones" in said[0],
           f"a sword and mats: the best stone, how many, and no weightstone line: {said}")

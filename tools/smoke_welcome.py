@@ -84,14 +84,20 @@ def run():
     check(w.hidden, "the window closed under it: the tour is not back the next time the window opens")
     lua.execute("HeadstartTour:GetParent():Show()")
 
-    # The first, unasked showing (Core.lua, YR.WelcomeFirst). A new install's very first login is a new
-    # character's, and that plays its flight over the zone with the interface hidden: the window was put
-    # up under it, closed by the Escape that ended the flight, and written down as seen (2026-10-13).
+    # The first, unasked showing (Core.lua, YR.WelcomeFirst): a small card since 2026-10-29, not the window and
+    # its tour ("vi ikke lar headstart åpne fullt når du logger inn for første gang" - the owner). A new install's
+    # very first login is a new character's, and that plays its flight over the zone with the interface hidden:
+    # the tour was put up under it, closed by the Escape that ended the flight, and written down as seen
+    # (2026-10-13). The same rules hold for the card.
     lua.execute("""UI_UP, IN_MOVIE, LATER = false, true, {}
         UIParent.IsVisible = function() return UI_UP end
         function InCinematic() return IN_MOVIE end
-        WIN = HeadstartTour
+        HeadstartNS.WelcomeCard()
+        if HeadstartWindow then HeadstartWindow:Hide() end
+        HeadstartTour:Hide()
+        WIN = HeadstartWelcomeCard
         WIN.IsVisible = function(self) return UI_UP and self:IsShown() end
+        HeadstartTour.IsVisible = WIN.IsVisible
         function Tick() local l = LATER LATER = {} for _, w in ipairs(l) do w[2]() end return #LATER end
         function First() WIN:Hide() LATER = {} YippRouteDB.welcome, YippRouteDB.welcomeSeen = true, nil
             HeadstartNS.WelcomeFirst() end""")
@@ -108,6 +114,8 @@ def run():
     lua.execute("IN_MOVIE = false")
     g.Tick()
     check(not win.hidden and db.welcomeSeen is None, "the screen is there: put up - and not counted as seen for that")
+    check(g.HeadstartTour.hidden and (g.HeadstartWindow is None or g.HeadstartWindow.hidden),
+          "the card alone: not Headstart's window, not the tour")
     lua.execute("WIN:Hide()")                   # Escape, or whatever closes every window
     g.Tick()
     check(not win.hidden and db.welcomeSeen is None, "closed before it could be read: put up once more")
@@ -123,14 +131,40 @@ def run():
     lua.execute("WIN:Hide()")
     left = g.Tick()
     check(win.hidden and db.welcomeSeen is None and left == 0, "closed twice: not put up a third time, still not seen (the next login asks)")
-    # a click in it is an answer
-    for name, press in (("Next", "WIN.next.fn(WIN.next)"), ("Skip", "WIN.skip.fn(WIN.skip)")):
+    # a click in it is an answer, and it goes (the window's functions are stand-ins here, as ShowSettingsTab is:
+    # what each button asks for is said, and smoke.py presses them against the real window)
+    lua.execute("""OPENED, SETUP_ON = nil, nil
+        HeadstartNS.ToggleWindow = function(_, page) OPENED = page or "window" end
+        HeadstartNS.SetSetupOn = function(on) SETUP_ON = on end""")
+    for name, press in (("Later", "WIN.later.fn(WIN.later)"), ("Show me around", "WIN.tour.fn(WIN.tour)"),
+                        ("Set up this character", "WIN.setup.fn(WIN.setup)")):
+        lua.execute("if HeadstartWindow then HeadstartWindow:Hide() end HeadstartTour:Hide()")
         g.First()
         g.Tick()
         shown = not win.hidden and db.welcomeSeen is None
         lua.execute(press)
-        check(shown and db.welcomeSeen is True, f"{name} pressed: seen")
+        check(shown and db.welcomeSeen is True and db.welcome is None and win.hidden, f"{name} pressed: seen, and the card goes")
         check(g.Tick() == 0, "and nothing looks any more")
+        if name == "Later":
+            check(g.HeadstartWindow is None or g.HeadstartWindow.hidden, "Later: nothing else opens")
+        elif name == "Show me around":
+            check(not g.HeadstartTour.hidden and g.SETUP_ON is None, "Show me around: the tour")
+        else:
+            check(g.SETUP_ON is True and g.OPENED == "setup",
+                  f"Set up this character: Character setup turned on, and its tab asked for ({g.SETUP_ON}, {g.OPENED})")
+    # what it says: a new install - nothing changed, set up this character; a character Character setup has put its bars
+    # on already (a YippYapp-oppsett install's Classic, Headstart as new) - its bars and keys are on, and no Set up
+    lua.execute("YippSetupCharDB = nil")
+    YR.WelcomeCard()
+    first = (win.text.text, win.setup.hidden)
+    lua.execute("YippSetupCharDB = { applied = 1761700000 }")
+    YR.WelcomeCard()
+    done = (win.text.text, win.setup.hidden)
+    lua.execute("YippSetupCharDB = nil WIN:Hide()")
+    check(first[0].startswith("Nothing that acts for you is on") and not first[1],
+          "a new install's card: nothing changed yet, Set up this character offered")
+    check(done[0].startswith("This character's bars and keys are on") and done[1] is True,
+          "a character already set up from YippYapp-oppsett: its bars and keys are on, and no Set up button")
     # asked for by hand (/headstart start, the button in the settings): seen at once, as before
     g.First()
     YR.WelcomeShow()
@@ -153,7 +187,7 @@ def run():
 
     # What speaks up by itself at a login (the reminders) waits until the welcome is answered or closed
     YR.windowLoaded = True
-    lua.execute("SAIDLIST = {} WIN:Hide()")
+    lua.execute("SAIDLIST = {} WIN:Hide() HeadstartTour:Hide()")
     g.First()
     lua.execute("HeadstartNS.AfterWelcome(function() SAIDLIST[#SAIDLIST + 1] = 'reminders' end)")
     check(len(g.SAIDLIST) == 0 and YR.WelcomeHolds(), "a new install's first login: the reminders wait for the welcome")

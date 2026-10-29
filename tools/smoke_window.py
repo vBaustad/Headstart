@@ -52,7 +52,7 @@ def run():
     # an account that had Headstart before keeps it on (latched once)
     g.YippRouteDB = lua.table(quiet=1)
     YR.Latch(False)
-    check(YR.SetupOn() and g.YippRouteDB.quiet == 4, "an account that had Headstart: Character setup stays on")
+    check(YR.SetupOn() and g.YippRouteDB.quiet == 5, "an account that had Headstart: Character setup stays on")
     g.YippRouteDB.setupOn = False
     YR.Latch(False)
     check(not YR.SetupOn(), "turned off after that: it stays off")

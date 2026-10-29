@@ -84,7 +84,7 @@ SWITCH_ON = """
     local db, T = YippRouteDB, HEADSTART
     for key in pairs(T.STARTS_OFF) do if key ~= "xpbar" then db[key] = true end end       -- (xpbar: a table of its own)
     for _, key in ipairs({ "camp", "flightTimer", "remindTrainer", "remindTalents", "durability",
-        "craftRemind", "simTooltip", "skipCinematic", "minimapButton", "logging", "showSplits",
+        "simTooltip", "skipCinematic", "minimapButton", "logging", "showSplits",
         "campReminder", "buyLater", "sellGuard", "groupPanel", "trinketAuto", "mailAuto", "shareAll", "moveBag",
         "moveReagentBag" }) do db[key] = true end
     db.routes, db.bagBar, db.microMenu, db.chatStrip, db.whisperSound, db.talentFade = true, "hover", "hide", "slim", "ring", 40
@@ -135,7 +135,7 @@ EACH = """
     for _, k in ipairs({ "trinketAuto", "mailAuto", "shareAll", "moveBag", "moveReagentBag", "logging", "showSplits",
         "campReminder", "buyLater", "sellGuard", "groupPanel" }) do Key(k) end
     for _, k in ipairs({ "camp", "flightTimer", "remindTrainer", "remindTalents", "durability",
-        "craftRemind", "simTooltip", "skipCinematic", "minimapButton", "journey" }) do
+        "simTooltip", "skipCinematic", "minimapButton", "journey" }) do
         list[#list + 1] = { k, function() db[k] = false end, function() db[k] = nil end }
     end
     for _, v in ipairs({ { "routes", true, false }, { "bagBar", "hover" }, { "microMenu", "hide" }, { "chatStrip", "slim" },

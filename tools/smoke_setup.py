@@ -578,6 +578,31 @@ labels = lua.eval("(function() local t = {} for _, c in ipairs(YR_SETUP.StartGui
 ok = "01-06 Coldridge Lean  (Alliance Rogue only)" in labels
 print(("ok  " if ok else "FAIL"), f"the choice says the Rogue's guide is for Rogues ({labels[:120]})")
 bad += not ok
+# Which guide addon: Polestar alone picks its own guide (nothing started, and the chat line says Polestar); with both,
+# RestedXP's is started; with neither, the line says so (the owner, 2026-10-28: "see whether it is Polestar or RXP")
+
+
+def guide_line():
+    lines = [g.PRINTS[i] for i in range(1, len(g.PRINTS) + 1) if g.PRINTS[i] and "Levelling guide:" in g.PRINTS[i]]
+    return lines[-1].split("Levelling guide: ")[1].split(". ")[0] if lines else None
+
+
+lua.execute('''KEPT_RXP = RXP RXP = nil LOADED = { "Polestar", "Polestar_Guides" } IS_ROGUE = false''')
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = guide_line() == "Polestar (it picks the guide itself)" and YS.GuideAddon() == "Polestar"
+print(("ok  " if ok else "FAIL"), f"Polestar alone: nothing started, said as Polestar ({guide_line()})")
+bad += not ok
+lua.execute('''RXP = KEPT_RXP RXP.loaded = nil''')
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "RestedXP Forever Guide (A)|01-05 Coldridge Valley" and guide_line().startswith("RestedXP '01-05 Coldridge Valley'")
+print(("ok  " if ok else "FAIL"), f"Polestar and RestedXP both: RestedXP's guide started ({guide_line()})")
+bad += not ok
+lua.execute('''RXP = nil LOADED = {}''')
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = guide_line() == "no guide addon loaded (RestedXP or Polestar)" and YS.GuideAddon() is None
+print(("ok  " if ok else "FAIL"), f"neither: said so ({guide_line()})")
+bad += not ok
+lua.execute('''RXP = KEPT_RXP LOADED = {}''')
 # Headstart's openers, the Lean ones first: the first that is for the character (the owner, 2026-10-16)
 lua.execute('''for _, x in ipairs({ { "01-06 Shadowglen (Lean)", "Alliance Rogue" }, { "01-06 Shadowglen (Launch)", "Alliance" },
     { "01-06 Northshire (Lean)", "Alliance" }, { "01-06 Northshire (Launch)", "Alliance" } }) do

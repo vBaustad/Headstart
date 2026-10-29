@@ -1,4 +1,4 @@
-"""Talent trees and builds for Headstart, from Forever's client data (the trait system, build 1.60.1.70425).
+"""Talent trees and builds for Headstart, from Forever's client data (the trait system, live build 1.60.1.70630).
 
     python tools/talents_gen.py        (needs S:/forever-data/db/forever.duckdb)
 
@@ -17,8 +17,8 @@ import duckdb
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = "S:/forever-data/db/forever.duckdb"
-S = "wow_classic_beta_1_60_1_70425"
-BUILD = "1.60.1.70425"
+S = "wowf_1_60_1_70630_nohotfix"
+BUILD = "1.60.1.70630"
 # each tree's skill line (skilllinextraittree) is a class: Classic's class IDs
 CLASS_OF_LINE = {26: 1, 184: 2, 50: 3, 38: 4, 613: 5, 373: 7, 237: 8, 354: 9, 574: 11}
 CLASS_MASK = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16, 7: 64, 8: 128, 9: 256, 11: 1024}
@@ -65,7 +65,7 @@ BUILDS = {
         ("Convection", 5), ("Concussion", 5), ("Call of Flame", 3), ("Elemental Focus", 1), ("Reverberation", 1),
         ("Eye of the Storm", 3), ("Elemental Devastation", 2)])],
     8: [("level", "Levelling: Frost, then Arcane", "Frost to Ice Barrier - slow, freeze and kill - then Arcane for mana and Clearcasting.", [
-        ("Improved Frostbolt", 5), ("Ice Shards", 5), ("Frost Channeling", 3), ("Piercing Ice", 3), ("Improved Frost Nova", 2),
+        ("Improved Frostbolt", 5), ("Ice Shards", 5), ("Frost Channeling", 3), ("Frostbite", 3), ("Improved Frost Nova", 2),
         ("Arctic Reach", 2), ("Shatter", 3), ("Cold Snap", 1), ("Improved Cone of Cold", 1), ("Winter's Chill", 5),
         ("Ice Barrier", 1),
         ("Arcane::Wand Specialization", 2), ("Arcane Focus", 3), ("Arcane Concentration", 5), ("Arcane Impact", 3),
@@ -147,8 +147,8 @@ ROLE_BUILDS = {
         ("Improved Fireball", 5), ("Ignite", 5), ("Flame Throwing", 2), ("Pyroblast", 1), ("Burning Soul", 2),
         ("Improved Scorch", 3), ("Heating Up", 1), ("Master of Elements", 3), ("Critical Mass", 5), ("Blast Wave", 1),
         ("Fire Power", 3), ("Combustion", 1),
-        ("Elemental Precision", 5), ("Improved Frost Nova", 2), ("Permafrost", 3), ("Ice Lance", 1), ("Improved Blizzard", 3),
-        ("Frost Warding", 1), ("Ice Block", 1), ("Shatter", 3)])],
+        ("Elemental Precision", 3), ("Frost Warding", 2), ("Improved Frost Nova", 2), ("Permafrost", 3), ("Ice Lance", 1),
+        ("Improved Blizzard", 3), ("Frostbite", 1), ("Ice Block", 1), ("Shatter", 3)])],
     9: [("dps", "Damage: Destruction", "Shadow Bolt with Ruin and Shadow and Flame, then Incinerate, with Affliction for hit and Shadow crit.", [
         ("Improved Shadow Bolt", 5), ("Bane", 5), ("Cataclysm", 3), ("Ruin", 5), ("Shadowburn", 1), ("Agonizing Flames", 3),
         ("Conflagrate", 1), ("Bane of Havoc", 1), ("Fire and Brimstone", 1), ("Shadow and Flame", 5), ("Incinerate", 1),

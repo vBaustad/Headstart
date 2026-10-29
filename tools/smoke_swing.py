@@ -105,6 +105,12 @@ do
     rawset(f, "GetTypeLabel", function() return TYPE_LABEL end)
     rawset(f, "GetTypeLabelShadow", function() return nil end)
     rawset(f, "GetTimeLabel", function() return TIME_LABEL end)
+    -- Blizzard's own (live 70532): the background's and frame's alpha set again as each swing starts and ends
+    rawset(f, "ApplyRangePresentation", function(self)
+        local a = OUT_OF_RANGE and 0.4 or 1
+        self.Background:SetAlpha(a)
+        self.Border:SetAlpha(a)
+    end)
 end
 """)
     YR = lua.table()
@@ -284,6 +290,17 @@ end
           "our texture, your colour, its frame off, the text at your size")
     check(raw(their.Background, "alpha") == 0 and YR.SwingDB().icon is False and YR.SwingDB().outline is True,
           "Blizzard's own background cleared (ours goes round the bar itself), no weapon icon, an outline")
+    lua.execute("SwingTimerMainHandFrame:ApplyRangePresentation()")
+    check(raw(their.Background, "alpha") == 0 and raw(their.Border, "alpha") == 0,
+          "a swing starts or ends and Blizzard sets its background and frame again (live 70532): both stay away")
+    YR.SwingDB().border = True
+    YR.SwingApply()
+    lua.execute("OUT_OF_RANGE = true SwingTimerMainHandFrame:ApplyRangePresentation()")
+    check(raw(their.Background, "alpha") == 0 and raw(their.Border, "alpha") == 0.4,
+          "with the frame on: it dims out of reach as Blizzard has it, the background stays away")
+    lua.execute("OUT_OF_RANGE = nil")
+    YR.SwingDB().border = False
+    YR.SwingApply()
     lua.execute("SwingTimerMainHandFrame.StatusBar:SetStatusBarColor(1, 0, 0, 1)")
     check(list(raw(sb, "colour").values()) == mine, "Blizzard colours its bar again: yours goes back over it")
     lua.execute("Fire('PLAYER_SWING', 2.6, 0)")
