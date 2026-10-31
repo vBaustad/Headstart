@@ -604,7 +604,7 @@ print(("ok  " if ok else "FAIL"), f"neither: said so ({guide_line()})")
 bad += not ok
 lua.execute('''RXP = KEPT_RXP LOADED = {}''')
 # Headstart's openers, the Lean ones first: the first that is for the character (the owner, 2026-10-16)
-lua.execute('''for _, x in ipairs({ { "01-06 Shadowglen (Lean)", "Alliance Rogue" }, { "01-06 Shadowglen (Launch)", "Alliance" },
+lua.execute('''for _, x in ipairs({ { "01-06 Shadowglen (Lean)", "Alliance" }, { "01-06 Shadowglen (Launch)", "Alliance" },
     { "01-06 Northshire (Lean)", "Alliance" }, { "01-06 Northshire (Launch)", "Alliance" } }) do
     RXP.guides["Headstart Launch (A)||" .. x[1]] = { group = "Headstart Launch (A)", name = x[1], enabledFor = x[2] }
 end
@@ -615,11 +615,11 @@ print(("ok  " if ok else "FAIL"), f"a Night Elf Rogue: the Lean opener, and the 
 bad += not ok
 lua.execute("IS_ROGUE = false RXP.loaded = nil")
 YS.ApplyUI(YS, g.YippSetupDB.ui)
-ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Shadowglen (Launch)" and YS.StartGuideLabel("NightElf") == "Default: 01-06 Shadowglen (Launch)"
-print(("ok  " if ok else "FAIL"), f"a Night Elf Druid: the Launch opener (the Lean one is a Rogue's), not RestedXP's starter ({g.RXP.loaded})")
+ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Shadowglen (Lean)" and YS.StartGuideLabel("NightElf") == "Default: 01-06 Shadowglen (Lean)"
+print(("ok  " if ok else "FAIL"), f"a Night Elf Druid: the Lean opener too (it is for every Night Elf class) ({g.RXP.loaded})")
 bad += not ok
 first = lua.eval("YR_SETUP.StartGuideChoices('NightElf')[1][2]")
-ok = first == "Default: 01-06 Shadowglen (Launch)"
+ok = first == "Default: 01-06 Shadowglen (Lean)"
 print(("ok  " if ok else "FAIL"), f"and the choice's first line says so ({first})")
 bad += not ok
 lua.execute("RACE = 'Human' RXP.loaded = nil")
