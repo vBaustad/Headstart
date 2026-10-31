@@ -132,14 +132,13 @@ for _, name in ipairs(CLASS_CVARS) do IS_CLASS_CVAR[name] = true end
 -- (YippSetupDB.raceGuide[race] = { group, name }, for the account: Character setup, Interface tab), or else
 -- Headstart's opener for its starting zone where the routes are installed - the first of the race's list that
 -- is for the character (the Lean ones first: the owner, 2026-10-16, "can we make Lean the default guide"; the
--- Shadowglen ones are for one class each: a Rogue's and a Druid's (the owner, 2026-10-31), so a Night Elf of
--- any other class gets the Launch one) - or else RestedXP's own free starter
+-- Shadowglen one is a Rogue's, so a Night Elf Druid gets the Launch one) - or else RestedXP's own free starter
 -- for the race. Without one of them a new character's RestedXP was blank: RestedXP marks a default in its menu
 -- (#defaultfor) but loads none by itself (the owner, 2026-10-16).
 local GUIDE_GROUP = "Headstart Launch (A)"
 local GUIDE_FOR_RACE = {
     Human = { "1-6 Northshire (Lean)", "1-6 Northshire (Launch)" },
-    NightElf = { "1-6 Shadowglen (Lean)", "1-6 Shadowglen (Lean Druid)", "1-6 Shadowglen (Launch)" },
+    NightElf = { "1-6 Shadowglen (Lean)", "1-6 Shadowglen (Launch)" },
     Dwarf = { "1-5 Coldridge Valley (Launch)" },
     Gnome = { "1-5 Coldridge Valley (Launch)" },
 }
