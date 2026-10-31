@@ -604,19 +604,29 @@ print(("ok  " if ok else "FAIL"), f"neither: said so ({guide_line()})")
 bad += not ok
 lua.execute('''RXP = KEPT_RXP LOADED = {}''')
 # Headstart's openers, the Lean ones first: the first that is for the character (the owner, 2026-10-16)
-lua.execute('''for _, x in ipairs({ { "01-06 Shadowglen (Lean)", "Alliance Rogue" }, { "01-06 Shadowglen (Launch)", "Alliance" },
-    { "01-06 Northshire (Lean)", "Alliance" }, { "01-06 Northshire (Launch)", "Alliance" } }) do
+lua.execute('''for _, x in ipairs({ { "01-06 Shadowglen (Lean)", "Alliance Rogue" }, { "01-06 Shadowglen (Lean Druid)", "Alliance Druid" },
+    { "01-06 Shadowglen (Launch)", "Alliance" }, { "01-06 Northshire (Lean)", "Alliance" }, { "01-06 Northshire (Launch)", "Alliance" } }) do
     RXP.guides["Headstart Launch (A)||" .. x[1]] = { group = "Headstart Launch (A)", name = x[1], enabledFor = x[2] }
 end
-RACE = "NightElf" IS_ROGUE = true RXP.loaded = nil''')
+RXP.applies = function(tag)
+    if tag:find("Rogue") then return IS_ROGUE end
+    if tag:find("Druid") then return IS_DRUID end
+    return true
+end
+RACE = "NightElf" IS_ROGUE = true IS_DRUID = false RXP.loaded = nil''')
 YS.ApplyUI(YS, g.YippSetupDB.ui)
 ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Shadowglen (Lean)" and YS.StartGuideLabel("NightElf") == "Default: 01-06 Shadowglen (Lean)"
 print(("ok  " if ok else "FAIL"), f"a Night Elf Rogue: the Lean opener, and the choice's default names it ({g.RXP.loaded})")
 bad += not ok
-lua.execute("IS_ROGUE = false RXP.loaded = nil")
+lua.execute("IS_ROGUE = false IS_DRUID = true RXP.loaded = nil")
+YS.ApplyUI(YS, g.YippSetupDB.ui)
+ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Shadowglen (Lean Druid)" and YS.StartGuideLabel("NightElf") == "Default: 01-06 Shadowglen (Lean Druid)"
+print(("ok  " if ok else "FAIL"), f"a Night Elf Druid: the Druid's Lean opener, not the Rogue's ({g.RXP.loaded})")
+bad += not ok
+lua.execute("IS_DRUID = false RXP.loaded = nil")
 YS.ApplyUI(YS, g.YippSetupDB.ui)
 ok = g.RXP.loaded == "Headstart Launch (A)|01-06 Shadowglen (Launch)" and YS.StartGuideLabel("NightElf") == "Default: 01-06 Shadowglen (Launch)"
-print(("ok  " if ok else "FAIL"), f"a Night Elf Druid: the Launch opener (the Lean one is a Rogue's), not RestedXP's starter ({g.RXP.loaded})")
+print(("ok  " if ok else "FAIL"), f"a Night Elf Hunter: the Launch opener (the Lean ones are a Rogue's and a Druid's), not RestedXP's starter ({g.RXP.loaded})")
 bad += not ok
 first = lua.eval("YR_SETUP.StartGuideChoices('NightElf')[1][2]")
 ok = first == "Default: 01-06 Shadowglen (Launch)"

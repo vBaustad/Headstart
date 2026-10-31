@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **A Night Elf Druid starts on a Lean opener of its own.** With a routes addon that has "1-6 Shadowglen (Lean Druid)", a new Night Elf Druid starts on it, as a Night Elf Rogue starts on the Rogue's Lean one; every other Night Elf class still starts on the Launch opener. The route itself is in the routes addon, not in Headstart.
+
 ## 0.11.0
 
 - **A new install's first login: a small card, not the whole window.** It says that nothing that acts for you is on and nothing on your bars has changed, and offers **Set up this character** (Character setup on and open: plan this class's bars, or save a character's bars, keys and interface to put on the others), **Show me around** (the window with its tour, as the first login opened it before) or **Later**. Where Character setup has already put the character's bars and keys on at that login, it says so instead, and offers the tour or later. Like the tour before it, it waits until the screen is there and not in a fight, and comes back once if it is closed before you could read it.
