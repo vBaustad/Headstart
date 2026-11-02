@@ -2251,6 +2251,12 @@ reds = check_levels.red_mobs()
 check(not reds, "no red mobs to kill outside dungeons" + "".join(
     f"\n     {race} {cls}: {r[0]} step {r[1]}: {r[4]} (level {r[5]}, you ~{r[6]})" for race, cls, r in reds))
 
+# Every class on the Lean openers, which the checks above don't walk (tools/check_lean.py)
+import check_lean
+lean = check_lean.everyone()
+check(not lean, "no step on a Lean opener's route that a class can't finish" + "".join(
+    f"\n     {race} {cls}: {route} step {n}: {what}" for race, cls, route, n, what in lean))
+
 # The flight timer (its own fake API)
 import smoke_flight
 bad += smoke_flight.run()
