@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **The druid's levelling build takes Furor.** With all five ranks, going back to Cat Form gives you back your energy, plus more for the time you spent healing or casting, and the build had none of it. It also drops Shredding Attacks, because you are rarely behind what you fight alone, and Thick Hide, and takes Feral Instinct, Feral Charge, Primal Bite and a second rank of Nature's Reach. It ends at 9/32/10.
+
 ## 0.11.1
 
 - **Talent builds: the trees as the game has them now.** The latest patch and the October 30 hotfix rebuilt the druid's and the paladin's trees and changed parts of the mage's, and the builds follow. The druid's Feral build now runs to Shifting Power, then takes Naturalist and Genesis, the bear build runs to Primal Bite, and the healer takes Bloom where it had Gift of the Earthmother. All three paladin builds are new. The mage's two builds swap the talents that were renamed or moved.

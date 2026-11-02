@@ -181,13 +181,13 @@ YR.TalentBuilds = {
         } },
     },
     [11] = {   -- Druid
-        { key = "level", name = "Levelling: Feral Combat, then Restoration", about = "Feral to Shifting Power - cat for damage, bear when it gets rough - then Restoration for Naturalist and Balance for Genesis.", points = {
-            104938, 104938, 104938, 104938, 104938, 104943, 104943, 104942, 104942, 104942,
-            104946, 104946, 104948, 104948, 104945, 104945, 104945, 104952, 104952, 104952,
-            104947, 104947, 104951, 104955, 104950, 104950, 104953, 104953, 104953, 104953,
-            104953, 113563, 104958, 104958, 104958, 104958, 104958, 104922, 104922, 104922,
+        { key = "level", name = "Levelling: Feral Combat, then Restoration", about = "Furor to keep your energy, Feral to Shifting Power and Primal Bite, then Restoration for Naturalist and Balance for Genesis.", points = {
+            104938, 104939, 104939, 104939, 104939, 104940, 104940, 104940, 104939, 104943,
+            104943, 104948, 104948, 104946, 104946, 104951, 104947, 104947, 104944, 104952,
+            104955, 104950, 104950, 104952, 104952, 104953, 104953, 104953, 104953, 104953,
+            113563, 104956, 104958, 104958, 104958, 104958, 104958, 104922, 104922, 104922,
             104922, 104922, 104924, 104924, 104924, 104924, 104924, 104927, 104927, 104929,
-            104919,
+            104929,
         } },
         { key = "tank", name = "Tank: Feral (bear)", about = "Thick Hide, Natural Reaction and Primal Bite in bear form, with Restoration for Heart of the Wild and Naturalist.", points = {
             104938, 104938, 104938, 104938, 104938, 104939, 104939, 104939, 104939, 104939,

@@ -77,12 +77,12 @@ BUILDS = {
         ("Soul Siphon", 3), ("Grim Reach", 1), ("Shadow Mastery", 5), ("Wrack", 1),
         ("Demonic Embrace", 5), ("Fel Vitality", 3), ("Improved Voidwalker", 2), ("Demonic Sacrifice", 1),
         ("Master Summoner", 2), ("Unholy Power", 2), ("Fel Domination", 1), ("Unholy Power", 3), ("Demonic Aegis", 1)])],
-    11: [("level", "Levelling: Feral Combat, then Restoration", "Feral to Shifting Power - cat for damage, bear when it gets rough - then Restoration for Naturalist and Balance for Genesis.", [
-        ("Feral Combat::Ferocity", 5), ("Feral Swiftness", 2), ("Thick Hide", 3), ("Sharpened Claws", 2), ("Savage Fury", 2),
-        ("Shredding Attacks", 3), ("Predatory Strikes", 3), ("Blood Frenzy", 2), ("Predatory Discipline", 1),
-        ("Leader of the Pack", 1), ("Natural Instinct", 2), ("Rend and Tear", 5), ("Shifting Power", 1),
-        ("Heart of the Wild", 5), ("Naturalist", 5), ("Genesis", 5), ("Nature's Majesty", 2), ("Nature's Reach", 1),
-        ("Natural Shapeshifter", 1)])],
+    11: [("level", "Levelling: Feral Combat, then Restoration", "Furor to keep your energy, Feral to Shifting Power and Primal Bite, then Restoration for Naturalist and Balance for Genesis.", [
+        ("Feral Combat::Ferocity", 1), ("Furor", 4), ("Feral Instinct", 3), ("Furor", 1), ("Feral Swiftness", 2),
+        ("Savage Fury", 2), ("Sharpened Claws", 2), ("Predatory Discipline", 1), ("Blood Frenzy", 2), ("Feral Charge", 1),
+        ("Predatory Strikes", 1), ("Leader of the Pack", 1), ("Natural Instinct", 2), ("Predatory Strikes", 2),
+        ("Rend and Tear", 5), ("Shifting Power", 1), ("Primal Bite", 1),
+        ("Heart of the Wild", 5), ("Naturalist", 5), ("Genesis", 5), ("Nature's Majesty", 2), ("Nature's Reach", 2)])],
 }
 
 # Builds for a role at 60 - tanking, healing, damage in a group - each the 51 points in the order to take them (its
