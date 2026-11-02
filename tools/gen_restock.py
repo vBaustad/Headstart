@@ -1,6 +1,6 @@
 """Generate Data/Restock.lua (for Restock.lua): the vendor reagents each class's spells use.
 
-    python tools/gen_restock.py [schema]      (default: the newest wow_classic_beta build)
+    python tools/gen_restock.py [schema]      (default: the newest live build with its hotfixes)
 
 Read from the game's own tables (skilllineability -> spellreagents -> itemsparse), so it is what
 Forever's spells actually take, not a vanilla list from memory. Items with no buy price (Soul Shard)
@@ -11,6 +11,8 @@ import os
 import sys
 
 import duckdb
+
+from spell_rules import newest_schema
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = r"S:\forever-data\db\forever.duckdb"
@@ -31,8 +33,7 @@ DEFAULTS = {
 
 def main():
     c = duckdb.connect(DB, read_only=True)
-    s = sys.argv[1] if len(sys.argv) > 1 else c.sql(
-        "select schema_name from main.builds where schema_name like 'wow_classic_beta_%' order by schema_name desc limit 1").fetchone()[0]
+    s = sys.argv[1] if len(sys.argv) > 1 else newest_schema(c)
     line_class = {}
     for sid, mask in c.sql(f"""select sl.ID, cast(i.ClassMask as bigint) from {s}.skillline sl
             join {s}.skillraceclassinfo i on i.SkillID = sl.ID where sl.CategoryID = '7'""").fetchall():
