@@ -1,4 +1,4 @@
-"""Talent trees and builds for Headstart, from Forever's client data (the trait system, live build 1.60.1.70630).
+"""Talent trees and builds for Headstart, from Forever's client data (the trait system, live build 1.60.1.70707).
 
     python tools/talents_gen.py        (needs S:/forever-data/db/forever.duckdb)
 
@@ -17,8 +17,9 @@ import duckdb
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = "S:/forever-data/db/forever.duckdb"
-S = "wowf_1_60_1_70630_nohotfix"
-BUILD = "1.60.1.70630"
+# the hotfixed trees: 70707's client files still hold the old ones (the druid and paladin trees changed by hotfix alone)
+S = "wowf_1_60_1_70707"
+BUILD = "1.60.1.70707"
 # each tree's skill line (skilllinextraittree) is a class: Classic's class IDs
 CLASS_OF_LINE = {26: 1, 184: 2, 50: 3, 38: 4, 613: 5, 373: 7, 237: 8, 354: 9, 574: 11}
 CLASS_MASK = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16, 7: 64, 8: 128, 9: 256, 11: 1024}
@@ -35,11 +36,11 @@ BUILDS = {
         ("Sweeping Strikes", 1), ("Weaponmaster", 5), ("Improved Slam", 2), ("Deflection", 2), ("Mortal Strike", 1),
         ("Cruelty", 5), ("Unbridled Wrath", 5), ("Blood Craze", 3), ("Piercing Howl", 1), ("Booming Voice", 1),
         ("Enrage", 5)])],
-    2: [("level", "Levelling: Retribution, then Holy", "Retribution to Twist of Light with a two-handed weapon, then Holy for Strength, Intellect and mana.", [
-        ("Benediction", 5), ("Improved Judgement", 2), ("Conviction", 5), ("Seal of Command", 1), ("Pursuit of Justice", 2),
-        ("Vindication", 3), ("Sacred Arbiter", 1), ("Deflection", 1), ("Retribution::Two-Handed Weapon Specialization", 3),
-        ("Sanctified Judgement", 3), ("Vengeance", 3), ("Repentance", 1), ("Twist of Light", 1),
-        ("Divine Strength", 5), ("Divine Intellect", 5), ("Improved Seals", 3), ("Reverence", 3), ("Illumination", 4)])],
+    2: [("level", "Levelling: Retribution, then Holy", "Retribution to Unsealed Wrath with a two-handed weapon, then Holy for Strength and seals, and Protection for Intellect and hit.", [
+        ("Benediction", 5), ("Improved Judgement", 2), ("Conviction", 3), ("Seal of Command", 1), ("Pursuit of Justice", 2),
+        ("Vindication", 3), ("Sacred Arbiter", 1), ("Deflection", 3), ("Retribution::Two-Handed Weapon Specialization", 3),
+        ("Sanctified Judgement", 3), ("Vengeance", 3), ("Repentance", 1), ("Unsealed Wrath", 1),
+        ("Divine Strength", 5), ("Improved Seals", 5), ("Reverence", 2), ("Divine Intellect", 5), ("Precision", 3)])],
     3: [("level", "Levelling: Beast Mastery, then Marksmanship", "Beast Mastery to Bestial Wrath - your pet does the work - then Marksmanship for crits and Trueshot Aura.", [
         ("Deadly Aspects", 5), ("Focused Fire", 2), ("Endurance Training", 3), ("Unleashed Fury", 5), ("Beast Mastery::Ferocity", 5),
         ("Bestial Swiftness", 1), ("Intimidation", 1), ("Spirit Bond", 2), ("Endurance Training", 1), ("Frenzy", 5),
@@ -68,7 +69,7 @@ BUILDS = {
         ("Improved Frostbolt", 5), ("Ice Shards", 5), ("Frost Channeling", 3), ("Frostbite", 3), ("Improved Frost Nova", 2),
         ("Arctic Reach", 2), ("Shatter", 3), ("Cold Snap", 1), ("Improved Cone of Cold", 1), ("Winter's Chill", 5),
         ("Ice Barrier", 1),
-        ("Arcane::Wand Specialization", 2), ("Arcane Focus", 3), ("Arcane Concentration", 5), ("Arcane Impact", 3),
+        ("Arcane::Wand Specialization", 2), ("Arcane Resilience", 3), ("Arcane Concentration", 5), ("Arcane Impact", 3),
         ("Arcane Geometry", 2), ("Arcane Meditation", 3), ("Magic Absorption", 2)])],
     9: [("level", "Levelling: Affliction, then Demonology", "Affliction to Wrack - your damage over time does the work - then Demonology for a sturdier pet.", [
         ("Improved Corruption", 5), ("Improved Life Tap", 2), ("Improved Drains", 3), ("Fel Concentration", 3),
@@ -76,12 +77,12 @@ BUILDS = {
         ("Soul Siphon", 3), ("Grim Reach", 1), ("Shadow Mastery", 5), ("Wrack", 1),
         ("Demonic Embrace", 5), ("Fel Vitality", 3), ("Improved Voidwalker", 2), ("Demonic Sacrifice", 1),
         ("Master Summoner", 2), ("Unholy Power", 2), ("Fel Domination", 1), ("Unholy Power", 3), ("Demonic Aegis", 1)])],
-    11: [("level", "Levelling: Feral Combat, then Restoration", "Feral to Berserk - cat for damage, bear when it gets rough - then Restoration for Furor and shifting.", [
-        ("Feral Combat::Ferocity", 5), ("Feral Swiftness", 2), ("Thick Hide", 3), ("Sharpened Claws", 2), ("Feral Charge", 1),
-        ("Shredding Attacks", 2), ("Predatory Strikes", 3), ("Blood Frenzy", 2), ("Leader of the Pack", 1),
-        ("Savage Fury", 2), ("Primal Bite", 1), ("Heart of the Wild", 1), ("Rend and Tear", 5), ("Berserk", 1),
-        ("Furor", 5), ("Naturalist", 5), ("Natural Shapeshifter", 3), ("Reflection", 2), ("Improved Rejuvenation", 3),
-        ("Swiftmend", 1), ("Reflection", 1)])],
+    11: [("level", "Levelling: Feral Combat, then Restoration", "Feral to Shifting Power - cat for damage, bear when it gets rough - then Restoration for Naturalist and Balance for Genesis.", [
+        ("Feral Combat::Ferocity", 5), ("Feral Swiftness", 2), ("Thick Hide", 3), ("Sharpened Claws", 2), ("Savage Fury", 2),
+        ("Shredding Attacks", 3), ("Predatory Strikes", 3), ("Blood Frenzy", 2), ("Predatory Discipline", 1),
+        ("Leader of the Pack", 1), ("Natural Instinct", 2), ("Rend and Tear", 5), ("Shifting Power", 1),
+        ("Heart of the Wild", 5), ("Naturalist", 5), ("Genesis", 5), ("Nature's Majesty", 2), ("Nature's Reach", 1),
+        ("Natural Shapeshifter", 1)])],
 }
 
 # Builds for a role at 60 - tanking, healing, damage in a group - each the 51 points in the order to take them (its
@@ -99,17 +100,17 @@ ROLE_BUILDS = {
         ("Dual Wield Specialization", 5), ("Enrage", 4), ("Death Wish", 1), ("Flurry", 5), ("Bloodthirst", 1),
         ("Improved Heroic Strike", 3), ("Improved Rend", 3), ("Improved Tactical Mastery", 5), ("Improved Charge", 2),
         ("Anger Management", 1), ("Deep Wounds", 3), ("Impale", 2), ("Spearing Strike", 1)])],
-    2: [("tank", "Tank: Protection", "Holy Shield, Iron Creed and Righteous Fury behind a shield, with Holy for mana.", [
-        ("Toughness", 5), ("Redoubt", 5), ("Anticipation", 5), ("Precision", 1), ("Improved Righteous Fury", 3),
-        ("Shield Specialization", 3), ("Sacred Duty", 2), ("Templar's Bulwark", 1), ("Iron Creed", 5), ("Holy Shield", 1),
-        ("Divine Strength", 5), ("Divine Intellect", 5), ("Improved Seals", 3), ("Spiritual Focus", 2), ("Reverence", 3),
-        ("Purifying Power", 2)]),
-        ("heal", "Healer: Holy", "Holy Shock, Light's Vigil and Illumination, with Retribution for cheaper instants and judging.", [
-        ("Divine Intellect", 5), ("Healing Light", 3), ("Spiritual Focus", 2), ("Reverence", 3), ("Purifying Power", 2),
-        ("Illumination", 5), ("Divine Favor", 1), ("Holy Shock", 1), ("Infusion of Light", 2), ("Voice of Truth", 1),
-        ("Holy Power", 5), ("Light's Vigil", 1), ("Unyielding Faith", 2),
-        ("Benediction", 5), ("Improved Judgement", 2), ("Holy Conduit", 2), ("Deflection", 1), ("Sanctified Judgement", 3),
-        ("Pursuit of Justice", 2), ("Eye for an Eye", 2), ("Vindication", 1)])],
+    2: [("tank", "Tank: Protection", "Holy Shield, Iron Creed and Righteous Fury behind a shield, with Holy for Strength and seals.", [
+        ("Redoubt", 5), ("Divine Intellect", 5), ("Precision", 3), ("Sacred Duty", 2), ("Toughness", 5),
+        ("Shield Specialization", 2), ("Templar's Bulwark", 1), ("Anticipation", 5), ("Improved Righteous Fury", 3),
+        ("Holy Shield", 1), ("Reckoning", 5), ("Iron Creed", 3), ("Shieldsworn", 1),
+        ("Divine Strength", 5), ("Improved Seals", 5)]),
+        ("heal", "Healer: Holy", "Holy Shock, Light's Vigil and Illumination, with Protection for Intellect and Retribution for cheaper instants and crit.", [
+        ("Spiritual Focus", 5), ("Healing Light", 3), ("Reverence", 2), ("Illumination", 5), ("Divine Favor", 1),
+        ("Infusion of Light", 2), ("Oath of Light", 1), ("Purifying Power", 2), ("Holy Shock", 1), ("Boundless Light", 2),
+        ("Holy Conduit", 1), ("Holy Power", 5), ("Light's Vigil", 1),
+        ("Divine Intellect", 5), ("Sacred Duty", 2), ("Guardian's Favor", 2),
+        ("Benediction", 5), ("Conviction", 3), ("Sanctified Judgement", 3)])],
     3: [("dps", "Damage: Marksmanship", "Trueshot Aura, Mortal Shots and Sniper Shot, with Beast Mastery for Deadly Aspects and your pet.", [
         ("Lethal Attacks", 5), ("Careful Aim", 5), ("Efficiency", 3), ("Rapid Killing", 2), ("Trueshot Aura", 1),
         ("Mortal Shots", 5), ("Barrage", 3), ("Rapid Recuperation", 2), ("Ranged Weapon Specialization", 5), ("Sniper Shot", 1),
@@ -121,7 +122,7 @@ ROLE_BUILDS = {
         ("Improved Sprint", 2), ("Dual Wield Specialization", 5)])],
     5: [("heal", "Healer: Holy", "Prayer of Mending, Spiritual Guidance and Spiritual Healing, with Discipline for mana and shields.", [
         ("Improved Renew", 3), ("Holy Specialization", 5), ("Divine Fury", 5), ("Inspiration", 3), ("Holy Nova", 1),
-        ("Improved Healing", 3), ("Binding Heal", 1), ("Spirit of Redemption", 1), ("Spiritual Guidance", 5),
+        ("Improved Healing", 3), ("Holy Binding", 1), ("Spirit of Redemption", 1), ("Spiritual Guidance", 5),
         ("Litany of Light", 2), ("Spiritual Healing", 3), ("Prayer of Mending", 1),
         ("Twin Disciplines", 5), ("Mental Strength", 5), ("Meditation", 3), ("Inner Focus", 1),
         ("Improved Power Word: Shield", 3), ("Mental Agility", 1)]),
@@ -144,26 +145,26 @@ ROLE_BUILDS = {
         ("Thundering Strikes", 5), ("Ancestral Knowledge", 5), ("Improved Ghost Wolf", 2), ("Shamanistic Focus", 1),
         ("Guardian Totems", 2), ("Toughness", 5)])],
     8: [("dps", "Damage: Fire", "Ignite, Critical Mass and Combustion, with Frost for hit, Ice Block and Shatter.", [
-        ("Improved Fireball", 5), ("Ignite", 5), ("Flame Throwing", 2), ("Pyroblast", 1), ("Burning Soul", 2),
-        ("Improved Scorch", 3), ("Heating Up", 1), ("Master of Elements", 3), ("Critical Mass", 5), ("Blast Wave", 1),
-        ("Fire Power", 3), ("Combustion", 1),
-        ("Elemental Precision", 3), ("Frost Warding", 2), ("Improved Frost Nova", 2), ("Permafrost", 3), ("Ice Lance", 1),
+        ("Accelerant", 5), ("Ignite", 5), ("Flame Throwing", 2), ("Pyroblast", 1), ("Burning Soul", 3),
+        ("Improved Scorch", 3), ("Heating Up", 1), ("Master of Elements", 3), ("Critical Mass", 3), ("Blast Wave", 1),
+        ("Fire Power", 3), ("Combustion", 1), ("Incineration", 1),
+        ("Precision", 3), ("Frost Warding", 2), ("Improved Frost Nova", 2), ("Permafrost", 3), ("Ice Lance", 1),
         ("Improved Blizzard", 3), ("Frostbite", 1), ("Ice Block", 1), ("Shatter", 3)])],
     9: [("dps", "Damage: Destruction", "Shadow Bolt with Ruin and Shadow and Flame, then Incinerate, with Affliction for hit and Shadow crit.", [
         ("Improved Shadow Bolt", 5), ("Bane", 5), ("Cataclysm", 3), ("Ruin", 5), ("Shadowburn", 1), ("Agonizing Flames", 3),
         ("Conflagrate", 1), ("Bane of Havoc", 1), ("Fire and Brimstone", 1), ("Shadow and Flame", 5), ("Incinerate", 1),
         ("Suppression", 5), ("Improved Corruption", 5), ("Improved Life Tap", 2), ("Amplify Curse", 1),
         ("Improved Bane of Agony", 2), ("Malevolence", 5)])],
-    11: [("tank", "Tank: Feral (bear)", "Thick Hide, Natural Reaction and Berserk in bear form, with Restoration for Furor.", [
-        ("Feral Combat::Ferocity", 5), ("Heart of the Wild", 5), ("Thick Hide", 3), ("Feral Swiftness", 2), ("Feral Charge", 1),
-        ("Sharpened Claws", 2), ("Savage Fury", 2), ("Primal Bite", 1), ("Predatory Strikes", 3), ("Blood Frenzy", 2),
-        ("Leader of the Pack", 1), ("Natural Reaction", 5), ("Berserk", 1), ("Rend and Tear", 5),
-        ("Furor", 5), ("Naturalist", 5), ("Natural Shapeshifter", 3)]),
+    11: [("tank", "Tank: Feral (bear)", "Thick Hide, Natural Reaction and Primal Bite in bear form, with Restoration for Heart of the Wild and Naturalist.", [
+        ("Feral Combat::Ferocity", 5), ("Furor", 5), ("Thick Hide", 3), ("Feral Swiftness", 2), ("Feral Charge", 1),
+        ("Sharpened Claws", 2), ("Savage Fury", 2), ("Lacerate", 1), ("Predatory Strikes", 3), ("Blood Frenzy", 2),
+        ("Leader of the Pack", 1), ("Natural Instinct", 2), ("Natural Reaction", 5), ("Rend and Tear", 5), ("Primal Bite", 1),
+        ("Heart of the Wild", 5), ("Naturalist", 5), ("Natural Shapeshifter", 1)]),
         ("heal", "Healer: Restoration", "Wild Growth, Swiftmend and Improved Regrowth, with Balance for longer, stronger heals over time.", [
-        ("Nature's Focus", 5), ("Naturalist", 5), ("Reflection", 3), ("Gift of Nature", 5), ("Gift of the Earthmother", 1),
+        ("Nature's Focus", 5), ("Naturalist", 5), ("Reflection", 3), ("Gift of Nature", 5), ("Bloom", 1),
         ("Improved Rejuvenation", 3), ("Swiftmend", 1), ("Tranquil Spirit", 5), ("Nature's Swiftness", 1), ("Living Spirit", 3),
-        ("Improved Regrowth", 5), ("Wild Growth", 1),
-        ("Genesis", 5), ("Nature's Majesty", 2), ("Moonglow", 3), ("Nature's Splendor", 1), ("Improved Moonfire", 2)]),
+        ("Improved Regrowth", 5), ("Wild Growth", 1), ("Heart of the Wild", 2),
+        ("Genesis", 5), ("Nature's Majesty", 2), ("Moonglow", 3), ("Nature's Splendor", 1)]),
         ("dps", "Damage: Balance", "Moonkin Form, Moonfury and Eclipse, with Restoration for damage and mana.", [
         ("Improved Wrath", 5), ("Moonglow", 3), ("Improved Moonfire", 2), ("Nature's Majesty", 2), ("Nature's Reach", 2),
         ("Nature's Splendor", 1), ("Vengeance", 5), ("Improved Starfire", 5), ("Insect Swarm", 1), ("Nature's Grace", 1),

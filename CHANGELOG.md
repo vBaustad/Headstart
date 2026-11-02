@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Talent builds: the trees as the game has them now.** The latest patch and the October 30 hotfix rebuilt the druid's and the paladin's trees and changed parts of the mage's, and the builds follow. The druid's Feral build now runs to Shifting Power, then takes Naturalist and Genesis, and the bear build runs to Primal Bite. All three paladin builds are new. The mage's and the priest's builds swap the talents that were renamed or moved.
+
 ## 0.11.0
 
 - **A new install's first login: a small card, not the whole window.** It says that nothing that acts for you is on and nothing on your bars has changed, and offers **Set up this character** (Character setup on and open: plan this class's bars, or save a character's bars, keys and interface to put on the others), **Show me around** (the window with its tour, as the first login opened it before) or **Later**. Where Character setup has already put the character's bars and keys on at that login, it says so instead, and offers the tour or later. Like the tour before it, it waits until the screen is there and not in a fight, and comes back once if it is closed before you could read it.
