@@ -1,6 +1,6 @@
 """Generate Headstart_Setup/SpellLevels.lua: for every class, each trainable spell NAME -> the level its first rank is learned.
 
-    python tools/gen_spell_levels.py [schema]      (default: the newest wow_classic_beta schema)
+    python tools/gen_spell_levels.py [schema]      (default: the newest live build with its hotfixes)
 
 Source: S:/forever-data/db/forever.duckdb (client DB2).
   * class spell lines = skillline CategoryID 7, mapped to a class through skillraceclassinfo.ClassMask;
@@ -17,7 +17,7 @@ import os
 import sys
 import duckdb
 
-from spell_rules import LINE_SPELLS, NOT_IN_GAME, NOT_SPELLS
+from spell_rules import LINE_SPELLS, NOT_IN_GAME, NOT_SPELLS, newest_schema
 
 DB = "S:/forever-data/db/forever.duckdb"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Headstart_Setup", "SpellLevels.lua")
@@ -25,8 +25,7 @@ NOT_CLASS_SPELLS = {"Engraving", "Runes", "Meditation", "Explorer Imp", "Mounts"
 CLASSES = {1: "WARRIOR", 2: "PALADIN", 3: "HUNTER", 4: "ROGUE", 5: "PRIEST", 7: "SHAMAN", 8: "MAGE", 9: "WARLOCK", 11: "DRUID"}
 
 c = duckdb.connect(DB, read_only=True)
-schema = sys.argv[1] if len(sys.argv) > 1 else c.sql(
-    "select schema_name from main.builds where schema_name like 'wow_classic_beta_%' order by schema_name desc limit 1").fetchone()[0]
+schema = sys.argv[1] if len(sys.argv) > 1 else newest_schema(c)
 
 lines = c.sql(f"""
     select sl.ID, sl.DisplayName_lang, cast(i.ClassMask as bigint)

@@ -1,6 +1,6 @@
 """Generate Data/TrainerSpells.lua (for Reminders.lua): every rank a class trainer teaches, by level.
 
-    python tools/gen_trainer_spells.py [schema]      (default: the newest wow_classic_beta build)
+    python tools/gen_trainer_spells.py [schema]      (default: the newest live build with its hotfixes)
 
 From the game's tables: skilllineability rows with AcquireMethod 0 on a class's own skill lines,
 their level from spelllevels and their rank from spell.NameSubtext. Talent spells (talent.SpellRank
@@ -18,7 +18,7 @@ import duckdb
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = r"S:\forever-data\db\forever.duckdb"
 OUT = os.path.join(ROOT, "Data", "TrainerSpells.lua")
-from spell_rules import NOT_IN_GAME, NOT_SPELLS, NOT_TAUGHT, not_a_spell, other_line
+from spell_rules import NOT_IN_GAME, NOT_SPELLS, NOT_TAUGHT, effect_halves, newest_schema, not_a_spell, other_line
 
 # Class lines only. A rogue's poisons and Pick Lock and a mage's Comprehend Scroll are secondary skills
 # in Forever (the Poisons skill is a quest's): whether a class trainer sells them isn't known, and the
@@ -28,8 +28,7 @@ CLASSES = {1: "WARRIOR", 2: "PALADIN", 3: "HUNTER", 4: "ROGUE", 5: "PRIEST", 7: 
 
 def main():
     c = duckdb.connect(DB, read_only=True)
-    s = sys.argv[1] if len(sys.argv) > 1 else c.sql(
-        "select schema_name from main.builds where schema_name like 'wow_classic_beta_%' order by schema_name desc limit 1").fetchone()[0]
+    s = sys.argv[1] if len(sys.argv) > 1 else newest_schema(c)
     line_class = {}
     for sid, line, mask in c.sql(f"""select sl.ID, sl.DisplayName_lang, cast(i.ClassMask as bigint) from {s}.skillline sl
             join {s}.skillraceclassinfo i on i.SkillID = sl.ID where sl.CategoryID = '7'""").fetchall():
@@ -57,7 +56,7 @@ def main():
         left join {s}.spellmisc m on m.SpellID = a.Spell
         join {s}.spelllevels l on l.SpellID = a.Spell
         where a.AcquireMethod = '0' and cast(l.SpellLevel as int) > 0
-            and cast(a.Spell as int) not in ({", ".join(str(i) for i in sorted(NOT_IN_GAME))})
+            and cast(a.Spell as int) not in ({", ".join(str(i) for i in sorted(NOT_IN_GAME | effect_halves(c, s)))})
         group by 1, 2, 3, 4, 6""").fetchall()
     out, talent_names, trait_ranks = {}, {}, set()
     for line, spell, name, sub, level, race, attr in rows:
@@ -103,10 +102,8 @@ def main():
                     if mask & bit and (cmask == 0 or cmask & bit):
                         out.setdefault(token, {})[spell] = (level, name, 0, 0)
 
-    # One rank can be two spells in the tables: the spell, and what it does when it goes off (Immolation
-    # Trap 13795 / 13797, Lightning Shield 324 / 26364, Holy Nova's heal). The spell is the lower ID in
-    # every pair. A rank that is a trait's (Holy Nova rank 1 comes with the talent point) has no trained
-    # twin at all: 23455 there is the heal half, and listing it told every priest to go and train it.
+    # A rank that is a trait's (Holy Nova rank 1 comes with the talent point) has no trained twin at all.
+    # What is still two spells for one rank (see effect_halves) is the lower ID.
     for token, spells in out.items():
         first = {}
         for spell in sorted(spells):

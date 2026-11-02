@@ -3,8 +3,8 @@
 The client's SkillLineAbility table lists more than the game has: Season of Discovery runes that
 were never taken out, procs and marks named like spells, a hunter's pet's abilities on lines of
 their own. The rules here take out what can be told from the data; NOT_SPELLS is what is left, found
-by comparing with foreverchanges.pro's spellbook (tools/check_spellbook.py; build 1.60.1.70338,
-2026-10-11). Run that again after a new build before trusting this list.
+by comparing with foreverchanges.pro's spellbook (tools/check_spellbook.py; build 1.60.1.70707,
+2026-11-02). Run that again after a new build before trusting this list.
 """
 
 # spell IDs: in the tables as trained class spells, and not in the game
@@ -21,6 +21,30 @@ NOT_CLASS_LINES = {"Engraving", "Runes", "Meditation", "Explorer Imp", "Companio
 LINE_SPELLS = {"Beast Training"}
 
 HIDDEN = 0x80           # spellmisc.Attributes[0]: not shown in the spellbook
+
+
+def newest_schema(c):
+    """The newest live build WITH its hotfixes. (_nohotfix is the client files alone: 70707's still hold the old
+    druid tree. _wagohotfix is nine talent tables and no spells.)"""
+    return c.sql("""select schema_name from main.builds where schema_name like 'wowf_%' and schema_name not like '%hotfix'
+        order by schema_name desc limit 1""").fetchone()[0]
+
+
+def effect_halves(c, s):
+    """One rank can be two spells in the tables: the spell, and what it does when it goes off (Immolation Trap 14302 /
+    14298, Lightning Shield 324 / 26364, Holy Nova's heal). The spell is the half that costs something: the ID doesn't
+    tell (the trap's is the higher one, the shield's the lower), and since Explosive Trap Effect lost the "Effect"
+    neither does the name. Returns the other halves' IDs."""
+    return {r[0] for r in c.sql(f"""
+        with learned as (
+            select distinct a.SkillLine, cast(a.Spell as int) as id, n.Name_lang as name,
+                coalesce(sp.NameSubtext_lang, '') as sub, a.Spell in (select SpellID from {s}.spellpower) as paid
+            from {s}.skilllineability a
+            join {s}.spellname n on n.ID = a.Spell
+            left join {s}.spell sp on sp.ID = a.Spell
+            where a.AcquireMethod in ('0', '2'))
+        select id from learned l where not paid and exists (select 1 from learned o
+            where o.paid and o.SkillLine = l.SkillLine and o.name = l.name and o.sub = l.sub)""").fetchall()}
 
 
 def other_line(line):

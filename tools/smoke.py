@@ -1118,6 +1118,11 @@ _priest = _ts[_ts.index("    PRIEST = function()"):_ts.index("    ROGUE = functi
 _hunter = _ts[_ts.index("    HUNTER = function()"):_ts.index("    MAGE = function()")]
 check('"Holy Nova", 1,' not in _priest and '"Holy Nova", 2,' in _priest and _hunter.count('"Immolation Trap", 1,') == 1 and '"Bite"' not in _hunter,
       "trainer data: no rank that comes with a talent point (Holy Nova 1), one spell a rank (Immolation Trap), no pet abilities")
+# a rank's two spells share a name: the one you learn costs something, whichever ID is lower (a rank that listed the
+# effect's ID could never be known, so it was "new at your trainer" for good)
+check('{ 14302, 26, "Immolation Trap", 2,' in _hunter and '{ 13813, 34, "Explosive Trap", 1,' in _hunter
+      and '{ 19261, 20, "Touch of Weakness", 2,' in _priest,
+      "trainer data: a trap's rank is the trap, not the effect that goes off (Immolation Trap 2, Explosive Trap 1, Touch of Weakness 2)")
 # the QoL tab: the campfire icon, the flight timer, and the reward picker with a hand-picked reward listed
 YR.RewardSettings(YR).chosen[123] = lua.eval('{ item = 1, name = "Sturdy Boots", title = "A Test Quest" }')
 YR.ShowSettingsTab(YR, "quests")

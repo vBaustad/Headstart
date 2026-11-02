@@ -1,7 +1,7 @@
 """Generate Headstart_Setup/PlannerSpells.lua (for Planner.lua): an icon and an ID for every class spell and racial,
 so spells a level-1 character doesn't know yet can still be shown and placed in the bar planner.
 
-    python tools/gen_planner.py [schema]      (default: the newest wow_classic_beta build)
+    python tools/gen_planner.py [schema]      (default: the newest live build with its hotfixes)
 
 The same selection as gen_spell_levels.py (a class's own skill lines, AcquireMethod 0 or 2, a level
 above 0), so every name here is a name YS.SPELL_LEVELS knows and Set up layout can place. The ID is
@@ -42,7 +42,7 @@ FORM_CLASS = {"Cat Form": "DRUID", "Bear Form": "DRUID", "Dire Bear Form": "DRUI
               "Defensive Stance": "WARRIOR", "Berserker Stance": "WARRIOR", "Stealth": "ROGUE"}
 
 
-from spell_rules import LINE_SPELLS, NOT_IN_GAME, NOT_SPELLS, other_line
+from spell_rules import LINE_SPELLS, NOT_IN_GAME, NOT_SPELLS, effect_halves, newest_schema, other_line
 
 def q(t):
     return '"' + t.replace("\\", "\\\\").replace('"', '\\"') + '"'
@@ -50,8 +50,7 @@ def q(t):
 
 def main():
     c = duckdb.connect(DB, read_only=True)
-    s = sys.argv[1] if len(sys.argv) > 1 else c.sql(
-        "select schema_name from main.builds where schema_name like 'wow_classic_beta_%' order by schema_name desc limit 1").fetchone()[0]
+    s = sys.argv[1] if len(sys.argv) > 1 else newest_schema(c)
     line_class, line_only = {}, {}
     for sid, line, mask in c.sql(f"""select sl.ID, sl.DisplayName_lang, cast(i.ClassMask as bigint) from {s}.skillline sl
             join {s}.skillraceclassinfo i on i.SkillID = sl.ID where sl.CategoryID = '7'""").fetchall():
@@ -73,7 +72,7 @@ def main():
         join {s}.spelllevels l on l.SpellID = a.Spell
         left join {s}.spellmisc m on m.SpellID = a.Spell
         where a.AcquireMethod in ('0', '2') and cast(l.SpellLevel as int) > 0
-            and cast(a.Spell as int) not in ({", ".join(str(i) for i in sorted(NOT_IN_GAME))})
+            and cast(a.Spell as int) not in ({", ".join(str(i) for i in sorted(NOT_IN_GAME | effect_halves(c, s)))})
         group by 1, 2, 3, 5, 6, 7""").fetchall()
     best = {}
     # Which races get a class spell (a priest's Desperate Prayer, Starshards ...; a paladin's mount; a

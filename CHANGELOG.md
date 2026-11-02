@@ -3,6 +3,9 @@
 ## Unreleased
 
 - **Talent builds: the trees as the game has them now.** The latest patch and the October 30 hotfix rebuilt the druid's and the paladin's trees and changed parts of the mage's, and the builds follow. The druid's Feral build now runs to Shifting Power, then takes Naturalist and Genesis, and the bear build runs to Primal Bite. All three paladin builds are new. The mage's and the priest's builds swap the talents that were renamed or moved.
+- **Character setup, the bar planner and the trainer list: the spells as the game has them now.** They still had the spells of an older build. A druid's Ferocious Bite starts at 24, Lacerate (25) and Primal Bite (40) are talents with trainer ranks after them, and Berserk is gone. A paladin's Blessing of Light, Blessing of Salvation, their Greater versions and Sense Undead are gone from the game and so from the lists; Righteous Fury comes at 10 and Voice of Truth is trained at 20. A priest's Binding Heal is trained at 25. A spell that comes with a talent waits for the level the new trees reach it at, such as Holy Shield and Lava Burst at 30 and Shifting Power at 40.
+- **Read Leyline stays on your bars.** It was called Read Ley Line, and a saved layout that still held the old name never put the button on. It takes the new name at your next login.
+- **Immolation Trap ranks 2 to 5 and Touch of Weakness ranks 2 to 6 can be crossed off the trainer list.** The list was looking for the effect those spells set off, which nobody learns, instead of the spell you train, so a rank you had trained still counted as missing.
 
 ## 0.11.0
 

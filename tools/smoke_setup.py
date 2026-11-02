@@ -1208,7 +1208,24 @@ n = YS.RepairLayouts()
 slots = YS.Profile(YS).slots
 report(n == 1 and slots[5].kind == "spell" and slots[5].name == "Exorcism" and slots[7].kind == "macro",
        f"a plan saved with such a macro in it is put right: the spell, and your own macro left ({n})")
-lua.execute("YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE2")
+# A spell the game renamed: a layout holds names, and the old one found nothing - the button just wasn't put on.
+lua.execute("""YippSetupDB.classes.PALADIN.profile = { class = "PALADIN", planned = true, slots = {
+        [5] = { kind = "spell", name = "Read Ley Line", level = 1, racial = true }, [6] = { kind = "spell", name = "Exorcism", level = 20 } } }
+    YippSetupDB.classes.PALADIN.layouts = { Tank = { class = "PALADIN", slots = { [9] = { kind = "spell", name = "Read Ley Line", level = 1, racial = true } } } }
+    KEPT_LAYOUT = YippSetupCharDB.layout
+    YippSetupCharDB.layout = { [2] = { kind = "spell", name = "Read Ley Line", level = 1, racial = true } }""")
+n = YS.RepairLayouts()
+report(n == 3 and lua.eval("YippSetupDB.classes.PALADIN.profile.slots[5].name") == "Read Leyline"
+       and lua.eval("YippSetupDB.classes.PALADIN.layouts.Tank.slots[9].name") == "Read Leyline"
+       and lua.eval("YippSetupCharDB.layout[2].name") == "Read Leyline"
+       and lua.eval("YippSetupDB.classes.PALADIN.profile.slots[6].name") == "Exorcism",
+       f"a spell saved under its old name takes the new one in every layout of the class, and on the character ({n})")
+report(lua.eval("YR_SETUP.SPELL_LEVELS.PALADIN['Read Leyline']") is None and lua.eval("YR_SETUP.RACIALS['Read Leyline']") is True
+       and lua.eval("YR_SETUP.RACIALS['Read Ley Line']") is None,
+       "the new name is the one the data knows: the old one would have stayed on no bar")
+lua.execute("""YippSetupCharDB.layout = KEPT_LAYOUT
+    YippSetupDB.classes.PALADIN.layouts = nil
+    YippSetupDB.classes.PALADIN.profile = KEPT_PROFILE2""")
 
 # A spell's macro has a name no other spell of the class has. (They were named by the spell's last
 # part alone: a priest's five heals were all "Heal", and a button's macro is read back by its name.)

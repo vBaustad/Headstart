@@ -971,7 +971,9 @@ end
 --------------------------------------------------------------------------------
 
 -- Your choices for the new character.
-local REPLACE = {}   -- e.g. ["Seal of Fury"] = "Seal of Righteousness": that spell goes in this one's slot
+-- A spell the game calls something else now: that spell goes in this one's slot. A layout holds spells by name,
+-- and the old name finds nothing (RepairLayouts gives a saved layout the new one).
+local REPLACE = { ["Read Ley Line"] = "Read Leyline" }
 -- Spells cast on your mouseover target (else yourself or your target): a list in the options.
 local mouseoverText, mouseoverSet
 local function MOUSEOVER_SET(o)
@@ -1161,14 +1163,21 @@ end
 YS.OwnSpellOf = function(e) return OwnSpellOf(e) end
 
 --- A saved layout put right: every macro in it that is one of Headstart's own for a spell becomes that
---- spell. Returns how many. (This class's layout, and the layout as it went onto this character.)
+--- spell, and a spell the game has renamed takes its new name. Returns how many. (All of this class's
+--- layouts, and the layout as it went onto this character.)
 function YS.RepairLayouts()
     local done = 0
-    for _, slots in ipairs({ (YS:Profile() or {}).slots or false, YippSetupCharDB and YippSetupCharDB.layout or false }) do
+    local c = YippSetupDB and ClassData(PlayerClass()) or {}
+    local lists = { (c.profile or {}).slots or false, YippSetupCharDB and YippSetupCharDB.layout or false }
+    for _, layout in pairs(c.layouts or {}) do lists[#lists + 1] = layout.slots or false end
+    for _, slots in ipairs(lists) do
         if type(slots) == "table" then
             for slot, e in pairs(slots) do
                 local spell = type(e) == "table" and OwnSpellOf(e)
                 if spell then slots[slot], done = spell, done + 1 end
+                e = slots[slot]
+                local now = type(e) == "table" and e.kind == "spell" and REPLACE[e.name]
+                if now then e.name, done = now, done + 1 end
             end
         end
     end

@@ -417,32 +417,37 @@ def run():
 
     # New at your trainer: a window at the ding with what came at that level and isn't trained - not a line in chat
     # (the owner, 2026-10-21: "a popup that comes every second level and says what is available this level")
-    lua.execute("PRINTS = {} KNOWN[25780] = nil KNOWN[7294] = nil")
-    g.Fire("PLAYER_LEVEL_UP", 16)
+    freedom, protection = by[("Blessing of Freedom", 0)], by[("Divine Protection", 2)]
+    g.KNOWN[by[("Divine Protection", 1)]] = True
+    lua.execute("PRINTS = {}")
+    g.KNOWN[freedom], g.KNOWN[protection] = None, None
+    g.Fire("PLAYER_LEVEL_UP", 18)
     lua.execute("RunAfter()")
     pop = g.HeadstartTrainerPopup
     is_up = lua.eval("function(f) return rawget(f, '_shown') == true end")
     shown = lambda: sorted(b.m.name for b in pop.icons.values() if is_up(b))
-    check(pop is not None and is_up(pop) and shown() == ["Retribution Aura", "Righteous Fury"] and not any("trainer" in p for p in prints()),
-          f"a ding at 16: a window with what came at 16 and nothing else ({shown()}), nothing in chat")
+    check(pop is not None and is_up(pop) and shown() == ["Blessing of Freedom", "Divine Protection"] and not any("trainer" in p for p in prints()),
+          f"a ding at 18: a window with what came at 18 and nothing else ({shown()}), nothing in chat")
     # thin: the heading and the icons, as wide as they are, no line of level and price (the owner, 2026-10-21: "make it
     # thinner. no need for price etc and make the X better")
     _w, _h = lua.eval("function(f) return rawget(f, '_w'), rawget(f, '_h') end")(pop)
     check(_w is not None and 200 <= _w <= 260 and _h <= 50 and lua.eval("function(f) return rawget(f, 'line') end")(pop) is None,
           f"one row - heading, icons, x - as low as an icon (the owner, 2026-10-22: 'mostly the height'): {_w} x {_h}, no line")
-    lua.execute("KNOWN[7294] = true")
+    g.KNOWN[protection] = True
     g.Fire("SPELLS_CHANGED")
-    check(shown() == ["Righteous Fury"], f"a spell trained: it goes from the window ({shown()})")
-    lua.execute("KNOWN[25780] = true")
+    check(shown() == ["Blessing of Freedom"], f"a spell trained: it goes from the window ({shown()})")
+    g.KNOWN[freedom] = True
     g.Fire("SPELLS_CHANGED")
     check(not is_up(pop), "the last one trained: the window goes")
-    lua.execute("KNOWN[25780] = nil COMBAT = true")
-    YR.TrainerPopup(16, 16)
+    g.KNOWN[freedom] = None
+    lua.execute("COMBAT = true")
+    YR.TrainerPopup(18, 18)
     _during = is_up(pop)
     lua.execute("COMBAT = false")
     g.Fire("PLAYER_REGEN_ENABLED")
     check(not _during and is_up(pop), "levelled in a fight: the window comes when it ends")
-    lua.execute("HeadstartTrainerPopup:Hide() KNOWN[25780] = true")
+    lua.execute("HeadstartTrainerPopup:Hide()")
+    g.KNOWN[freedom] = True
     f = YR.TrainerPopupFrame(True)
     check(f is not None and is_up(pop) and len(shown()) > 0, "Arrange has it to place, with spells of yours on it")
     YR.TrainerPopupFrame(False)
