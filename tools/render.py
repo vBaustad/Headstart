@@ -381,6 +381,13 @@ def main(pages):
             YR.WelcomeShow()                              # the tour, at one of its hints (tour:4)
             for _ in range(int(page[5:] or 1) - 1):
                 lua.execute("local b = HeadstartTour.next b.fn(b)")
+        elif page.startswith("builds:"):
+            YR.ShowSettingsTab(YR, "builds")              # the Talents page with one build in view (builds:own)
+            shown = YR.BuildsShown()
+            if page[7:] == "own":                         # your own build, a first 12 points in (the class's first build's)
+                first = YR.TalentBuildsOf(shown["class"])[1]
+                YR.TalentOwnSet(shown["class"], lua.table(*[first.points[i] for i in range(1, 13)]))
+            shown.pick(page[7:])
         else:
             YR.ShowSettingsTab(YR, page)
         objs = load(lua)

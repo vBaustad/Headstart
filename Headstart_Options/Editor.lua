@@ -5387,6 +5387,39 @@ local function BuildInView()
     return nil
 end
 
+-- A talent on the trees, under the mouse: the spell, the levels the build in view takes it at, your own ranks - and on your
+-- own build what a click would do, or why it can't.
+function builds.Enter(self)
+    if not self.spell then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    if GameTooltip.SetSpellByID then GameTooltip:SetSpellByID(self.spell) end
+    if self.levels and #self.levels > 0 then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("This build: level " .. table.concat(self.levels, ", "), 1, 0.82, 0)
+    end
+    if self.mine then GameTooltip:AddLine(("You have %d of %d"):format(self.mine, self.max), 0.6, 0.9, 0.6) end
+    if builds.own and self.node then
+        GameTooltip:AddLine(" ")
+        if self.refused then GameTooltip:AddLine(self.refused, 1, 0.45, 0.4, true) end
+        local why = YR.TalentWhyNot(builds.class, builds.ownPoints or {}, self.node)
+        if why then GameTooltip:AddLine("Can't add a point: " .. why, 0.75, 0.75, 0.75, true)
+        else GameTooltip:AddLine("Click to add a point", 0.6, 0.9, 0.6) end
+        if (self.got or 0) > 0 then GameTooltip:AddLine("Right-click to take one off", 0.75, 0.75, 0.75) end
+    end
+    GameTooltip:Show()
+end
+-- Your own build: a click adds a point to the talent, a right-click takes its last one off; what the rules don't allow is
+-- refused, and the tooltip says why.
+function builds.Click(self, button)
+    if not (builds.own and self.node) then return end
+    local ok, why
+    if button == "RightButton" then ok, why = YR.TalentOwnRemove(builds.class, self.node)
+    else ok, why = YR.TalentOwnAdd(builds.class, self.node) end
+    YR:RefreshWindow()
+    self.refused = (not ok and button == "RightButton") and ("Can't take it off: " .. tostring(why)) or false
+    builds.Enter(self)
+end
+
 function BuildBuilds(page)
     builds.class = YR.TalentClassID and YR.TalentClassID() or 1
     local top = -12             -- (under QoL's heading: the page is the frame beneath it)
@@ -5400,6 +5433,7 @@ function BuildBuilds(page)
         if builds.class == YR.TalentClassID() and YR.TalentFollowed and YR.TalentFollowed() then YR.TalentFollow(v) end
         YR:RefreshWindow()
     end
+    builds.Pick = Pick
     builds.pick = S.Dropdown(page, 290, {}, Pick)
     builds.pick:SetPoint("LEFT", builds.classes, "RIGHT", 8, 0)
     -- (its list is made again as it opens, for the class shown)
@@ -5454,18 +5488,10 @@ function BuildBuilds(page)
                 b.rank = S.Text(b, 11, S.C.text)
                 b.rank:SetFont(S.FONT, 11, "OUTLINE")
                 b.rank:SetPoint("BOTTOMRIGHT", 4, -4)
-                b:SetScript("OnEnter", function(self)
-                    if not self.spell then return end
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    if GameTooltip.SetSpellByID then GameTooltip:SetSpellByID(self.spell) end
-                    if self.levels and #self.levels > 0 then
-                        GameTooltip:AddLine(" ")
-                        GameTooltip:AddLine("This build: level " .. table.concat(self.levels, ", "), 1, 0.82, 0)
-                    end
-                    if self.mine then GameTooltip:AddLine(("You have %d of %d"):format(self.mine, self.max), 0.6, 0.9, 0.6) end
-                    GameTooltip:Show()
-                end)
-                b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                b:SetScript("OnEnter", builds.Enter)
+                b:SetScript("OnLeave", function(self) self.refused = false GameTooltip:Hide() end)
+                b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+                b:SetScript("OnClick", builds.Click)
                 b:Hide()
                 builds.cells[t .. ":" .. row .. ":" .. c4] = b
             end
@@ -5490,6 +5516,33 @@ function BuildBuilds(page)
     notice:SetHeight(24)
     notice:SetPoint("BOTTOMRIGHT", -10, 10)
     notice.tip = "How the notice tells you of points to spend, and which talent is next: QoL, Reminders"
+    builds.notice = notice
+    -- your own build's two, in the notice's place: start it from one of Headstart's, or empty it. Either asks first when
+    -- yours has points.
+    StaticPopupDialogs["HEADSTART_OWN_TALENTS"] = {
+        text = "Headstart: %s\n\nYour own build's points are replaced.",
+        button1 = "Replace", button2 = "Cancel", timeout = 0, whileDead = true, hideOnEscape = true,
+        OnAccept = function(_, to) YR.TalentOwnSet(builds.class, to) YR:RefreshWindow() end,
+    }
+    local function ReplaceOwn(to, what)
+        if #(builds.ownPoints or {}) == 0 then YR.TalentOwnSet(builds.class, to) YR:RefreshWindow() return end
+        StaticPopup_Show("HEADSTART_OWN_TALENTS", what, nil, to)
+    end
+    builds.clear = S.Button(trees, "Clear", function() ReplaceOwn({}, "clear your own build?") end, "ghost", 70)
+    builds.clear:SetHeight(24)
+    builds.clear:SetPoint("BOTTOMRIGHT", -10, 10)
+    builds.clear.tip = "Takes every point off your own build. Asks first."
+    builds.copy = S.Button(trees, "Start from a build", function()
+        local opts = {}
+        for _, b in ipairs(BuildsOf(builds.class)) do if not b.own then opts[#opts + 1] = { b.key, b.name } end end
+        S.OpenMenu(builds.copy, opts, function(key)
+            local from = YR.TalentBuild(builds.class, key)
+            if from then ReplaceOwn(from.points, ("start your own build from %s?"):format(from.name)) end
+        end, 290)
+    end, "ghost", 150)
+    builds.copy:SetHeight(24)
+    builds.copy:SetPoint("RIGHT", builds.clear, "LEFT", -8, 0)
+    builds.copy.tip = "Your own build becomes a copy of one of Headstart's, to change from there."
     builds.none = S.Text(trees, 13, S.C.sub)
     builds.none:SetPoint("CENTER")
     builds.none:SetText("No talent trees for this class yet.")
@@ -5527,8 +5580,14 @@ function RefreshBuilds()
     win.subtitle:SetText("")
     local class = builds.class
     local build = BuildInView()
+    builds.own = build and build.own or false
+    builds.ownPoints = builds.own and build.points or nil
+    builds.notice:SetShown(not builds.own)
+    builds.clear:SetShown(builds.own)
+    builds.copy:SetShown(builds.own)
     for _, o in ipairs(TALENT_CLASSES) do if o[1] == class then builds.classes:SetValue(o[2]) end end
-    builds.pick:SetValue(build and build.name or "No builds for this class yet")
+    builds.pick:SetValue(not build and "No builds for this class yet"
+        or build.own and ("%s  (%d of 51)"):format(build.name, #build.points) or build.name)
     builds.follow:Refresh()
     local tree = YR.TalentTrees and YR.TalentTrees[class]
     for _, b in pairs(builds.cells) do b:Hide() end
@@ -5559,8 +5618,9 @@ function RefreshBuilds()
             b.rank:SetText(have > 0 and (have .. "/" .. n[2]) or got > 0 and (got .. "/" .. n[2]) or "")
             b.rank:SetTextColor(unpack(have > 0 and S.C.text or S.C.sub))
             b.edge:Color(have > 0 and S.C.boxOn or got > 0 and S.C.boxLine or S.C.line)
-            b.spell, b.levels, b.max = n[1], levels[node], n[2]
-            b.mine = mine and mine[node] or nil
+            b.spell, b.levels, b.max = n[1], levels[node] or false, n[2]
+            b.node, b.got = node, got
+            b.mine = mine and mine[node] or false
             b:Show()
         end
     end
@@ -5600,10 +5660,11 @@ function RefreshBuilds()
 end
 --- For the tests: the Talents page as shown - { class, key, cells (talents drawn), rows (lines of the order), follow }.
 function YR.BuildsShown()
-    local cells, rows = 0, 0
-    for _, b in pairs(builds.cells) do if b:IsShown() then cells = cells + 1 end end
+    local cells, rows, byNode = 0, 0, {}
+    for _, b in pairs(builds.cells) do if b:IsShown() then cells = cells + 1 byNode[b.node or 0] = b end end
     for _, r in ipairs(builds.rows) do if r:IsShown() then rows = rows + 1 end end
-    return { class = builds.class, key = builds.key, cells = cells, rows = rows, follow = builds.follow, lit = builds.lit }
+    return { class = builds.class, key = builds.key, cells = cells, rows = rows, follow = builds.follow, lit = builds.lit,
+        own = builds.own, byNode = byNode, pick = builds.Pick, clear = builds.clear, copy = builds.copy, notice = builds.notice }
 end
 
 end

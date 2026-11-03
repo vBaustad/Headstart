@@ -98,6 +98,55 @@ def run():
     check(told is not None and "next:" in str(told) and "Improved Heroic Strike 1/3" in str(told),
           f"the talent points notice says which talent is next ({told})")
     YR.TalentFollow(None)
+
+    # your own build: the rules, on a small tree made here (node = { spell, ranks, tab, row, column, the node it needs })
+    YR.TalentTrees[99] = lua.eval("""{ tabs = { "Alpha", "Beta", "Gamma" }, nodes = {
+        [1] = { 100, 2, 1, 1, 1 }, [2] = { 101, 3, 1, 1, 2 }, [3] = { 102, 1, 1, 2, 1, 1 }, [4] = { 103, 5, 1, 1, 3 },
+        [5] = { 104, 60, 2, 1, 1 } } }""")
+    add = lua.eval("function(YR, c, n) local ok, why = YR.TalentOwnAdd(c, n) return { ok = ok, why = why } end")
+    rem = lua.eval("function(YR, c, n) local ok, why = YR.TalentOwnRemove(c, n) return { ok = ok, why = why } end")
+
+    def pts():
+        p = YR.TalentOwn(99).points
+        return [p[i] for i in range(1, len(p) + 1)]
+
+    own = YR.TalentBuildsOf(99)
+    check(len(own) == 1 and own[1].key == "own" and len(own[1].points) == 0, "a class with a tree has your own build, empty at first")
+    r = add(YR, 99, 3)
+    check(not r.ok and "needs 5 points in Alpha (0 now)" in str(r.why), f"row 2 first: refused, 5 points in the tab before it ({r.why})")
+    for n in (1, 2, 2, 2, 4):
+        add(YR, 99, n)
+    r = add(YR, 99, 3)
+    check(pts() == [1, 2, 2, 2, 4] and not r.ok and "Spell 100 at full rank first" in str(r.why),
+          f"5 points in the tab, but the talent it needs at 1 of 2: refused ({pts()}, {r.why})")
+    add(YR, 99, 1)
+    r = add(YR, 99, 3)
+    check(r.ok and pts() == [1, 2, 2, 2, 4, 1, 3], f"the talent it needs full: taken ({pts()})")
+    r = add(YR, 99, 1)
+    check(not r.ok and "all its ranks" in str(r.why), f"a talent past its ranks: refused ({r.why})")
+    r = rem(YR, 99, 1)
+    check(not r.ok and "Spell 102 needs it" in str(r.why) and len(pts()) == 7, f"a point a later talent needs can't come off ({r.why})")
+    r = rem(YR, 99, 3)
+    r2 = rem(YR, 99, 1)
+    check(r.ok and r2.ok and pts() == [1, 2, 2, 2, 4], f"the later one off first, then the one it needed ({pts()})")
+    check(len(g.YippRouteDB.talentPlans[99]) == 5, "kept for the account, in YippRouteDB.talentPlans")
+    YR.TalentOwnSet(99, lua.eval("{ 999, 4, 3, 4 }"))
+    check(pts() == [4, 4], f"a talent not in the tree, and one the rules no longer allow there, are left out ({pts()})")
+    YR.TalentOwnSet(99, lua.table(*([5] * 51)))
+    r = add(YR, 99, 4)
+    check(len(pts()) == 51 and not r.ok and "all 51 points" in str(r.why), f"51 points and no more ({r.why})")
+    YR.TalentTrees[99] = None
+    g.YippRouteDB.talentPlans[99] = None
+
+    # ... followed like Headstart's: the notice's next talent is your own build's
+    YR.TalentOwnSet(1, lua.table(warrior.points[1], warrior.points[2], warrior.points[3]))
+    lua.execute("RANKS = {}")
+    YR.TalentFollow("own")
+    f = YR.TalentFollowed()
+    lines = YR.TalentNextLines(1)
+    check(f is not None and f.key == "own" and lines[1] == "Improved Heroic Strike 1/3", f"your own build followed: its first point is next ({lines[1]})")
+    YR.TalentFollow(None)
+    YR.TalentOwnSet(1, lua.table())
     return bad
 
 

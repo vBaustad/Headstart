@@ -8,6 +8,11 @@
 --   C_Traits.GetNodeInfo's ranksPurchased).
 --   Per character: YippSetupCharDB.talentBuild, the key of the build followed (nil: none). Nothing listens for
 --   anything here: the notice asks when it is drawn.
+--   Your own build (the owner, 2026-11-03: "a talent planner, so you can plan your own talents"): one a class, for the
+--   account, made on the same page by clicking talents and followed like Headstart's, under the key "own":
+--   YippRouteDB.talentPlans[class] = { node, ... } in the order taken. The game's rules hold at every point, as
+--   tools/talents_gen.py checks Headstart's: 5 points a row in the tab before a talent, a talent it needs at full rank
+--   first, no talent past its ranks, 51 points.
 local _, YR = ...
 
 local function ClassID()
@@ -16,9 +21,94 @@ local function ClassID()
 end
 YR.TalentClassID = ClassID
 
---- A class's builds (Headstart's), in order.
+--- A class's builds: Headstart's in order, then your own (where the class has a tree).
 function YR.TalentBuildsOf(class)
-    return type(YR.TalentBuilds) == "table" and YR.TalentBuilds[class] or {}
+    local list = {}
+    for _, b in ipairs(type(YR.TalentBuilds) == "table" and YR.TalentBuilds[class] or {}) do list[#list + 1] = b end
+    if type(YR.TalentTrees) == "table" and YR.TalentTrees[class] then list[#list + 1] = YR.TalentOwn(class) end
+    return list
+end
+
+local function Plans()
+    if type(YippRouteDB) ~= "table" then return nil end
+    YippRouteDB.talentPlans = type(YippRouteDB.talentPlans) == "table" and YippRouteDB.talentPlans or {}
+    return YippRouteDB.talentPlans
+end
+
+--- Why `node` can't be the next point after `points`, in words; nil when it can.
+function YR.TalentWhyNot(class, points, node)
+    local tree = type(YR.TalentTrees) == "table" and YR.TalentTrees[class]
+    local n = tree and tree.nodes[node]
+    if not n then return "it isn't in this class's tree" end
+    if #points >= 51 then return "all 51 points are spent" end
+    local ranks, spent = {}, { 0, 0, 0 }
+    for _, p in ipairs(points) do
+        local t = tree.nodes[p]
+        if t then
+            ranks[p] = (ranks[p] or 0) + 1
+            spent[t[3]] = spent[t[3]] + 1
+        end
+    end
+    if (ranks[node] or 0) >= n[2] then return "it has all its ranks" end
+    local need = (n[4] - 1) * 5
+    if spent[n[3]] < need then return ("it needs %d points in %s (%d now)"):format(need, tree.tabs[n[3]], spent[n[3]]) end
+    if n[6] and (ranks[n[6]] or 0) < tree.nodes[n[6]][2] then
+        return ("it needs %s at full rank first"):format((YR.TalentNodeName(class, n[6])))
+    end
+    return nil
+end
+
+--- The points that hold, in order: one the rules don't allow at its place (a talent a patch took away) is left out.
+function YR.TalentKeepValid(class, points)
+    local out = {}
+    for _, node in ipairs(points) do
+        if not YR.TalentWhyNot(class, out, node) then out[#out + 1] = node end
+    end
+    return out
+end
+
+--- Your own build of a class, as a build: { key = "own", own = true, name, about, points }.
+function YR.TalentOwn(class)
+    local all = Plans()
+    local saved = all and all[class]
+    return { key = "own", own = true, name = "Your own build",
+        about = "Click a talent to add a point, right-click to take one off.",
+        points = YR.TalentKeepValid(class, type(saved) == "table" and saved or {}) }
+end
+
+--- Your own build written: the points kept as the rules allow.
+function YR.TalentOwnSet(class, points)
+    local all = Plans()
+    if not all then return end
+    all[class] = YR.TalentKeepValid(class, points or {})
+    if YR.TalentNotice then YR.TalentNotice() end
+end
+
+--- A point added to a talent of your own build. Returns true, or false and why not.
+function YR.TalentOwnAdd(class, node)
+    local points = YR.TalentOwn(class).points
+    local why = YR.TalentWhyNot(class, points, node)
+    if why then return false, why end
+    points[#points + 1] = node
+    YR.TalentOwnSet(class, points)
+    return true
+end
+
+--- A talent's last point taken off your own build. Returns true, or false and why not (a later point needs it).
+function YR.TalentOwnRemove(class, node)
+    local points = YR.TalentOwn(class).points
+    local at
+    for i = #points, 1, -1 do if points[i] == node then at = i break end end
+    if not at then return false, "it has no point" end
+    local rest = {}
+    for i, p in ipairs(points) do
+        if i ~= at then
+            if YR.TalentWhyNot(class, rest, p) then return false, ("%s needs it"):format((YR.TalentNodeName(class, p))) end
+            rest[#rest + 1] = p
+        end
+    end
+    YR.TalentOwnSet(class, rest)
+    return true
 end
 
 --- One build of a class by its key, or nil.

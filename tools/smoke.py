@@ -1213,6 +1213,20 @@ _followed = YR.TalentFollowed()
 check(_b.cells > 0 and _b.rows > 0 and _followed is not None and _followed.key == YR.BuildsShown().key,
       f"Talents: {_b.cells} talents on the trees, {_b.rows} lines by level; switched on, the build in view is followed")
 YR.TalentFollow(_kept_build)
+# ... your own build on the page: a click on a first-row talent adds a point, a right-click takes it off
+_b.pick("own")
+YR.RefreshWindow(YR)
+_b = YR.BuildsShown()
+_first = next((node for node, n in YR.TalentTrees[_b["class"]].nodes.items() if n[4] == 1 and n[6] is None), None)
+_cell = _b.byNode[_first]
+_cell.scripts.OnClick(_cell, "LeftButton")
+_after = YR.BuildsShown()
+_n1 = len(YR.TalentOwn(_b["class"]).points)
+_cell.scripts.OnClick(_cell, "RightButton")
+_n0 = len(YR.TalentOwn(_b["class"]).points)
+check(_b.own is True and _b.clear.IsShown(_b.clear) and not _b.notice.IsShown(_b.notice) and _n1 == 1 and _after.rows == 1 and _n0 == 0,
+      f"Talents, your own build: a click adds a point and it is in the order by level, a right-click takes it off ({_n1}, {_after.rows}, {_n0})")
+_b.pick(YR.TalentBuildsOf(_b["class"])[1].key)
 # Route settings: one list - the routes, group play, recording, the splits and the pace - without what moved
 YR.ToggleWindow(YR, "route")
 _L = YR.RouteSettingsLayout()
