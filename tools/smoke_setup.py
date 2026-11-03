@@ -20,6 +20,8 @@ Obj = { __call = function() return setmetatable({}, Obj) end }
 Obj.__index = function(t, k)
     local v = rawget(Obj, k)
     if v then return v end
+    -- only a method (a capital first letter) is made up: a field the addon never set is nil, as in the game
+    if type(k) ~= "string" or not k:match("^%u") then return nil end
     local child = setmetatable({}, Obj); rawset(t, k, child); return child
 end
 function Obj.Show(self) rawset(self, "_shown", true) end

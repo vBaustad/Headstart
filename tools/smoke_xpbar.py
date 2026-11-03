@@ -21,7 +21,8 @@ local Obj = {}
 Obj.__index = function(t, k)
     local v = rawget(Obj, k)
     if v then return v end
-    return function() return setmetatable({}, Obj) end
+    -- only a method (a capital first letter) is made up: a field the addon never set is nil, as in the game
+    if type(k) == "string" and k:match("^%u") then return function() return setmetatable({}, Obj) end end
 end
 function Obj:SetAlpha(a) rawset(self, "alpha", a) end
 function Obj:GetAlpha() return rawget(self, "alpha") or 1 end

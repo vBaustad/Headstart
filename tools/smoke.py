@@ -15,9 +15,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 lua = lua51.LuaRuntime(unpack_returned_tuples=True)
 lua.execute(r'''
 FRAMES, TICKERS, NOW, CLOCK = {}, {}, 0, 1000
--- frames: any method this fake doesn't define is a no-op that returns another fake (textures, font strings)
+-- frames: any method this fake doesn't define is a no-op that returns another fake (textures, font strings);
+-- only a method (a capital first letter) is made up: a field the addon never set is nil, as in the game
 local Frame = {}
-Frame.__index = function(_, k) return rawget(Frame, k) or function() return setmetatable({ ev = {} }, Frame) end end
+Frame.__index = function(_, k)
+    local v = rawget(Frame, k)
+    if v ~= nil then return v end
+    if type(k) == "string" and k:match("^%u") then return function() return setmetatable({ ev = {} }, Frame) end end
+end
 function Frame:Show() self.hidden = false end
 function Frame:Hide() self.hidden = true end
 function Frame:IsShown() return not self.hidden end
@@ -51,6 +56,7 @@ function Screenshot() SHOTS = SHOTS + 1 end   -- the QoL screenshot at a ding
 function GetInventoryItemDurability() return nil end
 function GetInventoryItemID() return nil end
 function GetInventoryItemTexture() return nil end
+function GetInventoryItemCooldown() return 0, 0, 1 end   -- (the trinket bar, on screen now a new frame is shown)
 function UnitExists() return false end   -- Quick group's bar: no target
 function UnitIsGroupLeader() return false end
 function UnitIsGroupAssistant() return false end
@@ -98,7 +104,7 @@ function HasAction() return false end
 function GetNumMacros() return 0, 0 end        -- (no macros: Character setup's first look keeps the bars, and none)
 tinsert = table.insert
 function StaticPopup_Show(which) POPUP = which end
-GameTooltip = setmetatable({}, { __index = function() return function() end end })
+GameTooltip = setmetatable({}, { __index = function(_, k) if type(k) == "string" and k:match("^%u") then return function() end end end })   -- (a method, as the frames: a field is nil)
 function hooksecurefunc(a, b, c) if c then HOOKS[b] = c else HOOKS[a] = b end end
 -- bags (BAGS[bag * 100 + slot] = { itemID, stackCount }) and a vendor window
 BAGS = {}
@@ -189,17 +195,28 @@ function GetQuestLogRewardMoney(id) return KNOWN[id] and KNOWN[id][4] or 0 end
 function Answer() for _, id in ipairs(ASKED or {}) do Fire("QUEST_DATA_LOAD_RESULT", id, KNOWN[id] ~= nil) end ASKED = {} end
 ''')
 YR = lua.table()
+# The fake game's own rule, looked at before any test changes it (said in _apart): a method it doesn't define is made
+# up, a field the addon never set is nil - and so a new frame is shown - as in the game. A made-up function for a nil
+# field made the Talents tooltip fail here and nowhere else (2026-11-03).
+HARNESS = lua.eval("""(function() local f = setmetatable({ ev = {} }, getmetatable(UIParent))
+    return { field = f.mine == nil, method = type(f.SetAlpha) == "function", shown = f:IsShown(),
+             tip = GameTooltip.owner == nil and type(GameTooltip.AddLine) == "function" } end)()""")
 # The routes are not part of Headstart: they are the routes addon beside it (Headstart_Routes, private),
 # which loads first and queues its guides for Guides.lua. The route tests below need it.
 ROUTES = os.path.join(os.path.dirname(ROOT), "Headstart_Routes")
 
 
 def _apart():
-    """What runs whether the routes are there or not: no frame named as a saved variable is, and the tests that are
-    scripts of their own (Character setup's, the live move's). Returns how many failed."""
+    """What runs whether the routes are there or not: the fake game's own rule, no frame named as a saved variable is,
+    and the tests that are scripts of their own (Character setup's, the live move's). Returns how many failed."""
     import glob as _glob
     import subprocess as _sp
     n_bad = 0
+    ok = HARNESS.field and HARNESS.method and HARNESS.shown and HARNESS.tip
+    print(("ok  " if ok else "FAIL"), "the fake game: a method is made up, a field the addon never set is nil and a new "
+          f"frame is shown, as in the game (field {HARNESS.field}, method {HARNESS.method}, shown {HARNESS.shown}, "
+          f"tooltip {HARNESS.tip})")
+    n_bad += not ok
     # A frame's name is a global, and so is a saved variable's: one name for both and the frame replaces
     # the saved table (or the game's Esc handling finds the table where it looks for the frame).
     saved, frames = set(), set()

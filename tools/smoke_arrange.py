@@ -20,16 +20,19 @@ def run():
     lua.execute(r'''
 MADE, COMBAT, SHIFT, SAID = 0, false, false, {}
 local F = {}
-F.__index = function(t, k) return rawget(F, k) or function() end end
+-- only a method (a capital first letter) is made up: a field the addon never set is nil, as in the game
+F.__index = function(t, k) local v = rawget(F, k) if v ~= nil then return v end if type(k) == "string" and k:match("^%u") then return function() end end end
+-- where a frame is and how big, kept where the addon can't write: Arrange's own fields are l, t, w, h and scale (a
+-- handle's) and w, h (the panel's boxes to type into), and a fake sharing them answered GetWidth with a box
 function F:SetPoint(p, rel, rp, x, y)
-    if type(x) == "number" then rawset(self, "l", x) rawset(self, "t", y) end
+    if type(x) == "number" then rawset(self, "_l", x) rawset(self, "_t", y) end
 end
-function F:GetLeft() return rawget(self, "l") end
-function F:GetTop() return rawget(self, "t") end
-function F:SetSize(w, h) rawset(self, "w", w) rawset(self, "h", h) end
-function F:GetWidth() return rawget(self, "w") or 0 end
-function F:GetHeight() return rawget(self, "h") or 0 end
-function F:GetEffectiveScale() return rawget(self, "scale") or 1 end
+function F:GetLeft() return rawget(self, "_l") end
+function F:GetTop() return rawget(self, "_t") end
+function F:SetSize(w, h) rawset(self, "_w", w) rawset(self, "_h", h) end
+function F:GetWidth() return rawget(self, "_w") or 0 end
+function F:GetHeight() return rawget(self, "_h") or 0 end
+function F:GetEffectiveScale() return rawget(self, "_scale") or 1 end
 function F:GetFrameLevel() return 1 end
 function F:Show() rawset(self, "shown", true) end
 function F:Hide() rawset(self, "shown", false) end
@@ -45,7 +48,7 @@ function F:SetLabel(t) rawset(self, "label", t) end
 function F:SetText(t) rawset(self, "words", t) end
 function F:SetEnabled(on) rawset(self, "enabled", on) end
 function CreateFrame(kind, name) MADE = MADE + 1 local f = setmetatable({}, F) if name then _G[name] = f end return f end
-UIParent = setmetatable({ l = 0, t = 1000, w = 1600, h = 1000 }, F)
+UIParent = setmetatable({ _l = 0, _t = 1000, _w = 1600, _h = 1000 }, F)
 function InCombatLockdown() return COMBAT end
 CURSOR = { 0, 0 }
 function GetCursorPosition() return CURSOR[1], CURSOR[2] end
@@ -64,7 +67,7 @@ function YR.XPBarDB() return XP end
 function YR.XPBarApply() HeadstartXPBar:SetSize(XP.w, XP.h) end
 -- an element: the XP bar, which keeps its place (rounded) when a drag of its own ends
 function Element(name, l, t, w, h)
-    local f = setmetatable({ l = l, t = t, w = w, h = h }, F)
+    local f = setmetatable({ _l = l, _t = t, _w = w, _h = h }, F)
     f:SetScript("OnDragStop", function(self)
         rawset(self, "kept", { math.floor(self:GetLeft() + 0.5), math.floor(self:GetTop() + 0.5) })
     end)
@@ -96,7 +99,7 @@ end
           "opened: shown, and a fight is listened for")
     key = raw(g.HeadstartArrange, "_OnKeyDown")
     key(g.HeadstartArrange, "RIGHT")
-    check(raw(xp, "l") == 400 and raw(g.HeadstartArrange, "passes") is True, "an arrow with nothing picked: the game's key, nothing moved")
+    check(raw(xp, "_l") == 400 and raw(g.HeadstartArrange, "passes") is True, "an arrow with nothing picked: the game's key, nothing moved")
     # the handles, out of Arrange.lua's own list
     find = lua.eval("""function()
         local found = {}
@@ -124,56 +127,59 @@ end
     check(hx is not None and raw(hx, "shown") is True and raw(hx, "l") == 400 and raw(hx, "w") == 200
           and raw(find["Camp icon"], "shown") is False, "a handle over each element that exists, none for one that doesn't")
     raw(hx, "_OnClick")(hx)
+    box = raw(g.HeadstartArrange, "panel")
+    check(raw(box, "_l") == 400 + 200 + 12 and raw(box, "_t") == 300,
+          f"picked: the small window beside it, to its right ({raw(box, '_l')}, {raw(box, '_t')})")
     key(g.HeadstartArrange, "RIGHT")
-    check(raw(xp, "l") == 401 and raw(xp, "t") == 300 and list(raw(xp, "kept").values()) == [401, 300]
+    check(raw(xp, "_l") == 401 and raw(xp, "_t") == 300 and list(raw(xp, "kept").values()) == [401, 300]
           and raw(g.HeadstartArrange, "passes") is False, "picked, arrow right: one step, kept by the element's own script")
     g.SHIFT = True
     key(g.HeadstartArrange, "UP")
     g.SHIFT = False
-    check(raw(xp, "t") == 310 and raw(hx, "t") == 310, "Shift and arrow up: ten steps, the handle with it")
+    check(raw(xp, "_t") == 310 and raw(hx, "t") == 310, "Shift and arrow up: ten steps, the handle with it")
     # a drag let go: near nothing, so onto the grid (16, out from the middle of the screen: 800, 500)
     drag(hx, 207, 441)
     drop(hx)
-    check(raw(xp, "l") == 208 and raw(xp, "t") == 436, f"dropped: onto the grid ({raw(xp, 'l')}, {raw(xp, 't')})")
+    check(raw(xp, "_l") == 208 and raw(xp, "_t") == 436, f"dropped: onto the grid ({raw(xp, '_l')}, {raw(xp, '_t')})")
     # near another element's edge: to that, not the grid
     drag(hx, 897, 700, [0.016])
     what = raw(raw(g.HeadstartArrange, "bar"), "what") if False else None
-    check(raw(xp, "l") == 900 and raw(hx, "l") == 900 and raw(hl, "lined") is True,
-          f"dragged near another element's left edge: shown lined up with it as it is dragged, that one outlined ({raw(xp, 'l')})")
+    check(raw(xp, "_l") == 900 and raw(hx, "l") == 900 and raw(hl, "lined") is True,
+          f"dragged near another element's left edge: shown lined up with it as it is dragged, that one outlined ({raw(xp, '_l')})")
     drop(hx)
-    check(raw(xp, "l") == 900 and raw(hl, "lined") is False, f"let go: there, and the outline gone ({raw(xp, 'l')})")
+    check(raw(xp, "_l") == 900 and raw(hl, "lined") is False, f"let go: there, and the outline gone ({raw(xp, '_l')})")
     # almost onto another: not pulled the rest of the way (it went onto it)
-    drag(hx, raw(loot, "l") + 3, raw(loot, "t") - 3)
+    drag(hx, raw(loot, "_l") + 3, raw(loot, "_t") - 3)
     drop(hx)
-    check(not (raw(xp, "l") == raw(loot, "l") and raw(xp, "t") == raw(loot, "t")),
-          f"dropped almost onto another: not pulled onto it ({raw(xp, 'l')}, {raw(xp, 't')})")
+    check(not (raw(xp, "_l") == raw(loot, "_l") and raw(xp, "_t") == raw(loot, "_t")),
+          f"dropped almost onto another: not pulled onto it ({raw(xp, '_l')}, {raw(xp, '_t')})")
     # beside another, the gap between (2)
-    drag(hx, raw(loot, "l") + raw(loot, "w") + 5, raw(loot, "t") + 1)
+    drag(hx, raw(loot, "_l") + raw(loot, "_w") + 5, raw(loot, "_t") + 1)
     drop(hx)
-    check(raw(xp, "l") == raw(loot, "l") + raw(loot, "w") + 2 and raw(xp, "t") == raw(loot, "t"),
-          f"dropped to the right of another: beside it with the gap, tops lined up ({raw(xp, 'l')}, {raw(xp, 't')})")
+    check(raw(xp, "_l") == raw(loot, "_l") + raw(loot, "_w") + 2 and raw(xp, "_t") == raw(loot, "_t"),
+          f"dropped to the right of another: beside it with the gap, tops lined up ({raw(xp, '_l')}, {raw(xp, '_t')})")
     g.YippRouteDB.arrange.snap = False
     drag(hx, 333, 222)
     drop(hx)
-    check(raw(xp, "l") == 333 and raw(xp, "t") == 222, "snap off: where it was dropped")
+    check(raw(xp, "_l") == 333 and raw(xp, "_t") == 222, "snap off: where it was dropped")
     # the small window: where it is and how large, typed in
     panel = raw(g.HeadstartArrange, "panel")
     check(raw(panel, "shown") is True and raw(raw(panel, "x"), "value") == 333 and raw(raw(panel, "w"), "value") == 200,
           "picked: a window with its place and size")
     raw(raw(panel, "x"), "opts").onCommit("512")
     raw(raw(panel, "y"), "opts").onCommit("640")
-    check(raw(xp, "l") == 512 and raw(xp, "t") == 640 and list(raw(xp, "kept").values()) == [512, 640], "x and y typed in: there, and kept")
+    check(raw(xp, "_l") == 512 and raw(xp, "_t") == 640 and list(raw(xp, "kept").values()) == [512, 640], "x and y typed in: there, and kept")
     raw(raw(panel, "w"), "opts").onCommit("320")
     raw(raw(panel, "h"), "opts").onCommit("999")
     check(g.XP.w == 320 and g.XP.h == 40 and raw(hx, "w") == 320, f"width and height typed in: set, within what the bar allows ({g.XP.w}, {g.XP.h})")
     raw(raw(panel, "x"), "opts").onCommit("nonsense")
-    check(raw(xp, "l") == 512, "not a number: nothing moved")
+    check(raw(xp, "_l") == 512, "not a number: nothing moved")
     raw(hl, "_OnClick")(hl)
     raw(raw(panel, "w"), "opts").onCommit("50")
-    check(raw(loot, "w") == 100 and raw(raw(panel, "w"), "enabled") is False, "an element with no size to set: its size left alone")
+    check(raw(loot, "_w") == 100 and raw(raw(panel, "w"), "enabled") is False, "an element with no size to set: its size left alone")
     # anchors: the XP bar dragged over the loot feed and held there, then let go
-    at = (raw(loot, "l"), raw(loot, "t"))
-    was = (raw(xp, "l"), raw(xp, "t"))
+    at = (raw(loot, "_l"), raw(loot, "_t"))
+    was = (raw(xp, "_l"), raw(xp, "_t"))
     lua.execute(f"CURSOR = {{ {was[0] + 5}, {was[1] - 5} }}")
     raw(hx, "_OnDragStart")(hx)
     lua.execute(f"CURSOR = {{ {at[0] + 5}, {at[1] - 5} }}")
@@ -184,16 +190,16 @@ end
     raw(hx, "_OnDragStop")(hx)
     chooser = raw(g.HeadstartArrange, "chooser")
     check(raw(chooser, "shown") is True and g.YippRouteDB.arrange.anchor["XP bar"] is None
-          and (raw(xp, "l"), raw(xp, "t")) == was,
+          and (raw(xp, "_l"), raw(xp, "_t")) == was,
           "held over it, then let go: a window asks where it goes by it, and it is back where it was meanwhile")
     spots = raw(chooser, "spots")
     raw(spots["below"], "preview")()
     below = (at[0] + (100 - 320) // 2, at[1] - 50 - 2)
-    check((raw(xp, "l"), raw(xp, "t")) == below and g.YippRouteDB.arrange.anchor["XP bar"] is None,
-          f"the mouse over Below: shown there, under it in the middle with the gap ({raw(xp, 'l')}, {raw(xp, 't')})")
+    check((raw(xp, "_l"), raw(xp, "_t")) == below and g.YippRouteDB.arrange.anchor["XP bar"] is None,
+          f"the mouse over Below: shown there, under it in the middle with the gap ({raw(xp, '_l')}, {raw(xp, '_t')})")
     key(g.HeadstartArrange, "ESCAPE")
     check(raw(chooser, "shown") is False and raw(g.HeadstartArrange, "shown") is True
-          and (raw(xp, "l"), raw(xp, "t")) == was and g.YippRouteDB.arrange.anchor["XP bar"] is None,
+          and (raw(xp, "_l"), raw(xp, "_t")) == was and g.YippRouteDB.arrange.anchor["XP bar"] is None,
           "Esc: as it was, not anchored - and Arrange still open")
     lua.execute(f"CURSOR = {{ {was[0] + 5}, {was[1] - 5} }}")
     raw(hx, "_OnDragStart")(hx)
@@ -203,30 +209,30 @@ end
     raw(hx, "_OnDragStop")(hx)
     raw(spots["below"], "click")()
     check(raw(chooser, "shown") is False and g.YippRouteDB.arrange.anchor["XP bar"] == "Loot feed"
-          and (raw(xp, "l"), raw(xp, "t")) == below and list(raw(xp, "kept").values()) == list(below),
-          f"Below picked: anchored to it, put there and kept ({raw(xp, 'l')}, {raw(xp, 't')})")
-    before = (raw(xp, "l"), raw(xp, "t"))
+          and (raw(xp, "_l"), raw(xp, "_t")) == below and list(raw(xp, "kept").values()) == list(below),
+          f"Below picked: anchored to it, put there and kept ({raw(xp, '_l')}, {raw(xp, '_t')})")
+    before = (raw(xp, "_l"), raw(xp, "_t"))
     raw(hl, "_OnClick")(hl)
     g.SHIFT = True
     key(g.HeadstartArrange, "LEFT")
     key(g.HeadstartArrange, "DOWN")
     g.SHIFT = False
-    check(raw(loot, "l") == at[0] - 10 and raw(xp, "l") == before[0] - 10 and raw(xp, "t") == before[1] - 10
+    check(raw(loot, "_l") == at[0] - 10 and raw(xp, "_l") == before[0] - 10 and raw(xp, "_t") == before[1] - 10
           and list(raw(xp, "kept").values()) == [before[0] - 10, before[1] - 10], "the one it hangs on moved: it goes along, and keeps its place")
     # the other way round would be a ring: not offered
-    lua.execute(f"CURSOR = {{ {raw(loot, 'l') + 5}, {raw(loot, 't') - 5} }}")
+    lua.execute(f"CURSOR = {{ {raw(loot, '_l') + 5}, {raw(loot, '_t') - 5} }}")
     raw(hl, "_OnDragStart")(hl)
-    lua.eval("function(x, y) CURSOR = { x + 5, y - 5 } end")(raw(xp, "l"), raw(xp, "t"))
+    lua.eval("function(x, y) CURSOR = { x + 5, y - 5 } end")(raw(xp, "_l"), raw(xp, "_t"))
     raw(hl, "_OnUpdate")(hl, 0.1)
     raw(hl, "_OnUpdate")(hl, 1.0)
     raw(hl, "_OnDragStop")(hl)
     check(g.YippRouteDB.arrange.anchor["Loot feed"] is None, "anchoring the one it hangs on back to it: not offered")
     raw(hx, "_OnClick")(hx)
     raw(raw(panel, "release"), "click")()
-    spot = raw(xp, "l")
+    spot = raw(xp, "_l")
     raw(hl, "_OnClick")(hl)
     key(g.HeadstartArrange, "RIGHT")
-    check(g.YippRouteDB.arrange.anchor["XP bar"] is None and raw(xp, "l") == spot, "released: it stays where it is when the other moves")
+    check(g.YippRouteDB.arrange.anchor["XP bar"] is None and raw(xp, "_l") == spot, "released: it stays where it is when the other moves")
     raw(hx, "_OnClick")(hx)
     key(g.HeadstartArrange, "A")
     check(raw(g.HeadstartArrange, "passes") is True, "any other key is the game's")
@@ -238,21 +244,21 @@ end
     camp = g.Element("HeadstartCampFrame", 50, 900, 20, 20)
     YR.ArrangeOpen()
     hc = find["Camp icon"]
-    mid = (raw(xp, "l") + (raw(xp, "w") - 20) / 2, raw(xp, "t") - (raw(xp, "h") - 20) / 2)
+    mid = (raw(xp, "_l") + (raw(xp, "_w") - 20) / 2, raw(xp, "_t") - (raw(xp, "_h") - 20) / 2)
     drag(hc, mid[0] - 1, mid[1] - 2)          # (the loot feed above has its middle a pixel further right: the nearer wins)
     drop(hc)
-    check((raw(camp, "l"), raw(camp, "t")) == mid, f"a small one dropped near the middle of a larger: lined up in it ({raw(camp, 'l')}, {raw(camp, 't')})")
+    check((raw(camp, "_l"), raw(camp, "_t")) == mid, f"a small one dropped near the middle of a larger: lined up in it ({raw(camp, '_l')}, {raw(camp, '_t')})")
     # the top bar never over an element on opening: one under it at the top, so at the bottom; dragged, kept there
     YR.ArrangeClose()
     g.Element("HeadstartFlightFrame", 780, 930, 120, 20)
     YR.ArrangeOpen()
     topbar = raw(g.HeadstartArrange, "bar")
-    check(raw(topbar, "t") == 60 + 92, f"an element under the bar's place at the top: the bar at the bottom ({raw(topbar, 't')})")
-    lua.eval("function(b) rawset(b, 'l', 100) rawset(b, 't', 300) end")(topbar)
+    check(raw(topbar, "_t") == 60 + 92, f"an element under the bar's place at the top: the bar at the bottom ({raw(topbar, '_t')})")
+    lua.eval("function(b) rawset(b, '_l', 100) rawset(b, '_t', 300) end")(topbar)
     raw(topbar, "_OnDragStop")(topbar)
     YR.ArrangeClose()
     YR.ArrangeOpen()
-    check(raw(topbar, "l") == 100 and raw(topbar, "t") == 300, "dragged somewhere clear: kept there the next time")
+    check(raw(topbar, "_l") == 100 and raw(topbar, "_t") == 300, "dragged somewhere clear: kept there the next time")
     # the combat bars shown as they are while it is open, and back as it closes
     check(g.ARRANGING is True, "open: the combat bars asked to show")
     YR.ArrangeClose()

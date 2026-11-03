@@ -20,7 +20,8 @@ def run():
     lua.execute(r"""
 FRAMES, BUILT = {}, 0
 local F = {}
-F.__index = function(t, k) return rawget(F, k) or function() end end
+-- only a method (a capital first letter) is made up: a field the addon never set is nil, as in the game
+F.__index = function(t, k) local v = rawget(F, k) if v ~= nil then return v end if type(k) == "string" and k:match("^%u") then return function() end end end
 function F:RegisterEvent(e) local ev = rawget(self, "ev") or {} ev[e] = true rawset(self, "ev", ev) end
 function F:UnregisterEvent(e) local ev = rawget(self, "ev") if ev then ev[e] = nil end end
 function F:UnregisterAllEvents() rawset(self, "ev", nil) end

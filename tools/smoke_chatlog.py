@@ -19,8 +19,8 @@ FRAMES, SAID, HOOKS = {}, {}, 0
 local F = {}
 F.__index = function(t, k)
     if F[k] then return F[k] end
-    return function() end                 -- any widget method: nothing
-end
+    if type(k) == "string" and k:match("^%u") then return function() end end   -- any widget method: nothing
+end                                       -- (a field the addon never set is nil, as in the game)
 function F:RegisterEvent(e) local ev = rawget(self, "ev") or {} rawset(self, "ev", ev) ev[e] = true end
 function F:UnregisterEvent(e) local ev = rawget(self, "ev") if ev then ev[e] = nil end end
 function F:SetScript(what, fn) if what == "OnEvent" then rawset(self, "fn", fn) end end
@@ -52,7 +52,11 @@ function time() return CLOCK end
 wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
 C_Timer = { After = function(_, fn) fn() end }
 function date(fmt, t) return os.date("!" .. fmt, t) end
-function GetChatWindowInfo(i) return ({ "General", "Combat Log", "Guild" })[i] end
+-- name, font size, r, g, b, alpha, shown, locked, docked: the three docked together, the first shown, as the game has them
+function GetChatWindowInfo(i)
+    local name = ({ "General", "Combat Log", "Guild" })[i]
+    if name then return name, 14, 0, 0, 0, 0, i == 1, false, i end
+end
 NUM_CHAT_WINDOWS = 3
 for i = 1, 3 do _G["ChatFrame" .. i] = setmetatable({}, F) end
 COMBATLOG = ChatFrame2

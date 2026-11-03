@@ -36,7 +36,8 @@ end
 function Fire(e, ...) for _, f in ipairs(FRAMES) do if f.ev and f.ev[e] and f.fn then f.fn(f, e, ...) end end end
 C_Timer = { After = function(_, fn) fn() end, NewTicker = function() return { Cancel = function() end } end }
 W = {}
-W.__index = function(t, k) return rawget(W, k) or function() return setmetatable({}, W) end end
+-- only a method (a capital first letter) is made up: a field the addon never set is nil, as in the game
+W.__index = function(t, k) local v = rawget(W, k) if v ~= nil then return v end if type(k) == "string" and k:match("^%u") then return function() return setmetatable({}, W) end end end
 function W:SetShown(on) rawset(self, "shown", on and true or false) end
 function W:Show() rawset(self, "shown", true) end
 function W:Hide() rawset(self, "shown", false) end

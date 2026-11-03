@@ -5618,9 +5618,9 @@ function RefreshBuilds()
             b.rank:SetText(have > 0 and (have .. "/" .. n[2]) or got > 0 and (got .. "/" .. n[2]) or "")
             b.rank:SetTextColor(unpack(have > 0 and S.C.text or S.C.sub))
             b.edge:Color(have > 0 and S.C.boxOn or got > 0 and S.C.boxLine or S.C.line)
-            b.spell, b.levels, b.max = n[1], levels[node] or false, n[2]
+            b.spell, b.levels, b.max = n[1], levels[node], n[2]
             b.node, b.got = node, got
-            b.mine = mine and mine[node] or false
+            b.mine = mine and mine[node]
             b:Show()
         end
     end

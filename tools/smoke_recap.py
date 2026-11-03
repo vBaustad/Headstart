@@ -18,8 +18,8 @@ FRAMES, AFTER, SAID = {}, {}, {}
 local F = {}
 F.__index = function(t, k)
     if F[k] then return F[k] end
-    return function() end                 -- any widget method: nothing
-end
+    if type(k) == "string" and k:match("^%u") then return function() end end   -- any widget method: nothing
+end                                       -- (a field the addon never set is nil, as in the game)
 function F:RegisterEvent(e) local ev = rawget(self, "ev") or {} rawset(self, "ev", ev) ev[e] = true end
 function F:RegisterUnitEvent(e, ...) local ev = rawget(self, "ev") or {} rawset(self, "ev", ev) ev[e] = { ... } end
 function F:UnregisterAllEvents() self.ev = {} end

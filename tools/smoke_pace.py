@@ -39,9 +39,10 @@ C_QuestLog = {
     GetTitleForQuestID = function(q) return TITLE[q] end,
 }
 function GetQuestLogRewardXP(q) return REWARD[q] or 0 end
--- frames: what is set can be read back
+-- frames: what is set can be read back; only a method (a capital first letter) is made up, a field the addon never
+-- set is nil, as in the game
 local F = {}
-F.__index = function(t, k) return rawget(F, k) or function() end end
+F.__index = function(t, k) local v = rawget(F, k) if v ~= nil then return v end if type(k) == "string" and k:match("^%u") then return function() end end end
 function F:CreateFontString() return setmetatable({}, F) end
 function F:Show() rawset(self, "shown", true) end
 function F:Hide() rawset(self, "shown", false) end

@@ -72,9 +72,10 @@ YR = { QoLOn = function() return true end, Open = function(v) return v end, Prin
     Part = function(want, events, handler, opt) PART = { want = want, handler = handler, opt = opt } return PART end,
     LoadWindow = function() return true end, ApplyParts = function() end }
 HeadstartNS = YR
--- frames for the window: anything asked of them is there and does nothing, what is set can be read back
+-- frames for the window: any method asked of them is there and does nothing, what is set can be read back - and a
+-- field the addon never set is nil, as in the game (only a capital first letter is made up)
 local F = {}
-F.__index = function(t, k) return rawget(F, k) or function() end end
+F.__index = function(t, k) local v = rawget(F, k) if v ~= nil then return v end if type(k) == "string" and k:match("^%u") then return function() end end end
 function F:CreateTexture() return setmetatable({}, F) end
 function F:CreateFontString() return setmetatable({}, F) end
 function F:CreateAnimationGroup() return setmetatable({}, F) end

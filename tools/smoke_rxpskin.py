@@ -16,7 +16,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 FAKE = r'''
 local Obj = {}
-Obj.__index = function(t, k) return rawget(Obj, k) or function() return setmetatable({}, Obj) end end
+-- only a method (a capital first letter) is made up: a field the addon never set is nil, as in the game
+Obj.__index = function(t, k) local v = rawget(Obj, k) if v ~= nil then return v end if type(k) == "string" and k:match("^%u") then return function() return setmetatable({}, Obj) end end end
 function Obj:SetColorTexture(r, g, b, a) rawset(self, "colour", { r, g, b, a }) rawset(self, "atlas", nil) end
 function Obj:SetAtlas(name) rawset(self, "atlas", name) end
 function Obj:SetTexture(path) rawset(self, "file", path) rawset(self, "atlas", nil) end

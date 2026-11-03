@@ -16,7 +16,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 FAKE = r"""
 local Obj = {}
-Obj.__index = function(t, k) return rawget(Obj, k) or function() return setmetatable({}, Obj) end end
+-- only a method (a capital first letter) is made up: a field the addon never set is nil, as in the game
+Obj.__index = function(t, k) local v = rawget(Obj, k) if v ~= nil then return v end if type(k) == "string" and k:match("^%u") then return function() return setmetatable({}, Obj) end end end
 WRITES = {}
 Obj.__newindex = function(t, k, v) if rawget(t, "blizzard") then WRITES[#WRITES + 1] = tostring(k) end rawset(t, k, v) end
 function Obj:SetPoint(...) local p = rawget(self, "points") or {} p[#p + 1] = { ... } rawset(self, "points", p) end
