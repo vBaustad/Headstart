@@ -64,7 +64,7 @@ local OPTION_DEFAULTS = {
     mouseover = "Purify",
     macros = true, autofeed = true, items = false,
     clearBars = true, clearMacros = true,
-    settings = true, editMode = true, barVisibility = true, guide = true, noAutoPush = true,
+    settings = true, editMode = true, barVisibility = true, guide = true,
     swap = true, popup = true, chat = true, camera = true, keys = true,
     graphics = true,
 }
@@ -1435,15 +1435,6 @@ local function MacroIndex()
     return index
 end
 
--- Blizzard drops every newly learned spell onto the first empty bar slot; with the bars set up from the
--- main that only makes duplicates. Turned off on every set-up character (the setting may be per character).
-local function NoAutoPush()
-    local cur = C_CVar.GetCVar("AutoPushSpellToActionBar")
-    if cur == nil then return false end
-    if cur ~= "0" then C_CVar.SetCVar("AutoPushSpellToActionBar", "0") end
-    return true
-end
-
 --- How many character macros a layout takes with these options, and the game's limit (30 a character on
 --- Forever, MacroConstants). Each different macro counts once: your own macros, mouseover spells, and the
 --- class spells your Spell buttons choice makes into macros (all of them, or only those not learned
@@ -1890,11 +1881,6 @@ function YS:Apply(force, only, how)
         end
         -- The planner's apply and "Bars only" stop here: no game setting, Edit Mode, chat window, camera
         -- or RestedXP guide is touched on a character in play.
-        -- Blizzard's own placing of new spells is stopped by every apply, the bars-only ones too: it stayed
-        -- on until the next login there, and each spell trained in that first session was placed twice.
-        if o.noAutoPush and not NoAutoPush() and not (only or how.barsOnly) then
-            Print("this client has no setting for Blizzard placing new spells on the bars, so it may still add duplicates.")
-        end
         YippSetupCharDB.hold = nil
         if full then YS.Hold("the macro list was full, so not every button is on") end
         -- (for /ysetup debug: what a new character's bars took)
@@ -2711,7 +2697,6 @@ f:SetScript("OnEvent", function(self, event, arg1, arg2)
         C_Timer.After(3, FillInUI)
         C_Timer.After(4, ChangedElsewhere)
         C_Timer.After(6, YS.UISettle)
-        if YippSetupCharDB.applied and YS:Options().noAutoPush and not InCombatLockdown() then NoAutoPush() end
     elseif event == "ACTIVE_TALENT_GROUP_CHANGED" then
         if YS.OnSpecChanged then YS.OnSpecChanged(arg1, arg2) end
     elseif event == "ACTIONBAR_SLOT_CHANGED" then

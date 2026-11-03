@@ -182,8 +182,8 @@ print(("ok  " if ok else "FAIL"), "a class set up for the first time: Only spell
 bad_default = not ok
 YS.Options(YS).spellButtons = "placeholder"
 YS.Apply(YS, None, None, SURE)
-ok = g.CVARS.AutoPushSpellToActionBar == "0"
-print(("ok  " if ok else "FAIL"), "Blizzard's auto-placing of new spells turned off")
+ok = g.CVARS.AutoPushSpellToActionBar == "1"
+print(("ok  " if ok else "FAIL"), "the game's own setting for placing new spells is left as it is (the game no longer places them)")
 bad_autopush = not ok
 ui_line = g.PRINTS[len(g.PRINTS) - 1]
 print(ui_line)
@@ -1953,10 +1953,10 @@ YS.Hold("again")
 report(g.YippSetupCharDB.hold == "the profile it was on was deleted", "said once: a second reason does not replace the first")
 YS.Scan(YS)
 report(g.YippSetupCharDB.hold is None and not same(YS.Profile(YS), before), "saved by hand: these bars are the profile, and the hold is off")
-# Blizzard's own placing of new spells is stopped by a bars-only apply too
+# ... and a bars-only apply leaves it alone too
 lua.execute('CVARS.AutoPushSpellToActionBar = "1"')
 YS.Apply(YS, None, None, lua.eval("{ sure = true, barsOnly = true }"))
-report(g.CVARS.AutoPushSpellToActionBar == "0", f"Bars only: Blizzard's own placing of new spells is stopped at once, not at the next login ({g.CVARS.AutoPushSpellToActionBar})")
+report(g.CVARS.AutoPushSpellToActionBar == "1", f"Bars only: the game's own setting is left alone ({g.CVARS.AutoPushSpellToActionBar})")
 
 # Put back everything (General page, Character setup, /headstart putback): this character as it was before
 # Headstart first changed it - the bars only where Headstart changed them, the interface only where one went on

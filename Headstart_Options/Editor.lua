@@ -1911,8 +1911,6 @@ local function BuildSetup(page)
     function mo:Refresh() if not self:HasFocus() then self:SetValue(o().mouseover) end end
     Row("Mouseover macros", mo, "Spells listed here are placed as /cast [@mouseover] macros: cast on the unit under your mouse,"
         .. " otherwise on yourself. Separate names with commas.")
-    Row("Stop automatic spell placement", Sw("noAutoPush"), "Stops Blizzard from putting new spells on the first empty button, which creates duplicates on"
-        .. " planned bars.")
 
     Section("Macros and items", nil, { icon = 134394 })
     Row("Your own macros", Sw("macros"))
