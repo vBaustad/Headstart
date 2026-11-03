@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.11.2
 
 - **Talents: plan your own build (new).** On the Talents page, pick Your own build: click a talent to add a point and right-click to take its last one off, and the order by level fills in as you go. The game's rules hold at every point - 5 points a row in a tree before the next, a talent another needs at full rank first, 51 points - and a talent's tooltip says why one can't be taken yet. Start from one of Headstart's builds or clear it; one build a class, for the account. Follow it like Headstart's, and the talent points notice says which talent is next.
 - **The druid's levelling build takes Furor.** With all five ranks, going back to Cat Form gives you back your energy, plus more for the time you spent healing or casting, and the build had none of it. It also drops Shredding Attacks, because you are rarely behind what you fight alone, Thick Hide and Natural Shapeshifter, keeps one point of Ferocity where it had five, and takes Feral Instinct, Feral Charge, Primal Bite and a second rank of Nature's Reach. It ends at 9/32/10.
