@@ -51,7 +51,7 @@ local ACTS = { { "mailAuto", "mail to another character" }, { "restock", "restoc
 -- What the addon reads as a table: anything else under these names, and the login stopped at it.
 local TABLES = { custom = true, myRoutes = true, extra = true, swing = true, xpbar = true, trainer = true, rewardClasses = true,
     mailTo = true, mailCustom = true, restockCustom = true, restockCounts = true, minimap = true, anchor = true,
-    windowScale = true, trainerCosts = true, kept = true, cardOn = true }
+    windowScale = true, trainerCosts = true, kept = true, cardOn = true, workoutDone = true }
 local DROP_SETUP = { uiPrev = true }
 local MAX_LINES, MAX_DEPTH = 400000, 40
 

@@ -9,7 +9,7 @@
 --   Placing one: Ctrl+click on the world map (the game's own), or /headstart way 45 62 in the zone you're in;
 --   /headstart way alone takes it away.
 --   Follow RestedXP's arrow (waypointRXP): the next stop stands in the world - a map pin where RestedXP's arrow
---   points, as Naowh Forever does it (see below). A quest you track yourself is shown over its NPC.
+--   points (see below). A quest you track yourself is shown over its NPC.
 --   Over the NPC: where the NPC the RestedXP step is at has a nameplate on the screen (friendly NPC plates on, in
 --   the game's own settings - this doesn't turn them on), the marker stands over that plate - right over the NPC's
 --   "?" or "!", as near or far as it is - and stays there while you stand at the NPC, where the game takes the pin
@@ -304,7 +304,7 @@ local function Current() return C_Navigation and C_Navigation.GetFrame and C_Nav
 -- A pin put with Ctrl+click on the world map is put untracked - the map's own code takes the tracking off right
 -- after it - and only what the game tracks has a spot on the screen. So a new pin is tracked here: a frame
 -- later with the map shut, or as the map shuts (tracking it with the map open would be ours inside the map's
--- code). One already tracked is left as it is. (Found in Naowh Forever's notes, 2026-10-16.)
+-- code). One already tracked is left as it is.
 local trackOnShut, mapHooked = false, false
 local function TrackPin()
     trackOnShut = false
@@ -423,8 +423,8 @@ end
 
 -- ---------------------------------------------------------------------------
 -- Following RestedXP's arrow: a map pin where RestedXP's arrow points - the step you're on - set again when that
--- moves. One thing, done the same way every time, as Naowh Forever does it (the owner, 2026-10-20: "Naowh Forever
--- is very consistent", choosing that over a marker that stands still in a jump).
+-- moves. One thing, done the same way every time (the owner, 2026-10-20, choosing that over a marker that stands
+-- still in a jump).
 --   For a while (2026-10-16 to 10-20) a step at a quest giver had the step's quest tracked instead: the game's own
 --   spot for a quest's NPC stays put in a jump, where a map pin's rises with you. But the game shows and hides
 --   that spot by itself - gone as you came near the NPC, gone and back around a hand-in - and the marker went with

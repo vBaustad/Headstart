@@ -77,8 +77,7 @@ local function Place()
     end
 end
 
--- The card (the owner, 2026-10-20: "it works very well, but it's very like Naowh Forever's - redesign it so it's
--- less copy-paste, and bring in the land button and hide Blizzard's"). Where you are going first, in large
+-- The card (redesigned 2026-10-20, with the land button in it and Blizzard's hidden). Where you are going first, in large
 -- letters, and where from under it; at the left a ring round your portrait (or your side's flight mount) that
 -- fills as the flight goes - the game's own cooldown sweep, which draws itself: nothing is moved each frame; at
 -- the right the time left and the clock time you land; and Land as a stub of its own at the card's right end,

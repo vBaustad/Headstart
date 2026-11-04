@@ -255,8 +255,8 @@ LOOKS.marker = {
 -- each coming and going somewhere else in a column that falls from the plate - over an NPC's head, over an object - down
 -- over it (s: the size; top and span: where the column starts under the plate and how far it reaches, width: how wide,
 -- in s). Each has a small white heart, so they read on any ground; an orange mist behind them, the column's size (wider
--- and more orange once seen in the game: "a bit wider maybe, and more orange mist - or just more orange"). (Naowh Forever's are silver, on a plate you can
--- see: ours are orange, and no friendly plate shows - the owner, 2026-10-21: "not the same as theirs".)
+-- and more orange once seen in the game: "a bit wider maybe, and more orange mist - or just more orange"). No friendly plate
+-- shows with them.
 --   An NPC: from just under its plate, over its body. An object: from under its line, farther - a small one lies well
 --   under its plate when near, and closer to it far off.
 local SPARKS = 16
@@ -490,7 +490,7 @@ local function ApplyLoot()
 end
 -- The interact key (SoftTargetInteract) is the game's "Enable Interact Key": turned off by you while Glimmer is on, it
 -- stays off - written down (glimmerKeyOff) and not turned on again at the next login, as it was at every one until
--- 2026-10-21 (Naowh Forever found the same and stopped). Nothing lights while it is off; the card says so, with a
+-- 2026-10-21. Nothing lights while it is off; the card says so, with a
 -- button that turns it on (YR.GlimmerInteractKeyOn).
 local KEY_CVAR = "SoftTargetInteract"
 local function ApplySettings()

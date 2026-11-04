@@ -2778,6 +2778,49 @@ local BuildReminders = QoLPage("reminders", function(L, c, Section, Row, Opt)
         Row("About the screenshot", S.Text(c, 12, S.C.muted),
             "Takes a screenshot a moment after you level, so the animation is in it. Saved in your"
             .. " Screenshots folder.")
+        -- (Workout.lua; the owner, 2026-11-04: "for a little exercise, and for fun")
+        Section("Level-up workout", "exercise every time you level", { icon = 136101,
+            find = "workout exercise training fitness push-ups pushups squats sit-ups situps ding",
+            master = { Opt("workout"), function(on) YippRouteDB.workout = on YR.ApplyParts() end } })
+        Row("About the workout", S.Text(c, 12, S.C.muted),
+            "For fun and a little exercise: when you level, a small window says how many to do. Click Done when they are"
+            .. " done. The x puts it away until your next level, and what you owe adds up. It waits for a fight to end, and"
+            .. " moves in Arrange on screen.")
+        local KINDS = { { "pushups", "Push-ups" }, { "squats", "Squats" }, { "situps", "Sit-ups" }, { "turns", "In turn, one a level" } }
+        local kinds
+        kinds = S.Dropdown(c, 190, KINDS, function(v)
+            YippRouteDB.workoutKind = v ~= "pushups" and v or nil
+            kinds:Refresh()
+        end)
+        function kinds:Refresh()
+            local now = YippRouteDB.workoutKind or "pushups"
+            for _, o in ipairs(KINDS) do if o[1] == now then self:SetValue(o[2]) end end
+        end
+        Row("Exercise", kinds, "In turn: push-ups, squats and sit-ups, one after the other as you level.")
+        local COUNTS = { { "level", "Your new level" }, { "half", "Half your new level" }, { "stamina", "Stamina gained, times 10" } }
+        local counts
+        counts = S.Dropdown(c, 190, COUNTS, function(v)
+            YippRouteDB.workoutCount = v ~= "level" and v or nil
+            counts:Refresh()
+        end)
+        function counts:Refresh()
+            local now = YippRouteDB.workoutCount or "level"
+            for _, o in ipairs(COUNTS) do if o[1] == now then self:SetValue(o[2]) end end
+        end
+        Row("How many", counts, "Your new level: 23 at level 23, about 1,800 in all from 1 to 60. Half: about 900 in all."
+            .. " Stamina: ten for each point of Stamina the level gave you.")
+        local tally = S.Text(c, 12, S.C.sub)
+        tally:SetJustifyH("RIGHT")
+        tally:SetWidth(320)
+        function tally:Refresh()
+            local mine, all = YR.WorkoutDone()
+            local here, every = YR.WorkoutDoneWords(mine), YR.WorkoutDoneWords(all)
+            if here and every and every ~= here then self:SetText("Here " .. here .. "  ·  all " .. every)
+            else self:SetText(here or (every and ("Other characters: " .. every)) or "None yet") end
+        end
+        Row("Done so far", tally, "What you clicked Done on: this character, and all your characters together.")
+        Row("Work out now", S.Button(c, "Open", function() YR.WorkoutNow() end, nil, 90),
+            "Shows the window now: what you owe, or one for your level. Also /headstart workout.")
 end)
 
 local BuildRecap = QoLPage("recap", function(L, c, Section, Row, Opt)
@@ -4240,8 +4283,8 @@ end)
 
 -- General: what is about no one thing you do - the game's cinematics, and Headstart itself (its minimap button,
 -- the colour of its windows). The owner looked for Skip cinematics under Bars & windows and would never have
--- found it there (2026-10-14); Leatrix Plus keeps such things on pages of their own too ("System" and
--- "Settings"). First in the menu after All features, under no group: where you look for what fits nowhere.
+-- found it there (2026-10-14). First in the menu after All features, under no group: where you look for what fits
+-- nowhere.
 local BuildGeneral = QoLPage("general", function(L, c, Section, Row, Opt)
         Section("Intro cinematic", "skipped on a new character", { find = "skip cinematic intro movie opening", icon = 133885,
             master = { Opt("skipCinematic"), function(on) YippRouteDB.skipCinematic = on end } })
@@ -4352,6 +4395,8 @@ local function HomeFeatures()
                 Toggle("craftRemind")),
             F(134441, "Level-up screenshot", "A screenshot every time you level.", "reminders", "Level-up screenshot",
                 Toggle("levelShot")),
+            F(136101, "Level-up workout", "Push-ups when you level, for fun and fitness.", "reminders", "Level-up workout",
+                Toggle("workout", function() YR.ApplyParts() end)),
             F(134237, "Instance tracker", "Dungeon entries counted against the limits.", "instances", "Instance tracker",
                 Toggle("instanceTrack", function() if YR.InstanceHudApply then YR.InstanceHudApply() end end)),
             talents,
@@ -4708,7 +4753,7 @@ function YR.SettingsMenuFits() return settings.navBottom, PH end
 -- QoL, what Headstart does for you:
 --   Levelling       the quest helpers, sharing and rewards; the journey and its timers; reminders; instances
 --   Automation      what acts for you: the class trainer, restock, the bank and mail
---                   (Leatrix Plus opens on its Automation page too; nothing on without the player knowing)
+--                   (nothing on without the player knowing)
 --   Loot & gear     Glimmer, the loot feed and log, upgrades, your other characters
 --   Social          chat; invites, the Invite and Leave buttons and the quest group finder
 --   Headstart       General: cinematics, Headstart's minimap button, the colour of its windows (last: not a feature)
@@ -4741,8 +4786,8 @@ local CATEGORIES = {
       scope = "Every character; each has its own journey",
       desc = "Your road as a story, the flight and boat timers, and the camp icon." },
     { key = "reminders", label = "Reminders", build = BuildReminders, refresh = QoLRefresh("reminders"), icon = 134376,
-      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") end, scope = "Every character on this account",
-      desc = "Said when something needs doing: the trainer, talent points to spend (on screen), repairs, items to craft." },
+      status = function() return YR.Option("remindTrainer") or YR.Option("remindTalents") or YR.Option("durability") or YR.Option("craftRemind") or YR.Option("levelShot") or YR.Option("workout") end, scope = "Every character on this account",
+      desc = "Said when something needs doing: the trainer, talent points to spend (on screen), repairs, items to craft, a workout as you level." },
     { key = "instances", label = "Instance tracker", build = BuildInstanceSettings, refresh = RefreshInstances, icon = 134237,
       status = function() return YR.Option("instanceTrack") end, scope = "Every character on this account",
       desc = "The dungeons and raids you entered this hour and today, against the limits." },

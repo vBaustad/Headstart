@@ -10,7 +10,7 @@ end
 
 --- Something Headstart did that can taint Blizzard's action bars until the next reload - Character setup putting
 --- spells, items or macros on them, or changing which bars show or the Edit Mode layout the old way - written down
---- with when (seconds, as BugGrabber keeps its errors) and on whom, in YippRouteDB.taintLog (the last 40). The
+--- with when (the clock time, in seconds) and on whom, in YippRouteDB.taintLog (the last 40). The
 --- owner met "Headstart tried to call the protected function MultiBarBottomLeftButton1:SetShown()" in a fight
 --- (2026-10-20), and nothing told what had come before it; with this the two times can be laid side by side. The
 --- same thing again within ten seconds is the line before, counted.
@@ -291,6 +291,7 @@ local STARTS_OFF = { autoTrain = true, restock = true, bankAuto = true, levelSho
     questSkip = true,                       -- (Skip quest in RestedXP's step menu, QuestSkip.lua)
     editModeOutline = true,                 -- (outlines for Edit Mode's sheets, EditModeLook.lua)
     craftRemind = true,                     -- (the craftable items line in chat, CraftRemind.lua)
+    workout = true,                         -- (the level-up workout window, Workout.lua)
     bankButton = true, mailButton = true, deathSkipRelease = true, skipQuests = true, groupShare = true, groupAccept = true }
 YR.STARTS_OFF = STARTS_OFF
 
@@ -694,6 +695,9 @@ SlashCmdList.HEADSTART = function(msg)
         YR.RepairDebug()
     elseif cmd == "boats" then
         YR.BoatsCommand(arg)
+    elseif cmd == "workout" then
+        -- the level-up workout's window now: what you owe, or one for your level (Workout.lua)
+        YR.WorkoutNow()
     elseif cmd == "putback" then
         YR.AskPutBack()
     elseif cmd == "range" then
@@ -936,6 +940,7 @@ f:SetScript("OnEvent", function(_, event, name)
     Start(YR.StartMail)
     Start(YR.StartRestock)
     Start(YR.StartReminders)
+    Start(YR.StartWorkout)
     Start(YR.StartWhisper)
     Start(YR.StartSim)
     Start(YR.StartUpgrades)

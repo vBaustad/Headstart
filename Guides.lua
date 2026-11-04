@@ -97,7 +97,7 @@ end
 
 -- RestedXP's "go to" icon (in front of every ".goto ... >> text" line) is a crop of the minimap POI
 -- sheet that comes out as a red smudge on Forever (the user, 2026-10-03: "the icon is just so ugly").
--- Ours instead while the routes are on: a map pin (art/pin.tga), grey like RestedXP's talk bubble.
+-- Ours instead while the routes are on: a map pin (art/pin.tga), in grey.
 -- RestedXP reads the icon each time it draws the window, so setting it before its guides load is enough.
 local PIN = "|TInterface\\AddOns\\Headstart\\art\\pin:0:0:0:0:64:64:0:64:0:64:210:210:210|t"
 function YR.RxpIcons()

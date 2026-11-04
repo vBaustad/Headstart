@@ -183,7 +183,7 @@ S.Rounded = Rounded
 
 --- A texture drawn where it falls, not snapped to the screen's pixel grid: a small shape scaled down from a larger
 --- texture stays round and sharp (snapped, the switch and its knob were soft and uneven: the owner, 2026-10-21, "feels
---- so low resolution" - Naowh Forever draws its own so).
+--- so low resolution").
 function S.Smooth(tex)
     if tex.SetTexelSnappingBias then tex:SetTexelSnappingBias(0) end
     if tex.SetSnapToPixelGrid then tex:SetSnapToPixelGrid(false) end

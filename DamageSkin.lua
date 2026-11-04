@@ -4,8 +4,8 @@
 --   pushes the title onto two lines, the title sits in the middle of nowhere, and the three buttons are
 --   three different things at three different sizes.
 --   Both looks lay the top bar out the same way: the title (the kind of meter)
---   at the left on one line; at the right the fight's timer and one row of small plain icons, as
---   Details has them: what it shows, which fight, reset, settings, minimise.
+--   at the left on one line; at the right the fight's timer and one row of small plain icons:
+--   what it shows, which fight, reset, settings, minimise.
 --     Headstart: a flat dark card with a thin outline, the title in the accent with a line under the
 --     bar. The frame's colour and the accent are yours to pick (or the accent is your class colour).
 --     Blizzard: the game's dark frame fill, its thin panel round the window, the title in gold.
@@ -126,7 +126,7 @@ end
 -- A button with a face of ours. Blizzard's buttons each bring their own art at its own size (a boxed
 -- letter, a small gear, a red square, a large yellow arrow box): sized alike they still look like four
 -- different things. So their art is made clear (the button itself, and what a click on it does, is
--- untouched) and each gets one plain icon of ours in the look's colour, the way Details has its row:
+-- untouched) and each gets one plain icon of ours in the look's colour, in one row:
 --   "bars"  what the meter shows (damage, healing, ...): Blizzard's type dropdown
 --   letter  which fight (C this one, O all of them): Blizzard's session dropdown, its own letter kept
 --   "reset" clear the meter: a button of ours (Blizzard has this inside its settings menu)

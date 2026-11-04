@@ -5,7 +5,7 @@ local _, YR = ...
 
 YR.TalentBuilds = {
     [1] = {   -- Warrior
-        { key = "level", name = "Levelling: Arms, then Fury", about = "Arms to Mortal Strike with a two-handed weapon, then Fury for crits and Enrage.", points = {
+        { key = "level", name = "Levelling: Arms", about = "Arms to Mortal Strike with a two-handed weapon, then Fury for crits and Enrage.", points = {
             105958, 105958, 105958, 105956, 105956, 105956, 105955, 105955, 105952, 105952,
             105950, 105950, 105950, 105957, 105957, 105948, 105948, 105948, 105947, 105947,
             105945, 105944, 105944, 105944, 105944, 105944, 110858, 110858, 105957, 105957,
@@ -31,7 +31,7 @@ YR.TalentBuilds = {
         } },
     },
     [2] = {   -- Paladin
-        { key = "level", name = "Levelling: Retribution, then Holy", about = "Retribution to Unsealed Wrath with a two-handed weapon, then Holy for Strength and seals, and Protection for Intellect and hit.", points = {
+        { key = "level", name = "Levelling: Retribution", about = "Retribution to Unsealed Wrath with a two-handed weapon, then Holy for Strength and seals, and Protection for Intellect and hit.", points = {
             105706, 105706, 105706, 105706, 105706, 105705, 105705, 105703, 105703, 105703,
             105696, 105699, 105699, 105702, 105702, 105702, 105700, 105707, 105707, 105707,
             105697, 105697, 105697, 105701, 105701, 105701, 105693, 105693, 105693, 105694,
@@ -57,7 +57,7 @@ YR.TalentBuilds = {
         } },
     },
     [3] = {   -- Hunter
-        { key = "level", name = "Levelling: Beast Mastery, then Marksmanship", about = "Beast Mastery to Bestial Wrath - your pet does the work - then Marksmanship for crits and Trueshot Aura.", points = {
+        { key = "level", name = "Levelling: Beast Mastery", about = "Beast Mastery to Bestial Wrath - your pet does the work - then Marksmanship for crits and Trueshot Aura.", points = {
             104960, 104960, 104960, 104960, 104960, 104975, 104975, 104976, 104976, 104976,
             104969, 104969, 104969, 104969, 104969, 104967, 104967, 104967, 104967, 104967,
             104970, 104964, 104965, 104965, 104976, 104962, 104962, 104962, 104962, 104962,
@@ -75,13 +75,21 @@ YR.TalentBuilds = {
         } },
     },
     [4] = {   -- Rogue
-        { key = "level", name = "Levelling: Combat, then Assassination", about = "Combat to Adrenaline Rush with two weapons - cheaper Sinister Strike and Eviscerate, a cheaper opener - then Assassination for crits.", points = {
-            105741, 105741, 105708, 105708, 105708, 105737, 105737, 105737, 105738, 105738,
-            105759, 105759, 105736, 105736, 113398, 105730, 105730, 105730, 108100, 105726,
-            105726, 105727, 105727, 105727, 105727, 105727, 105728, 113635, 113635, 113398,
-            105724, 105722, 105722, 105722, 105722, 105722, 105723, 105723, 105721, 105721,
-            105721, 105739, 105739, 105739, 105720, 105720, 105716, 105716, 105715, 105713,
-            105713,
+        { key = "level", name = "Levelling: Combat", about = "Sinister Strike with two weapons: Riposte, Composure for a cheaper opener and Flash of Steel for Shank, to Adrenaline Rush - then Assassination for Cold Blood.", points = {
+            105741, 105741, 105723, 105723, 105708, 105708, 105708, 105737, 105737, 105738,
+            105738, 105738, 105735, 105759, 105759, 105737, 105736, 105726, 105726, 105730,
+            105730, 105730, 105728, 113635, 113635, 108100, 105727, 105740, 105740, 105740,
+            105740, 105740, 105724, 105727, 105727, 105727, 105727, 105722, 105722, 105722,
+            105739, 105739, 105739, 105722, 105722, 105720, 105720, 105716, 105716, 105721,
+            105715,
+        } },
+        { key = "level-ambush", name = "Levelling: Subtlety", about = "Ambush from stealth with a big crit chance - Improved Ambush, and Remorseless Attacks after a kill - and Ghostly Strike for a second Ambush out of stealth, then Combat.", points = {
+            105741, 105741, 105723, 105723, 105760, 105760, 105760, 105760, 105760, 105749,
+            105749, 105749, 105761, 105756, 105752, 105752, 105752, 105755, 105755, 105754,
+            105755, 105743, 105756, 105761, 105748, 105746, 105708, 105708, 105708, 105737,
+            105737, 105738, 105738, 105738, 105735, 105759, 105759, 105737, 105736, 105726,
+            105726, 108100, 105736, 105730, 105728, 113635, 113635, 105727, 105727, 105740,
+            105740,
         } },
         { key = "dps", name = "Damage: Assassination", about = "Mutilate with two daggers, poisons, Seal Fate and Venom, with Subtlety's Opportunity and Combat for hit.", points = {
             105722, 105722, 105722, 105722, 105722, 105721, 105721, 105721, 105739, 105739,
@@ -125,7 +133,7 @@ YR.TalentBuilds = {
         } },
     },
     [5] = {   -- Priest
-        { key = "level", name = "Levelling: Shadow, then Discipline", about = "Shadow to Shadowform - Spirit Tap keeps the mana coming - then Discipline for wanding and instants.", points = {
+        { key = "level", name = "Levelling: Shadow", about = "Shadow to Shadowform - Spirit Tap keeps the mana coming - then Discipline for wanding and instants.", points = {
             105833, 105833, 105833, 105833, 105833, 105830, 105830, 105831, 105831, 105831,
             105826, 105825, 105825, 110851, 110851, 105823, 105823, 105823, 105823, 105823,
             105820, 105824, 105831, 105831, 110851, 105818, 105818, 105818, 105818, 105818,
@@ -151,7 +159,7 @@ YR.TalentBuilds = {
         } },
     },
     [7] = {   -- Shaman
-        { key = "level", name = "Levelling: Enhancement, then Elemental", about = "Enhancement to Rage of the Farseer with a two-handed weapon, then Elemental for cheaper, harder shocks.", points = {
+        { key = "level", name = "Levelling: Enhancement", about = "Enhancement to Rage of the Farseer with a two-handed weapon, then Elemental for cheaper, harder shocks.", points = {
             104753, 104753, 104753, 104753, 104753, 104755, 104755, 104755, 104756, 104756,
             104749, 104750, 104750, 104750, 104756, 104747, 104747, 104747, 104747, 104747,
             104743, 104752, 104752, 104744, 104744, 104745, 104742, 104741, 104741, 104741,
@@ -177,7 +185,7 @@ YR.TalentBuilds = {
         } },
     },
     [8] = {   -- Mage
-        { key = "level", name = "Levelling: Frost, then Arcane", about = "Frost to Ice Barrier - slow, freeze and kill - then Arcane for mana and Clearcasting.", points = {
+        { key = "level", name = "Levelling: Frost", about = "Frost to Ice Barrier - slow, freeze and kill - then Arcane for mana and Clearcasting.", points = {
             105779, 105779, 105779, 105779, 105779, 105777, 105777, 105777, 105777, 105777,
             105772, 105772, 105772, 105774, 105774, 105774, 105775, 105775, 105770, 105770,
             105768, 105768, 105768, 105766, 105765, 105763, 105763, 105763, 105763, 105763,
@@ -195,7 +203,7 @@ YR.TalentBuilds = {
         } },
     },
     [9] = {   -- Warlock
-        { key = "level", name = "Levelling: Affliction, then Demonology", about = "Affliction to Wrack - your damage over time does the work - then Demonology for a sturdier pet.", points = {
+        { key = "level", name = "Levelling: Affliction", about = "Affliction to Wrack - your damage over time does the work - then Demonology for a sturdier pet.", points = {
             105924, 105924, 105924, 105924, 105924, 105921, 105921, 105920, 105920, 105920,
             105918, 105918, 105918, 105916, 105919, 105914, 105914, 110876, 110876, 110876,
             105912, 105911, 105911, 105911, 105923, 105910, 105910, 105910, 105910, 105910,
@@ -213,7 +221,7 @@ YR.TalentBuilds = {
         } },
     },
     [11] = {   -- Druid
-        { key = "level", name = "Levelling: Feral Combat, then Restoration", about = "Furor to keep your energy, Feral to Shifting Power and Primal Bite, then Restoration for Naturalist and Balance for Genesis.", points = {
+        { key = "level", name = "Levelling: Feral", about = "Furor to keep your energy, Feral to Shifting Power and Primal Bite, then Restoration for Naturalist and Balance for Genesis.", points = {
             104938, 104939, 104939, 104939, 104939, 104940, 104940, 104940, 104939, 104943,
             104943, 104948, 104948, 104946, 104946, 104951, 104947, 104947, 104944, 104952,
             104955, 104950, 104950, 104952, 104952, 104953, 104953, 104953, 104953, 104953,
@@ -221,7 +229,7 @@ YR.TalentBuilds = {
             104922, 104922, 104924, 104924, 104924, 104924, 104924, 104927, 104927, 104929,
             104929,
         } },
-        { key = "tank", name = "Tank: Feral (bear)", about = "Thick Hide, Natural Reaction and Primal Bite in bear form, with Restoration for Heart of the Wild and Naturalist.", points = {
+        { key = "tank", name = "Tank: Bear", about = "Thick Hide, Natural Reaction and Primal Bite in bear form, with Restoration for Heart of the Wild and Naturalist.", points = {
             104938, 104938, 104938, 104938, 104938, 104939, 104939, 104939, 104939, 104939,
             104942, 104942, 104942, 104943, 104943, 104944, 104946, 104946, 104948, 104948,
             104949, 104952, 104952, 104952, 104947, 104947, 104955, 104950, 104950, 104954,

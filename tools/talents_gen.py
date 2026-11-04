@@ -6,9 +6,8 @@ Writes Data/TalentTrees.lua (every class's tree: three tabs of 7 rows by 4 colum
 and the node it needs at full rank) and Data/TalentBuilds.lua (Headstart's suggested builds: the 51 points in the
 order they are taken, levels 10 to 60). The builds are written below by talent name and checked here against the
 tree as the game has it: 5 points in a tab per row, a needed talent at full rank first, no talent past its ranks,
-51 points. They are Headstart's own suggestions for levelling (the owner, 2026-10-20: "start - I have no builds"),
-and for a role at 60 - tank, healer, damage (ROLE_BUILDS) - with two kinds of exception the owner chose: the druid's
-levelling build is Snupy's (2026-11-02), and the rogue's PvP builds (PVP_BUILDS) are a rogue PvP video's (2026-11-04).
+51 points. They are Headstart's suggested builds for levelling (the owner, 2026-10-20: "start - I have no builds"),
+for a role at 60 - tank, healer, damage (ROLE_BUILDS) - and for PvP (PVP_BUILDS), as the owner chose them.
 """
 import os
 import sys
@@ -32,38 +31,47 @@ ROW_POINTS, POINTS = 5, 51
 # The builds: (talent, points) in the order they are taken; "Tab::Name" where a name is in two tabs.
 # ---------------------------------------------------------------------------------------------------------------
 BUILDS = {
-    1: [("level", "Levelling: Arms, then Fury", "Arms to Mortal Strike with a two-handed weapon, then Fury for crits and Enrage.", [
+    1: [("level", "Levelling: Arms", "Arms to Mortal Strike with a two-handed weapon, then Fury for crits and Enrage.", [
         ("Improved Heroic Strike", 3), ("Improved Rend", 3), ("Improved Charge", 2), ("Improved Overpower", 2),
         ("Deep Wounds", 3), ("Deflection", 2), ("Two-Handed Weapon Specialization", 3), ("Impale", 2),
         ("Sweeping Strikes", 1), ("Weaponmaster", 5), ("Improved Slam", 2), ("Deflection", 2), ("Mortal Strike", 1),
         ("Cruelty", 5), ("Unbridled Wrath", 5), ("Blood Craze", 3), ("Piercing Howl", 1), ("Booming Voice", 1),
         ("Enrage", 5)])],
-    2: [("level", "Levelling: Retribution, then Holy", "Retribution to Unsealed Wrath with a two-handed weapon, then Holy for Strength and seals, and Protection for Intellect and hit.", [
+    2: [("level", "Levelling: Retribution", "Retribution to Unsealed Wrath with a two-handed weapon, then Holy for Strength and seals, and Protection for Intellect and hit.", [
         ("Benediction", 5), ("Improved Judgement", 2), ("Conviction", 3), ("Seal of Command", 1), ("Pursuit of Justice", 2),
         ("Vindication", 3), ("Sacred Arbiter", 1), ("Deflection", 3), ("Retribution::Two-Handed Weapon Specialization", 3),
         ("Sanctified Judgement", 3), ("Vengeance", 3), ("Repentance", 1), ("Unsealed Wrath", 1),
         ("Divine Strength", 5), ("Improved Seals", 5), ("Reverence", 2), ("Divine Intellect", 5), ("Precision", 3)])],
-    3: [("level", "Levelling: Beast Mastery, then Marksmanship", "Beast Mastery to Bestial Wrath - your pet does the work - then Marksmanship for crits and Trueshot Aura.", [
+    3: [("level", "Levelling: Beast Mastery", "Beast Mastery to Bestial Wrath - your pet does the work - then Marksmanship for crits and Trueshot Aura.", [
         ("Deadly Aspects", 5), ("Focused Fire", 2), ("Endurance Training", 3), ("Unleashed Fury", 5), ("Beast Mastery::Ferocity", 5),
         ("Bestial Swiftness", 1), ("Intimidation", 1), ("Spirit Bond", 2), ("Endurance Training", 1), ("Frenzy", 5),
         ("Bestial Wrath", 1),
         ("Lethal Attacks", 5), ("Efficiency", 5), ("Improved Arcane Shot", 5), ("Trueshot Aura", 1), ("Rapid Killing", 2),
         ("Hawk Eye", 2)])],
-    # (the tree of the night before launch: Efficient Strikes for a cheaper Sinister Strike, Composure for the opener
-    # out of combat at full energy, Flawless Execution for a cheaper Eviscerate)
-    4: [("level", "Levelling: Combat, then Assassination", "Combat to Adrenaline Rush with two weapons - cheaper Sinister Strike and Eviscerate, a cheaper opener - then Assassination for crits.", [
-        ("Efficient Strikes", 2), ("Coup de Grace", 3), ("Precision", 3), ("Deflection", 2), ("Composure", 2), ("Endurance", 2),
-        ("Lightning Reflexes", 1), ("Aggression", 3), ("Flawless Execution", 1), ("Weapon Expertise", 2), ("Hack and Slash", 5),
-        ("Blade Flurry", 1), ("Dual Wield Specialization", 2), ("Lightning Reflexes", 1), ("Adrenaline Rush", 1),
-        ("Malice", 5), ("Remorseless Attacks", 2), ("Ruthlessness", 3), ("Improved Slice and Dice", 3), ("Vigor", 2),
-        ("Lethality", 2), ("Cold Blood", 1), ("Improved Poisons", 2)])],
-    5: [("level", "Levelling: Shadow, then Discipline", "Shadow to Shadowform - Spirit Tap keeps the mana coming - then Discipline for wanding and instants.", [
+    # (the owner's choice, 2026-11-04: two levelling builds for the tree of the night before launch, Combat and Subtlety
+    # for Ambush)
+    4: [("level", "Levelling: Combat", "Sinister Strike with two weapons: Riposte, Composure for a cheaper opener and Flash of Steel for Shank, to Adrenaline Rush - then Assassination for Cold Blood.", [
+        ("Efficient Strikes", 2), ("Remorseless Attacks", 2), ("Coup de Grace", 3), ("Precision", 2), ("Deflection", 3),
+        ("Riposte", 1), ("Composure", 2), ("Precision", 1), ("Endurance", 1), ("Weapon Expertise", 2), ("Aggression", 3),
+        ("Blade Flurry", 1), ("Dual Wield Specialization", 2), ("Flawless Execution", 1), ("Hack and Slash", 1),
+        ("Flash of Steel", 5), ("Adrenaline Rush", 1), ("Hack and Slash", 4),
+        ("Malice", 3), ("Improved Slice and Dice", 3), ("Malice", 2), ("Vigor", 2), ("Lethality", 2), ("Ruthlessness", 1),
+        ("Cold Blood", 1)]),
+        ("level-ambush", "Levelling: Subtlety", "Ambush from stealth with a big crit chance - Improved Ambush, and Remorseless Attacks after a kill - and Ghostly Strike for a second Ambush out of stealth, then Combat.", [
+        ("Efficient Strikes", 2), ("Remorseless Attacks", 2), ("Opportunity", 5), ("Improved Ambush", 3),
+        ("Master of Deception", 1), ("Camouflage", 1), ("Serrated Blades", 3), ("Initiative", 2), ("Ghostly Strike", 1),
+        ("Initiative", 1), ("Premeditation", 1), ("Camouflage", 1), ("Master of Deception", 1), ("Hemorrhage", 1),
+        ("Preparation", 1),
+        ("Coup de Grace", 3), ("Precision", 2), ("Deflection", 3), ("Riposte", 1), ("Composure", 2), ("Precision", 1),
+        ("Endurance", 1), ("Weapon Expertise", 2), ("Flawless Execution", 1), ("Endurance", 1), ("Aggression", 1),
+        ("Blade Flurry", 1), ("Dual Wield Specialization", 2), ("Hack and Slash", 2), ("Flash of Steel", 2)])],
+    5: [("level", "Levelling: Shadow", "Shadow to Shadowform - Spirit Tap keeps the mana coming - then Discipline for wanding and instants.", [
         ("Spirit Tap", 5), ("Improved Shadow Word: Pain", 2), ("Improved Mind Blast", 3), ("Mind Flay", 1),
         ("Improved Mind Flay", 2), ("Shadow Focus", 2), ("Dark Inspiration", 5), ("Vampiric Embrace", 1), ("Silence", 1),
         ("Improved Mind Blast", 2), ("Shadow Focus", 1), ("Darkness", 5), ("Shadowform", 1),
         ("Wand Specialization", 2), ("Twin Disciplines", 5), ("Mental Strength", 3), ("Meditation", 3),
         ("Improved Power Word: Shield", 2), ("Inner Focus", 1), ("Improved Inner Fire", 3), ("Mental Strength", 1)])],
-    7: [("level", "Levelling: Enhancement, then Elemental", "Enhancement to Rage of the Farseer with a two-handed weapon, then Elemental for cheaper, harder shocks.", [
+    7: [("level", "Levelling: Enhancement", "Enhancement to Rage of the Farseer with a two-handed weapon, then Elemental for cheaper, harder shocks.", [
         # (Improved Ghost Wolf went down to the fourth row on 70755: it comes after Stormstrike, and two more Ancestral
         # Knowledge fill the first rows where it was)
         ("Thundering Strikes", 5), ("Mental Dexterity", 3), ("Ancestral Knowledge", 2), ("Shamanistic Focus", 1),
@@ -71,19 +79,19 @@ BUILDS = {
         ("Mental Quickness", 2), ("Spirit Weapons", 1), ("Improved Stormstrike", 1), ("Maelstrom Weapon", 5), ("Rage of the Farseer", 1),
         ("Convection", 5), ("Concussion", 5), ("Call of Flame", 3), ("Elemental Focus", 1), ("Reverberation", 1),
         ("Eye of the Storm", 3)])],
-    8: [("level", "Levelling: Frost, then Arcane", "Frost to Ice Barrier - slow, freeze and kill - then Arcane for mana and Clearcasting.", [
+    8: [("level", "Levelling: Frost", "Frost to Ice Barrier - slow, freeze and kill - then Arcane for mana and Clearcasting.", [
         ("Improved Frostbolt", 5), ("Ice Shards", 5), ("Frost Channeling", 3), ("Frostbite", 3), ("Improved Frost Nova", 2),
         ("Arctic Reach", 2), ("Shatter", 3), ("Cold Snap", 1), ("Improved Cone of Cold", 1), ("Winter's Chill", 5),
         ("Ice Barrier", 1),
         ("Arcane::Wand Specialization", 2), ("Arcane Resilience", 3), ("Arcane Concentration", 5), ("Arcane Impact", 3),
         ("Arcane Geometry", 2), ("Arcane Meditation", 3), ("Magic Absorption", 2)])],
-    9: [("level", "Levelling: Affliction, then Demonology", "Affliction to Wrack - your damage over time does the work - then Demonology for a sturdier pet.", [
+    9: [("level", "Levelling: Affliction", "Affliction to Wrack - your damage over time does the work - then Demonology for a sturdier pet.", [
         ("Improved Corruption", 5), ("Improved Life Tap", 2), ("Improved Drains", 3), ("Fel Concentration", 3),
         ("Amplify Curse", 1), ("Improved Bane of Agony", 1), ("Nightfall", 2), ("Malevolence", 3), ("Siphon Life", 1),
         ("Soul Siphon", 3), ("Grim Reach", 1), ("Shadow Mastery", 5), ("Wrack", 1),
         ("Demonic Embrace", 5), ("Fel Vitality", 3), ("Improved Voidwalker", 2), ("Demonic Sacrifice", 1),
         ("Master Summoner", 2), ("Unholy Power", 2), ("Fel Domination", 1), ("Unholy Power", 3), ("Demonic Aegis", 1)])],
-    11: [("level", "Levelling: Feral Combat, then Restoration", "Furor to keep your energy, Feral to Shifting Power and Primal Bite, then Restoration for Naturalist and Balance for Genesis.", [
+    11: [("level", "Levelling: Feral", "Furor to keep your energy, Feral to Shifting Power and Primal Bite, then Restoration for Naturalist and Balance for Genesis.", [
         ("Feral Combat::Ferocity", 1), ("Furor", 4), ("Feral Instinct", 3), ("Furor", 1), ("Feral Swiftness", 2),
         ("Savage Fury", 2), ("Sharpened Claws", 2), ("Predatory Discipline", 1), ("Blood Frenzy", 2), ("Feral Charge", 1),
         ("Predatory Strikes", 1), ("Leader of the Pack", 1), ("Natural Instinct", 2), ("Predatory Strikes", 2),
@@ -169,7 +177,7 @@ ROLE_BUILDS = {
         ("Conflagrate", 1), ("Bane of Havoc", 1), ("Fire and Brimstone", 1), ("Shadow and Flame", 5), ("Incinerate", 1),
         ("Suppression", 5), ("Improved Corruption", 5), ("Improved Life Tap", 2), ("Amplify Curse", 1),
         ("Improved Bane of Agony", 2), ("Malevolence", 5)])],
-    11: [("tank", "Tank: Feral (bear)", "Thick Hide, Natural Reaction and Primal Bite in bear form, with Restoration for Heart of the Wild and Naturalist.", [
+    11: [("tank", "Tank: Bear", "Thick Hide, Natural Reaction and Primal Bite in bear form, with Restoration for Heart of the Wild and Naturalist.", [
         ("Feral Combat::Ferocity", 5), ("Furor", 5), ("Thick Hide", 3), ("Feral Swiftness", 2), ("Feral Charge", 1),
         ("Sharpened Claws", 2), ("Savage Fury", 2), ("Lacerate", 1), ("Predatory Strikes", 3), ("Blood Frenzy", 2),
         ("Leader of the Pack", 1), ("Natural Instinct", 2), ("Natural Reaction", 5), ("Rend and Tear", 5), ("Primal Bite", 1),
@@ -188,10 +196,8 @@ ROLE_BUILDS = {
 for _cls, _extra in ROLE_BUILDS.items():
     BUILDS[_cls] = BUILDS[_cls] + _extra
 
-# PvP builds at 60, the owner's choice (2026-11-04): the rogue's four from a rogue PvP video made the day before launch
-# (youtube.com/watch?v=9ufWTwz0Vy0, "Massive Rogue PvP Buffs in WoW: Forever + New Talents"), read point for point from
-# its talent calculator screenshots - backstab, battlegrounds, mutilate, hemorrhage. Each tab's total matched the
-# screenshot's. The video gives only the finished builds: the order here is Headstart's (the build's main tree first).
+# PvP builds at 60, the owner's choice (2026-11-04): the rogue's four - backstab, battlegrounds, mutilate, hemorrhage -
+# each in the order of its main tree first.
 PVP_BUILDS = {
     4: [("pvp-backstab", "PvP: Backstab", "Daggers from stealth: Composure, Shank and Puncturing Wounds for a two-Backstab opener, with two Saps, Cold Blood and Preparation.", [
         ("Opportunity", 3), ("Master of Deception", 2), ("Improved Ambush", 3), ("Dirty Deeds", 2), ("Initiative", 3),

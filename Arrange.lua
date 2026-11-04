@@ -72,6 +72,9 @@ local ITEMS = {
         function() YR.TrainerPopupReset() end, function() YR.TrainerPopupSave() end },
     { "Talent points notice", function() return YR.TalentNoticeFrame and YR.TalentNoticeFrame(true) or nil end,
         function() YR.TalentNoticeReset() end, function() YR.TalentNoticeSave() end },
+    -- (shown with a sample on it while you arrange, so it can be placed before a ding)
+    { "Level-up workout", function() return YR.WorkoutFrame and YR.WorkoutFrame(true) or nil end,
+        function() YR.WorkoutReset() end, function() YR.WorkoutSave() end },
     { "Flight timer", "HeadstartFlightFrame" },
     { "Instance counter", "HeadstartInstanceHud", function() YR.InstanceHudResetPosition() end },
     { "Quest group button", "HeadstartQuestLFGButton", function() YR.QuestLFGResetPosition() end },
@@ -647,6 +650,7 @@ local function Close()
     root:Hide()
     if YR.TalentNoticeFrame then YR.TalentNoticeFrame(false) end        -- (its sample points go with the grid)
     if YR.TrainerPopupFrame then YR.TrainerPopupFrame(false) end
+    if YR.WorkoutFrame then YR.WorkoutFrame(false) end
     if YR.SwingArranging then YR.SwingArranging(false) end              -- (and the combat bars' samples)
 end
 

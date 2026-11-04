@@ -1,4 +1,4 @@
--- Trinkets and gear sets: the useful half of ItemRack, for levelling.
+-- Trinkets and gear sets, for levelling.
 --   * Two trinket buttons on screen. Click one for the trinkets in your bags and click one of those to
 --     put it in that slot; right-click a button to use the trinket in it. A click, not a hover: a list
 --     that opens whenever the mouse goes past is in the way.

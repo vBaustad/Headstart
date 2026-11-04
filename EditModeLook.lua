@@ -1,8 +1,7 @@
 -- Edit Mode outlines: in the game's Edit Mode every element is covered by a large blue sheet (yellow on the one
 -- picked) with its name in large letters across the middle, so with the screen full of them you can't see what you
 -- are placing or what it lines up with (the owner, 2026-10-29: "de svære blå overlays ... umulig å se hvor du
--- plasserer ting"). On, each element is a clean dark block instead, as EllesmereUI's unlock mode draws its own
--- (the owner pointed there; the idea is taken, not the code):
+-- plasserer ting"). On, each element is a clean dark block instead:
 --   at rest     a dark slate block, a one-pixel edge in Headstart's accent, half strength, and the element's name
 --               small in the middle - every element says what it is, and its edges are sharp against anything
 --   the mouse   the edge white

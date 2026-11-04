@@ -4,7 +4,7 @@
 
 Off for a new install, and then nothing of Edit Mode is touched. On: as Edit Mode opens, each element's blue sheet
 (its nine pieces), its mouse-over glow and the large name across it are made clear, and it is a clean dark block
-instead (the idea of EllesmereUI's unlock mode): at rest a dark slate block, a one-pixel edge in the accent at half
+instead: at rest a dark slate block, a one-pixel edge in the accent at half
 strength, its name small in the middle; under the mouse the edge white; picked, the edge the full accent and two
 pixels, the block warmed, the name in the accent and its position in pixels from the screen's middle, counted on
 every frame only while it is dragged. All of it after Blizzard's own ShowHighlighted and ShowSelected (a post-hook:

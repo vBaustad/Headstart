@@ -1531,8 +1531,8 @@ lua.execute("WP.sets = 0 HOOKS.UpdateGotoSteps()")
 check(g.WP.sets == 0, "RestedXP looking again at the same spot: not set again")
 lua.execute("RXP.arrowFrame.element = { zone = 1429, x = 52, y = 47 } HOOKS.UpdateGotoSteps()")
 check(g.WP.sets == 1 and abs(g.WP.set.position.x - 0.52) < 1e-9, "the next step's spot: moved there")
-# a step at an NPC is a pin like any other, RestedXP's spot (the owner, 2026-10-20: "Naowh Forever is very
-# consistent" - the game's own spot for a quest came and went near the NPC and around a hand-in)
+# a step at an NPC is a pin like any other, RestedXP's spot (the owner, 2026-10-20: one thing, the same every time -
+# the game's own spot for a quest came and went near the NPC and around a hand-in)
 lua.execute("""KEPT_LOG_WP, KEPT_LOGIDX_WP, KEPT_AFTER_FOLLOW = LOG, C_QuestLog.GetLogIndexForQuestID, C_Timer.After
     LOG = { { 179, true } }
     C_QuestLog.GetLogIndexForQuestID = function(id) for i, q in ipairs(LOG) do if q[1] == id then return i end end return nil end
@@ -2381,6 +2381,8 @@ import smoke_instances
 bad += smoke_instances.run()
 import smoke_boats
 bad += smoke_boats.run()
+import smoke_workout
+bad += smoke_workout.run()
 import smoke_xpbar
 bad += smoke_xpbar.run()
 import smoke_talentfade

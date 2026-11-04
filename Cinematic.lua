@@ -33,7 +33,7 @@ local function NewCharacter() return (UnitLevel("player") or 1) <= 1 end
 
 -- Not under the login's loading screen. A new character's opening flight starts while the login's loading
 -- screen is still up; ended then, the world was loaded again behind a second loading screen (the user,
--- 2026-10-16: "Naowh Forever skips it without one"). So until that loading screen has gone
+-- 2026-10-16: it should skip without one). So until that loading screen has gone
 -- (LOADING_SCREEN_DISABLED - listened for until then, and no longer) a stop waits for it. Escape, Blizzard's
 -- own way, comes to the same StopCinematic: it is when, not how.
 local inWorld = false           -- the login's loading screen has gone

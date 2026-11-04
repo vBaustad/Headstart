@@ -46,6 +46,7 @@ Data\TalentTrees.lua
 Data\TalentBuilds.lua
 Talents.lua
 Reminders.lua
+Workout.lua
 Whisper.lua
 Sim.lua
 Upgrades.lua

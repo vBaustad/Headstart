@@ -54,6 +54,7 @@ Hold Shift as you open a trainer, vendor, bank or mailbox to do it yourself that
 - **Glimmer:** herbs (with Herbalism), ore (with Mining), chests, quest objects and your fishing bobber light up as you walk up to them, coloured by your chance of a skill-up. Five looks and three colourings, with a preview in the settings; the game's own sparkle on lootable quest items can come back too.
 - **Upgrade notes.** Every item's tooltip says what it would do for you, and an upgrade in your bags gets an Equip button.
 - **Reminders.** Trainer spells waiting and what they cost, talent points to spend, low durability, stones, oils and bandages you could make.
+- **Level-up workout** (off until you turn it on): push-ups, squats or sit-ups as you level - as many as your new level, half of it, or ten a point of Stamina gained - for fun and a little exercise, with a count of what you have done.
 - **Your other characters'** bags, bank and gold.
 - **Chat log** to search and copy from, past sessions included, a whisper sound of your own, and fewer buttons beside chat.
 - **Arrange** (`/hs move`): every bar, button and icon of Headstart's on a grid, moved by dragging, the arrow keys or typed numbers - the one place where they are placed and sized.
