@@ -210,7 +210,7 @@ local RECIPES = {
         { "Chain Heal, mouseover first", "Chain Heal", { mouse = "help", self = true } },
         { "Lesser Healing Wave on your target's target", body = "#showtooltip Lesser Healing Wave\n/cast [@targettarget,help,nodead][help,nodead][@player] Lesser Healing Wave", needs = { "Lesser Healing Wave" }, name = "Tank Heal" },
         { "Nature's Swiftness, then Healing Wave", body = "#showtooltip Healing Wave\n/cast Nature's Swiftness\n/cast [@mouseover,help,nodead][] Healing Wave", needs = { "Nature's Swiftness", "Healing Wave" }, name = "NS Heal" },
-        { "Elemental Mastery, trinkets, then Lightning Bolt", body = "#showtooltip Elemental Mastery\n/use 13\n/use 14\n/cast Elemental Mastery\n/cast Lightning Bolt", needs = { "Elemental Mastery", "Lightning Bolt" }, name = "EM Burst" },
+        { "Lightning Mastery, trinkets, then Lightning Bolt", body = "#showtooltip Lightning Mastery\n/use 13\n/use 14\n/cast Lightning Mastery\n/cast Lightning Bolt", needs = { "Lightning Mastery", "Lightning Bolt" }, name = "LM Burst" },
         { "Purge an enemy, Cure Poison a friend", body = "#showtooltip\n/cast [@mouseover,help,nodead] Cure Poison; [@mouseover,harm,nodead][harm,nodead] Purge; [help,nodead] Cure Poison", needs = { "Purge", "Cure Poison" }, name = "Purge Cure" },
         { "Purge, mouseover first", "Purge", { mouse = "harm" } },
         { "Weapon imbue: Windfury, others on Alt, Ctrl, Shift", body = "#showtooltip\n/cast [mod:alt] Rockbiter Weapon; [mod:ctrl] Flametongue Weapon; [mod:shift] Frostbrand Weapon; Windfury Weapon",
