@@ -1,5 +1,5 @@
 {
- "build": "1.60.1.70707",
+ "build": "1.60.1.70755",
  "classes": {
   "DRUID": {
    "Blood Frenzy": {
@@ -1049,31 +1049,47 @@
     "points": 1
    },
    "Aggression": {
-    "needs": 25,
+    "needs": 15,
     "points": 3
    },
    "Blade Flurry": {
     "needs": 20,
     "points": 1
    },
-   "Camouflage": {
-    "needs": 0,
+   "Blood Splatter": {
+    "needs": 10,
+    "points": 1
+   },
+   "Boot Knife": {
+    "needs": 25,
     "points": 5
+   },
+   "Camouflage": {
+    "needs": 5,
+    "points": 3
    },
    "Cold Blood": {
     "needs": 15,
     "points": 1
    },
-   "Cutthroat": {
-    "needs": 25,
-    "points": 5
+   "Composure": {
+    "needs": 10,
+    "points": 2
+   },
+   "Coup de Grace": {
+    "needs": 0,
+    "points": 3
+   },
+   "Death Mark": {
+    "needs": 30,
+    "points": 1
    },
    "Deflection": {
     "needs": 5,
     "points": 3
    },
    "Dirty Deeds": {
-    "needs": 20,
+    "needs": 5,
     "points": 2
    },
    "Dirty Tricks": {
@@ -1081,23 +1097,31 @@
     "points": 2
    },
    "Dual Wield Specialization": {
-    "needs": 15,
-    "points": 5
+    "needs": 20,
+    "points": 2
+   },
+   "Efficient Strikes": {
+    "needs": 0,
+    "points": 2
    },
    "Elusiveness": {
-    "needs": 5,
+    "needs": 15,
     "points": 2
    },
    "Endurance": {
     "needs": 10,
     "points": 2
    },
+   "Flash of Steel": {
+    "needs": 25,
+    "points": 5
+   },
    "Flawless Execution": {
     "needs": 15,
     "points": 1
    },
    "Ghostly Strike": {
-    "needs": 10,
+    "needs": 15,
     "points": 1
    },
    "Hack and Slash": {
@@ -1105,7 +1129,7 @@
     "points": 5
    },
    "Heightened Senses": {
-    "needs": 15,
+    "needs": 20,
     "points": 2
    },
    "Hemorrhage": {
@@ -1116,16 +1140,8 @@
     "needs": 5,
     "points": 3
    },
-   "Improved Distract": {
-    "needs": 10,
-    "points": 2
-   },
-   "Improved Eviscerate": {
-    "needs": 0,
-    "points": 3
-   },
    "Improved Expose Armor": {
-    "needs": 10,
+    "needs": 5,
     "points": 2
    },
    "Improved Gouge": {
@@ -1144,16 +1160,12 @@
     "needs": 15,
     "points": 5
    },
-   "Improved Sinister Strike": {
-    "needs": 0,
-    "points": 2
-   },
    "Improved Slice and Dice": {
     "needs": 5,
     "points": 3
    },
    "Improved Sprint": {
-    "needs": 10,
+    "needs": 5,
     "points": 2
    },
    "Initiative": {
@@ -1162,7 +1174,7 @@
    },
    "Lethality": {
     "needs": 10,
-    "points": 5
+    "points": 2
    },
    "Lightning Reflexes": {
     "needs": 0,
@@ -1176,24 +1188,20 @@
     "needs": 0,
     "points": 3
    },
-   "Murder": {
-    "needs": 5,
-    "points": 2
-   },
    "Mutilate": {
-    "needs": 20,
+    "needs": 30,
     "points": 1
    },
    "Opportunity": {
     "needs": 0,
-    "points": 2
+    "points": 5
    },
    "Precision": {
     "needs": 5,
     "points": 3
    },
    "Premeditation": {
-    "needs": 15,
+    "needs": 10,
     "points": 1
    },
    "Preparation": {
@@ -1204,13 +1212,13 @@
     "needs": 5,
     "points": 3
    },
-   "Quietus": {
-    "needs": 25,
-    "points": 5
+   "Quick Getaway": {
+    "needs": 15,
+    "points": 2
    },
    "Relentless Strikes": {
-    "needs": 10,
-    "points": 1
+    "needs": 20,
+    "points": 5
    },
    "Remorseless Attacks": {
     "needs": 0,
@@ -1226,26 +1234,22 @@
    },
    "Seal Fate": {
     "needs": 25,
-    "points": 5
+    "points": 3
    },
    "Serrated Blades": {
-    "needs": 15,
+    "needs": 10,
     "points": 3
    },
    "Setup": {
-    "needs": 5,
+    "needs": 0,
     "points": 3
    },
-   "Thousand Cuts": {
-    "needs": 30,
-    "points": 1
-   },
    "Venom": {
-    "needs": 30,
+    "needs": 20,
     "points": 1
    },
    "Vigor": {
-    "needs": 20,
+    "needs": 10,
     "points": 2
    },
    "Vile Poisons": {
@@ -1253,7 +1257,7 @@
     "points": 5
    },
    "Weapon Expertise": {
-    "needs": 25,
+    "needs": 15,
     "points": 2
    }
   },
@@ -1273,6 +1277,10 @@
    "Call of Flame": {
     "needs": 5,
     "points": 3
+   },
+   "Call of Thunder": {
+    "needs": 20,
+    "points": 1
    },
    "Concussion": {
     "needs": 0,
@@ -1305,10 +1313,6 @@
    "Elemental Fury": {
     "needs": 25,
     "points": 5
-   },
-   "Elemental Mastery": {
-    "needs": 30,
-    "points": 1
    },
    "Elemental Reach": {
     "needs": 20,
@@ -1343,7 +1347,7 @@
     "points": 3
    },
    "Improved Ghost Wolf": {
-    "needs": 5,
+    "needs": 15,
     "points": 2
    },
    "Improved Healing Wave": {
@@ -1362,8 +1366,8 @@
     "needs": 20,
     "points": 2
    },
-   "Lava Burst": {
-    "needs": 20,
+   "Lightning Mastery": {
+    "needs": 30,
     "points": 1
    },
    "Lightning Overload": {
@@ -1692,7 +1696,7 @@
    },
    "Bloodthrill": {
     "needs": 20,
-    "points": 5
+    "points": 2
    },
    "Booming Voice": {
     "needs": 0,
@@ -1727,12 +1731,12 @@
     "points": 5
    },
    "Enrage": {
-    "needs": 15,
+    "needs": 10,
     "points": 5
    },
    "Flurry": {
     "needs": 25,
-    "points": 5
+    "points": 3
    },
    "Focused Rage": {
     "needs": 20,
@@ -1743,7 +1747,7 @@
     "points": 3
    },
    "Gore Drinker": {
-    "needs": 25,
+    "needs": 20,
     "points": 2
    },
    "Impale": {
@@ -1812,11 +1816,15 @@
    },
    "Improved Tactical Mastery": {
     "needs": 5,
-    "points": 5
+    "points": 3
    },
    "Improved Thunder Clap": {
     "needs": 5,
     "points": 3
+   },
+   "Improved Whirlwind": {
+    "needs": 25,
+    "points": 2
    },
    "Iron Will": {
     "needs": 0,
@@ -1842,7 +1850,7 @@
     "needs": 10,
     "points": 1
    },
-   "Raging Blows": {
+   "Reckless Swings": {
     "needs": 15,
     "points": 1
    },

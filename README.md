@@ -40,7 +40,7 @@ Hold Shift as you open a trainer, vendor, bank or mailbox to do it yourself that
 
 - **Combat bars.** A swing timer (Blizzard's bars restyled, or Headstart's own), a range bar that says Melee range, In range, Charge range, Dead zone or Out of range and how many yards your target is away (or those yards on their own, where you like), health, power and combo point bars, and a cast bar, all in one look. Which ones show is each character's own.
 - **Trinket buttons** with your other trinkets a click away, and keys for the game's equipment sets.
-- **Talent builds:** for every class on Forever's own trees, a levelling build and builds for a role at 60 - tank, healer, damage - each point in order, with the trees beside it (QoL, Talents). Follow one and your talent points notice says what's next. Before level 10 your talent key opens them too.
+- **Talent builds:** for every class on Forever's own trees, a levelling build and builds for a role at 60 - tank, healer, damage, and four PvP builds for the rogue - each point in order, with the trees beside it (QoL, Talents). Follow one and your talent points notice says what's next. Before level 10 your talent key opens them too.
 - **Quests on NPC tooltips:** hover an NPC to see the quests it has for you - from your route, and from what it offered when you talked to it.
 - **Quest item buttons:** the rewards quests gave you that you use - Really Sticky Glue, a Sprouted Frond - as buttons on screen, with their cooldowns, so they needn't go on your bars.
 - **Quest mob markers:** a sword on the nameplates of the enemies your quests still need - to kill, or for what they drop.

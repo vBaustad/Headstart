@@ -1,4 +1,4 @@
-"""Talent trees and builds for Headstart, from Forever's client data (the trait system, live build 1.60.1.70707).
+"""Talent trees and builds for Headstart, from Forever's client data (the trait system, live build 1.60.1.70755).
 
     python tools/talents_gen.py        (needs S:/forever-data/db/forever.duckdb)
 
@@ -7,7 +7,8 @@ and the node it needs at full rank) and Data/TalentBuilds.lua (Headstart's sugge
 order they are taken, levels 10 to 60). The builds are written below by talent name and checked here against the
 tree as the game has it: 5 points in a tab per row, a needed talent at full rank first, no talent past its ranks,
 51 points. They are Headstart's own suggestions for levelling (the owner, 2026-10-20: "start - I have no builds"),
-and for a role at 60 - tank, healer, damage (ROLE_BUILDS) - not anyone's published builds.
+and for a role at 60 - tank, healer, damage (ROLE_BUILDS) - with two kinds of exception the owner chose: the druid's
+levelling build is Snupy's (2026-11-02), and the rogue's PvP builds (PVP_BUILDS) are a rogue PvP video's (2026-11-04).
 """
 import os
 import sys
@@ -17,9 +18,10 @@ import duckdb
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = "S:/forever-data/db/forever.duckdb"
-# the hotfixed trees: 70707's client files still hold the old ones (the druid and paladin trees changed by hotfix alone)
-S = "wowf_1_60_1_70707"
-BUILD = "1.60.1.70707"
+# the hotfixed trees: the client files don't hold them (the druid and paladin trees changed by hotfix alone on 70707, the
+# rogue, warrior and shaman trees on 70755 - the rogue's rework came the night before launch, push 113483)
+S = "wowf_1_60_1_70755"
+BUILD = "1.60.1.70755"
 # each tree's skill line (skilllinextraittree) is a class: Classic's class IDs
 CLASS_OF_LINE = {26: 1, 184: 2, 50: 3, 38: 4, 613: 5, 373: 7, 237: 8, 354: 9, 574: 11}
 CLASS_MASK = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16, 7: 64, 8: 128, 9: 256, 11: 1024}
@@ -47,12 +49,14 @@ BUILDS = {
         ("Bestial Wrath", 1),
         ("Lethal Attacks", 5), ("Efficiency", 5), ("Improved Arcane Shot", 5), ("Trueshot Aura", 1), ("Rapid Killing", 2),
         ("Hawk Eye", 2)])],
-    4: [("level", "Levelling: Combat, then Assassination", "Combat to Adrenaline Rush with two weapons, then Assassination for crits and combo points.", [
-        ("Improved Sinister Strike", 2), ("Improved Eviscerate", 3), ("Precision", 3), ("Combat::Deflection", 2), ("Endurance", 2),
-        ("Lightning Reflexes", 3), ("Dual Wield Specialization", 5), ("Blade Flurry", 1), ("Hack and Slash", 5),
-        ("Weapon Expertise", 2), ("Aggression", 2), ("Adrenaline Rush", 1),
-        ("Malice", 5), ("Ruthlessness", 3), ("Murder", 2), ("Relentless Strikes", 1), ("Lethality", 5),
-        ("Improved Slice and Dice", 3), ("Cold Blood", 1)])],
+    # (the tree of the night before launch: Efficient Strikes for a cheaper Sinister Strike, Composure for the opener
+    # out of combat at full energy, Flawless Execution for a cheaper Eviscerate)
+    4: [("level", "Levelling: Combat, then Assassination", "Combat to Adrenaline Rush with two weapons - cheaper Sinister Strike and Eviscerate, a cheaper opener - then Assassination for crits.", [
+        ("Efficient Strikes", 2), ("Coup de Grace", 3), ("Precision", 3), ("Deflection", 2), ("Composure", 2), ("Endurance", 2),
+        ("Lightning Reflexes", 1), ("Aggression", 3), ("Flawless Execution", 1), ("Weapon Expertise", 2), ("Hack and Slash", 5),
+        ("Blade Flurry", 1), ("Dual Wield Specialization", 2), ("Lightning Reflexes", 1), ("Adrenaline Rush", 1),
+        ("Malice", 5), ("Remorseless Attacks", 2), ("Ruthlessness", 3), ("Improved Slice and Dice", 3), ("Vigor", 2),
+        ("Lethality", 2), ("Cold Blood", 1), ("Improved Poisons", 2)])],
     5: [("level", "Levelling: Shadow, then Discipline", "Shadow to Shadowform - Spirit Tap keeps the mana coming - then Discipline for wanding and instants.", [
         ("Spirit Tap", 5), ("Improved Shadow Word: Pain", 2), ("Improved Mind Blast", 3), ("Mind Flay", 1),
         ("Improved Mind Flay", 2), ("Shadow Focus", 2), ("Dark Inspiration", 5), ("Vampiric Embrace", 1), ("Silence", 1),
@@ -60,11 +64,13 @@ BUILDS = {
         ("Wand Specialization", 2), ("Twin Disciplines", 5), ("Mental Strength", 3), ("Meditation", 3),
         ("Improved Power Word: Shield", 2), ("Inner Focus", 1), ("Improved Inner Fire", 3), ("Mental Strength", 1)])],
     7: [("level", "Levelling: Enhancement, then Elemental", "Enhancement to Rage of the Farseer with a two-handed weapon, then Elemental for cheaper, harder shocks.", [
-        ("Thundering Strikes", 5), ("Improved Ghost Wolf", 2), ("Mental Dexterity", 3), ("Shamanistic Focus", 1),
-        ("Elemental Weapons", 3), ("Ancestral Knowledge", 1), ("Flurry", 5), ("Stormstrike", 1), ("Mental Quickness", 2),
-        ("Spirit Weapons", 1), ("Improved Stormstrike", 1), ("Maelstrom Weapon", 5), ("Rage of the Farseer", 1),
+        # (Improved Ghost Wolf went down to the fourth row on 70755: it comes after Stormstrike, and two more Ancestral
+        # Knowledge fill the first rows where it was)
+        ("Thundering Strikes", 5), ("Mental Dexterity", 3), ("Ancestral Knowledge", 2), ("Shamanistic Focus", 1),
+        ("Elemental Weapons", 3), ("Ancestral Knowledge", 1), ("Flurry", 5), ("Stormstrike", 1), ("Improved Ghost Wolf", 2),
+        ("Mental Quickness", 2), ("Spirit Weapons", 1), ("Improved Stormstrike", 1), ("Maelstrom Weapon", 5), ("Rage of the Farseer", 1),
         ("Convection", 5), ("Concussion", 5), ("Call of Flame", 3), ("Elemental Focus", 1), ("Reverberation", 1),
-        ("Eye of the Storm", 3), ("Elemental Devastation", 2)])],
+        ("Eye of the Storm", 3)])],
     8: [("level", "Levelling: Frost, then Arcane", "Frost to Ice Barrier - slow, freeze and kill - then Arcane for mana and Clearcasting.", [
         ("Improved Frostbolt", 5), ("Ice Shards", 5), ("Frost Channeling", 3), ("Frostbite", 3), ("Improved Frost Nova", 2),
         ("Arctic Reach", 2), ("Shatter", 3), ("Cold Snap", 1), ("Improved Cone of Cold", 1), ("Winter's Chill", 5),
@@ -93,12 +99,16 @@ ROLE_BUILDS = {
         ("Shield Specialization", 5), ("Anticipation", 5), ("Improved Revenge", 3), ("Defiance", 3), ("Last Stand", 1),
         ("Master of Defense", 2), ("Improved Sunder Armor", 3), ("Concussion Blow", 1), ("Focused Rage", 2), ("Bastion", 5),
         ("Shield Slam", 1),
-        ("Deflection", 5), ("Improved Heroic Strike", 3), ("Improved Rend", 3), ("Improved Tactical Mastery", 5),
-        ("Anger Management", 1), ("Deep Wounds", 3)]),
+        # (Improved Tactical Mastery has 3 ranks since 70755: its last two went to Improved Charge)
+        ("Deflection", 5), ("Improved Heroic Strike", 3), ("Improved Rend", 3), ("Improved Tactical Mastery", 3),
+        ("Improved Charge", 2), ("Anger Management", 1), ("Deep Wounds", 3)]),
         ("dps", "Damage: Fury", "Two weapons, Flurry and Bloodthirst, with Arms for rage and Deep Wounds.", [
+        # (since 70755 Flurry and Improved Tactical Mastery have 3 ranks: the four points went to Enrage's fifth, Reckless
+        # Swings and Improved Whirlwind, which also make the 30 in Fury that Bloodthirst needs)
         ("Cruelty", 5), ("Unbridled Wrath", 5), ("Furious Precision", 3), ("Booming Voice", 1), ("Piercing Howl", 1),
-        ("Dual Wield Specialization", 5), ("Enrage", 4), ("Death Wish", 1), ("Flurry", 5), ("Bloodthirst", 1),
-        ("Improved Heroic Strike", 3), ("Improved Rend", 3), ("Improved Tactical Mastery", 5), ("Improved Charge", 2),
+        ("Dual Wield Specialization", 5), ("Enrage", 5), ("Death Wish", 1), ("Reckless Swings", 1), ("Flurry", 3),
+        ("Improved Whirlwind", 2), ("Bloodthirst", 1),
+        ("Improved Heroic Strike", 3), ("Improved Rend", 3), ("Improved Tactical Mastery", 3), ("Improved Charge", 2),
         ("Anger Management", 1), ("Deep Wounds", 3), ("Impale", 2), ("Spearing Strike", 1)])],
     2: [("tank", "Tank: Protection", "Holy Shield, Iron Creed and Righteous Fury behind a shield, with Holy for Strength and seals.", [
         ("Redoubt", 5), ("Divine Intellect", 5), ("Precision", 3), ("Sacred Duty", 2), ("Toughness", 5),
@@ -115,11 +125,12 @@ ROLE_BUILDS = {
         ("Lethal Attacks", 5), ("Careful Aim", 5), ("Efficiency", 3), ("Rapid Killing", 2), ("Trueshot Aura", 1),
         ("Mortal Shots", 5), ("Barrage", 3), ("Rapid Recuperation", 2), ("Ranged Weapon Specialization", 5), ("Sniper Shot", 1),
         ("Deadly Aspects", 5), ("Focused Fire", 2), ("Endurance Training", 3), ("Unleashed Fury", 5), ("Beast Mastery::Ferocity", 4)])],
-    4: [("dps", "Damage: Assassination", "Mutilate with two daggers, Seal Fate and Venom, with Combat for the off-hand.", [
-        ("Malice", 5), ("Ruthlessness", 3), ("Murder", 2), ("Relentless Strikes", 1), ("Lethality", 5), ("Improved Poisons", 5),
-        ("Cold Blood", 1), ("Mutilate", 1), ("Vigor", 2), ("Seal Fate", 5), ("Venom", 1),
-        ("Improved Eviscerate", 3), ("Lightning Reflexes", 2), ("Puncturing Wounds", 3), ("Precision", 3), ("Endurance", 2),
-        ("Improved Sprint", 2), ("Dual Wield Specialization", 5)])],
+    # (since 70755 Mutilate is the bottom of the tree and needs Venom, which works through Shank)
+    4: [("dps", "Damage: Assassination", "Mutilate with two daggers, poisons, Seal Fate and Venom, with Subtlety's Opportunity and Combat for hit.", [
+        ("Malice", 5), ("Ruthlessness", 3), ("Improved Slice and Dice", 3), ("Vigor", 2), ("Lethality", 2), ("Improved Poisons", 5),
+        ("Vile Poisons", 5), ("Relentless Strikes", 5), ("Venom", 1), ("Seal Fate", 3), ("Mutilate", 1), ("Cold Blood", 1),
+        ("Opportunity", 5),
+        ("Coup de Grace", 3), ("Lightning Reflexes", 2), ("Precision", 3), ("Puncturing Wounds", 2)])],
     5: [("heal", "Healer: Holy", "Prayer of Mending, Spiritual Guidance and Spiritual Healing, with Discipline for mana and shields.", [
         ("Improved Renew", 3), ("Holy Specialization", 5), ("Divine Fury", 5), ("Inspiration", 3), ("Holy Nova", 1),
         ("Improved Healing", 3), ("Holy Binding", 1), ("Spirit of Redemption", 1), ("Spiritual Guidance", 5),
@@ -136,14 +147,17 @@ ROLE_BUILDS = {
         ("Improved Healing Wave", 5), ("Tidal Focus", 5), ("Mindfulness", 3), ("Totemic Focus", 2), ("Water Shield", 1),
         ("Healing Focus", 3), ("Tidal Mastery", 5), ("Mana Tide Totem", 1), ("Healing Way", 3), ("Nature's Swiftness", 1),
         ("Purification", 5), ("Riptide", 1),
-        ("Ancestral Knowledge", 5), ("Thundering Strikes", 5), ("Improved Ghost Wolf", 2), ("Guardian Totems", 2),
-        ("Shamanistic Focus", 1), ("Toughness", 1)]),
-        ("dps", "Damage: Elemental", "Lava Burst, Lightning Overload and Elemental Mastery, with Enhancement for crit and Intellect.", [
+        # (Improved Ghost Wolf went down to the fourth row on 70755, out of reach: it and Toughness became Totemic Focus)
+        ("Ancestral Knowledge", 5), ("Thundering Strikes", 5), ("Guardian Totems", 2), ("Shamanistic Focus", 1),
+        ("Totemic Focus", 3)]),
+        # (70755 put Call of Thunder and Lightning Mastery where Lava Burst and Elemental Mastery were)
+        ("dps", "Damage: Elemental", "Call of Thunder, Lightning Overload and Lightning Mastery, with Enhancement for crit and Intellect.", [
         ("Convection", 5), ("Concussion", 5), ("Elemental Alacrity", 3), ("Call of Flame", 3), ("Elemental Focus", 1),
-        ("Eye of the Storm", 3), ("Lava Burst", 1), ("Lightning Overload", 3), ("Elemental Reach", 1), ("Elemental Fury", 5),
-        ("Elemental Mastery", 1),
-        ("Thundering Strikes", 5), ("Ancestral Knowledge", 5), ("Improved Ghost Wolf", 2), ("Shamanistic Focus", 1),
-        ("Guardian Totems", 2), ("Toughness", 5)])],
+        ("Eye of the Storm", 3), ("Call of Thunder", 1), ("Lightning Overload", 3), ("Elemental Reach", 1), ("Elemental Fury", 5),
+        ("Lightning Mastery", 1),
+        # (and Improved Ghost Wolf went down to the fourth row: Earth's Grasp opens it, from two of Toughness's points)
+        ("Thundering Strikes", 5), ("Ancestral Knowledge", 5), ("Shamanistic Focus", 1), ("Guardian Totems", 2),
+        ("Earth's Grasp", 2), ("Improved Ghost Wolf", 2), ("Toughness", 3)])],
     8: [("dps", "Damage: Fire", "Ignite, Critical Mass and Combustion, with Frost for hit, Ice Block and Shatter.", [
         ("Accelerant", 5), ("Ignite", 5), ("Flame Throwing", 2), ("Pyroblast", 1), ("Burning Soul", 3),
         ("Improved Scorch", 3), ("Heating Up", 1), ("Master of Elements", 3), ("Critical Mass", 3), ("Blast Wave", 1),
@@ -172,6 +186,41 @@ ROLE_BUILDS = {
         ("Nature's Focus", 5), ("Naturalist", 5), ("Natural Shapeshifter", 2), ("Reflection", 3)])],
 }
 for _cls, _extra in ROLE_BUILDS.items():
+    BUILDS[_cls] = BUILDS[_cls] + _extra
+
+# PvP builds at 60, the owner's choice (2026-11-04): the rogue's four from a rogue PvP video made the day before launch
+# (youtube.com/watch?v=9ufWTwz0Vy0, "Massive Rogue PvP Buffs in WoW: Forever + New Talents"), read point for point from
+# its talent calculator screenshots - backstab, battlegrounds, mutilate, hemorrhage. Each tab's total matched the
+# screenshot's. The video gives only the finished builds: the order here is Headstart's (the build's main tree first).
+PVP_BUILDS = {
+    4: [("pvp-backstab", "PvP: Backstab", "Daggers from stealth: Composure, Shank and Puncturing Wounds for a two-Backstab opener, with two Saps, Cold Blood and Preparation.", [
+        ("Opportunity", 3), ("Master of Deception", 2), ("Improved Ambush", 3), ("Dirty Deeds", 2), ("Initiative", 3),
+        ("Premeditation", 1), ("Camouflage", 1), ("Dirty Tricks", 2), ("Elusiveness", 2), ("Quick Getaway", 1), ("Preparation", 1),
+        ("Malice", 5), ("Improved Gouge", 3), ("Remorseless Attacks", 1), ("Improved Expose Armor", 2), ("Vigor", 2),
+        ("Lethality", 2), ("Cold Blood", 1),
+        ("Coup de Grace", 3), ("Efficient Strikes", 2), ("Puncturing Wounds", 3), ("Improved Sprint", 2), ("Endurance", 2),
+        ("Composure", 2)]),
+        ("pvp-bg", "PvP: Battlegrounds", "The backstab build for team fights: Heightened Senses and a faster getaway after Sap in place of Cold Blood and Composure.", [
+        ("Opportunity", 3), ("Master of Deception", 3), ("Improved Ambush", 3), ("Dirty Deeds", 2), ("Initiative", 3),
+        ("Premeditation", 1), ("Camouflage", 1), ("Dirty Tricks", 2), ("Elusiveness", 2), ("Quick Getaway", 2),
+        ("Heightened Senses", 2), ("Preparation", 1),
+        ("Malice", 5), ("Improved Gouge", 3), ("Improved Expose Armor", 2), ("Vigor", 2), ("Lethality", 2),
+        ("Coup de Grace", 3), ("Efficient Strikes", 2), ("Puncturing Wounds", 3), ("Improved Sprint", 2), ("Endurance", 2)]),
+        ("pvp-mutilate", "PvP: Mutilate", "Mutilate with two daggers, Seal Fate and Relentless Strikes - no Preparation, so one Vanish and one Blind.", [
+        ("Malice", 5), ("Improved Gouge", 3), ("Ruthlessness", 3), ("Vigor", 2), ("Lethality", 2), ("Cold Blood", 1),
+        ("Improved Poisons", 4), ("Relentless Strikes", 5), ("Venom", 1), ("Improved Kidney Shot", 2), ("Seal Fate", 3),
+        ("Mutilate", 1),
+        ("Coup de Grace", 3), ("Efficient Strikes", 2), ("Puncturing Wounds", 3), ("Improved Sprint", 2),
+        ("Opportunity", 5), ("Master of Deception", 1), ("Dirty Deeds", 2), ("Dirty Tricks", 1)]),
+        ("pvp-hemo", "PvP: Hemorrhage", "Hemorrhage, Ghostly Strike and Cold Blood, with Improved Sprint, two Saps and Preparation.", [
+        ("Opportunity", 3), ("Master of Deception", 2), ("Improved Ambush", 3), ("Dirty Deeds", 2), ("Serrated Blades", 3),
+        ("Initiative", 3), ("Ghostly Strike", 1), ("Elusiveness", 2), ("Premeditation", 1), ("Hemorrhage", 1),
+        ("Camouflage", 1), ("Dirty Tricks", 2), ("Quick Getaway", 1), ("Heightened Senses", 2), ("Preparation", 1),
+        ("Malice", 5), ("Improved Gouge", 3), ("Improved Expose Armor", 2), ("Vigor", 2), ("Blood Splatter", 1),
+        ("Lethality", 2), ("Cold Blood", 1),
+        ("Coup de Grace", 3), ("Efficient Strikes", 2), ("Improved Sprint", 2)])],
+}
+for _cls, _extra in PVP_BUILDS.items():
     BUILDS[_cls] = BUILDS[_cls] + _extra
 
 
